@@ -190,6 +190,12 @@ type Value struct {
 	// Inner are the wrapped values of a Wrap, or the single value under a
 	// Truncated marker.
 	Inner []ValueID
+	// MayHoldNil marks a Wrap that, on some path, holds nothing for one of
+	// its operands, which was nil there: a %w operand of fmt.Errorf, an
+	// operand of errors.Join or the field a custom Unwrap returns. Such a
+	// Wrap may not contain its inner values, so errors.Is and errors.As
+	// are not sure to find them.
+	MayHoldNil bool
 
 	// Unresolved is the kind of an Unresolved value.
 	Unresolved UnresolvedKind
@@ -226,6 +232,7 @@ type key struct {
 	wrapKind    WrapKind
 	format      string
 	inner       string
+	mayHoldNil  bool
 	unresolved  UnresolvedKind
 	detail      string
 	fn          string
@@ -246,6 +253,7 @@ func keyOf(v Value) key {
 		message:     v.Message,
 		hasMessage:  v.HasMessage,
 		wrapKind:    v.WrapKind,
+		mayHoldNil:  v.MayHoldNil,
 		format:      v.Format,
 		unresolved:  v.Unresolved,
 		detail:      v.Detail,

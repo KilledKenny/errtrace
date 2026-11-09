@@ -55,12 +55,15 @@ func TestApplyGuard(t *testing.T) {
 	unexpInfo := sents.Info(io.Var("ErrUnexpectedEOF"))
 	tbl := errset.NewTable()
 	sEOF := tbl.Intern(errset.Value{Kind: errset.Sentinel, Var: eof, Canon: eof, Fresh: true})
-	sUnexp := tbl.Intern(errset.Value{Kind: errset.Sentinel, Var: unexpected, Canon: unexpected, Fresh: unexpInfo.Fresh})
+	sUnexp := tbl.Intern(errset.Value{Kind: errset.Sentinel, Var: unexpected, Canon: unexpected, Fresh: unexpInfo.Fresh, Type: unexpInfo.Type})
+	// A Fresh Sentinel whose dynamic type errtrace does not know.
+	sUntyped := tbl.Intern(errset.Value{Kind: errset.Sentinel, Var: io.Var("ErrClosedPipe").Object().(*types.Var), Fresh: true})
 	// Values whose Canon and Fresh are set by hand (they follow from Var
 	// and are not part of a value's identity, so each needs its own Var).
 	unfresh := tbl.Intern(errset.Value{Kind: errset.Sentinel, Var: io.Var("ErrShortBuffer").Object().(*types.Var)})
 	alias := tbl.Intern(errset.Value{Kind: errset.Sentinel, Var: io.Var("ErrNoProgress").Object().(*types.Var), Canon: eof})
 	wrapped := tbl.Intern(errset.Value{Kind: errset.Wrap, WrapKind: errset.WrapErrorf, Format: "w: %w", Inner: []errset.ValueID{sEOF}})
+	wrappedMayNil := tbl.Intern(errset.Value{Kind: errset.Wrap, WrapKind: errset.WrapErrorf, Format: "w: %w", Inner: []errset.ValueID{sEOF}, MayHoldNil: true})
 	unres := tbl.Intern(errset.Value{Kind: errset.Unresolved, Unresolved: errset.Memory, Detail: "x"})
 	param := tbl.Intern(errset.Value{Kind: errset.Param, Fn: "f", Name: "err"})
 	tests := []struct {
@@ -84,6 +87,9 @@ func TestApplyGuard(t *testing.T) {
 		{"eq true keeps an unresolved value", unres, errset.Guard{Kind: errset.GuardEqual, Var: eof, Holds: true}, flow.Keep},
 		{"is false removes a wrapped sentinel", wrapped, errset.Guard{Kind: errset.GuardIs, Var: eof}, flow.Remove},
 		{"is true removes another sentinel", sUnexp, errset.Guard{Kind: errset.GuardIs, Var: eof, Canon: eof, Fresh: true, Holds: true}, flow.Remove},
+		{"is true keeps a sentinel of unknown type, which may have an Is method", sUntyped, errset.Guard{Kind: errset.GuardIs, Var: eof, Canon: eof, Fresh: true, Holds: true}, flow.Keep},
+		{"is false keeps a wrap that may hold nothing", wrappedMayNil, errset.Guard{Kind: errset.GuardIs, Var: eof}, flow.Note},
+		{"is true keeps a wrap that may hold nothing", wrappedMayNil, errset.Guard{Kind: errset.GuardIs, Var: eof, Holds: true}, flow.Keep},
 		{"nil true removes everything", unres, errset.Guard{Kind: errset.GuardNil, Holds: true}, flow.Remove},
 		{"a param is pending", param, errset.Guard{Kind: errset.GuardIs, Var: eof}, flow.Pending},
 		{"a helper notes on its false outcome", sEOF, errset.Guard{Kind: errset.GuardHelper, Detail: "guarded by call to h"}, flow.Note},

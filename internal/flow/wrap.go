@@ -137,10 +137,7 @@ func (a *analyzer) madeAt(src any, ids ...errset.ValueID) []wrapped {
 // operand's leaves are added to the analyzer's own facts, marked as cut,
 // and operand returns nothing.
 func (a *analyzer) operand(v ssa.Value, site any) []wrapped {
-	pt := a.pt
-	if instr, ok := site.(ssa.Instruction); ok && instr.Block() != nil {
-		pt = pointOf(instr)
-	}
+	pt := a.sitePoint(site)
 	if a.flat {
 		a.inner(pt, func() { a.walk(v) })
 		return nil
@@ -166,6 +163,15 @@ func (a *analyzer) operand(v ssa.Value, site any) []wrapped {
 		}
 	}
 	return out
+}
+
+// sitePoint returns the point of the instruction site, or the analyzer's
+// own point.
+func (a *analyzer) sitePoint(site any) point {
+	if instr, ok := site.(ssa.Instruction); ok && instr.Block() != nil {
+		return pointOf(instr)
+	}
+	return a.pt
 }
 
 // inner runs walk, in flat mode, for the inner values of a Wrap used at
@@ -292,13 +298,15 @@ func (a *analyzer) errorf(site any, pos token.Pos, format, args ssa.Value) {
 		}
 		operands = append(operands, a.madeAt(site, nf...))
 	}
+	mayNil := false
 	for _, op := range ops {
 		if op != nil && MayCarryError(op) {
 			operands = append(operands, a.operand(op, site))
+			mayNil = mayNil || a.mayBeNil(op, a.sitePoint(site))
 		}
 	}
 	if !a.flat {
-		a.addFacts(a.wraps(errset.Value{Site: site, Pos: pos, WrapKind: errset.WrapErrorf}, operands))
+		a.addFacts(a.wraps(errset.Value{Site: site, Pos: pos, WrapKind: errset.WrapErrorf, MayHoldNil: mayNil}, operands))
 	}
 }
 
@@ -327,9 +335,13 @@ func (a *analyzer) constErrorf(site any, pos token.Pos, format string, args ssa.
 		return
 	}
 	var operands [][]wrapped
+	mayNil := false
 	for _, i := range verbs {
 		if op := ops[i]; op != nil && MayCarryError(op) && !isNilConst(op) {
 			operands = append(operands, a.operand(op, site))
+			// fmt.Errorf drops a nil %w operand: the Wrap then holds
+			// nothing for it.
+			mayNil = mayNil || a.mayBeNil(op, a.sitePoint(site))
 		}
 	}
 	if a.flat {
@@ -339,7 +351,7 @@ func (a *analyzer) constErrorf(site any, pos token.Pos, format string, args ssa.
 		}
 		return
 	}
-	facts := a.wraps(errset.Value{Site: site, Pos: pos, WrapKind: errset.WrapErrorf, Format: format}, operands)
+	facts := a.wraps(errset.Value{Site: site, Pos: pos, WrapKind: errset.WrapErrorf, Format: format, MayHoldNil: mayNil}, operands)
 	if len(facts) == 0 {
 		// Every %w operand is nil or not an error: the result wraps
 		// nothing and is as opaque as errors.New.
@@ -375,11 +387,20 @@ func (a *analyzer) join(call *ssa.Call, args ssa.Value) {
 		return
 	}
 	var operands [][]wrapped
+	n, mayNil := 0, false
 	for _, op := range ops {
 		if op != nil {
 			operands = append(operands, a.operand(op, call))
 		}
+		if op != nil && !isNilConst(op) {
+			n++
+			mayNil = mayNil || a.mayBeNil(op, pointOf(call))
+		}
 	}
+	// errors.Join drops nil operands. With one operand left that may be
+	// nil, the result is nil or holds it; with more, the Wrap may hold
+	// only some of them.
+	base.MayHoldNil = n > 1 && mayNil
 	if !a.flat {
 		a.addFacts(a.wraps(base, operands))
 	}
@@ -421,19 +442,24 @@ func (a *analyzer) constructed(typ types.Type, alloc *ssa.Alloc) {
 	}
 	before, revisits := len(a.facts), a.revisits
 	var operands [][]wrapped
-	stored := fieldStores(alloc, m.field)
+	stores := fieldStores(alloc, m.field)
+	// The field is nil on a path with no store to it. With more than one
+	// store, the slice of Unwrap() []error is one of them, not all.
+	base.MayHoldNil = !a.storedOnEveryPath(stores) || (m.multi && len(stores) > 1)
 	if !m.multi {
 		var vals []wrapped
-		for _, v := range stored {
-			vals = append(vals, a.operand(v, alloc)...)
+		for _, st := range stores {
+			vals = append(vals, a.operand(st.Val, alloc)...)
+			base.MayHoldNil = base.MayHoldNil || a.mayBeNil(st.Val, pointOf(st))
 		}
 		operands = append(operands, vals)
 	} else {
-		for _, v := range stored {
-			if elems, ok := sliceElems(v); ok {
+		for _, st := range stores {
+			if elems, ok := sliceElems(st.Val); ok {
 				for _, e := range elems {
 					if e != nil {
 						operands = append(operands, a.operand(e, alloc))
+						base.MayHoldNil = base.MayHoldNil || a.mayBeNil(e, pointOf(st))
 					}
 				}
 				continue
@@ -462,10 +488,10 @@ func (a *analyzer) constructed(typ types.Type, alloc *ssa.Alloc) {
 	a.addFacts(facts)
 }
 
-// fieldStores returns the values stored to field f of the struct that
-// alloc allocates.
-func fieldStores(alloc *ssa.Alloc, f int) []ssa.Value {
-	var out []ssa.Value
+// fieldStores returns the stores to field f of the struct that alloc
+// allocates.
+func fieldStores(alloc *ssa.Alloc, f int) []*ssa.Store {
+	var out []*ssa.Store
 	for _, r := range *alloc.Referrers() {
 		fa, ok := r.(*ssa.FieldAddr)
 		if !ok || fa.X != alloc || fa.Field != f {
@@ -473,11 +499,151 @@ func fieldStores(alloc *ssa.Alloc, f int) []ssa.Value {
 		}
 		for _, rr := range *fa.Referrers() {
 			if st, ok := rr.(*ssa.Store); ok && st.Addr == fa {
-				out = append(out, st.Val)
+				out = append(out, st)
 			}
 		}
 	}
 	return out
+}
+
+// storedOnEveryPath reports whether one of stores is made on every path
+// to the analyzer's point: its block dominates the point's, and, in the
+// block of the instruction the analyzer walks for, comes before it.
+func (a *analyzer) storedOnEveryPath(stores []*ssa.Store) bool {
+	b := a.pt.b
+	if b == nil {
+		return false
+	}
+	for _, st := range stores {
+		sb := st.Block()
+		if sb == nil || !sb.Dominates(b) {
+			continue
+		}
+		if sb == b && a.pt.edgeTo == nil && a.at != nil && a.at.Block() == b && !before(st, a.at) {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+// before reports whether instruction x comes before y in their block.
+func before(x, y ssa.Instruction) bool {
+	for _, instr := range x.Block().Instrs {
+		switch instr {
+		case x:
+			return true
+		case y:
+			return false
+		}
+	}
+	return false
+}
+
+// mayBeNil reports whether v may be nil when it is used at pt, unless
+// errtrace can prove it is not: nil itself, a Phi with an edge that may be
+// nil, a call that is not an intrinsic which never returns nil, a
+// parameter, a load other than of a Sentinel that is never nil, and any
+// other value errtrace does not model. A check that holds at pt can
+// prove v non-nil (err != nil, errors.Is(err, io.EOF); see provesNonNil).
+// A conversion to an interface (a typed nil
+// included), a new allocation, errors.New and fmt.Errorf are never nil.
+func (a *analyzer) mayBeNil(v ssa.Value, pt point) bool {
+	return a.nilWalk(v, pt, make(map[nilKey]bool), 0)
+}
+
+type nilKey struct {
+	v  ssa.Value
+	pt point
+}
+
+func (a *analyzer) nilWalk(v ssa.Value, pt point, seen map[nilKey]bool, depth int) bool {
+	if depth > 4*maxDynDepth {
+		return true
+	}
+	k := nilKey{v, pt}
+	if seen[k] {
+		// A cycle (of Phis or Sentinels) adds no value of its own.
+		return false
+	}
+	seen[k] = true
+	if a.fn != nil && a.fn.Blocks != nil && v.Parent() == a.fn && a.funcGuards().isNonNil(pt, v) {
+		return false
+	}
+	switch v := v.(type) {
+	case *ssa.Const:
+		return v.IsNil()
+	case *ssa.Phi:
+		for i, e := range v.Edges {
+			if a.nilWalk(e, point{b: v.Block().Preds[i], edgeTo: v.Block()}, seen, depth+1) {
+				return true
+			}
+		}
+		return false
+	case *ssa.ChangeInterface:
+		return a.nilWalk(v.X, pt, seen, depth+1)
+	case *ssa.ChangeType:
+		return a.nilWalk(v.X, pt, seen, depth+1)
+	case *ssa.MakeInterface, *ssa.Alloc:
+		return false
+	case *ssa.UnOp:
+		if g, ok := v.X.(*ssa.Global); ok && v.Op == token.MUL {
+			return a.globalMayBeNil(g, seen, depth+1)
+		}
+	case *ssa.Call:
+		common := v.Common()
+		name, ok := Intrinsic(common.StaticCallee())
+		if !ok {
+			return true
+		}
+		switch name {
+		case "errors.New", "fmt.Errorf":
+			return false
+		case "errtrace.Wrap":
+			return a.nilWalk(common.Args[0], pointOf(v), seen, depth+1)
+		case "errors.Join":
+			ops, ok := VarargsOperands(common.Args[0])
+			if !ok {
+				return true
+			}
+			for _, op := range ops {
+				if op != nil && !a.nilWalk(op, pointOf(v), seen, depth+1) {
+					return false
+				}
+			}
+			return true
+		}
+	}
+	return true
+}
+
+// globalMayBeNil reports whether the package-level variable g may hold
+// nil: unless its value is a Fresh pointer, or every store of its
+// initialization gives a value that is never nil, and it is not stored to
+// elsewhere.
+func (a *analyzer) globalMayBeNil(g *ssa.Global, seen map[nilKey]bool, depth int) bool {
+	s := a.sentinels()
+	inf := s.Info(g)
+	switch {
+	case inf.Unstable:
+		return true
+	case inf.Fresh:
+		return false
+	}
+	canon := inf.Canon
+	if canon == nil {
+		canon = g
+	}
+	stores := s.initStores[canon]
+	if len(stores) == 0 {
+		return true
+	}
+	for _, st := range stores {
+		if a.nilWalk(st.Val, pointOf(st), seen, depth) {
+			return true
+		}
+	}
+	return false
 }
 
 // sliceElems returns the elements of a slice literal ([]error{a, b}).

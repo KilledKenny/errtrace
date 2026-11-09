@@ -1,0 +1,35 @@
+errors.Is through a custom Unwrap whose field always holds io.EOF: where the check fails the wrapper is removed.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:17:12-13: Error Set of example.com/fx.G: 0 entries
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"io"
+)
+
+type W struct{ inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.inner }
+
+func source() error {
+	return &W{inner: io.EOF}
+}
+
+func /*@g*/G() error {
+	err := source()
+	if errors.Is(err, io.EOF) {
+		return nil
+	}
+	return err
+}

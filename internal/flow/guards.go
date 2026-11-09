@@ -53,11 +53,14 @@ type point struct {
 type funcGuards struct {
 	conds map[*ssa.BasicBlock][]condGuard
 	at    map[point][]guardUse
+	// nonNil are, per point asked for, the values that a check that
+	// holds there proves non-nil (see provesNonNil).
+	nonNil map[point][]ssa.Value
 }
 
 // newFuncGuards recognises the guards of fn's Ifs.
 func newFuncGuards(fn *ssa.Function, sents *Sentinels) *funcGuards {
-	gd := &funcGuards{conds: make(map[*ssa.BasicBlock][]condGuard), at: make(map[point][]guardUse)}
+	gd := &funcGuards{conds: make(map[*ssa.BasicBlock][]condGuard), at: make(map[point][]guardUse), nonNil: make(map[point][]ssa.Value)}
 	n := 0
 	for _, b := range fn.Blocks {
 		if len(b.Instrs) == 0 {
@@ -79,7 +82,8 @@ func newFuncGuards(fn *ssa.Function, sents *Sentinels) *funcGuards {
 // guardsAt returns the guards that hold at pt: those of the Ifs whose
 // block strictly dominates pt's block through a successor that dominates
 // it and is entered only from that If, and, for a Phi edge, that of the
-// predecessor's If whose one branch is the edge.
+// predecessor's If whose one branch is the edge. A check err != nil that
+// holds changes no abstract value and is left out; isNonNil uses it.
 func (gd *funcGuards) guardsAt(pt point) []guardUse {
 	if pt.b == nil {
 		return nil
@@ -88,12 +92,15 @@ func (gd *funcGuards) guardsAt(pt point) []guardUse {
 		return out
 	}
 	var out []guardUse
+	var nonNil []ssa.Value
 	add := func(b *ssa.BasicBlock, outcome bool) {
 		for _, cg := range gd.conds[b] {
 			g := cg.g
 			g.Holds = outcome == cg.positive
+			if provesNonNil(g) {
+				nonNil = append(nonNil, cg.raw, cg.operand)
+			}
 			if g.Kind == errset.GuardNil && !g.Holds {
-				// err != nil changes no abstract value.
 				continue
 			}
 			id := 2 * cg.id
@@ -126,8 +133,34 @@ func (gd *funcGuards) guardsAt(pt point) []guardUse {
 			add(b, false)
 		}
 	}
-	gd.at[pt] = out
+	gd.at[pt], gd.nonNil[pt] = out, nonNil
 	return out
+}
+
+// provesNonNil reports whether the check of g, as it went, proves the
+// tested value non-nil: err != nil, a type assertion or errors.As that
+// succeeded, or err == X or errors.Is(err, X) that holds for a Sentinel X
+// that is never nil (Fresh and not reassigned).
+func provesNonNil(g errset.Guard) bool {
+	switch g.Kind {
+	case errset.GuardNil:
+		return !g.Holds
+	case errset.GuardAssert, errset.GuardAs:
+		return g.Holds
+	case errset.GuardEqual, errset.GuardIs:
+		return g.Holds && g.Fresh && !g.Unstable
+	}
+	return false
+}
+
+// isNonNil reports whether a check that holds at pt proves v non-nil
+// there (see provesNonNil).
+func (gd *funcGuards) isNonNil(pt point, v ssa.Value) bool {
+	if pt.b == nil {
+		return false
+	}
+	gd.guardsAt(pt)
+	return slices.Contains(gd.nonNil[pt], v)
 }
 
 // stripConv removes ChangeInterface and ChangeType conversions from v.
@@ -268,10 +301,7 @@ func (a *analyzer) matchGuards(v ssa.Value) {
 	if a.fn == nil || a.fn.Blocks == nil {
 		return
 	}
-	if a.gd == nil {
-		a.gd = newFuncGuards(a.fn, a.sentinels())
-	}
-	for _, u := range a.gd.guardsAt(a.pt) {
+	for _, u := range a.funcGuards().guardsAt(a.pt) {
 		if u.raw != v && u.operand != v {
 			continue
 		}
@@ -280,6 +310,15 @@ func (a *analyzer) matchGuards(v ssa.Value) {
 			a.guards = slices.Insert(slices.Clip(a.guards), i, u)
 		}
 	}
+}
+
+// funcGuards returns the guards of the analyzer's function, shared with
+// its child analyzers.
+func (a *analyzer) funcGuards() *funcGuards {
+	if a.gd == nil {
+		a.gd = newFuncGuards(a.fn, a.sentinels())
+	}
+	return a.gd
 }
 
 // guardsKey names the analyzer's current guards, for its seen set.
@@ -346,8 +385,14 @@ func Decide(tbl *errset.Table, id errset.ValueID, g errset.Guard) (Verdict, stri
 			if verdict, why := equalVerdict(v, g); verdict != No {
 				return verdict, why
 			}
-			if t := nodeType(v); t != nil && hasMethod(t, "Is") {
+			t := nodeType(v)
+			if t != nil && hasMethod(t, "Is") {
 				return Maybe, "custom Is method of " + typeString(t)
+			}
+			if t == nil && v.Kind == errset.Sentinel {
+				// Its type, which errtrace does not know, may have an
+				// Is method that matches.
+				return Maybe, "sentinel " + qualifiedName(v.Var) + " of unknown dynamic type may have a custom Is method"
 			}
 			return No, ""
 		})
@@ -380,12 +425,14 @@ func decideTop(tbl *errset.Table, id errset.ValueID, node func(errset.Value) (Ve
 }
 
 // decideTree decides a check that is true if it is true for any node of
-// the value's Wrap Chains (errors.Is, errors.As).
+// the value's Wrap Chains (errors.Is, errors.As). A node below a Wrap that
+// may hold nothing for one of its operands (MayHoldNil) may not be in the
+// chain at run time, so the check being true for it gives only Maybe.
 func decideTree(tbl *errset.Table, id errset.ValueID, node func(errset.Value) (Verdict, string)) (Verdict, string) {
 	found, unknown := false, false
 	maybe := ""
-	var walk func(errset.ValueID)
-	walk = func(id errset.ValueID) {
+	var walk func(errset.ValueID, bool)
+	walk = func(id errset.ValueID, mayBeMissing bool) {
 		v := tbl.Get(id)
 		var verdict Verdict
 		why := ""
@@ -399,6 +446,9 @@ func decideTree(tbl *errset.Table, id errset.ValueID, node func(errset.Value) (V
 		default:
 			verdict, why = node(v)
 		}
+		if verdict == Yes && mayBeMissing {
+			verdict, why = Maybe, "wrapped value may be nil"
+		}
 		switch verdict {
 		case Yes:
 			found = true
@@ -409,11 +459,12 @@ func decideTree(tbl *errset.Table, id errset.ValueID, node func(errset.Value) (V
 				maybe = why
 			}
 		}
+		below := mayBeMissing || (v.Kind == errset.Wrap && v.MayHoldNil)
 		for _, in := range v.Inner {
-			walk(in)
+			walk(in, below)
 		}
 	}
-	walk(id)
+	walk(id, false)
 	switch {
 	case found:
 		return Yes, ""

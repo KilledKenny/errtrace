@@ -107,7 +107,7 @@ func Dedup(t *Table, entries []Entry) []Entry {
 			return n
 		}
 		v := t.Get(w)
-		v.Inner = nil
+		v.Inner, v.MayHoldNil = nil, false
 		k := keyOf(v)
 		n, ok := shown[k]
 		if !ok {
