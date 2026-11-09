@@ -1,0 +1,33 @@
+A generic declaration Target: its Funcs are the instances, sorted by name.
+-- args --
+-debug=target a.go:@map
+-- stdout --
+-- stderr --
+target: declaration example.com/fx.Map funcs=[example.com/fx.Map[int] example.com/fx.Map[string]] span=$WORK/a.go:3:14-17
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+func /*@map*/Map[T any](xs []T, f func(T) (T, error)) ([]T, error) {
+	out := make([]T, 0, len(xs))
+	for _, x := range xs {
+		y, err := f(x)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, y)
+	}
+	return out, nil
+}
+
+func Use() error {
+	_, err := Map([]string{"a"}, func(s string) (string, error) { return s, nil })
+	if err != nil {
+		return err
+	}
+	_, err = Map([]int{1}, func(i int) (int, error) { return i, nil })
+	return err
+}

@@ -1,0 +1,23 @@
+A call-site Target on the Sel of a selector, inside a defer statement.
+-- args --
+-debug=target a.go:@sel
+-- stdout --
+-- stderr --
+target: call-site call to f.Close in example.com/fx.Load funcs=[example.com/fx.Load] span=$WORK/a.go:10:8-25
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "os"
+
+func Load(name string) error {
+	f, err := os.Open(name)
+	if err != nil {
+		return err
+	}
+	defer f./*@sel*/Close()
+	return nil
+}

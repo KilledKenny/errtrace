@@ -1,0 +1,18 @@
+A declaration Target on a method name: -debug=target describes it.
+-- args --
+-debug=target,timing a.go:@m
+-- stdout --
+-- stderr --
+target: declaration (*example.com/fx.T).Get funcs=[(*example.com/fx.T).Get] span=$WORK/a.go:7:19-22
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "io"
+
+type T struct{}
+
+func (t *T) /*@m*/Get() error { return io.EOF }

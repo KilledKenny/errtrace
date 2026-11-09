@@ -30,6 +30,7 @@ import (
 
 	"golang.org/x/tools/txtar"
 
+	"github.com/killedKenny/errtrace/internal/load"
 	"github.com/killedKenny/errtrace/internal/span"
 )
 
@@ -334,4 +335,59 @@ func rewrite(ar *txtar.Archive, res Result) []byte {
 		seen[name] = true
 	}
 	return txtar.Format(out)
+}
+
+// Loaded is a fixture module loaded with LoadProgram.
+type Loaded struct {
+	// Program is the loaded SSA program.
+	*load.Program
+	// Dir is the temporary module directory.
+	Dir string
+
+	ar *txtar.Archive
+}
+
+// LoadProgram writes the module files of the txtar fixture at path into a
+// temporary directory and loads every package in it (./...) the way the CLI
+// does, for unit tests that need a load.Program without running a Query.
+func LoadProgram(t *testing.T, path string) *Loaded {
+	t.Helper()
+	dir, ar := Extract(t, path)
+	prog, err := load.Load(t.Context(), load.Config{Dir: dir, Env: Env()})
+	if err != nil {
+		t.Fatalf("%s: %v", path, err)
+	}
+	return &Loaded{Program: prog, Dir: dir, ar: ar}
+}
+
+// Extract writes the module files of the txtar fixture at path into a new
+// temporary directory and returns the directory and the parsed archive.
+func Extract(t *testing.T, path string) (string, *txtar.Archive) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ar := txtar.Parse(data)
+	dir := t.TempDir()
+	if err := writeFiles(dir, ar); err != nil {
+		t.Fatalf("%s: %v", path, err)
+	}
+	return dir, ar
+}
+
+// Pos returns the point span named by ref, a "file.go:@name" marker
+// reference (or any position the span grammar accepts), resolved against
+// the module directory. It fails the test if ref is malformed.
+func (l *Loaded) Pos(t *testing.T, ref string) span.Span {
+	t.Helper()
+	args, err := substitute(ref, l.ar)
+	if err != nil || len(args) != 1 {
+		t.Fatalf("bad position reference %q: %v", ref, err)
+	}
+	s, err := span.Parse(args[0], l.Dir)
+	if err != nil {
+		t.Fatalf("bad position reference %q: %v", ref, err)
+	}
+	return s
 }

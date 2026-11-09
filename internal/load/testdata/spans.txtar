@@ -1,0 +1,30 @@
+A fixture for FileFor and the span lookups, with an in-package test file.
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var ErrBad = errors.New("bad")
+
+type MyErr struct{}
+
+func (*MyErr) Error() string { return "my" }
+
+func F(b bool) error {
+	if b {
+		return &MyErr{}
+	}
+	return g()
+}
+
+func g() error { return ErrBad }
+-- a_test.go --
+package fx
+
+import "testing"
+
+func TestF(t *testing.T) { _ = F(false) }

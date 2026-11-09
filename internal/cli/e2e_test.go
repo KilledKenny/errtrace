@@ -46,5 +46,16 @@ func runCLI(t *testing.T, inv fixture.Invocation) fixture.Result {
 		Stdout: &stdout,
 		Stderr: &stderr,
 	})
-	return fixture.Result{Stdout: stdout.String(), Stderr: stderr.String(), Exit: code}
+	return fixture.Result{Stdout: stdout.String(), Stderr: stripTiming(stderr.String()), Exit: code}
+}
+
+// stripTiming drops the -debug=timing lines, which vary from run to run.
+func stripTiming(s string) string {
+	var b strings.Builder
+	for _, line := range strings.SplitAfter(s, "\n") {
+		if !strings.HasPrefix(line, "timing:") {
+			b.WriteString(line)
+		}
+	}
+	return b.String()
 }

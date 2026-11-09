@@ -1,10 +1,10 @@
+The -tags and -p flags are accepted and passed to package loading.
 -- args --
 -tags=foo -p ./... a.go:@f
 -- stdout --
 -- stderr --
-errtrace: not implemented
 -- exit --
-2
+0
 -- go.mod --
 module example.com/fx
 

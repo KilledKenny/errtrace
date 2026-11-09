@@ -1,0 +1,18 @@
+A type error in a loaded package: the load fails with its position.
+-- args --
+a.go:@f
+-- stdout --
+-- stderr --
+errtrace: $WORK/a.go:4:9: undefined: undefinedThing
+-- exit --
+2
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+func /*@f*/F() error {
+	return undefinedThing
+}

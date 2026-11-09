@@ -1,0 +1,11 @@
+A fixture whose package does not type-check.
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+func F() error {
+	return undefinedThing
+}

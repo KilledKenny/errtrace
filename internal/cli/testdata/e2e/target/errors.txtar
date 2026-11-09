@@ -1,0 +1,19 @@
+A position on a variable is neither a declaration nor a call.
+-- args --
+-debug=target a.go:@v
+-- stdout --
+-- stderr --
+errtrace: $WORK/a.go:4:12: no function declaration or call at position
+-- exit --
+2
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+func F() error {
+	var /*@v*/v error
+	return v
+}

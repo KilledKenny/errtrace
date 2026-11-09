@@ -1,0 +1,82 @@
+Fixture for target.Resolve unit tests: each /*@marker*/ is a position
+the tests resolve.
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var ErrBad = errors.New("bad")
+
+/*@ws*/
+
+/*@decl_kw*/func /*@decl_name*/Load(name string) error {
+	var /*@variable*/v int
+	_ = v
+	_ = /*@len*/len(name)
+	_ = /*@noerr*/count()
+	_ = /*@conv*/MyErr(MyErr{})
+	return /*@callee*/helper/*@lparen*/()
+}
+
+func helper() error { return ErrBad }
+
+func count() int { return 0 }
+
+type MyErr struct{}
+
+func (MyErr) Error() string { return "my" }
+
+type T struct{}
+
+func (t *T) /*@ptr_method*/M() error { return nil }
+
+func (t T) /*@val_method*/V() error { return nil }
+
+type Getter interface {
+	/*@iface_method*/Get() error
+}
+
+func Use(t *T, g Getter) error {
+	_ = t./*@sel*/M()
+	return g.Get()
+}
+
+func Closure() func() error {
+	return /*@closure_kw*/func() error { return ErrBad }
+}
+
+func Stmts() {
+	/*@defer_kw*/defer /*@defer*/helper()
+	go /*@go*/helper()
+}
+
+func /*@generic_decl*/Map[T any](xs []T, f func(T) (T, error)) ([]T, error) {
+	var out []T
+	for _, x := range xs {
+		y, err := /*@in_generic*/f(x)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, y)
+	}
+	return out, nil
+}
+
+func Callers() error {
+	_, err := /*@generic_call*/Map([]int{1}, func(i int) (int, error) { return i, nil })
+	if err != nil {
+		return err
+	}
+	_, err = /*@generic_call_explicit*/Map[string]([]string{"a"}, func(s string) (string, error) { return s, nil })
+	return err
+}
+-- ignored.go --
+//go:build ignore
+
+package fx
+
+func /*@ignored*/Ignored() error { return nil }

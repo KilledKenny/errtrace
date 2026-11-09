@@ -3,8 +3,12 @@ package cli
 import (
 	"bytes"
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/killedKenny/errtrace/internal/fixture"
 )
 
 func runInProcess(t *testing.T, args ...string) (stdout, stderr string, code int) {
@@ -61,8 +65,30 @@ func TestUsageOnlyForUsageErrors(t *testing.T) {
 }
 
 func TestDebugModes(t *testing.T) {
-	_, stderr, _ := runInProcess(t, "-debug=target,timing,summary", "a.go:1:1")
-	if stderr != BinaryName+": not implemented\n" {
-		t.Errorf("valid -debug list: stderr = %q", stderr)
+	dir := t.TempDir()
+	files := map[string]string{
+		"go.mod": "module example.com/fx\n\ngo 1.24\n",
+		"a.go":   "package fx\n\nfunc F() error { return nil }\n",
+	}
+	for name, data := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(data), 0o666); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var out, errb bytes.Buffer
+	code := Run(context.Background(), Options{
+		Args:   []string{"-debug=target,timing,summary", "a.go:3:6"},
+		Dir:    dir,
+		Env:    fixture.Env(),
+		Stdout: &out,
+		Stderr: &errb,
+	})
+	if code != ExitOK || out.String() != "" {
+		t.Errorf("valid -debug list: code %d, stdout %q; want 0 and empty stdout", code, out.String())
+	}
+	lines := strings.Split(strings.TrimSuffix(errb.String(), "\n"), "\n")
+	if len(lines) != 2 || !strings.HasPrefix(lines[0], "timing: load=") || !strings.Contains(lines[0], " ssa=") ||
+		!strings.HasPrefix(lines[1], "target: declaration example.com/fx.F funcs=[example.com/fx.F] span=") {
+		t.Errorf("valid -debug list: stderr = %q, want a timing line and a target line", errb.String())
 	}
 }

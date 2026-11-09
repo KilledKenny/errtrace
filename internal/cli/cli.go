@@ -12,7 +12,9 @@ import (
 	"os/signal"
 	"strings"
 
+	"github.com/killedKenny/errtrace/internal/load"
 	"github.com/killedKenny/errtrace/internal/span"
+	"github.com/killedKenny/errtrace/internal/target"
 )
 
 // Exit codes, as in gopls.
@@ -93,7 +95,7 @@ func Run(ctx context.Context, opts Options) int {
 	return ExitError
 }
 
-func run(_ context.Context, opts Options, fs *flag.FlagSet, cfg *config) error {
+func run(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) error {
 	if err := fs.Parse(opts.Args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return err
@@ -108,11 +110,48 @@ func run(_ context.Context, opts Options, fs *flag.FlagSet, cfg *config) error {
 	if fs.NArg() != 1 {
 		return usageError{fmt.Errorf("expected exactly one Target argument, got %d", fs.NArg())}
 	}
-	if _, err := span.Parse(fs.Arg(0), opts.Dir); err != nil {
+	pos, err := span.Parse(fs.Arg(0), opts.Dir)
+	if err != nil {
 		return err
 	}
-	// Package loading and the Query itself come in later steps.
-	return errors.New("not implemented")
+	prog, err := load.Load(ctx, load.Config{
+		Dir:        opts.Dir,
+		Env:        opts.Env,
+		Tags:       splitList(cfg.tags),
+		Patterns:   splitList(cfg.patterns),
+		TargetFile: pos.File,
+	})
+	if err != nil {
+		return err
+	}
+	if cfg.debug["timing"] {
+		fmt.Fprintf(opts.Stderr, "timing: load=%s ssa=%s\n", prog.Timing.Load, prog.Timing.SSA)
+	}
+	tgt, err := target.Resolve(prog, pos)
+	if err != nil {
+		return err
+	}
+	if cfg.debug["target"] {
+		names := make([]string, len(tgt.Funcs))
+		for i, fn := range tgt.Funcs {
+			names[i] = fn.String()
+		}
+		fmt.Fprintf(opts.Stderr, "target: %s %s funcs=[%s] span=%s\n",
+			tgt.Kind, tgt.Name, strings.Join(names, " "), tgt.Span)
+	}
+	// The Query itself comes in later steps.
+	return nil
+}
+
+// splitList splits a comma-separated flag value, dropping empty elements.
+func splitList(value string) []string {
+	var out []string
+	for _, s := range strings.Split(value, ",") {
+		if s = strings.TrimSpace(s); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 func newFlagSet() (*flag.FlagSet, *config) {
