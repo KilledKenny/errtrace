@@ -8,11 +8,13 @@ import (
 	"github.com/killedKenny/errtrace/internal/errset"
 )
 
-// node is a fact of a summary: a value of one error result of a function.
+// node is a leaf of a fact of a summary: leaf number leaf of a value of
+// one error result of a function.
 type node struct {
 	fn     *ssa.Function
 	result int
 	value  errset.ValueID
+	leaf   int
 }
 
 // best is the best Propagation Path known to a node, and its cost.
@@ -30,8 +32,9 @@ func (a best) less(b best) bool {
 	return len(a.path) < len(b.path)
 }
 
-// Path returns the best Propagation Path of a value that reaches fn with
-// the sources srcs (a fact of fn's summary, or a fact from SiteFacts): the
+// Path returns the best Propagation Path of a leaf that reaches fn with
+// the sources srcs (a leaf of a fact of fn's summary, or of a fact from
+// SiteFacts): the
 // one with the fewest dynamic hops, then the fewest hops, with ties going
 // to the first-ranked source. It runs from the place the value enters the
 // innermost function up to fn. It reports false if no source leads to a
@@ -56,14 +59,16 @@ func (s *Solver) computePaths() {
 		for _, fn := range s.order {
 			for _, r := range s.sums[fn].Results {
 				for _, f := range r.Facts {
-					n := node{fn, r.Index, f.Value}
-					b, ok := s.bestOf(fn, f.Sources)
-					if !ok {
-						continue
-					}
-					if cur, known := s.paths[n]; !known || b.less(cur) {
-						s.paths[n] = b
-						changed = true
+					for k, srcs := range f.Leaves {
+						n := node{fn, r.Index, f.Value, k}
+						b, ok := s.bestOf(fn, srcs)
+						if !ok {
+							continue
+						}
+						if cur, known := s.paths[n]; !known || b.less(cur) {
+							s.paths[n] = b
+							changed = true
+						}
 					}
 				}
 			}
@@ -93,7 +98,7 @@ func (s *Solver) sourcePath(fn *ssa.Function, src Source) (best, bool) {
 	if src.Kind == Local {
 		return best{path: errset.Path{{Site: src.Site, Func: fn.String()}}}, true
 	}
-	callee, ok := s.paths[node{src.Callee, src.CalleeResult, src.CalleeValue}]
+	callee, ok := s.paths[node{src.Callee, src.CalleeResult, src.CalleeValue, src.CalleeLeaf}]
 	if !ok {
 		return best{}, false
 	}

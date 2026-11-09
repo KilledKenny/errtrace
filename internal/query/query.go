@@ -87,16 +87,20 @@ func Run(ctx context.Context, prog *load.Program, tgt *target.Target, opts Optio
 	return r, nil
 }
 
-// entries flattens the facts that reach fn at the top of the Query, each
-// with its best Propagation Path and a count of its other sources.
+// entries flattens the facts that reach fn at the top of the Query into
+// one entry per leaf, each with the best Propagation Path of that leaf and
+// a count of the leaf's other sources.
 func (r *Result) entries(solver *summary.Solver, fn *ssa.Function, facts []summary.Fact) []errset.Entry {
 	var out []errset.Entry
 	for _, f := range facts {
-		path, _ := solver.Path(fn, f.Sources)
-		for _, e := range errset.Flatten(r.Table, r.top(f.Value), path) {
-			e.MorePaths = len(f.Sources) - 1
-			out = append(out, e)
+		entries := errset.Flatten(r.Table, r.top(f.Value))
+		for k := range entries {
+			if k < len(f.Leaves) {
+				entries[k].Path, _ = solver.Path(fn, f.Leaves[k])
+				entries[k].MorePaths = len(f.Leaves[k]) - 1
+			}
 		}
+		out = append(out, entries...)
 	}
 	return out
 }

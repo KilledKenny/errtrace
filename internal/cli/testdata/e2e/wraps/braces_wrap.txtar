@@ -7,7 +7,7 @@ $WORK/a.go:9:5-9: sentinel example.com/fx.ErrX
 	wrap chain (origin → target):
 		$WORK/a.go:11:31-50: errtrace.Wrap
 	path (origin → target):
-		$WORK/a.go:11:31-50: in example.com/fx.F
+		$WORK/a.go:11:45-49: in example.com/fx.F
 -- go.mod --
 module example.com/fx
 

@@ -7,6 +7,7 @@ $WORK/a.go:8:5-9: sentinel example.com/fx.ErrX
 	wrap chain (origin → target):
 		$WORK/a.go:12:31-51: fmt.Errorf "y: %w"
 	path (origin → target):
+		$WORK/a.go:12:46-50: in example.com/fx.F
 		$WORK/a.go:10:55-82: in example.com/fx.wrapf
 		$WORK/a.go:12:31-51: in example.com/fx.F, call to example.com/fx.wrapf
 -- go.mod --

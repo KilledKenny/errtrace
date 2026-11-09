@@ -43,11 +43,11 @@ func TestSubstitutionMapsParam(t *testing.T) {
 	if got := factStrings(tbl, facts); got != "sentinel example.com/fx.ErrX" {
 		t.Fatalf("summary of A = %q, want Param(0) of id replaced by the argument ErrX", got)
 	}
-	src := facts[0].Sources[0]
+	src := facts[0].Leaves[0][0]
 	if src.Kind != Via || src.Callee != id || tbl.Get(src.CalleeValue).Kind != errset.Param || len(src.ArgSources) != 1 || src.ArgSources[0].Kind != Local {
 		t.Errorf("source of ErrX in A = %+v, want Via id from its Param with a local argument source", src)
 	}
-	path, ok := s.Path(a, facts[0].Sources)
+	path, ok := s.Path(a, facts[0].Leaves[0])
 	if !ok || len(path) != 3 || path[0].Func != "example.com/fx.A" || path[1].Func != "example.com/fx.id" || path[2].Callee != "example.com/fx.id" {
 		t.Errorf("path of ErrX = %+v (%v), want the argument in A, the return in id, the call in A", path, ok)
 	}
@@ -83,7 +83,7 @@ func TestFixpointLimit(t *testing.T) {
 		var facts []Fact
 		for i := 1; i <= round; i++ {
 			id := tbl.Intern(errset.Value{Kind: errset.Opaque, Constructor: "errors.New", Message: strings.Repeat("x", i), HasMessage: true})
-			facts = append(facts, Fact{Value: id, Sources: []Source{{Kind: Local, Site: fn}}})
+			facts = append(facts, Fact{Value: id, Leaves: [][]Source{{{Kind: Local, Site: fn}}}})
 		}
 		return []ResultSummary{{Index: 0, Facts: facts}}
 	}
@@ -109,7 +109,7 @@ func TestSizeCap(t *testing.T) {
 		var facts []Fact
 		for i := range maxValues + 5 {
 			id := tbl.Intern(errset.Value{Kind: errset.Opaque, Pos: 1, Message: strings.Repeat("y", i+1), HasMessage: true})
-			facts = append(facts, Fact{Value: id, Sources: []Source{{Kind: Local, Site: fn}}})
+			facts = append(facts, Fact{Value: id, Leaves: [][]Source{{{Kind: Local, Site: fn}}}})
 		}
 		return []ResultSummary{{Index: 0, Facts: facts}}
 	}

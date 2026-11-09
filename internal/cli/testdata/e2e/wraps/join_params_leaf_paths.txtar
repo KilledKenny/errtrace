@@ -1,0 +1,39 @@
+A callee that joins its two parameters: each leaf's path starts at its own argument in the caller and goes through the matching parameter.
+-- args --
+a.go:@p
+-- stdout --
+$WORK/a.go:14:12-13: Error Set of example.com/fx.P: 2 entries
+$WORK/a.go:6:2-6: sentinel example.com/fx.ErrA
+	wrap chain (origin → target):
+		$WORK/a.go:12:38-55: errors.Join
+	path (origin → target):
+		$WORK/a.go:10:27-31: in example.com/fx.get
+		$WORK/a.go:14:36-41: in example.com/fx.P, call to example.com/fx.get
+		$WORK/a.go:12:50-51: in example.com/fx.both
+		$WORK/a.go:14:31-48: in example.com/fx.P, call to example.com/fx.both
+$WORK/a.go:7:2-6: sentinel example.com/fx.ErrY
+	wrap chain (origin → target):
+		$WORK/a.go:12:38-55: errors.Join
+	path (origin → target):
+		$WORK/a.go:14:43-47: in example.com/fx.P
+		$WORK/a.go:12:53-54: in example.com/fx.both
+		$WORK/a.go:14:31-48: in example.com/fx.P, call to example.com/fx.both
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var (
+	ErrA = errors.New("a")
+	ErrY = errors.New("y")
+)
+
+func get() error { return ErrA }
+
+func both(a, b error) error { return errors.Join(a, b) }
+
+func /*@p*/P() error { return both(get(), ErrY) }

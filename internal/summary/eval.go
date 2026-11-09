@@ -27,38 +27,30 @@ func (s *Solver) evaluate(fn *ssa.Function) []ResultSummary {
 }
 
 // expand adds to fs the values of the local fact f of fn, with the calls
-// it refers to (CallRef values) replaced by their callees' summaries.
+// it refers to (CallRef values) replaced by their callees' summaries. Each
+// leaf keeps its own provenance: a local leaf enters fn where f says it
+// does, a leaf from a call has the call's sources.
 //
 // active holds the call sites being expanded. A call whose argument
 // depends on its own result (err = f(err) in a loop) is not expanded
 // again inside itself: the values that flow around such a loop are the
 // ones that enter it, which the outer expansion already adds.
 func (s *Solver) expand(fn *ssa.Function, f flow.Fact, fs *factSet, active map[ssa.CallInstruction]bool) {
-	local := Source{Kind: Local, Site: f.Source}
-	for _, sub := range s.mapTree(f.Value, func(id errset.ValueID) []subst {
+	for _, sub := range s.mapTree(f.Value, func(id errset.ValueID, k int) []subst {
 		v := s.tbl.Get(id)
-		if v.Kind != errset.CallRef {
-			return []subst{{value: id}}
-		}
 		site, ok := v.Site.(ssa.CallInstruction)
-		if !ok {
-			return []subst{{value: id}}
+		if v.Kind != errset.CallRef || !ok {
+			return []subst{{value: id, leaves: local(1, Source{Kind: Local, Site: f.LeafSource(k)})}}
 		}
 		var calls factSet
 		s.expandCall(fn, site, v.Index, &calls, active)
 		out := make([]subst, len(calls.facts))
 		for i, c := range calls.facts {
-			out[i] = subst{value: c.Value, sources: c.Sources}
+			out[i] = subst{value: c.Value, leaves: c.Leaves}
 		}
 		return out
 	}) {
-		if len(sub.sources) == 0 {
-			fs.add(sub.value, local)
-			continue
-		}
-		for _, src := range sub.sources {
-			fs.add(sub.value, src)
-		}
+		fs.add(sub.value, sub.leaves)
 	}
 }
 
@@ -72,7 +64,7 @@ func (s *Solver) expandCall(fn *ssa.Function, site ssa.CallInstruction, index in
 	active[site] = true
 	defer delete(active, site)
 
-	here := Source{Kind: Local, Site: site}
+	here := local(1, Source{Kind: Local, Site: site})
 	common := site.Common()
 	dynamic := s.res.IsDynamic(site)
 	callees := s.res.Callees(site)
@@ -107,16 +99,16 @@ func (s *Solver) expandCall(fn *ssa.Function, site ssa.CallInstruction, index in
 			continue
 		}
 		for _, gf := range res.Facts {
-			for _, sub := range s.substitute(fn, site, g, gf.Value, active) {
-				fs.add(sub.value, Source{
-					Kind:         Via,
-					Site:         site,
-					Callee:       g,
-					CalleeResult: index,
-					CalleeValue:  gf.Value,
-					ArgSources:   sub.sources,
-					Dynamic:      dynamic,
-				})
+			via := Source{
+				Kind:         Via,
+				Site:         site,
+				Callee:       g,
+				CalleeResult: index,
+				CalleeValue:  gf.Value,
+				Dynamic:      dynamic,
+			}
+			for _, sub := range s.substitute(fn, site, g, gf.Value, via, active) {
+				fs.add(sub.value, sub.leaves)
 			}
 		}
 	}
@@ -132,11 +124,11 @@ func (s *Solver) unresolved(site ssa.CallInstruction, kind errset.UnresolvedKind
 	})
 }
 
-// subst is one value a value tree maps to, with the sources of the parts
-// that were replaced (empty if nothing was).
+// subst is one value a value tree maps to, with the sources of each of its
+// leaves.
 type subst struct {
-	value   errset.ValueID
-	sources []Source
+	value  errset.ValueID
+	leaves [][]Source
 }
 
 // substitute maps the value id of callee g's summary into fn at the call
@@ -144,12 +136,15 @@ type subst struct {
 // FreeVar of an immediately applied closure captured by value becomes the
 // values of its binding, an ErrorfLike value is evaluated against the
 // site's format and operands, and Error Origins and Unresolved values stay
-// as they are.
-func (s *Solver) substitute(fn *ssa.Function, site ssa.CallInstruction, g *ssa.Function, id errset.ValueID, active map[ssa.CallInstruction]bool) []subst {
-	return s.mapTree(id, func(id errset.ValueID) []subst {
+// as they are. Each leaf gets the source via, naming the callee leaf it
+// comes from, with the leaf's sources in fn if it came from an argument.
+func (s *Solver) substitute(fn *ssa.Function, site ssa.CallInstruction, g *ssa.Function, id errset.ValueID, via Source, active map[ssa.CallInstruction]bool) []subst {
+	return s.mapTree(id, func(id errset.ValueID, k int) []subst {
+		via := via
+		via.CalleeLeaf = k
 		v := s.tbl.Get(id)
 		if v.Kind == errset.ErrorfLike && v.Fn == g.String() {
-			return s.forwardedErrorf(fn, site, v, active)
+			return s.forwardedErrorf(fn, site, v, via, active)
 		}
 		var operand ssa.Value
 		switch {
@@ -166,7 +161,7 @@ func (s *Solver) substitute(fn *ssa.Function, site ssa.CallInstruction, g *ssa.F
 			}
 		}
 		if operand == nil {
-			return []subst{{value: id}}
+			return []subst{{value: id, leaves: local(1, via)}}
 		}
 		var fs factSet
 		for _, af := range s.argFacts(fn, operand, site) {
@@ -174,7 +169,13 @@ func (s *Solver) substitute(fn *ssa.Function, site ssa.CallInstruction, g *ssa.F
 		}
 		out := make([]subst, len(fs.facts))
 		for i, f := range fs.facts {
-			out[i] = subst{value: f.Value, sources: f.Sources}
+			leaves := make([][]Source, len(f.Leaves))
+			for j, srcs := range f.Leaves {
+				src := via
+				src.ArgSources = srcs
+				leaves[j] = []Source{src}
+			}
+			out[i] = subst{value: f.Value, leaves: leaves}
 		}
 		return out
 	})
@@ -183,12 +184,13 @@ func (s *Solver) substitute(fn *ssa.Function, site ssa.CallInstruction, g *ssa.F
 // forwardedErrorf evaluates the ErrorfLike value v of the callee at site
 // in fn: the site's format argument and variadic operands take the place of
 // the callee's parameters, as if fn called fmt.Errorf itself at the site.
-// The Wraps made are placed at the site, where the format is.
-func (s *Solver) forwardedErrorf(fn *ssa.Function, site ssa.CallInstruction, v errset.Value, active map[ssa.CallInstruction]bool) []subst {
+// The Wraps made are placed at the site, where the format is. Each leaf
+// gets the source via, with its sources in fn as argument sources.
+func (s *Solver) forwardedErrorf(fn *ssa.Function, site ssa.CallInstruction, v errset.Value, via Source, active map[ssa.CallInstruction]bool) []subst {
 	c := site.Common()
 	format, args := argument(c, v.Index), argument(c, v.ArgIndex)
 	if format == nil || args == nil {
-		return []subst{{value: s.unresolved(site, errset.DynamicFormat, "format of fmt.Errorf is not a constant")}}
+		return []subst{{value: s.unresolved(site, errset.DynamicFormat, "format of fmt.Errorf is not a constant"), leaves: local(1, via)}}
 	}
 	var fs factSet
 	for _, af := range flow.ErrorfFacts(s.tbl, fn, site, site, c.Pos(), format, args, s.opts) {
@@ -196,15 +198,29 @@ func (s *Solver) forwardedErrorf(fn *ssa.Function, site ssa.CallInstruction, v e
 	}
 	out := make([]subst, len(fs.facts))
 	for i, f := range fs.facts {
-		// A value made at the site itself needs no argument path: the
-		// call hop already names the site.
-		var srcs []Source
-		for _, src := range f.Sources {
-			if src.Kind != Local || src.Site != site {
-				srcs = append(srcs, src)
+		leaves := make([][]Source, len(f.Leaves))
+		for j, srcs := range f.Leaves {
+			// A leaf made at the site itself needs no argument path:
+			// the call hop already names the site.
+			var args []Source
+			atSite := false
+			for _, src := range srcs {
+				if src.Kind == Local && src.Site == site {
+					atSite = true
+				} else {
+					args = append(args, src)
+				}
+			}
+			if atSite || len(args) == 0 {
+				leaves[j] = append(leaves[j], via)
+			}
+			if len(args) > 0 {
+				src := via
+				src.ArgSources = args
+				leaves[j] = addSource(leaves[j], src)
 			}
 		}
-		out[i] = subst{value: f.Value, sources: srcs}
+		out[i] = subst{value: f.Value, leaves: leaves}
 	}
 	return out
 }
@@ -224,19 +240,24 @@ func argument(c *ssa.CallCommon, i int) ssa.Value {
 	return nil
 }
 
-// mapTree maps every leaf of the value tree id with leaf and rebuilds the
-// Wraps around the results: a Wrap whose inner values map to several
-// values each becomes one Wrap per combination (at most maxValues). The
-// rebuilt trees are capped at the chain depth limit.
-func (s *Solver) mapTree(id errset.ValueID, leaf func(errset.ValueID) []subst) []subst {
+// mapTree maps every leaf of the value tree id with leaf, which gets the
+// leaf and its index in leaf order, and rebuilds the Wraps around the
+// results: a Wrap whose inner values map to several values each becomes
+// one Wrap per combination (at most maxValues). Leaf sources follow their
+// leaves. The rebuilt trees are capped at the chain depth limit.
+func (s *Solver) mapTree(id errset.ValueID, leaf func(errset.ValueID, int) []subst) []subst {
 	v := s.tbl.Get(id)
 	if v.Kind != errset.Wrap && v.Kind != errset.Truncated {
-		return leaf(id)
+		return leaf(id, 0)
 	}
 	var out []subst
-	for _, sub := range s.mapTreeRaw(id, leaf) {
-		for _, c := range s.tbl.Cap(sub.value, s.chainDepth()) {
-			out = append(out, subst{value: c, sources: sub.sources})
+	for _, sub := range s.mapTreeRaw(id, 0, leaf) {
+		for _, c := range s.tbl.CapLeaves(sub.value, s.chainDepth()) {
+			leaves := make([][]Source, len(c.From))
+			for i, from := range c.From {
+				leaves[i] = sub.leaves[from]
+			}
+			out = append(out, subst{value: c.Value, leaves: leaves})
 		}
 	}
 	return out
@@ -249,16 +270,20 @@ func (s *Solver) chainDepth() int {
 	return s.opts.ChainDepth
 }
 
-func (s *Solver) mapTreeRaw(id errset.ValueID, leaf func(errset.ValueID) []subst) []subst {
+// mapTreeRaw is mapTree without the cap, for the tree id whose first leaf
+// has index base.
+func (s *Solver) mapTreeRaw(id errset.ValueID, base int, leaf func(errset.ValueID, int) []subst) []subst {
 	v := s.tbl.Get(id)
 	if v.Kind != errset.Wrap && v.Kind != errset.Truncated {
-		return leaf(id)
+		return leaf(id, base)
 	}
 	combos := []subst{{}}
 	var inner [][]errset.ValueID
 	inner = append(inner, nil)
+	off := base
 	for _, in := range v.Inner {
-		subs := s.mapTreeRaw(in, leaf)
+		subs := s.mapTreeRaw(in, off, leaf)
+		off += s.tbl.Leaves(in)
 		var nextCombos []subst
 		var nextInner [][]errset.ValueID
 		for ci, c := range combos {
@@ -266,11 +291,7 @@ func (s *Solver) mapTreeRaw(id errset.ValueID, leaf func(errset.ValueID) []subst
 				if len(nextCombos) == maxValues {
 					break
 				}
-				srcs := c.sources
-				if len(srcs) == 0 {
-					srcs = sub.sources
-				}
-				nextCombos = append(nextCombos, subst{sources: srcs})
+				nextCombos = append(nextCombos, subst{leaves: append(c.leaves[:len(c.leaves):len(c.leaves)], sub.leaves...)})
 				nextInner = append(nextInner, append(inner[ci][:len(inner[ci]):len(inner[ci])], sub.value))
 			}
 		}

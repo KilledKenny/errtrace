@@ -10,27 +10,27 @@ $WORK/a.go:8:5-9: sentinel example.com/fx.ErrX
 	wrap chain (origin → target):
 		$WORK/a.go:13:9-42: fmt.Errorf "step %d: %w"
 	path (origin → target):
-		$WORK/a.go:13:9-42: in example.com/fx.F
+		$WORK/a.go:11:9-13: in example.com/fx.F
 $WORK/a.go:8:5-9: sentinel example.com/fx.ErrX
 	wrap chain (origin → target):
 		$WORK/a.go:13:9-42: fmt.Errorf "step %d: %w"
 		$WORK/a.go:13:9-42: fmt.Errorf "step %d: %w"
 	path (origin → target):
-		$WORK/a.go:13:9-42: in example.com/fx.F
+		$WORK/a.go:11:9-13: in example.com/fx.F
 $WORK/a.go:8:5-9: sentinel example.com/fx.ErrX
 	wrap chain (origin → target):
 		$WORK/a.go:13:9-42: fmt.Errorf "step %d: %w"
 		$WORK/a.go:13:9-42: fmt.Errorf "step %d: %w"
 		$WORK/a.go:13:9-42: fmt.Errorf "step %d: %w"
 	path (origin → target):
-		$WORK/a.go:13:9-42: in example.com/fx.F
+		$WORK/a.go:11:9-13: in example.com/fx.F
 $WORK/a.go:8:5-9: sentinel example.com/fx.ErrX [chain truncated]
 	wrap chain (origin → target):
 		$WORK/a.go:13:9-42: fmt.Errorf "step %d: %w"
 		$WORK/a.go:13:9-42: fmt.Errorf "step %d: %w"
 		$WORK/a.go:13:9-42: fmt.Errorf "step %d: %w"
 	path (origin → target):
-		$WORK/a.go:13:9-42: in example.com/fx.F
+		$WORK/a.go:11:9-13: in example.com/fx.F
 -- go.mod --
 module example.com/fx
 

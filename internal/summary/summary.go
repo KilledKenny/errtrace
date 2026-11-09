@@ -51,9 +51,13 @@ type Source struct {
 	// fact. It differs from the fact's value when it was a Param (or held
 	// one) substituted with this call's argument.
 	CalleeValue errset.ValueID
-	// ArgSources are the sources of the argument value substituted for a
-	// Param in CalleeValue, in the calling function; empty if nothing was
-	// substituted.
+	// CalleeLeaf is the index of the leaf of CalleeValue this leaf came
+	// from (in errset.Flatten's leaf order): the leaf itself, or the Param
+	// (or forwarded format) whose argument holds it.
+	CalleeLeaf int
+	// ArgSources are the sources, in the calling function, of this leaf
+	// inside the argument substituted for the callee leaf CalleeLeaf;
+	// empty if nothing was substituted.
 	ArgSources []Source
 	// Dynamic reports whether a Via source's call is a dynamic call.
 	Dynamic bool
@@ -72,7 +76,7 @@ func (s Source) rank() int {
 
 func sourceEqual(a, b Source) bool {
 	return a.Kind == b.Kind && a.Site == b.Site && a.Callee == b.Callee &&
-		a.CalleeResult == b.CalleeResult && a.CalleeValue == b.CalleeValue &&
+		a.CalleeResult == b.CalleeResult && a.CalleeValue == b.CalleeValue && a.CalleeLeaf == b.CalleeLeaf &&
 		a.Dynamic == b.Dynamic && slices.EqualFunc(a.ArgSources, b.ArgSources, sourceEqual)
 }
 
@@ -96,13 +100,26 @@ func addSource(srcs []Source, src Source) []Source {
 	return srcs
 }
 
-// Fact is one abstract value an error result can carry, with its sources.
+// Fact is one abstract value an error result can carry, with the
+// provenance of each of its leaves.
 type Fact struct {
 	// Value is the abstract value: an Error Origin, a Wrap, an Unresolved
 	// place, or a Param or FreeVar of the summarised function.
 	Value errset.ValueID
-	// Sources is the value's provenance, ranked (see MaxSources).
-	Sources []Source
+	// Leaves has the sources of each leaf of Value, in errset.Flatten's
+	// leaf order, each ranked (see MaxSources). A leaf under a Wrap has
+	// its own sources: the Wrap's other operands may come from elsewhere.
+	Leaves [][]Source
+}
+
+// local returns the provenance of a value of n leaves that all have the
+// single source src.
+func local(n int, src Source) [][]Source {
+	out := make([][]Source, n)
+	for i := range out {
+		out[i] = []Source{src}
+	}
+	return out
 }
 
 // ResultSummary is the summary of one error result.
@@ -133,21 +150,29 @@ func (s *Summary) Result(index int) *ResultSummary {
 	return nil
 }
 
-// factSet collects facts in insertion order, merging the sources of equal
-// values.
+// factSet collects facts in insertion order, merging the sources of the
+// leaves of equal values.
 type factSet struct {
 	facts []Fact
 	index map[errset.ValueID]int
 }
 
-func (fs *factSet) add(id errset.ValueID, src Source) {
+// add adds the value id whose leaves have the sources leaves (one list
+// per leaf).
+func (fs *factSet) add(id errset.ValueID, leaves [][]Source) {
 	if fs.index == nil {
 		fs.index = make(map[errset.ValueID]int)
 	}
-	if i, ok := fs.index[id]; ok {
-		fs.facts[i].Sources = addSource(fs.facts[i].Sources, src)
-		return
+	i, ok := fs.index[id]
+	if !ok {
+		i = len(fs.facts)
+		fs.index[id] = i
+		fs.facts = append(fs.facts, Fact{Value: id, Leaves: make([][]Source, len(leaves))})
 	}
-	fs.index[id] = len(fs.facts)
-	fs.facts = append(fs.facts, Fact{Value: id, Sources: []Source{src}})
+	f := &fs.facts[i]
+	for k, srcs := range leaves {
+		for _, src := range srcs {
+			f.Leaves[k] = addSource(f.Leaves[k], src)
+		}
+	}
 }

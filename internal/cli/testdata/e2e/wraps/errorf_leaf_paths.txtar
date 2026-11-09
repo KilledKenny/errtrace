@@ -1,0 +1,36 @@
+fmt.Errorf with two %w, one a call and one a sentinel: each leaf has its own path; ErrY's hop 0 is its own load in P, not the return in get.
+-- args --
+a.go:@p
+-- stdout --
+$WORK/a.go:15:12-13: Error Set of example.com/fx.P: 2 entries
+$WORK/a.go:9:2-6: sentinel example.com/fx.ErrA
+	wrap chain (origin → target):
+		$WORK/a.go:15:31-63: fmt.Errorf "%w %w"
+	path (origin → target):
+		$WORK/a.go:13:27-31: in example.com/fx.get
+		$WORK/a.go:15:51-56: in example.com/fx.P, call to example.com/fx.get
+$WORK/a.go:10:2-6: sentinel example.com/fx.ErrY
+	wrap chain (origin → target):
+		$WORK/a.go:15:31-63: fmt.Errorf "%w %w"
+	path (origin → target):
+		$WORK/a.go:15:58-62: in example.com/fx.P
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"fmt"
+)
+
+var (
+	ErrA = errors.New("a")
+	ErrY = errors.New("y")
+)
+
+func get() error { return ErrA }
+
+func /*@p*/P() error { return fmt.Errorf("%w %w", get(), ErrY) }

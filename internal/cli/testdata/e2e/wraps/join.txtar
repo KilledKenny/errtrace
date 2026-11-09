@@ -7,12 +7,12 @@ $WORK/a.go:6:2-6: sentinel example.com/fx.ErrA
 	wrap chain (origin → target):
 		$WORK/a.go:10:31-59: errors.Join
 	path (origin → target):
-		$WORK/a.go:10:31-59: in example.com/fx.F
+		$WORK/a.go:10:43-47: in example.com/fx.F
 $WORK/a.go:7:2-6: sentinel example.com/fx.ErrB
 	wrap chain (origin → target):
 		$WORK/a.go:10:31-59: errors.Join
 	path (origin → target):
-		$WORK/a.go:10:31-59: in example.com/fx.F
+		$WORK/a.go:10:54-58: in example.com/fx.F
 -- go.mod --
 module example.com/fx
 

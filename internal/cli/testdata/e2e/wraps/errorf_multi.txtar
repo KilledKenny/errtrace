@@ -7,12 +7,12 @@ $WORK/a.go:9:2-6: sentinel example.com/fx.ErrA
 	wrap chain (origin → target):
 		$WORK/a.go:13:31-66: fmt.Errorf "%w and %w"
 	path (origin → target):
-		$WORK/a.go:13:31-66: in example.com/fx.F
+		$WORK/a.go:13:55-59: in example.com/fx.F
 $WORK/a.go:10:2-6: sentinel example.com/fx.ErrB
 	wrap chain (origin → target):
 		$WORK/a.go:13:31-66: fmt.Errorf "%w and %w"
 	path (origin → target):
-		$WORK/a.go:13:31-66: in example.com/fx.F
+		$WORK/a.go:13:61-65: in example.com/fx.F
 -- go.mod --
 module example.com/fx
 

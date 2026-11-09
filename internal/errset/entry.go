@@ -2,7 +2,9 @@ package errset
 
 import (
 	"cmp"
+	"fmt"
 	"slices"
+	"strings"
 )
 
 // Hop is one step of a Propagation Path. Hop 0 is the instruction where the
@@ -44,9 +46,11 @@ type Entry struct {
 }
 
 // Flatten turns the value tree rooted at top into entries, one per leaf,
-// each with its Wrap Chain and the Propagation Path path.
-func Flatten(t *Table, top ValueID, path Path) []Entry {
-	var out []Entry
+// each with its Wrap Chain. The entries are in leaf order (inner values
+// left to right), so entry k is the leaf k whose Path the caller fills in;
+// there are t.Leaves(top) of them.
+func Flatten(t *Table, top ValueID) []Entry {
+	out := make([]Entry, 0, t.Leaves(top))
 	var walk func(id ValueID, outer []ValueID, truncated bool)
 	walk = func(id ValueID, outer []ValueID, truncated bool) {
 		v := t.Get(id)
@@ -63,7 +67,7 @@ func Flatten(t *Table, top ValueID, path Path) []Entry {
 			for i, w := range outer {
 				chain[len(outer)-1-i] = w
 			}
-			out = append(out, Entry{Leaf: id, Chain: chain, Truncated: truncated, Path: path})
+			out = append(out, Entry{Leaf: id, Chain: chain, Truncated: truncated})
 		}
 	}
 	walk(top, nil, false)
@@ -79,26 +83,41 @@ func Flatten(t *Table, top ValueID, path Path) []Entry {
 func Dedup(t *Table, entries []Entry) []Entry {
 	type group struct {
 		entry Entry
-		chain []key
 		paths []Path
 	}
+	// shown numbers the distinct shown forms of Wraps; wrapShown caches
+	// the number of each Wrap.
+	shown := make(map[key]int)
+	wrapShown := make(map[ValueID]int)
+	shownOf := func(w ValueID) int {
+		if n, ok := wrapShown[w]; ok {
+			return n
+		}
+		v := t.Get(w)
+		v.Inner = nil
+		k := keyOf(v)
+		n, ok := shown[k]
+		if !ok {
+			n = len(shown)
+			shown[k] = n
+		}
+		wrapShown[w] = n
+		return n
+	}
 	var groups []*group
+	index := make(map[string]*group)
+	var b strings.Builder
 	for _, e := range entries {
-		chain := make([]key, len(e.Chain))
-		for i, w := range e.Chain {
-			v := t.Get(w)
-			v.Inner = nil
-			chain[i] = keyOf(v)
+		b.Reset()
+		fmt.Fprintf(&b, "%d %t", e.Leaf, e.Truncated)
+		for _, w := range e.Chain {
+			fmt.Fprintf(&b, " %d", shownOf(w))
 		}
-		var g *group
-		for _, cand := range groups {
-			if cand.entry.Leaf == e.Leaf && cand.entry.Truncated == e.Truncated && slices.Equal(cand.chain, chain) {
-				g = cand
-				break
-			}
-		}
+		g := index[b.String()]
 		if g == nil {
-			groups = append(groups, &group{entry: e, chain: chain, paths: []Path{e.Path}})
+			g = &group{entry: e, paths: []Path{e.Path}}
+			groups = append(groups, g)
+			index[b.String()] = g
 			continue
 		}
 		g.entry.MorePaths += e.MorePaths

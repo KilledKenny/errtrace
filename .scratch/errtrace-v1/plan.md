@@ -295,6 +295,11 @@ local sources come first, then static calls, then dynamic calls:
 - `Via{Site, Callee, CalleeResult, CalleeValue}`: came from a callee's summary fact;
 - `WrapOf{Instr, InnerValue, InnerSources}`: created here as a Wrap of an inner value.
 
+  As built, this provenance is kept per leaf: a fact holds one ranked source list
+  for each leaf of its value tree (in flattening order), and a `Via` source names
+  the callee leaf it came from (`CalleeLeaf`) plus that leaf's sources inside a
+  substituted argument. A Wrap's operands therefore never share one path.
+
 Paths are rebuilt by a shortest-path search over `(function, value)` nodes. The
 cost is `(number of dynamic hops, number of hops)`, compared lexicographically,
 and each node is visited once (modelled on govulncheck's `witness.go:36-73`). For a

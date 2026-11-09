@@ -8,13 +8,12 @@ $WORK/a.go:8:5-9: sentinel example.com/fx.ErrX
 		$WORK/a.go:10:53-76: fmt.Errorf with dynamic format
 	path (origin → target):
 		$WORK/a.go:12:46-50: in example.com/fx.F
-		$WORK/a.go:10:53-76: in example.com/fx.wrapf
+		$WORK/a.go:10:72-75: in example.com/fx.wrapf
 		$WORK/a.go:12:31-51: in example.com/fx.F, call to example.com/fx.wrapf
 $WORK/a.go:10:53-76: unresolved(dynamic-format): format of fmt.Errorf is not a constant
 	wrap chain (origin → target):
 		$WORK/a.go:10:53-76: fmt.Errorf with dynamic format
 	path (origin → target):
-		$WORK/a.go:12:46-50: in example.com/fx.F
 		$WORK/a.go:10:53-76: in example.com/fx.wrapf
 		$WORK/a.go:12:31-51: in example.com/fx.F, call to example.com/fx.wrapf
 -- go.mod --

@@ -5,6 +5,7 @@ import (
 	"go/constant"
 	"go/token"
 	"go/types"
+	"slices"
 
 	"golang.org/x/tools/go/ssa"
 
@@ -20,8 +21,14 @@ type Fact struct {
 	// Value is the abstract value, interned in the analysis's table.
 	Value errset.ValueID
 	// Source is the ssa.Value (or, for an implicit conversion, the
-	// ssa.DebugRef of its operand) where Value enters the function.
+	// ssa.DebugRef of its operand) where Value enters the function. For a
+	// Wrap made in the function it is the wrapping call or literal.
 	Source any
+	// Leaves, if set, is where each leaf of Value (in errset.Flatten's
+	// leaf order) enters the function: for a Wrap made here, the place of
+	// each wrapped value. Its length is the number of leaves of Value.
+	// When it is nil, every leaf enters at Source.
+	Leaves []any
 	// cut is set, inside an analyzer at the Wrap Chain depth limit, for a
 	// leaf found below a further Wrap: its chain is longer than the limit.
 	cut bool
@@ -140,13 +147,28 @@ type analyzer struct {
 	revisits int
 }
 
+// LeafSource returns where leaf k of the fact's value enters the function.
+func (f Fact) LeafSource(k int) any {
+	if k < len(f.Leaves) {
+		return f.Leaves[k]
+	}
+	return f.Source
+}
+
 func (a *analyzer) add(id errset.ValueID, src any) {
-	for _, f := range a.facts {
-		if f.Value == id && f.Source == src && f.cut == a.cut {
+	a.addFact(Fact{Value: id, Source: src})
+}
+
+// addFact adds f, marked as cut if the analyzer is, unless it is there
+// already.
+func (a *analyzer) addFact(f Fact) {
+	f.cut = a.cut
+	for _, g := range a.facts {
+		if g.Value == f.Value && g.Source == f.Source && g.cut == f.cut && slices.Equal(g.Leaves, f.Leaves) {
 			return
 		}
 	}
-	a.facts = append(a.facts, Fact{Value: id, Source: src, cut: a.cut})
+	a.facts = append(a.facts, f)
 }
 
 // posOf returns a valid position for v: its own, its operand's for an

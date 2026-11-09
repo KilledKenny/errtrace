@@ -343,7 +343,7 @@ func appendFact(facts []Fact, id errset.ValueID, src Source) []Fact {
 			return facts
 		}
 	}
-	return append(facts, Fact{Value: id, Sources: []Source{src}})
+	return append(facts, Fact{Value: id, Leaves: [][]Source{{src}}})
 }
 
 // changedResults compares the value sets of two summaries of one function

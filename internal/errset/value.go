@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"go/token"
 	"go/types"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -247,6 +248,8 @@ func keyOf(v Value) key {
 // Table is not safe for concurrent use.
 type Table struct {
 	values []Value
+	// leaves is the number of leaves of each value's tree.
+	leaves []int
 	index  map[key]ValueID
 }
 
@@ -272,13 +275,26 @@ func (t *Table) Intern(v Value) ValueID {
 	}
 	id := ValueID(len(t.values))
 	v.Inner = append([]ValueID(nil), v.Inner...)
+	n := 0
+	for _, in := range v.Inner {
+		n += t.leaves[in]
+	}
+	if len(v.Inner) == 0 {
+		n = 1
+	}
 	t.values = append(t.values, v)
+	t.leaves = append(t.leaves, n)
 	t.index[k] = id
 	return id
 }
 
 // Get returns the Value named by id. It panics if id is not in the table.
 func (t *Table) Get(id ValueID) Value { return t.values[id] }
+
+// Leaves returns the number of leaves of the value tree id: the entries
+// Flatten makes of it. A leaf value has one; a Wrap has the sum of its
+// inner values' leaves; a Truncated marker has its inner value's.
+func (t *Table) Leaves(id ValueID) int { return t.leaves[id] }
 
 // Len returns the number of distinct values in the table.
 func (t *Table) Len() int { return len(t.values) }
@@ -362,50 +378,95 @@ func (t *Table) WrapDescription(id ValueID) string {
 // 0). Interning keeps capped trees finite, so a fixpoint over them
 // terminates.
 func (t *Table) Cap(id ValueID, limit int) []ValueID {
-	return t.capAt(id, 0, limit)
+	capped := t.CapLeaves(id, limit)
+	out := make([]ValueID, len(capped))
+	for i, c := range capped {
+		out[i] = c.Value
+	}
+	return out
 }
 
-func (t *Table) capAt(id ValueID, level, limit int) []ValueID {
+// Capped is one value made by CapLeaves.
+type Capped struct {
+	// Value is the capped value tree.
+	Value ValueID
+	// From maps each leaf of Value, in leaf order, to the index of the
+	// leaf of the original tree it is.
+	From []int
+}
+
+// CapLeaves is Cap, which also says where each leaf of the capped values
+// was in the original tree, so per-leaf information follows the leaves.
+// Of equal leaves or inner values merged by capping, the first is kept.
+func (t *Table) CapLeaves(id ValueID, limit int) []Capped {
+	return t.capAt(id, 0, limit, 0)
+}
+
+func (t *Table) capAt(id ValueID, level, limit, base int) []Capped {
 	v := t.Get(id)
 	switch v.Kind {
 	case Wrap:
 		if level >= limit {
-			return t.truncateLeaves(id)
+			return t.truncateLeaves(id, base)
 		}
-		var inner []ValueID
+		var inner []Capped
 		changed := false
+		off := base
 		for _, in := range v.Inner {
-			c := t.capAt(in, level+1, limit)
-			changed = changed || len(c) != 1 || c[0] != in
+			c := t.capAt(in, level+1, limit, off)
+			off += t.leaves[in]
+			changed = changed || len(c) != 1 || c[0].Value != in
 			inner = append(inner, c...)
 		}
 		if !changed {
-			return []ValueID{id}
+			return []Capped{{Value: id, From: seq(base, t.leaves[id])}}
 		}
-		v.Inner = dedupIDs(inner)
-		return []ValueID{t.Intern(v)}
+		var from []int
+		v.Inner = nil
+		for _, c := range inner {
+			if slices.Contains(v.Inner, c.Value) {
+				continue
+			}
+			v.Inner = append(v.Inner, c.Value)
+			from = append(from, c.From...)
+		}
+		return []Capped{{Value: t.Intern(v), From: from}}
 	case Truncated:
 		if t.Get(v.Inner[0]).Kind.IsLeaf() {
-			return []ValueID{id}
+			return []Capped{{Value: id, From: []int{base}}}
 		}
-		return t.truncateLeaves(v.Inner[0])
+		return t.truncateLeaves(v.Inner[0], base)
 	}
-	return []ValueID{id}
+	return []Capped{{Value: id, From: []int{base}}}
+}
+
+// seq returns n consecutive indices from base.
+func seq(base, n int) []int {
+	out := make([]int, n)
+	for i := range out {
+		out[i] = base + i
+	}
+	return out
 }
 
 // truncateLeaves returns a Truncated marker over each distinct leaf of the
-// tree id.
-func (t *Table) truncateLeaves(id ValueID) []ValueID {
-	var out []ValueID
+// tree id, whose first leaf has index base.
+func (t *Table) truncateLeaves(id ValueID, base int) []Capped {
+	var out []Capped
 	seen := make(map[ValueID]bool)
+	next := base
 	var walk func(ValueID)
 	walk = func(id ValueID) {
 		v := t.Get(id)
 		if v.Kind.IsLeaf() {
 			if !seen[id] {
 				seen[id] = true
-				out = append(out, t.Intern(Value{Kind: Truncated, Site: v.Site, Pos: v.Pos, Inner: []ValueID{id}}))
+				out = append(out, Capped{
+					Value: t.Intern(Value{Kind: Truncated, Site: v.Site, Pos: v.Pos, Inner: []ValueID{id}}),
+					From:  []int{next},
+				})
 			}
+			next++
 			return
 		}
 		for _, in := range v.Inner {
@@ -413,19 +474,5 @@ func (t *Table) truncateLeaves(id ValueID) []ValueID {
 		}
 	}
 	walk(id)
-	return out
-}
-
-func dedupIDs(ids []ValueID) []ValueID {
-	out := ids[:0:0]
-	for _, id := range ids {
-		dup := false
-		for _, o := range out {
-			dup = dup || o == id
-		}
-		if !dup {
-			out = append(out, id)
-		}
-	}
 	return out
 }

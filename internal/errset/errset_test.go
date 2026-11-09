@@ -80,19 +80,20 @@ func TestFlatten(t *testing.T) {
 	inner := tbl.Intern(Value{Kind: Wrap, WrapKind: WrapErrorf, Format: "a: %w", Inner: []ValueID{sa}})
 	trunc := tbl.Intern(Value{Kind: Truncated, Inner: []ValueID{un}})
 	join := tbl.Intern(Value{Kind: Wrap, WrapKind: WrapJoin, Inner: []ValueID{inner, sb, trunc}})
-	path := Path{{Site: "ret", Func: "example.com/fx.F"}}
-
-	got := Flatten(tbl, join, path)
+	got := Flatten(tbl, join)
 	want := []Entry{
-		{Leaf: sa, Chain: []ValueID{inner, join}, Path: path},
-		{Leaf: sb, Chain: []ValueID{join}, Path: path},
-		{Leaf: un, Chain: []ValueID{join}, Truncated: true, Path: path},
+		{Leaf: sa, Chain: []ValueID{inner, join}},
+		{Leaf: sb, Chain: []ValueID{join}},
+		{Leaf: un, Chain: []ValueID{join}, Truncated: true},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Flatten =\n%+v\nwant\n%+v", got, want)
 	}
+	if n := tbl.Leaves(join); n != len(got) {
+		t.Errorf("Leaves = %d, want %d (one per Flatten entry)", n, len(got))
+	}
 
-	if got := Flatten(tbl, sa, path); len(got) != 1 || got[0].Leaf != sa || len(got[0].Chain) != 0 {
+	if got := Flatten(tbl, sa); len(got) != 1 || got[0].Leaf != sa || len(got[0].Chain) != 0 {
 		t.Errorf("Flatten of a leaf = %+v", got)
 	}
 }
@@ -132,7 +133,10 @@ func TestDedupComparesWrapsWithoutSiblings(t *testing.T) {
 	p := Path{{Site: "one", Func: "F"}}
 	var entries []Entry
 	for _, w := range []ValueID{w1, w2, other} {
-		entries = append(entries, Flatten(tbl, w, p)...)
+		for _, e := range Flatten(tbl, w) {
+			e.Path = p
+			entries = append(entries, e)
+		}
 	}
 	got := Dedup(tbl, entries)
 	want := []Entry{
@@ -240,5 +244,33 @@ func TestCap(t *testing.T) {
 	once := tbl.Cap(w3, 1)
 	if twice := tbl.Cap(once[0], 1); !reflect.DeepEqual(once, twice) {
 		t.Errorf("Cap is not idempotent: %v then %v", once, twice)
+	}
+}
+
+// TestCapLeavesFollowsLeaves checks that CapLeaves says which leaf of the
+// original tree each leaf of a capped value is, also when capping merges
+// equal leaves.
+func TestCapLeavesFollowsLeaves(t *testing.T) {
+	_, a, b := testVars()
+	tbl := NewTable()
+	sa := tbl.Intern(Value{Kind: Sentinel, Var: a})
+	sb := tbl.Intern(Value{Kind: Sentinel, Var: b})
+	inner := tbl.Intern(Value{Kind: Wrap, WrapKind: WrapErrorf, Format: "i %w %w", Inner: []ValueID{sa, sa}})
+	// Leaves of top in order: sb (0), sa (1), sa (2).
+	top := tbl.Intern(Value{Kind: Wrap, WrapKind: WrapJoin, Inner: []ValueID{sb, inner}})
+	if n := tbl.Leaves(top); n != 3 {
+		t.Fatalf("Leaves = %d, want 3", n)
+	}
+	got := tbl.CapLeaves(top, 1)
+	if len(got) != 1 || !reflect.DeepEqual(got[0].From, []int{0, 1}) || tbl.Leaves(got[0].Value) != 2 {
+		t.Errorf("CapLeaves(top, 1) = %+v, want one value whose leaves are sb (0) and a single truncated sa (1)", got)
+	}
+	got = tbl.CapLeaves(top, 0)
+	if len(got) != 2 || !reflect.DeepEqual(got[0].From, []int{0}) || !reflect.DeepEqual(got[1].From, []int{1}) {
+		t.Errorf("CapLeaves(top, 0) = %+v, want truncated sb from 0 and truncated sa from 1", got)
+	}
+	got = tbl.CapLeaves(top, 5)
+	if len(got) != 1 || got[0].Value != top || !reflect.DeepEqual(got[0].From, []int{0, 1, 2}) {
+		t.Errorf("CapLeaves(top, 5) = %+v, want top unchanged", got)
 	}
 }

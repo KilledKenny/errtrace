@@ -3,30 +3,29 @@ errors.Join whose operands are calls returning several sentinels: each leaf is o
 a.go:@p
 -- stdout --
 $WORK/a.go:22:12-13: Error Set of example.com/fx.P: 4 entries
-$WORK/a.go:6:2-6: sentinel example.com/fx.ErrA [+2 more paths]
+$WORK/a.go:6:2-6: sentinel example.com/fx.ErrA [+1 more paths]
 	wrap chain (origin → target):
 		$WORK/a.go:22:39-74: errors.Join
 	path (origin → target):
 		$WORK/a.go:15:10-14: in example.com/fx.pick
 		$WORK/a.go:22:51-58: in example.com/fx.P, call to example.com/fx.pick
-$WORK/a.go:7:2-6: sentinel example.com/fx.ErrB [+2 more paths]
+$WORK/a.go:7:2-6: sentinel example.com/fx.ErrB [+1 more paths]
 	wrap chain (origin → target):
 		$WORK/a.go:22:39-74: errors.Join
 	path (origin → target):
-		$WORK/a.go:15:10-14: in example.com/fx.pick
-		$WORK/a.go:22:51-58: in example.com/fx.P, call to example.com/fx.pick
-$WORK/a.go:8:2-6: sentinel example.com/fx.ErrC [+2 more paths]
+		$WORK/a.go:17:10-14: in example.com/fx.pick
+		$WORK/a.go:22:60-67: in example.com/fx.P, call to example.com/fx.pick
+$WORK/a.go:8:2-6: sentinel example.com/fx.ErrC [+1 more paths]
 	wrap chain (origin → target):
 		$WORK/a.go:22:39-74: errors.Join
 	path (origin → target):
-		$WORK/a.go:15:10-14: in example.com/fx.pick
-		$WORK/a.go:22:51-58: in example.com/fx.P, call to example.com/fx.pick
-$WORK/a.go:9:2-6: sentinel example.com/fx.ErrY [+2 more paths]
+		$WORK/a.go:19:9-13: in example.com/fx.pick
+		$WORK/a.go:22:60-67: in example.com/fx.P, call to example.com/fx.pick
+$WORK/a.go:9:2-6: sentinel example.com/fx.ErrY
 	wrap chain (origin → target):
 		$WORK/a.go:22:39-74: errors.Join
 	path (origin → target):
-		$WORK/a.go:15:10-14: in example.com/fx.pick
-		$WORK/a.go:22:51-58: in example.com/fx.P, call to example.com/fx.pick
+		$WORK/a.go:22:69-73: in example.com/fx.P
 -- go.mod --
 module example.com/fx
 
