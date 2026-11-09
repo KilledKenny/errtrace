@@ -83,8 +83,9 @@ func TestDebugModes(t *testing.T) {
 		Stdout: &out,
 		Stderr: &errb,
 	})
-	if code != ExitOK || out.String() != "" {
-		t.Errorf("valid -debug list: code %d, stdout %q; want 0 and empty stdout", code, out.String())
+	wantOut := filepath.Join(dir, "a.go") + ":3:6-7: Error Set of example.com/fx.F: 0 entries\n"
+	if code != ExitOK || out.String() != wantOut {
+		t.Errorf("valid -debug list: code %d, stdout %q; want 0 and stdout %q (debug output goes to stderr only)", code, out.String(), wantOut)
 	}
 	lines := strings.Split(strings.TrimSuffix(errb.String(), "\n"), "\n")
 	if len(lines) != 2 || !strings.HasPrefix(lines[0], "timing: load=") || !strings.Contains(lines[0], " ssa=") ||

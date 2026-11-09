@@ -1,0 +1,32 @@
+A pointer and a value Concrete Type are distinct Origins.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:11:12-13: Error Set of example.com/fx.F: 2 entries
+$WORK/a.go:13:10-25: concrete *example.com/fx.MyErr
+	path (origin → target):
+		$WORK/a.go:13:10-25: in example.com/fx.F
+$WORK/a.go:15:9-24: concrete example.com/fx.ValErr
+	path (origin → target):
+		$WORK/a.go:15:9-24: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+type MyErr struct{ Code int }
+
+func (*MyErr) Error() string { return "my" }
+
+type ValErr struct{ Code int }
+
+func (ValErr) Error() string { return "val" }
+
+func /*@f*/F(b bool) error {
+	if b {
+		return &MyErr{Code: 1}
+	}
+	return ValErr{Code: 2}
+}

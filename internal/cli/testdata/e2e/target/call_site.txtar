@@ -2,6 +2,10 @@ A call-site Target on the Sel of a selector, inside a defer statement.
 -- args --
 -debug=target a.go:@sel
 -- stdout --
+$WORK/a.go:10:8-25: Error Set of call to f.Close in example.com/fx.Load: 1 entries, 1 unresolved
+$WORK/a.go:10:8-25: unresolved(pending): call to (*os.File).Close not followed yet
+	path (origin → target):
+		$WORK/a.go:10:8-25: in example.com/fx.Load
 -- stderr --
 target: call-site call to f.Close in example.com/fx.Load funcs=[example.com/fx.Load] span=$WORK/a.go:10:8-25
 -- go.mod --

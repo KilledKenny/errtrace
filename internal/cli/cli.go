@@ -13,6 +13,8 @@ import (
 	"strings"
 
 	"github.com/killedKenny/errtrace/internal/load"
+	"github.com/killedKenny/errtrace/internal/query"
+	"github.com/killedKenny/errtrace/internal/render"
 	"github.com/killedKenny/errtrace/internal/span"
 	"github.com/killedKenny/errtrace/internal/target"
 )
@@ -139,8 +141,17 @@ func run(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) error
 		fmt.Fprintf(opts.Stderr, "target: %s %s funcs=[%s] span=%s\n",
 			tgt.Kind, tgt.Name, strings.Join(names, " "), tgt.Span)
 	}
-	// The Query itself comes in later steps.
-	return nil
+	res, err := query.Run(ctx, prog, tgt)
+	if err != nil {
+		return err
+	}
+	return render.Text(opts.Stdout, render.Input{
+		TargetSpan: tgt.Span,
+		TargetName: tgt.Name,
+		Table:      res.Table,
+		Entries:    res.Entries,
+		Locator:    res,
+	})
 }
 
 // splitList splits a comma-separated flag value, dropping empty elements.

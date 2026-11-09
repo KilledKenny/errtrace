@@ -1,0 +1,20 @@
+errors.New is an Opaque Error with its constant message.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:5:12-13: Error Set of example.com/fx.F: 1 entries
+$WORK/a.go:6:9-27: opaque errors.New "boom"
+	path (origin → target):
+		$WORK/a.go:6:9-27: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+func /*@f*/F() error {
+	return errors.New("boom")
+}

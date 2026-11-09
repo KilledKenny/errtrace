@@ -1,0 +1,324 @@
+// Package errset is errtrace's data model: the interned abstract error
+// values a Query works with (Error Origins, Wraps, Unresolved places and the
+// symbolic values that only live inside summaries), the Error Set entries
+// that flattening a value tree yields, their Propagation Paths, and the
+// deterministic order in which entries are reported. It contains no SSA
+// logic.
+package errset
+
+import (
+	"fmt"
+	"go/token"
+	"go/types"
+	"strconv"
+	"strings"
+)
+
+// ValueID names an interned Value in a Table. Equal values have equal IDs.
+type ValueID int32
+
+// Kind is the kind of an abstract error value.
+type Kind uint8
+
+const (
+	// Sentinel is an Error Origin: a package-level error variable returned
+	// by identity (io.EOF).
+	Sentinel Kind = iota + 1
+	// Concrete is an Error Origin: a value of a named type that implements
+	// error, created at a known place (*fs.PathError).
+	Concrete
+	// Opaque is an Error Origin with no identity and no inspectable type
+	// (errors.New).
+	Opaque
+	// Wrap is a node of a Wrap Chain: an error that keeps its Inner errors
+	// reachable through errors.Is and errors.As.
+	Wrap
+	// Truncated marks a Wrap Chain that was cut at the chain depth limit.
+	Truncated
+	// Unresolved is a place the analysis could not see through. It is
+	// never dropped from an Error Set.
+	Unresolved
+	// Param is symbolic: whatever the caller passed as parameter Index of
+	// function Fn. It only exists inside summaries.
+	Param
+	// FreeVar is symbolic: the variable captured by closure Fn as free
+	// variable Index.
+	FreeVar
+	// CallRef is symbolic: result Index of the call at Site, to be replaced
+	// by the callee's summary.
+	CallRef
+)
+
+var kindNames = [...]string{
+	Sentinel:   "sentinel",
+	Concrete:   "concrete",
+	Opaque:     "opaque",
+	Wrap:       "wrap",
+	Truncated:  "truncated",
+	Unresolved: "unresolved",
+	Param:      "param",
+	FreeVar:    "freevar",
+	CallRef:    "callref",
+}
+
+// String returns the lower-case name of k.
+func (k Kind) String() string {
+	if int(k) < len(kindNames) && kindNames[k] != "" {
+		return kindNames[k]
+	}
+	return fmt.Sprintf("Kind(%d)", int(k))
+}
+
+// IsOrigin reports whether k is an Error Origin kind.
+func (k Kind) IsOrigin() bool { return k == Sentinel || k == Concrete || k == Opaque }
+
+// IsLeaf reports whether a value of kind k is a leaf of a value tree: an
+// Error Origin, an Unresolved place, or (only inside summaries) a symbolic
+// value.
+func (k Kind) IsLeaf() bool { return k != Wrap && k != Truncated }
+
+// UnresolvedKind says why a value is Unresolved. The set is closed.
+type UnresolvedKind string
+
+const (
+	// Pending is temporary: a call that is not followed yet. It exists only
+	// until interprocedural summaries replace it.
+	Pending UnresolvedKind = "pending"
+	// Memory is an error loaded from a struct field, a map, slice or array
+	// element, a pointer that isn't a local variable, or a channel.
+	Memory UnresolvedKind = "memory"
+	// DependsOnCaller is a parameter or captured variable that reaches the
+	// top of a Query: its errors depend on the caller.
+	DependsOnCaller UnresolvedKind = "depends-on-caller"
+)
+
+// WrapKind says how a Wrap was made.
+type WrapKind string
+
+const (
+	// WrapErrorf is a fmt.Errorf with one or more %w verbs.
+	WrapErrorf WrapKind = "errorf"
+	// WrapJoin is errors.Join.
+	WrapJoin WrapKind = "join"
+	// WrapUnwrapMethod is a value of a type with a custom Unwrap method.
+	WrapUnwrapMethod WrapKind = "unwrap-method"
+	// WrapBraces is braces.dev/errtrace.Wrap.
+	WrapBraces WrapKind = "braces-wrap"
+)
+
+// Value is one abstract error value. Which fields are set depends on Kind;
+// the others are zero. Values are immutable once interned: Inner must not
+// be modified.
+type Value struct {
+	Kind Kind
+
+	// Site is where the value is made, for printing its span: the
+	// *types.Var of a Sentinel, and the SSA value or instruction that
+	// creates the other kinds. It is opaque to this package and is not
+	// part of the value's identity: of two values that differ only in Site,
+	// the first one interned is kept.
+	Site any
+	// Pos is the source position of the value, part of its identity (two
+	// Concrete Type Origins of the same type made at different places are
+	// different Origins).
+	Pos token.Pos
+
+	// Var is the variable of a Sentinel.
+	Var *types.Var
+	// Type is the type of a Concrete Type Origin or of a pointer Sentinel,
+	// the wrapper type of a custom-Unwrap Wrap, and the type of a Param or
+	// FreeVar.
+	Type types.Type
+	// TypedNil marks a Concrete Type Origin that is a nil pointer in a
+	// non-nil interface.
+	TypedNil bool
+
+	// Constructor is the function that made an Opaque Error
+	// ("errors.New"), or empty if unknown.
+	Constructor string
+	// Message is the constant message of an Opaque Error, if known.
+	Message string
+	// HasMessage reports whether Message is a known constant.
+	HasMessage bool
+
+	// WrapKind is the kind of a Wrap.
+	WrapKind WrapKind
+	// Format is the format string of an errorf Wrap.
+	Format string
+	// Inner are the wrapped values of a Wrap, or the single value under a
+	// Truncated marker.
+	Inner []ValueID
+
+	// Unresolved is the kind of an Unresolved value.
+	Unresolved UnresolvedKind
+	// Detail describes an Unresolved value, or the callee of a CallRef.
+	Detail string
+
+	// Fn is the SSA name of the function a Param or FreeVar belongs to.
+	Fn string
+	// Index is the parameter index of a Param, the free variable index of
+	// a FreeVar, or the result index of a CallRef.
+	Index int
+	// Name is the source name of a Param or FreeVar.
+	Name string
+}
+
+// key is the identity of a Value: every field except Site, in comparable
+// form.
+type key struct {
+	kind        Kind
+	pos         token.Pos
+	v           *types.Var
+	typ         string
+	typedNil    bool
+	constructor string
+	message     string
+	hasMessage  bool
+	wrapKind    WrapKind
+	format      string
+	inner       string
+	unresolved  UnresolvedKind
+	detail      string
+	fn          string
+	index       int
+	name        string
+}
+
+func keyOf(v Value) key {
+	k := key{
+		kind:        v.Kind,
+		pos:         v.Pos,
+		v:           v.Var,
+		typedNil:    v.TypedNil,
+		constructor: v.Constructor,
+		message:     v.Message,
+		hasMessage:  v.HasMessage,
+		wrapKind:    v.WrapKind,
+		format:      v.Format,
+		unresolved:  v.Unresolved,
+		detail:      v.Detail,
+		fn:          v.Fn,
+		index:       v.Index,
+		name:        v.Name,
+	}
+	if v.Type != nil {
+		k.typ = types.TypeString(v.Type, nil)
+	}
+	if len(v.Inner) > 0 {
+		var b strings.Builder
+		for i, id := range v.Inner {
+			if i > 0 {
+				b.WriteByte(',')
+			}
+			b.WriteString(strconv.Itoa(int(id)))
+		}
+		k.inner = b.String()
+	}
+	return k
+}
+
+// Table interns Values: it hash-conses them, so that equal values share a
+// ValueID and set operations and fixpoint checks compare small integers. A
+// Table is not safe for concurrent use.
+type Table struct {
+	values []Value
+	index  map[key]ValueID
+}
+
+// NewTable returns an empty Table.
+func NewTable() *Table {
+	return &Table{index: make(map[key]ValueID)}
+}
+
+// Intern returns the ValueID of v, adding v to the table if no equal value
+// is there yet. It panics if v has no Kind or refers to an unknown ValueID.
+func (t *Table) Intern(v Value) ValueID {
+	if v.Kind == 0 {
+		panic("errset: Intern of a Value with no Kind")
+	}
+	for _, id := range v.Inner {
+		if id < 0 || int(id) >= len(t.values) {
+			panic(fmt.Sprintf("errset: Intern of a Value with unknown inner ValueID %d", id))
+		}
+	}
+	k := keyOf(v)
+	if id, ok := t.index[k]; ok {
+		return id
+	}
+	id := ValueID(len(t.values))
+	v.Inner = append([]ValueID(nil), v.Inner...)
+	t.values = append(t.values, v)
+	t.index[k] = id
+	return id
+}
+
+// Get returns the Value named by id. It panics if id is not in the table.
+func (t *Table) Get(id ValueID) Value { return t.values[id] }
+
+// Len returns the number of distinct values in the table.
+func (t *Table) Len() int { return len(t.values) }
+
+// String returns a short description of the value id, without positions,
+// for tests, debugging and as an ordering tie-break.
+func (t *Table) String(id ValueID) string {
+	v := t.Get(id)
+	switch v.Kind {
+	case Sentinel:
+		if v.Var.Pkg() != nil {
+			return "sentinel " + v.Var.Pkg().Path() + "." + v.Var.Name()
+		}
+		return "sentinel " + v.Var.Name()
+	case Concrete:
+		s := "concrete " + types.TypeString(v.Type, nil)
+		if v.TypedNil {
+			s += " [typed nil]"
+		}
+		return s
+	case Opaque:
+		s := "opaque"
+		if v.Constructor != "" {
+			s += " " + v.Constructor
+		}
+		if v.HasMessage {
+			s += " " + strconv.Quote(v.Message)
+		}
+		return s
+	case Wrap:
+		parts := make([]string, len(v.Inner))
+		for i, in := range v.Inner {
+			parts[i] = t.String(in)
+		}
+		return fmt.Sprintf("wrap(%s %s)[%s]", v.WrapKind, t.WrapDescription(id), strings.Join(parts, "; "))
+	case Truncated:
+		return "truncated[" + t.String(v.Inner[0]) + "]"
+	case Unresolved:
+		return fmt.Sprintf("unresolved(%s): %s", v.Unresolved, v.Detail)
+	case Param:
+		return fmt.Sprintf("param %s#%d %s", v.Fn, v.Index, v.Name)
+	case FreeVar:
+		return fmt.Sprintf("freevar %s#%d %s", v.Fn, v.Index, v.Name)
+	case CallRef:
+		return fmt.Sprintf("callref %s #%d", v.Detail, v.Index)
+	}
+	return v.Kind.String()
+}
+
+// WrapDescription returns how the Wrap id is described in a Wrap Chain:
+// fmt.Errorf "<fmt>", errors.Join, <type>.Unwrap or errtrace.Wrap.
+func (t *Table) WrapDescription(id ValueID) string {
+	v := t.Get(id)
+	switch v.WrapKind {
+	case WrapErrorf:
+		return "fmt.Errorf " + strconv.Quote(v.Format)
+	case WrapJoin:
+		return "errors.Join"
+	case WrapUnwrapMethod:
+		if v.Type != nil {
+			return types.TypeString(v.Type, nil) + ".Unwrap"
+		}
+		return "Unwrap"
+	case WrapBraces:
+		return "errtrace.Wrap"
+	}
+	return string(v.WrapKind)
+}

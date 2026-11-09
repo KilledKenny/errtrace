@@ -1,0 +1,169 @@
+package errset
+
+import (
+	"go/token"
+	"go/types"
+	"reflect"
+	"strings"
+	"testing"
+)
+
+// testVars returns two package-level error variables of package
+// example.com/fx.
+func testVars() (pkg *types.Package, a, b *types.Var) {
+	pkg = types.NewPackage("example.com/fx", "fx")
+	errType := types.Universe.Lookup("error").Type()
+	a = types.NewVar(token.NoPos, pkg, "ErrA", errType)
+	b = types.NewVar(token.NoPos, pkg, "ErrB", errType)
+	return pkg, a, b
+}
+
+func TestInternEqualValues(t *testing.T) {
+	pkg, a, b := testVars()
+	tbl := NewTable()
+	named := types.NewNamed(types.NewTypeName(token.NoPos, pkg, "MyErr", nil), types.NewStruct(nil, nil), nil)
+
+	sa1 := tbl.Intern(Value{Kind: Sentinel, Var: a, Site: "first"})
+	sa2 := tbl.Intern(Value{Kind: Sentinel, Var: a, Site: "second"})
+	sb := tbl.Intern(Value{Kind: Sentinel, Var: b})
+	if sa1 != sa2 {
+		t.Errorf("equal Sentinels got IDs %d and %d", sa1, sa2)
+	}
+	if sa1 == sb {
+		t.Errorf("different Sentinels share ID %d", sa1)
+	}
+	if got := tbl.Get(sa2).Site; got != "first" {
+		t.Errorf("Site = %v, want the first interned one", got)
+	}
+
+	// Distinct but identical pointer types intern to one value.
+	c1 := tbl.Intern(Value{Kind: Concrete, Type: types.NewPointer(named), Pos: 10})
+	c2 := tbl.Intern(Value{Kind: Concrete, Type: types.NewPointer(named), Pos: 10})
+	c3 := tbl.Intern(Value{Kind: Concrete, Type: types.NewPointer(named), Pos: 20})
+	c4 := tbl.Intern(Value{Kind: Concrete, Type: named, Pos: 10})
+	if c1 != c2 {
+		t.Errorf("equal Concrete Types got IDs %d and %d", c1, c2)
+	}
+	if c1 == c3 || c1 == c4 {
+		t.Errorf("Concrete Types at another position or of another type share an ID")
+	}
+
+	w1 := tbl.Intern(Value{Kind: Wrap, WrapKind: WrapJoin, Inner: []ValueID{sa1, sb}})
+	w2 := tbl.Intern(Value{Kind: Wrap, WrapKind: WrapJoin, Inner: []ValueID{sa1, sb}})
+	w3 := tbl.Intern(Value{Kind: Wrap, WrapKind: WrapJoin, Inner: []ValueID{sb, sa1}})
+	if w1 != w2 || w1 == w3 {
+		t.Errorf("Wrap interning: w1=%d w2=%d w3=%d", w1, w2, w3)
+	}
+	if tbl.Len() != 7 {
+		t.Errorf("Len = %d, want 7", tbl.Len())
+	}
+}
+
+func TestInternCopiesInner(t *testing.T) {
+	_, a, _ := testVars()
+	tbl := NewTable()
+	s := tbl.Intern(Value{Kind: Sentinel, Var: a})
+	inner := []ValueID{s}
+	w := tbl.Intern(Value{Kind: Wrap, WrapKind: WrapJoin, Inner: inner})
+	inner[0] = 99
+	if got := tbl.Get(w).Inner[0]; got != s {
+		t.Errorf("Inner changed through the caller's slice: %d", got)
+	}
+}
+
+func TestFlatten(t *testing.T) {
+	_, a, b := testVars()
+	tbl := NewTable()
+	sa := tbl.Intern(Value{Kind: Sentinel, Var: a})
+	sb := tbl.Intern(Value{Kind: Sentinel, Var: b})
+	un := tbl.Intern(Value{Kind: Unresolved, Unresolved: Memory, Detail: "field"})
+	inner := tbl.Intern(Value{Kind: Wrap, WrapKind: WrapErrorf, Format: "a: %w", Inner: []ValueID{sa}})
+	trunc := tbl.Intern(Value{Kind: Truncated, Inner: []ValueID{un}})
+	join := tbl.Intern(Value{Kind: Wrap, WrapKind: WrapJoin, Inner: []ValueID{inner, sb, trunc}})
+	path := Path{{Site: "ret", Func: "example.com/fx.F"}}
+
+	got := Flatten(tbl, join, path)
+	want := []Entry{
+		{Leaf: sa, Chain: []ValueID{inner, join}, Path: path},
+		{Leaf: sb, Chain: []ValueID{join}, Path: path},
+		{Leaf: un, Chain: []ValueID{join}, Truncated: true, Path: path},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Flatten =\n%+v\nwant\n%+v", got, want)
+	}
+
+	if got := Flatten(tbl, sa, path); len(got) != 1 || got[0].Leaf != sa || len(got[0].Chain) != 0 {
+		t.Errorf("Flatten of a leaf = %+v", got)
+	}
+}
+
+func TestDedup(t *testing.T) {
+	_, a, b := testVars()
+	tbl := NewTable()
+	sa := tbl.Intern(Value{Kind: Sentinel, Var: a})
+	sb := tbl.Intern(Value{Kind: Sentinel, Var: b})
+	p1 := Path{{Site: "one", Func: "F"}}
+	p2 := Path{{Site: "two", Func: "F"}}
+	got := Dedup([]Entry{
+		{Leaf: sa, Path: p1},
+		{Leaf: sb, Path: p1},
+		{Leaf: sa, Path: p2},
+		{Leaf: sa, Path: p1}, // the same path again: not another path
+	})
+	want := []Entry{
+		{Leaf: sa, Path: p1, MorePaths: 1},
+		{Leaf: sb, Path: p1},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Dedup =\n%+v\nwant\n%+v", got, want)
+	}
+}
+
+func TestSortIsStableAndRanked(t *testing.T) {
+	pkg, a, b := testVars()
+	named := types.NewNamed(types.NewTypeName(token.NoPos, pkg, "MyErr", nil), types.NewStruct(nil, nil), nil)
+	tbl := NewTable()
+	ids := map[string]ValueID{
+		"un":  tbl.Intern(Value{Kind: Unresolved, Unresolved: Memory, Detail: "x", Pos: 1}),
+		"op":  tbl.Intern(Value{Kind: Opaque, Constructor: "errors.New", Message: "m", HasMessage: true, Pos: 2}),
+		"c9":  tbl.Intern(Value{Kind: Concrete, Type: named, Pos: 9}),
+		"c10": tbl.Intern(Value{Kind: Concrete, Type: types.NewPointer(named), Pos: 10}),
+		"sb":  tbl.Intern(Value{Kind: Sentinel, Var: b, Pos: 3}),
+		"sa":  tbl.Intern(Value{Kind: Sentinel, Var: a, Pos: 4}),
+	}
+	pos := func(id ValueID) (string, int) {
+		v := tbl.Get(id)
+		return "a.go", int(v.Pos)
+	}
+	// Two entries with the same leaf differ by chain.
+	w := tbl.Intern(Value{Kind: Wrap, WrapKind: WrapErrorf, Format: "x: %w", Inner: []ValueID{ids["sa"]}, Pos: 5})
+	order := func(entries []Entry) string {
+		var parts []string
+		for _, e := range entries {
+			s := tbl.String(e.Leaf)
+			if len(e.Chain) > 0 {
+				s += " via " + tbl.WrapDescription(e.Chain[0])
+			}
+			parts = append(parts, s)
+		}
+		return strings.Join(parts, " | ")
+	}
+	want := `sentinel example.com/fx.ErrB | sentinel example.com/fx.ErrA | sentinel example.com/fx.ErrA via fmt.Errorf "x: %w" | ` +
+		`concrete example.com/fx.MyErr | concrete *example.com/fx.MyErr | opaque errors.New "m" | unresolved(memory): x`
+	inputs := [][]Entry{
+		{{Leaf: ids["un"]}, {Leaf: ids["op"]}, {Leaf: ids["c10"]}, {Leaf: ids["c9"]}, {Leaf: ids["sa"], Chain: []ValueID{w}}, {Leaf: ids["sa"]}, {Leaf: ids["sb"]}},
+		{{Leaf: ids["sb"]}, {Leaf: ids["sa"]}, {Leaf: ids["sa"], Chain: []ValueID{w}}, {Leaf: ids["c9"]}, {Leaf: ids["c10"]}, {Leaf: ids["op"]}, {Leaf: ids["un"]}},
+	}
+	for i, in := range inputs {
+		for run := range 2 {
+			entries := append([]Entry(nil), in...)
+			Sort(tbl, entries, pos)
+			if got := order(entries); got != want {
+				t.Errorf("input %d, run %d: order =\n%s\nwant\n%s", i, run, got, want)
+			}
+		}
+	}
+	if n := CountUnresolved(tbl, inputs[0]); n != 1 {
+		t.Errorf("CountUnresolved = %d, want 1", n)
+	}
+}

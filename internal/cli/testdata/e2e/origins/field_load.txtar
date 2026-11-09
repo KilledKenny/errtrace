@@ -1,0 +1,20 @@
+An error loaded from a struct field is unresolved(memory).
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:5:12-13: Error Set of example.com/fx.F: 1 entries, 1 unresolved
+$WORK/a.go:6:9-14: unresolved(memory): load of field err of *example.com/fx.S
+	path (origin → target):
+		$WORK/a.go:6:9-14: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+type S struct{ err error }
+
+func /*@f*/F(s *S) error {
+	return s.err
+}

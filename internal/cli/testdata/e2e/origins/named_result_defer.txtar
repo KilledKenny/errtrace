@@ -1,0 +1,33 @@
+A named result in a function with a defer is a local variable: the values stored into it are followed (changes made by the deferred call itself are not modelled yet).
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:10:12-13: Error Set of example.com/fx.F: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:13:9-15: in example.com/fx.F
+$WORK/a.go:16:9-28: opaque errors.New "other"
+	path (origin → target):
+		$WORK/a.go:16:9-28: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"io"
+)
+
+func cleanup() {}
+
+func /*@f*/F(b bool) (err error) {
+	defer cleanup()
+	if b {
+		err = io.EOF
+		return
+	}
+	return errors.New("other")
+}

@@ -1,0 +1,20 @@
+A package-level sentinel returned by identity: one Sentinel entry whose span is the var identifier and whose path is one hop at the return operand.
+-- args --
+a.go:@find
+-- stdout --
+$WORK/a.go:7:15-19: Error Set of example.com/fx.Find: 1 entries
+$WORK/a.go:5:5-16: sentinel example.com/fx.ErrNotFound
+	path (origin → target):
+		$WORK/a.go:7:37-48: in example.com/fx.Find
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var ErrNotFound = errors.New("not found")
+
+func /*@find*/Find() error { return ErrNotFound }

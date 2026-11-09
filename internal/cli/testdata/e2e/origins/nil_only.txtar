@@ -1,0 +1,15 @@
+A function that only returns nil has an empty Error Set.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:3:12-13: Error Set of example.com/fx.F: 0 entries
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+func /*@f*/F() error {
+	return nil
+}

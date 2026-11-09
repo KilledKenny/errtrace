@@ -2,6 +2,7 @@ The -tags and -p flags are accepted and passed to package loading.
 -- args --
 -tags=foo -p ./... a.go:@f
 -- stdout --
+$WORK/a.go:3:12-13: Error Set of example.com/fx.F: 0 entries
 -- stderr --
 -- exit --
 0

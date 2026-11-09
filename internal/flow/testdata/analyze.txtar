@@ -1,0 +1,45 @@
+Functions whose local facts are checked by TestAnalyze.
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"io"
+	"os"
+)
+
+func g() (int, error) { return 0, io.EOF }
+
+// Symbolic values: a CallRef per call result, Param by index.
+func Symbolic(b bool, err error) (int, error) {
+	if b {
+		return g()
+	}
+	if err != nil {
+		return 0, err
+	}
+	_, e := os.Open("x")
+	return 0, e
+}
+
+// Two error results.
+func Two() (error, *os.PathError) {
+	return errors.New("one"), &os.PathError{}
+}
+
+// A loop phi terminates.
+func Loop(n int) error {
+	var err error
+	for i := 0; i < n; i++ {
+		if i == 3 {
+			err = io.EOF
+		}
+	}
+	return err
+}
+
+func NoError() int { return 0 }

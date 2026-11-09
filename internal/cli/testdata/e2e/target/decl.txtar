@@ -2,6 +2,10 @@ A declaration Target on a method name: -debug=target describes it.
 -- args --
 -debug=target,timing a.go:@m
 -- stdout --
+$WORK/a.go:7:19-22: Error Set of (*example.com/fx.T).Get: 1 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:7:40-46: in (*example.com/fx.T).Get
 -- stderr --
 target: declaration (*example.com/fx.T).Get funcs=[(*example.com/fx.T).Get] span=$WORK/a.go:7:19-22
 -- go.mod --
