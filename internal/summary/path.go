@@ -32,6 +32,25 @@ func (a best) less(b best) bool {
 	return len(a.path) < len(b.path)
 }
 
+// srcsKey names one list of sources of a value in fn by its backing
+// array. The lists in summaries share their argument source lists (each
+// Via source made by substitution refers to the list of the argument's
+// leaf, and loops solved to a fixpoint nest them as deep as the chain
+// depth), so the source trees are DAGs that are exponential as trees;
+// keying the best paths by list keeps the search linear in the lists.
+// Nothing changes a list while paths are computed.
+type srcsKey struct {
+	fn    *ssa.Function
+	first *Source
+	n     int
+}
+
+// memoBest is the best path of a list of sources, if it has one.
+type memoBest struct {
+	b  best
+	ok bool
+}
+
 // Path returns the best Propagation Path of a leaf that reaches fn with
 // the sources srcs (a leaf of a fact of fn's summary, or of a fact from
 // SiteFacts): the
@@ -56,6 +75,9 @@ func (s *Solver) computePaths() {
 	s.paths = make(map[node]best)
 	for changed := true; changed; {
 		changed = false
+		// The best paths of lists hold for the paths of this round; in
+		// the last round no path changes, so they stay exact for Path.
+		s.memo = make(map[srcsKey]memoBest)
 		for _, fn := range s.order {
 			for _, r := range s.sums[fn].Results {
 				for _, f := range r.Facts {
@@ -79,6 +101,13 @@ func (s *Solver) computePaths() {
 // bestOf returns the cheapest path among srcs in fn, given the current
 // best paths of the nodes they refer to.
 func (s *Solver) bestOf(fn *ssa.Function, srcs []Source) (best, bool) {
+	if len(srcs) == 0 {
+		return best{}, false
+	}
+	key := srcsKey{fn, &srcs[0], len(srcs)}
+	if m, ok := s.memo[key]; ok {
+		return m.b, m.ok
+	}
 	var b best
 	found := false
 	for _, src := range srcs {
@@ -87,6 +116,7 @@ func (s *Solver) bestOf(fn *ssa.Function, srcs []Source) (best, bool) {
 			b, found = c, true
 		}
 	}
+	s.memo[key] = memoBest{b, found}
 	return b, found
 }
 

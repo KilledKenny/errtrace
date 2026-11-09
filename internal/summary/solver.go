@@ -43,6 +43,9 @@ type Solver struct {
 	// paths are the best Propagation Paths, computed when first asked for
 	// after a Solve.
 	paths map[node]best
+	// memo has the best paths of the source lists, as of the paths (see
+	// computePaths).
+	memo map[srcsKey]memoBest
 
 	// transfer computes the result summaries of a function from the
 	// current summaries of its callees. It is evaluate, except in tests.

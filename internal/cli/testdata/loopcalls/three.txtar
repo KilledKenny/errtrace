@@ -1,0 +1,35 @@
+A loop that cycles through three wrapping helpers, at the default chain depth.
+-- args --
+a.go:@q
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrB = errors.New("b")
+
+func p1(e error) error { return fmt.Errorf("p1: %w", e) }
+func p2(e error) error { return fmt.Errorf("p2: %w", e) }
+func p3(e error) error { return fmt.Errorf("p3: %w", e) }
+
+func /*@q*/Q(n int) error {
+	err := ErrB
+	for i := 0; i < n; i++ {
+		switch i % 3 {
+		case 0:
+			err = p1(err)
+		case 1:
+			err = p2(err)
+		default:
+			err = p3(err)
+		}
+	}
+	return err
+}

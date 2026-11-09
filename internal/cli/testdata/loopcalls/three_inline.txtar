@@ -1,0 +1,31 @@
+The inline equivalent of three.txtar.
+-- args --
+a.go:@q
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrB = errors.New("b")
+
+func /*@q*/Q(n int) error {
+	err := ErrB
+	for i := 0; i < n; i++ {
+		switch i % 3 {
+		case 0:
+			err = fmt.Errorf("p1: %w", err)
+		case 1:
+			err = fmt.Errorf("p2: %w", err)
+		default:
+			err = fmt.Errorf("p3: %w", err)
+		}
+	}
+	return err
+}
