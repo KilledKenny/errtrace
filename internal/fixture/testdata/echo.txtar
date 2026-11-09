@@ -1,0 +1,25 @@
+The echo fixture checks the harness end to end: markers are substituted,
+module files are written into $WORK, and output is masked.
+-- args --
+-flag a.go:@load sub/b.go:#@b
+-- stdout --
+args: -flag a.go:5:15 sub/b.go:#23
+file: $WORK/a.go
+-- stderr --
+uri: file://$WORK/a.go
+-- exit --
+3
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+// é: the comment holds a 2-byte rune, which does not move line 5.
+
+func /*@load*/Load() error { return nil }
+-- sub/b.go --
+package sub
+
+var /*@b*/B = 1

@@ -1,0 +1,15 @@
+-- args --
+-tags=foo -p ./... a.go:@f
+-- stdout --
+-- stderr --
+errtrace: not implemented
+-- exit --
+2
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+func /*@f*/F() error { return nil }

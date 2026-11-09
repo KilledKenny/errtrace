@@ -1,0 +1,15 @@
+This comment must survive -update.
+-- args --
+a.go:@f
+-- stdout --
+stale output
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+func /*@f*/F() {}
+-- z/last.go --
+package z

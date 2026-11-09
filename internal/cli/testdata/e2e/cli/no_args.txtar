@@ -1,0 +1,19 @@
+-- args --
+-- stdout --
+-- stderr --
+errtrace: expected exactly one Target argument, got 0
+usage: errtrace [flags] <target>
+
+errtrace reports the Error Set of a Target: every Error Origin that can reach
+the Target's error result, with its Propagation Path.
+
+<target> is a position in a Go file, with byte columns:
+  file.go:LINE:COL | file.go:#OFFSET | file.go:L:C-L2:C2 (the start is used)
+
+flags:
+  -p patterns
+    	comma-separated package patterns to load (default "./...")
+  -tags list
+    	comma-separated list of build tags
+-- exit --
+2

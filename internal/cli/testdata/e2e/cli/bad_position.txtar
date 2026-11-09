@@ -1,0 +1,9 @@
+-- args --
+a.go:x:3
+-- stdout --
+-- stderr --
+errtrace: invalid position "a.go:x:3": "x" is not a number
+-- exit --
+2
+-- a.go --
+package fx
