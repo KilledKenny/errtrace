@@ -134,6 +134,10 @@ type analyzer struct {
 	// marked Truncated. seenCut is the seen set of that walk.
 	cut     bool
 	seenCut map[ssa.Value]bool
+	// revisits counts the walks of a non-nil value that was already
+	// walked: its facts were added before, so a walk that adds nothing
+	// does not show the value is nil.
+	revisits int
 }
 
 func (a *analyzer) add(id errset.ValueID, src any) {
@@ -161,6 +165,9 @@ func (a *analyzer) posOf(v ssa.Value) token.Pos {
 
 func (a *analyzer) walk(v ssa.Value) {
 	if a.seen[v] {
+		if !isNilConst(v) {
+			a.revisits++
+		}
 		return
 	}
 	a.seen[v] = true

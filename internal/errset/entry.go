@@ -70,25 +70,35 @@ func Flatten(t *Table, top ValueID, path Path) []Entry {
 	return out
 }
 
-// Dedup merges entries with the same leaf, Wrap Chain and truncation. The
-// first entry's Path is kept; every other distinct Path adds to MorePaths.
-// The order of first occurrences is kept.
-func Dedup(entries []Entry) []Entry {
+// Dedup merges entries with the same leaf, Wrap Chain and truncation. Wrap
+// Chains are compared by what is shown of each Wrap (its place, kind,
+// format and type), not by its wrapped values: the same leaf under one
+// errors.Join is one entry whatever the Join's other operands are. The
+// first entry's Path and Chain are kept; every other distinct Path adds to
+// MorePaths. The order of first occurrences is kept.
+func Dedup(t *Table, entries []Entry) []Entry {
 	type group struct {
 		entry Entry
+		chain []key
 		paths []Path
 	}
 	var groups []*group
 	for _, e := range entries {
+		chain := make([]key, len(e.Chain))
+		for i, w := range e.Chain {
+			v := t.Get(w)
+			v.Inner = nil
+			chain[i] = keyOf(v)
+		}
 		var g *group
 		for _, cand := range groups {
-			if cand.entry.Leaf == e.Leaf && cand.entry.Truncated == e.Truncated && slices.Equal(cand.entry.Chain, e.Chain) {
+			if cand.entry.Leaf == e.Leaf && cand.entry.Truncated == e.Truncated && slices.Equal(cand.chain, chain) {
 				g = cand
 				break
 			}
 		}
 		if g == nil {
-			groups = append(groups, &group{entry: e, paths: []Path{e.Path}})
+			groups = append(groups, &group{entry: e, chain: chain, paths: []Path{e.Path}})
 			continue
 		}
 		g.entry.MorePaths += e.MorePaths

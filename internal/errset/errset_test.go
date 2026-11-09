@@ -104,7 +104,7 @@ func TestDedup(t *testing.T) {
 	sb := tbl.Intern(Value{Kind: Sentinel, Var: b})
 	p1 := Path{{Site: "one", Func: "F"}}
 	p2 := Path{{Site: "two", Func: "F"}}
-	got := Dedup([]Entry{
+	got := Dedup(tbl, []Entry{
 		{Leaf: sa, Path: p1},
 		{Leaf: sb, Path: p1},
 		{Leaf: sa, Path: p2},
@@ -113,6 +113,32 @@ func TestDedup(t *testing.T) {
 	want := []Entry{
 		{Leaf: sa, Path: p1, MorePaths: 1},
 		{Leaf: sb, Path: p1},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Dedup =\n%+v\nwant\n%+v", got, want)
+	}
+}
+
+func TestDedupComparesWrapsWithoutSiblings(t *testing.T) {
+	_, a, b := testVars()
+	tbl := NewTable()
+	sa := tbl.Intern(Value{Kind: Sentinel, Var: a})
+	sb := tbl.Intern(Value{Kind: Sentinel, Var: b})
+	// errors.Join(x, ErrA) at one place, with x being ErrA or ErrB: two
+	// Wraps that differ only in their other operand.
+	w1 := tbl.Intern(Value{Kind: Wrap, WrapKind: WrapJoin, Pos: 7, Inner: []ValueID{sa, sa}})
+	w2 := tbl.Intern(Value{Kind: Wrap, WrapKind: WrapJoin, Pos: 7, Inner: []ValueID{sb, sa}})
+	other := tbl.Intern(Value{Kind: Wrap, WrapKind: WrapJoin, Pos: 8, Inner: []ValueID{sa}})
+	p := Path{{Site: "one", Func: "F"}}
+	var entries []Entry
+	for _, w := range []ValueID{w1, w2, other} {
+		entries = append(entries, Flatten(tbl, w, p)...)
+	}
+	got := Dedup(tbl, entries)
+	want := []Entry{
+		{Leaf: sa, Chain: []ValueID{w1}, Path: p},
+		{Leaf: sb, Chain: []ValueID{w2}, Path: p},
+		{Leaf: sa, Chain: []ValueID{other}, Path: p},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Dedup =\n%+v\nwant\n%+v", got, want)

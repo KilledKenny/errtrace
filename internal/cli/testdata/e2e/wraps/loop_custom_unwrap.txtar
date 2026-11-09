@@ -1,0 +1,41 @@
+A loop that wraps its own error in a type with a custom Unwrap, at -chain-depth=1: the wrapper always wraps something, so there is no concrete wrapErr entry.
+-- args --
+-chain-depth=1 a.go:@f
+-- stdout --
+$WORK/a.go:12:12-13: Error Set of example.com/fx.F: 3 entries
+$WORK/a.go:5:5-9: sentinel example.com/fx.ErrX
+	path (origin → target):
+		$WORK/a.go:13:9-13: in example.com/fx.F
+$WORK/a.go:5:5-9: sentinel example.com/fx.ErrX
+	wrap chain (origin → target):
+		$WORK/a.go:15:9-29: *example.com/fx.wrapErr.Unwrap
+	path (origin → target):
+		$WORK/a.go:15:9-29: in example.com/fx.F
+$WORK/a.go:5:5-9: sentinel example.com/fx.ErrX [chain truncated]
+	wrap chain (origin → target):
+		$WORK/a.go:15:9-29: *example.com/fx.wrapErr.Unwrap
+	path (origin → target):
+		$WORK/a.go:15:9-29: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var ErrX = errors.New("x")
+
+type wrapErr struct{ inner error }
+
+func (e *wrapErr) Error() string { return "wrap: " + e.inner.Error() }
+func (e *wrapErr) Unwrap() error { return e.inner }
+
+func /*@f*/F(xs []int) error {
+	err := ErrX
+	for range xs {
+		err = &wrapErr{inner: err}
+	}
+	return err
+}

@@ -81,7 +81,7 @@ func Run(ctx context.Context, prog *load.Program, tgt *target.Target, opts Optio
 		return nil, fmt.Errorf("unknown Target kind %v", tgt.Kind)
 	}
 	r.Stats = solver.Stats()
-	entries = errset.Dedup(entries)
+	entries = errset.Dedup(r.Table, entries)
 	errset.Sort(r.Table, entries, r.position)
 	r.Entries = entries
 	return r, nil

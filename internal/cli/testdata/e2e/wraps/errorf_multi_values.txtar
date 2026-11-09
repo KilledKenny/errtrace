@@ -1,0 +1,59 @@
+fmt.Errorf with two %w, one a call returning several sentinels: ErrY is one entry, not one per value of the other operand.
+-- args --
+a.go:@p
+-- stdout --
+$WORK/a.go:25:12-13: Error Set of example.com/fx.P: 4 entries
+$WORK/a.go:9:2-6: sentinel example.com/fx.ErrA
+	wrap chain (origin → target):
+		$WORK/a.go:25:36-70: fmt.Errorf "%w %w"
+	path (origin → target):
+		$WORK/a.go:18:10-14: in example.com/fx.pick
+		$WORK/a.go:25:56-63: in example.com/fx.P, call to example.com/fx.pick
+$WORK/a.go:10:2-6: sentinel example.com/fx.ErrB
+	wrap chain (origin → target):
+		$WORK/a.go:25:36-70: fmt.Errorf "%w %w"
+	path (origin → target):
+		$WORK/a.go:20:10-14: in example.com/fx.pick
+		$WORK/a.go:25:56-63: in example.com/fx.P, call to example.com/fx.pick
+$WORK/a.go:11:2-6: sentinel example.com/fx.ErrC
+	wrap chain (origin → target):
+		$WORK/a.go:25:36-70: fmt.Errorf "%w %w"
+	path (origin → target):
+		$WORK/a.go:22:9-13: in example.com/fx.pick
+		$WORK/a.go:25:56-63: in example.com/fx.P, call to example.com/fx.pick
+$WORK/a.go:12:2-6: sentinel example.com/fx.ErrY [+2 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:25:36-70: fmt.Errorf "%w %w"
+	path (origin → target):
+		$WORK/a.go:18:10-14: in example.com/fx.pick
+		$WORK/a.go:25:56-63: in example.com/fx.P, call to example.com/fx.pick
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"fmt"
+)
+
+var (
+	ErrA = errors.New("a")
+	ErrB = errors.New("b")
+	ErrC = errors.New("c")
+	ErrY = errors.New("y")
+)
+
+func pick(n int) error {
+	switch n {
+	case 0:
+		return ErrA
+	case 1:
+		return ErrB
+	}
+	return ErrC
+}
+
+func /*@p*/P(n int) error { return fmt.Errorf("%w %w", pick(n), ErrY) }

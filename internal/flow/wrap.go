@@ -368,7 +368,7 @@ func (a *analyzer) constructed(typ types.Type, alloc *ssa.Alloc) {
 		a.addAll(a.wraps(base, [][]errset.ValueID{{u}}), alloc)
 		return
 	}
-	before := len(a.facts)
+	before, revisits := len(a.facts), a.revisits
 	var operands [][]errset.ValueID
 	stored := fieldStores(alloc, m.field)
 	if !m.multi {
@@ -395,7 +395,9 @@ func (a *analyzer) constructed(typ types.Type, alloc *ssa.Alloc) {
 		}
 	}
 	if a.flat {
-		if len(a.facts) == before {
+		// Unwrap returns nil only when the walk found nothing and did not
+		// stop at values already walked (as in a wrapping loop).
+		if len(a.facts) == before && a.revisits == revisits {
 			a.add(conc, alloc)
 		}
 		return
