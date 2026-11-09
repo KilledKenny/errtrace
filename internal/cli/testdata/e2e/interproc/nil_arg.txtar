@@ -1,0 +1,26 @@
+A nil argument substituted for a returned parameter adds nothing, and the callee's own Origin stays.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:12:12-13: Error Set of example.com/fx.F: 1 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:9:9-15: in example.com/fx.pick
+		$WORK/a.go:12:37-49: in example.com/fx.F, call to example.com/fx.pick
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "io"
+
+func pick(b bool, e error) error {
+	if b {
+		return e
+	}
+	return io.EOF
+}
+
+func /*@f*/F(b bool) error { return pick(b, nil) }

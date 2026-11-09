@@ -81,15 +81,21 @@ func (k Kind) IsLeaf() bool { return k != Wrap && k != Truncated }
 type UnresolvedKind string
 
 const (
-	// Pending is temporary: a call that is not followed yet. It exists only
-	// until interprocedural summaries replace it.
-	Pending UnresolvedKind = "pending"
+	// NoBody is a call to a function without a Go body (assembly,
+	// //go:linkname, cgo, or no syntax loaded).
+	NoBody UnresolvedKind = "no-body"
+	// NoCandidates is a dynamic call for which no Candidate was found.
+	NoCandidates UnresolvedKind = "no-candidates"
 	// Memory is an error loaded from a struct field, a map, slice or array
 	// element, a pointer that isn't a local variable, or a channel.
 	Memory UnresolvedKind = "memory"
 	// DependsOnCaller is a parameter or captured variable that reaches the
 	// top of a Query: its errors depend on the caller.
 	DependsOnCaller UnresolvedKind = "depends-on-caller"
+	// FixpointLimit is a summary that did not converge within the
+	// iteration cap of its SCC, or an error result whose set of values
+	// passed the size cap.
+	FixpointLimit UnresolvedKind = "fixpoint-limit"
 )
 
 // WrapKind says how a Wrap was made.

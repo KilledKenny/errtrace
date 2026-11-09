@@ -1,0 +1,20 @@
+A parameter forwarded through a callee still depends on the caller of the Target.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:5:12-13: Error Set of example.com/fx.F: 1 entries, 1 unresolved
+$WORK/a.go:5:43-46: unresolved(depends-on-caller): parameter err (error)
+	path (origin → target):
+		$WORK/a.go:5:43-46: in example.com/fx.F
+		$WORK/a.go:3:33-34: in example.com/fx.id
+		$WORK/a.go:5:40-47: in example.com/fx.F, call to example.com/fx.id
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+func id(e error) error { return e }
+
+func /*@f*/F(err error) error { return id(err) }

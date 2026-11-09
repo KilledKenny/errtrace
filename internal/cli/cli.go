@@ -145,6 +145,9 @@ func run(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) error
 	if err != nil {
 		return err
 	}
+	if cfg.debug["summary"] {
+		fmt.Fprintf(opts.Stderr, "summary: functions=%d sccs=%d\n", res.Stats.Functions, res.Stats.SCCs)
+	}
 	return render.Text(opts.Stdout, render.Input{
 		TargetSpan: tgt.Span,
 		TargetName: tgt.Name,

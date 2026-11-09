@@ -1,0 +1,24 @@
+A passes a sentinel to id, which returns its parameter: the sentinel, with a path through id, and no depends-on-caller entry.
+-- args --
+a.go:@a
+-- stdout --
+$WORK/a.go:9:12-13: Error Set of example.com/fx.A: 1 entries
+$WORK/a.go:5:5-9: sentinel example.com/fx.ErrX
+	path (origin → target):
+		$WORK/a.go:9:34-38: in example.com/fx.A
+		$WORK/a.go:7:33-34: in example.com/fx.id
+		$WORK/a.go:9:31-39: in example.com/fx.A, call to example.com/fx.id
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var ErrX = errors.New("x")
+
+func id(e error) error { return e }
+
+func /*@a*/A() error { return id(ErrX) }

@@ -1,0 +1,89 @@
+The result of strconv.Atoi is followed into the stdlib: the set contains *strconv.NumError.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:5:12-13: Error Set of example.com/fx.F: 13 entries
+$GOROOT/src/strconv/atoi.go:*: concrete *strconv.NumError
+	path (origin → target):
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseUint
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseInt, call to strconv.ParseUint
+		$GOROOT/src/strconv/atoi.go:*: in strconv.Atoi, call to strconv.ParseInt
+		$WORK/a.go:6:12-29: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/strconv/atoi.go:*: concrete *strconv.NumError
+	path (origin → target):
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseUint
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseInt, call to strconv.ParseUint
+		$GOROOT/src/strconv/atoi.go:*: in strconv.Atoi, call to strconv.ParseInt
+		$WORK/a.go:6:12-29: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/strconv/atoi.go:*: concrete *strconv.NumError
+	path (origin → target):
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseUint
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseInt, call to strconv.ParseUint
+		$GOROOT/src/strconv/atoi.go:*: in strconv.Atoi, call to strconv.ParseInt
+		$WORK/a.go:6:12-29: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/strconv/atoi.go:*: concrete *strconv.NumError
+	path (origin → target):
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseUint
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseInt, call to strconv.ParseUint
+		$GOROOT/src/strconv/atoi.go:*: in strconv.Atoi, call to strconv.ParseInt
+		$WORK/a.go:6:12-29: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/strconv/atoi.go:*: concrete *strconv.NumError
+	path (origin → target):
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseUint
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseInt, call to strconv.ParseUint
+		$GOROOT/src/strconv/atoi.go:*: in strconv.Atoi, call to strconv.ParseInt
+		$WORK/a.go:6:12-29: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/strconv/atoi.go:*: concrete *strconv.NumError
+	path (origin → target):
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseUint
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseInt, call to strconv.ParseUint
+		$GOROOT/src/strconv/atoi.go:*: in strconv.Atoi, call to strconv.ParseInt
+		$WORK/a.go:6:12-29: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/strconv/atoi.go:*: concrete *strconv.NumError
+	path (origin → target):
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseUint
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseInt, call to strconv.ParseUint
+		$GOROOT/src/strconv/atoi.go:*: in strconv.Atoi, call to strconv.ParseInt
+		$WORK/a.go:6:12-29: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/strconv/atoi.go:*: concrete *strconv.NumError
+	path (origin → target):
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseUint
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseInt, call to strconv.ParseUint
+		$GOROOT/src/strconv/atoi.go:*: in strconv.Atoi, call to strconv.ParseInt
+		$WORK/a.go:6:12-29: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/strconv/atoi.go:*: concrete *strconv.NumError
+	path (origin → target):
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseInt
+		$GOROOT/src/strconv/atoi.go:*: in strconv.Atoi, call to strconv.ParseInt
+		$WORK/a.go:6:12-29: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/strconv/atoi.go:*: concrete *strconv.NumError
+	path (origin → target):
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseInt
+		$GOROOT/src/strconv/atoi.go:*: in strconv.Atoi, call to strconv.ParseInt
+		$WORK/a.go:6:12-29: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/strconv/atoi.go:*: concrete *strconv.NumError
+	path (origin → target):
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseInt
+		$GOROOT/src/strconv/atoi.go:*: in strconv.Atoi, call to strconv.ParseInt
+		$WORK/a.go:6:12-29: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/strconv/atoi.go:*: concrete *strconv.NumError
+	path (origin → target):
+		$GOROOT/src/strconv/atoi.go:*: in strconv.Atoi
+		$WORK/a.go:6:12-29: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/strconv/atoi.go:*: concrete *strconv.NumError
+	path (origin → target):
+		$GOROOT/src/strconv/atoi.go:*: in strconv.Atoi
+		$WORK/a.go:6:12-29: in example.com/fx.F, call to strconv.Atoi
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "strconv"
+
+func /*@f*/F() (int, error) {
+	n, err := strconv.Atoi("x")
+	return n, err
+}

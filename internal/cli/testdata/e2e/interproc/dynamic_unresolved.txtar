@@ -1,0 +1,18 @@
+A call of a function value has no Candidates yet: unresolved(no-candidates).
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:5:12-13: Error Set of example.com/fx.F: 1 entries, 1 unresolved
+$WORK/a.go:5:31-34: unresolved(no-candidates): dynamic call to function value example.com/fx.f
+	path (origin → target):
+		$WORK/a.go:5:31-34: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+var f func() error
+
+func /*@f*/F() error { return f() }

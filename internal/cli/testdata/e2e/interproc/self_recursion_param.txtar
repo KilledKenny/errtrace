@@ -1,0 +1,29 @@
+A self-recursive function that passes its error parameter along: the caller's argument is substituted through the recursion.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:14:12-13: Error Set of example.com/fx.g: 1 entries
+$WORK/a.go:5:5-9: sentinel example.com/fx.ErrX
+	path (origin → target):
+		$WORK/a.go:14:36-40: in example.com/fx.g
+		$WORK/a.go:9:10-11: in example.com/fx.f
+		$WORK/a.go:14:31-41: in example.com/fx.g, call to example.com/fx.f
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var ErrX = errors.New("x")
+
+func f(n int, e error) error {
+	if n == 0 {
+		return e
+	}
+	return f(n-1, e)
+}
+
+func /*@g*/g() error { return f(3, ErrX) }

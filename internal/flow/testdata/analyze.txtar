@@ -43,3 +43,14 @@ func Loop(n int) error {
 }
 
 func NoError() int { return 0 }
+
+func wrap(e error) error { return e }
+
+// Arguments: ValueFacts walks a call argument like a returned value.
+func Args(b bool, err error) error {
+	e := err
+	if b {
+		e = io.EOF
+	}
+	return wrap(e)
+}

@@ -1,0 +1,24 @@
+Functions for the Solver's unit tests.
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var ErrX = errors.New("x")
+
+func id(e error) error { return e }
+
+func A() error { return id(ErrX) }
+
+func Loop(n int) error {
+	if n == 0 {
+		return nil
+	}
+	return Loop(n - 1)
+}
+
+func Caller() error { return Loop(3) }

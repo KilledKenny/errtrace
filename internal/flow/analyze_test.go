@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/tools/go/ssa"
+
 	"github.com/killedKenny/errtrace/internal/errset"
 	"github.com/killedKenny/errtrace/internal/fixture"
 	"github.com/killedKenny/errtrace/internal/flow"
@@ -34,5 +36,51 @@ func TestAnalyze(t *testing.T) {
 		if got := strings.Join(results, " | "); got != want {
 			t.Errorf("Analyze(%s) = %q, want %q", name, got, want)
 		}
+	}
+}
+
+func TestValueFacts(t *testing.T) {
+	t.Parallel()
+	l := fixture.LoadProgram(t, filepath.Join("testdata", "analyze.txtar"))
+	fn := l.SSAPackage(l.Initial[0]).Func("Args")
+	var call *ssa.Call
+	for _, b := range fn.Blocks {
+		for _, instr := range b.Instrs {
+			if c, ok := instr.(*ssa.Call); ok {
+				call = c
+			}
+		}
+	}
+	if call == nil {
+		t.Fatal("no call in Args")
+	}
+	tbl := errset.NewTable()
+	var got []string
+	for _, f := range flow.ValueFacts(tbl, fn, call.Call.Args[0], call) {
+		got = append(got, tbl.String(f.Value))
+	}
+	if want := "param example.com/fx.Args#1 err; sentinel io.EOF"; strings.Join(got, "; ") != want {
+		t.Errorf("ValueFacts(wrap's argument) = %q, want %q", strings.Join(got, "; "), want)
+	}
+	if name, ok := flow.Intrinsic(call.Call.StaticCallee()); ok {
+		t.Errorf("wrap is reported as intrinsic %q", name)
+	}
+}
+
+func TestIntrinsic(t *testing.T) {
+	t.Parallel()
+	l := fixture.LoadProgram(t, filepath.Join("testdata", "analyze.txtar"))
+	errorsPkg := l.SSA.ImportedPackage("errors")
+	if errorsPkg == nil {
+		t.Fatal("errors is not loaded")
+	}
+	if name, ok := flow.Intrinsic(errorsPkg.Func("New")); !ok || name != "errors.New" {
+		t.Errorf("Intrinsic(errors.New) = %q, %v", name, ok)
+	}
+	if _, ok := flow.Intrinsic(errorsPkg.Func("Unwrap")); ok {
+		t.Error("errors.Unwrap is reported as intrinsic")
+	}
+	if _, ok := flow.Intrinsic(nil); ok {
+		t.Error("Intrinsic(nil) = true")
 	}
 }

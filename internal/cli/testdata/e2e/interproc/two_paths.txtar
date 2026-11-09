@@ -1,0 +1,30 @@
+A calls B and C, which both return the same sentinel: one entry with one more path.
+-- args --
+a.go:@a
+-- stdout --
+$WORK/a.go:7:12-13: Error Set of example.com/fx.A: 1 entries
+$WORK/a.go:5:5-9: sentinel example.com/fx.ErrX [+1 more paths]
+	path (origin → target):
+		$WORK/a.go:14:25-29: in example.com/fx.B
+		$WORK/a.go:9:10-13: in example.com/fx.A, call to example.com/fx.B
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var ErrX = errors.New("x")
+
+func /*@a*/A(b bool) error {
+	if b {
+		return B()
+	}
+	return C()
+}
+
+func B() error { return ErrX }
+
+func C() error { return ErrX }

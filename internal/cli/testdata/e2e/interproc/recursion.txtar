@@ -1,0 +1,41 @@
+Mutually recursive even and odd return a different sentinel on each base case: both sentinels, and the query terminates.
+-- args --
+-debug=summary a.go:@even
+-- stdout --
+$WORK/a.go:10:15-19: Error Set of example.com/fx.even: 2 entries
+$WORK/a.go:6:2-9: sentinel example.com/fx.ErrEven [+1 more paths]
+	path (origin → target):
+		$WORK/a.go:12:10-17: in example.com/fx.even
+$WORK/a.go:7:2-8: sentinel example.com/fx.ErrOdd
+	path (origin → target):
+		$WORK/a.go:19:10-16: in example.com/fx.odd
+		$WORK/a.go:14:9-19: in example.com/fx.even, call to example.com/fx.odd
+-- stderr --
+summary: functions=2 sccs=1
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var (
+	ErrEven = errors.New("even")
+	ErrOdd  = errors.New("odd")
+)
+
+func /*@even*/even(n int) error {
+	if n == 0 {
+		return ErrEven
+	}
+	return odd(n - 1)
+}
+
+func odd(n int) error {
+	if n == 0 {
+		return ErrOdd
+	}
+	return even(n - 1)
+}

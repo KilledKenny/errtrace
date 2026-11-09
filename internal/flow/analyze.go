@@ -64,7 +64,7 @@ func Analyze(tbl *errset.Table, fn *ssa.Function) *LocalFacts {
 		}
 		for i := range lf.Results {
 			r := &lf.Results[i]
-			a.ret = ret
+			a.at = ret
 			a.seen = make(map[ssa.Value]bool)
 			a.facts = r.Facts
 			a.walk(ret.Results[r.Index])
@@ -74,11 +74,22 @@ func Analyze(tbl *errset.Table, fn *ssa.Function) *LocalFacts {
 	return lf
 }
 
-// analyzer walks value definitions for one return operand.
+// ValueFacts returns the local facts of v, a value of fn used by the
+// instruction at (such as an argument of a call): the abstract values v can
+// carry, found by walking its definitions backwards exactly as Analyze does
+// for a returned value. Values are interned in tbl.
+func ValueFacts(tbl *errset.Table, fn *ssa.Function, v ssa.Value, at ssa.Instruction) []Fact {
+	a := &analyzer{tbl: tbl, fn: fn, at: at, seen: make(map[ssa.Value]bool)}
+	a.walk(v)
+	return a.facts
+}
+
+// analyzer walks value definitions for one operand of the instruction at
+// (a return operand or a call argument).
 type analyzer struct {
 	tbl   *errset.Table
 	fn    *ssa.Function
-	ret   *ssa.Return
+	at    ssa.Instruction
 	seen  map[ssa.Value]bool
 	facts []Fact
 }
@@ -93,7 +104,7 @@ func (a *analyzer) add(id errset.ValueID, src any) {
 }
 
 // posOf returns a valid position for v: its own, its operand's for an
-// implicit conversion, or the enclosing return statement's.
+// implicit conversion, or the position of the instruction that uses it.
 func (a *analyzer) posOf(v ssa.Value) token.Pos {
 	if p := v.Pos(); p.IsValid() {
 		return p
@@ -103,7 +114,7 @@ func (a *analyzer) posOf(v ssa.Value) token.Pos {
 			return p
 		}
 	}
-	return a.ret.Pos()
+	return a.at.Pos()
 }
 
 func (a *analyzer) walk(v ssa.Value) {
@@ -186,7 +197,7 @@ func (a *analyzer) makeInterface(mi *ssa.MakeInterface) {
 			// The implicit conversion has no position; name the operand
 			// expression of the return statement when debug info has it.
 			var site any = mi
-			if ref := a.debugRefAtReturn(x); ref != nil {
+			if ref := a.debugRefAtUse(x); ref != nil {
 				site = ref
 			}
 			id := a.tbl.Intern(errset.Value{Kind: errset.Concrete, Site: site, Pos: a.posOf(mi), Type: unalias(x.Type()), TypedNil: true})
@@ -200,11 +211,11 @@ func (a *analyzer) makeInterface(mi *ssa.MakeInterface) {
 	a.add(a.concrete(mi.X.Type(), mi, false), mi)
 }
 
-// debugRefAtReturn returns the first DebugRef of v at or after the
-// current return statement's position in its block, or nil.
-func (a *analyzer) debugRefAtReturn(v ssa.Value) *ssa.DebugRef {
-	for _, instr := range a.ret.Block().Instrs {
-		if d, ok := instr.(*ssa.DebugRef); ok && d.X == v && d.Pos() >= a.ret.Pos() {
+// debugRefAtUse returns the first DebugRef of v at or after the position
+// of the instruction that uses it, in its block, or nil.
+func (a *analyzer) debugRefAtUse(v ssa.Value) *ssa.DebugRef {
+	for _, instr := range a.at.Block().Instrs {
+		if d, ok := instr.(*ssa.DebugRef); ok && d.X == v && d.Pos() >= a.at.Pos() {
 			return d
 		}
 	}
@@ -280,7 +291,7 @@ func (a *analyzer) local(load *ssa.UnOp, alloc *ssa.Alloc) {
 // a CallRef otherwise.
 func (a *analyzer) call(call *ssa.Call, index int) {
 	common := call.Common()
-	if callee := common.StaticCallee(); callee != nil && isFunc(callee, "errors", "New") {
+	if name, ok := Intrinsic(common.StaticCallee()); ok && name == "errors.New" {
 		v := errset.Value{Kind: errset.Opaque, Site: call, Pos: a.posOf(call), Constructor: "errors.New"}
 		if c, ok := common.Args[0].(*ssa.Const); ok && c.Value != nil {
 			v.Message = constMessage(c)
@@ -375,11 +386,36 @@ func CalleeName(c *ssa.CallCommon) string {
 	if c.IsInvoke() {
 		return "(" + typeString(c.Value.Type()) + ")." + c.Method.Name()
 	}
-	return "function value " + c.Value.Name()
+	switch v := c.Value.(type) {
+	case *ssa.UnOp:
+		if g, ok := v.X.(*ssa.Global); ok && v.Op == token.MUL {
+			return "function value " + g.String()
+		}
+	case *ssa.Const:
+		return "function value nil"
+	case *ssa.Parameter, *ssa.FreeVar:
+		return "function value " + v.Name()
+	}
+	return "function value of type " + typeString(c.Value.Type())
 }
 
-func isFunc(fn *ssa.Function, pkgPath, name string) bool {
-	return fn.Pkg != nil && fn.Pkg.Pkg.Path() == pkgPath && fn.Name() == name && fn.Signature.Recv() == nil
+// intrinsics are the functions whose effect on errors errtrace models
+// itself instead of analysing their bodies, keyed on package path and
+// name, with the name they are shown under.
+var intrinsics = map[[2]string]string{
+	{"errors", "New"}: "errors.New",
+}
+
+// Intrinsic reports whether fn is an intrinsic: a package-level function,
+// such as errors.New, that the analysis models directly. An intrinsic never
+// has its body summarised. It returns the name the intrinsic is shown
+// under.
+func Intrinsic(fn *ssa.Function) (string, bool) {
+	if fn == nil || fn.Pkg == nil || fn.Signature.Recv() != nil {
+		return "", false
+	}
+	name, ok := intrinsics[[2]string{fn.Pkg.Pkg.Path(), fn.Name()}]
+	return name, ok
 }
 
 func constMessage(c *ssa.Const) string {

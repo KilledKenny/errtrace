@@ -1,0 +1,29 @@
+The error result of a multi-result call is followed: only the callee's error result counts.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:12:12-13: Error Set of example.com/fx.F: 1 entries
+$GOROOT/src/io/io.go:*: sentinel io.ErrUnexpectedEOF
+	path (origin → target):
+		$WORK/a.go:7:13-32: in example.com/fx.open
+		$WORK/a.go:13:12-22: in example.com/fx.F, call to example.com/fx.open
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "io"
+
+func open(name string) (int, error) {
+	if name == "" {
+		return 0, io.ErrUnexpectedEOF
+	}
+	return 1, nil
+}
+
+func /*@f*/F(name string) error {
+	_, err := open(name)
+	return err
+}

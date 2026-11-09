@@ -1,0 +1,26 @@
+A calls B, which calls C, which returns a sentinel: one entry whose path has three hops, from C's return up to A.
+-- args --
+a.go:@a
+-- stdout --
+$WORK/a.go:7:12-13: Error Set of example.com/fx.A: 1 entries
+$WORK/a.go:5:5-9: sentinel example.com/fx.ErrX
+	path (origin → target):
+		$WORK/a.go:11:25-29: in example.com/fx.C
+		$WORK/a.go:9:25-28: in example.com/fx.B, call to example.com/fx.C
+		$WORK/a.go:7:31-34: in example.com/fx.A, call to example.com/fx.B
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var ErrX = errors.New("x")
+
+func /*@a*/A() error { return B() }
+
+func B() error { return C() }
+
+func C() error { return ErrX }

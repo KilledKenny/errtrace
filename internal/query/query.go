@@ -2,9 +2,9 @@
 // every Error Origin and Unresolved place that can reach the Target's error
 // results, each with a Propagation Path, de-duplicated and ordered.
 //
-// For now a Query uses only the Target functions' own bodies: calls are not
-// followed (they are Unresolved, kind pending), and a call-site Target is a
-// single pending entry.
+// The Target functions' summaries follow static calls across functions,
+// packages and the stdlib. A call-site Target's set is what the call's
+// callees can return, with the site's arguments substituted.
 package query
 
 import (
@@ -18,7 +18,9 @@ import (
 	"github.com/killedKenny/errtrace/internal/errset"
 	"github.com/killedKenny/errtrace/internal/flow"
 	"github.com/killedKenny/errtrace/internal/load"
+	"github.com/killedKenny/errtrace/internal/resolve"
 	"github.com/killedKenny/errtrace/internal/span"
+	"github.com/killedKenny/errtrace/internal/summary"
 	"github.com/killedKenny/errtrace/internal/target"
 )
 
@@ -31,6 +33,8 @@ type Result struct {
 	// Entries are the Error Set's entries, de-duplicated and in output
 	// order.
 	Entries []errset.Entry
+	// Stats counts the summaries computed for the Query.
+	Stats summary.Stats
 
 	prog *load.Program
 }
@@ -38,67 +42,61 @@ type Result struct {
 // Run computes the Error Set of tgt in prog.
 func Run(ctx context.Context, prog *load.Program, tgt *target.Target) (*Result, error) {
 	r := &Result{Target: tgt, Table: errset.NewTable(), prog: prog}
+	solver := summary.NewSolver(r.Table, resolve.Static{})
 	var entries []errset.Entry
-	for _, fn := range tgt.Funcs {
-		if err := ctx.Err(); err != nil {
+	switch tgt.Kind {
+	case target.Declaration:
+		if err := solver.Solve(ctx, tgt.Funcs); err != nil {
 			return nil, err
 		}
-		switch tgt.Kind {
-		case target.Declaration:
-			entries = append(entries, r.declaration(fn)...)
-		case target.CallSite:
-			entries = append(entries, r.callSite(fn, tgt.SiteByFunc[fn])...)
-		default:
-			return nil, fmt.Errorf("unknown Target kind %v", tgt.Kind)
+		for _, fn := range tgt.Funcs {
+			for _, res := range solver.Summary(fn).Results {
+				entries = append(entries, r.entries(solver, fn, res.Facts)...)
+			}
 		}
+	case target.CallSite:
+		for _, fn := range tgt.Funcs {
+			site := tgt.SiteByFunc[fn]
+			if site == nil {
+				continue
+			}
+			if err := solver.SolveSite(ctx, fn, site); err != nil {
+				return nil, err
+			}
+			for _, idx := range flow.ErrorResults(site.Common().Signature()) {
+				entries = append(entries, r.entries(solver, fn, solver.SiteFacts(fn, site, idx))...)
+			}
+		}
+	default:
+		return nil, fmt.Errorf("unknown Target kind %v", tgt.Kind)
 	}
+	r.Stats = solver.Stats()
 	entries = errset.Dedup(entries)
 	errset.Sort(r.Table, entries, r.position)
 	r.Entries = entries
 	return r, nil
 }
 
-// declaration returns the entries of fn's error results.
-func (r *Result) declaration(fn *ssa.Function) []errset.Entry {
-	var entries []errset.Entry
-	lf := flow.Analyze(r.Table, fn)
-	for _, res := range lf.Results {
-		for _, f := range res.Facts {
-			path := errset.Path{{Site: f.Source, Func: fn.String()}}
-			entries = append(entries, errset.Flatten(r.Table, r.top(f.Value), path)...)
+// entries flattens the facts that reach fn at the top of the Query, each
+// with its best Propagation Path and a count of its other sources.
+func (r *Result) entries(solver *summary.Solver, fn *ssa.Function, facts []summary.Fact) []errset.Entry {
+	var out []errset.Entry
+	for _, f := range facts {
+		path, _ := solver.Path(fn, f.Sources)
+		for _, e := range errset.Flatten(r.Table, r.top(f.Value), path) {
+			e.MorePaths = len(f.Sources) - 1
+			out = append(out, e)
 		}
 	}
-	return entries
+	return out
 }
 
-// callSite returns the entries of a call-site Target in fn. Its semantics
-// come later; for now the call is one pending entry.
-func (r *Result) callSite(fn *ssa.Function, site ssa.CallInstruction) []errset.Entry {
-	if site == nil {
-		return nil
-	}
-	id := r.Table.Intern(errset.Value{
-		Kind:       errset.Unresolved,
-		Site:       site,
-		Pos:        site.Common().Pos(),
-		Unresolved: errset.Pending,
-		Detail:     pendingDetail(flow.CalleeName(site.Common())),
-	})
-	return errset.Flatten(r.Table, id, errset.Path{{Site: site, Func: fn.String()}})
-}
-
-// top maps a local value to what it is at the top of a Query: calls not
-// followed yet become pending, and parameters and captured variables
-// depend on the caller. Wraps are rebuilt around their mapped inner
-// values.
+// top maps a summary value to what it is at the top of a Query:
+// parameters and captured variables depend on the caller. Wraps are
+// rebuilt around their mapped inner values.
 func (r *Result) top(id errset.ValueID) errset.ValueID {
 	v := r.Table.Get(id)
 	switch v.Kind {
-	case errset.CallRef:
-		return r.Table.Intern(errset.Value{
-			Kind: errset.Unresolved, Site: v.Site, Pos: v.Pos,
-			Unresolved: errset.Pending, Detail: pendingDetail(v.Detail),
-		})
 	case errset.Param:
 		return r.Table.Intern(errset.Value{
 			Kind: errset.Unresolved, Site: v.Site, Pos: v.Pos,
@@ -125,10 +123,6 @@ func (r *Result) top(id errset.ValueID) errset.ValueID {
 		return r.Table.Intern(v)
 	}
 	return id
-}
-
-func pendingDetail(callee string) string {
-	return fmt.Sprintf("call to %s not followed yet", callee)
 }
 
 // Unresolved returns the number of entries with an Unresolved leaf.

@@ -1,0 +1,42 @@
+The Error Origin is in an imported package of the same module: its spans point there.
+-- args --
+a.go:@a
+-- stdout --
+$WORK/a.go:5:12-13: Error Set of example.com/fx.A: 2 entries
+$WORK/store/store.go:5:5-15: sentinel example.com/fx/store.ErrMissing
+	path (origin → target):
+		$WORK/store/store.go:13:10-20: in example.com/fx/store.Get
+		$WORK/a.go:5:31-42: in example.com/fx.A, call to example.com/fx/store.Get
+$WORK/store/store.go:15:9-17: concrete *example.com/fx/store.Error
+	path (origin → target):
+		$WORK/store/store.go:15:9-17: in example.com/fx/store.Get
+		$WORK/a.go:5:31-42: in example.com/fx.A, call to example.com/fx/store.Get
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "example.com/fx/store"
+
+func /*@a*/A() error { return store.Get() }
+-- store/store.go --
+package store
+
+import "errors"
+
+var ErrMissing = errors.New("missing")
+
+type Error struct{}
+
+func (*Error) Error() string { return "store" }
+
+func Get() error {
+	if missing() {
+		return ErrMissing
+	}
+	return &Error{}
+}
+
+func missing() bool { return true }

@@ -88,8 +88,9 @@ func TestDebugModes(t *testing.T) {
 		t.Errorf("valid -debug list: code %d, stdout %q; want 0 and stdout %q (debug output goes to stderr only)", code, out.String(), wantOut)
 	}
 	lines := strings.Split(strings.TrimSuffix(errb.String(), "\n"), "\n")
-	if len(lines) != 2 || !strings.HasPrefix(lines[0], "timing: load=") || !strings.Contains(lines[0], " ssa=") ||
-		!strings.HasPrefix(lines[1], "target: declaration example.com/fx.F funcs=[example.com/fx.F] span=") {
-		t.Errorf("valid -debug list: stderr = %q, want a timing line and a target line", errb.String())
+	if len(lines) != 3 || !strings.HasPrefix(lines[0], "timing: load=") || !strings.Contains(lines[0], " ssa=") ||
+		!strings.HasPrefix(lines[1], "target: declaration example.com/fx.F funcs=[example.com/fx.F] span=") ||
+		lines[2] != "summary: functions=1 sccs=1" {
+		t.Errorf("valid -debug list: stderr = %q, want a timing, a target and a summary line", errb.String())
 	}
 }

@@ -1,0 +1,25 @@
+An argument that is itself a call result is followed through the callee that returns it: id(g()) gives g's sentinel.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:9:12-13: Error Set of example.com/fx.F: 1 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:7:25-31: in example.com/fx.g
+		$WORK/a.go:9:34-37: in example.com/fx.F, call to example.com/fx.g
+		$WORK/a.go:5:33-34: in example.com/fx.id
+		$WORK/a.go:9:31-38: in example.com/fx.F, call to example.com/fx.id
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "io"
+
+func id(e error) error { return e }
+
+func g() error { return io.EOF }
+
+func /*@f*/F() error { return id(g()) }
