@@ -23,6 +23,7 @@ An implementation-ready spec for **errtrace v1**: a CLI query tool that takes a 
   - Anything that can't be resolved is shown as an explicit **Unresolved** entry, never dropped.
   - Speed target: under ~10s cold on a medium module, near-instant warm through cached summaries.
 - Tracker: local markdown (`.scratch/`). No GitHub remote yet; move it to Issues if one is added.
+- Implementation plan: [plan.md](./plan.md) (steps S01–S14, also listed in [plan-steps.json](./plan-steps.json)); tickets 05–10 were decided **provisionally** there (see its "Provisional decisions" section) and remain open until confirmed.
 
 ## Decisions so far
 

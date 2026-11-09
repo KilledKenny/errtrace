@@ -1,0 +1,72 @@
+[
+  {
+    "id": "S01",
+    "title": "Module scaffold, CLI shell, span grammar and fixture harness",
+    "section": "### S01: Module scaffold, CLI shell, span grammar and fixture harness"
+  },
+  {
+    "id": "S02",
+    "title": "Package loading, SSA build and position Targets",
+    "section": "### S02: Package loading, SSA build and position Targets"
+  },
+  {
+    "id": "S03",
+    "title": "Thin end-to-end slice: intraprocedural Origins and text output",
+    "section": "### S03: Thin end-to-end slice: intraprocedural Origins and text output"
+  },
+  {
+    "id": "S04",
+    "title": "Interprocedural summaries over SCCs and Propagation Paths",
+    "section": "### S04: Interprocedural summaries over SCCs and Propagation Paths"
+  },
+  {
+    "id": "S05",
+    "title": "Wraps and Wrap Chains",
+    "section": "### S05: Wraps and Wrap Chains"
+  },
+  {
+    "id": "S06",
+    "title": "Dynamic calls: VTA Candidates for interfaces, function values and generics",
+    "section": "### S06: Dynamic calls: VTA Candidates for interfaces, function values and generics"
+  },
+  {
+    "id": "S07",
+    "title": "Guard filtering per return path",
+    "section": "### S07: Guard filtering per return path"
+  },
+  {
+    "id": "S08",
+    "title": "Deferred changes to named results",
+    "section": "### S08: Deferred changes to named results"
+  },
+  {
+    "id": "S09",
+    "title": "Call-site Queries and local narrowing",
+    "section": "### S09: Call-site Queries and local narrowing"
+  },
+  {
+    "id": "S10",
+    "title": "Unresolved completeness and sentinel identity",
+    "section": "### S10: Unresolved completeness and sentinel identity"
+  },
+  {
+    "id": "S11",
+    "title": "JSON output with a stable schema",
+    "section": "### S11: JSON output with a stable schema"
+  },
+  {
+    "id": "S12",
+    "title": "Query roots for libraries and tests",
+    "section": "### S12: Query roots for libraries and tests"
+  },
+  {
+    "id": "S13",
+    "title": "Depth and package-boundary limits, symbol-name Targets",
+    "section": "### S13: Depth and package-boundary limits, symbol-name Targets"
+  },
+  {
+    "id": "S14",
+    "title": "Optional on-disk summary cache",
+    "section": "### S14: Optional on-disk summary cache"
+  }
+]
