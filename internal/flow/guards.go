@@ -434,8 +434,10 @@ func decideTree(tbl *errset.Table, id errset.ValueID, node func(errset.Value) (V
 // otherwise the two may hold the same value. A
 // Concrete Type of a comparable type may be equal to it unless the
 // Sentinel's dynamic type is known to differ: two equal struct values are
-// ==, and a pointer may be the one stored in the variable. Only a pointer
-// to a type of non-zero size against a Fresh Sentinel differs for sure.
+// ==, and a pointer may be the one stored in the variable. Only a new
+// allocation (Allocated) of a type of non-zero size against a Fresh
+// Sentinel differs for sure; a pointer from a type assertion, an
+// errors.As target, a parameter or a load may be the Sentinel's own.
 // Pointers to distinct zero-size variables may be == (Go spec,
 // Comparison operators), so neither they nor Fresh Sentinels of such
 // types (see Sentinels.fresh) are taken as different.
@@ -467,13 +469,15 @@ func equalVerdict(v errset.Value, g errset.Guard) (Verdict, string) {
 				// Pointers to distinct zero-size variables may be ==
 				// (the runtime points them all at one address).
 				return Maybe, "pointer to zero-size type " + typeString(ptr.Elem()) + " may equal " + g.Var.Name()
-			case g.Fresh:
-				// The Sentinel's pointer was allocated for it alone.
+			case g.Fresh && v.Allocated:
+				// The Sentinel's pointer was allocated for it alone, and
+				// this one is a new allocation.
 				return No, ""
 			}
 			// The Sentinel's value may be a pointer the program also
-			// returns (stored to it outside init, or cached by the
-			// function that initializes it).
+			// returns (stored to it outside init, cached by the function
+			// that initializes it, or taken out of the Sentinel itself by
+			// a type assertion or errors.As).
 			return Maybe, "pointer of type " + typeString(t) + " may be the value of " + g.Var.Name()
 		}
 		return Maybe, "value of comparable type " + typeString(t) + " may equal " + g.Var.Name()

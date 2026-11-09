@@ -397,7 +397,8 @@ func (a *analyzer) bracesWrap(call *ssa.Call, err ssa.Value) {
 // literal or new(T)): a Concrete Type Origin, or, for a composite literal
 // of a type with a custom Unwrap method, a Wrap of what Unwrap returns.
 func (a *analyzer) constructed(typ types.Type, alloc *ssa.Alloc) {
-	conc := a.concrete(typ, alloc, false)
+	typ = unalias(typ)
+	conc := a.tbl.Intern(errset.Value{Kind: errset.Concrete, Site: alloc, Pos: a.posOf(alloc), Type: typ, Allocated: true})
 	if alloc.Comment != "complit" {
 		a.add(conc, alloc)
 		return

@@ -167,6 +167,11 @@ type Value struct {
 	// TypedNil marks a Concrete Type Origin that is a nil pointer in a
 	// non-nil interface.
 	TypedNil bool
+	// Allocated marks a Concrete Type Origin that is a value the program
+	// allocates where it is made (a composite literal or new(T)), as
+	// opposed to one it got from elsewhere (a type assertion, a parameter,
+	// a load): a pointer Allocated is a new pointer.
+	Allocated bool
 
 	// Constructor is the function that made an Opaque Error
 	// ("errors.New"), or empty if unknown.
@@ -214,6 +219,7 @@ type key struct {
 	v           *types.Var
 	typ         string
 	typedNil    bool
+	allocated   bool
 	constructor string
 	message     string
 	hasMessage  bool
@@ -235,6 +241,7 @@ func keyOf(v Value) key {
 		pos:         v.Pos,
 		v:           v.Var,
 		typedNil:    v.TypedNil,
+		allocated:   v.Allocated,
 		constructor: v.Constructor,
 		message:     v.Message,
 		hasMessage:  v.HasMessage,

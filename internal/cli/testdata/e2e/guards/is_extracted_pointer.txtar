@@ -1,0 +1,58 @@
+source returns pointers taken out of ErrX itself (by a type assertion and by errors.As): although ErrX = &MyErr{} is Fresh, such a pointer may be ErrX's value, so where errors.Is(err, ErrX) fails it is kept and marked possibly handled.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:24:12-13: Error Set of example.com/fx.G: 3 entries, 2 possibly handled
+$WORK/a.go:13:8-21: concrete *example.com/fx.MyErr
+	possibly handled:
+		$WORK/a.go:26:5-25: errors.Is with example.com/fx.ErrX: pointer of type *example.com/fx.MyErr may be the value of ErrX
+	path (origin → target):
+		$WORK/a.go:13:8-21: in example.com/fx.source
+		$WORK/a.go:25:9-18: in example.com/fx.G, call to example.com/fx.source
+$WORK/a.go:19:10-11: concrete *example.com/fx.MyErr
+	possibly handled:
+		$WORK/a.go:26:5-25: errors.Is with example.com/fx.ErrX: pointer of type *example.com/fx.MyErr may be the value of ErrX
+	path (origin → target):
+		$WORK/a.go:19:10-11: in example.com/fx.source
+		$WORK/a.go:25:9-18: in example.com/fx.G, call to example.com/fx.source
+$WORK/a.go:21:9-24: opaque errors.New "x"
+	path (origin → target):
+		$WORK/a.go:21:9-24: in example.com/fx.source
+		$WORK/a.go:25:9-18: in example.com/fx.G, call to example.com/fx.source
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+type MyErr struct{ code int }
+
+func (*MyErr) Error() string { return "my" }
+
+var ErrX error = &MyErr{code: 1}
+
+func source(n int) error {
+	if n == 0 {
+		p := ErrX.(*MyErr)
+		return p
+	}
+	if n == 1 {
+		var p *MyErr
+		errors.As(ErrX, &p)
+		return p
+	}
+	return errors.New("x")
+}
+
+func /*@g*/G(n int) error {
+	err := source(n)
+	if errors.Is(err, ErrX) {
+		return nil
+	}
+	return err
+}
