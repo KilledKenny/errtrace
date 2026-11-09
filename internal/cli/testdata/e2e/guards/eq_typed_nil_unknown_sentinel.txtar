@@ -1,0 +1,46 @@
+ErrX is initialized by a call that returns a typed nil *MyErr (the classic typed nil bug); errtrace cannot prove ErrX non-nil, so the typed nil source returns is kept where err == ErrX holds.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:24:12-13: Error Set of example.com/fx.G: 1 entries
+$WORK/a.go:19:10-11: concrete *example.com/fx.MyErr [typed nil]
+	path (origin → target):
+		$WORK/a.go:19:10-11: in example.com/fx.source
+		$WORK/a.go:25:9-18: in example.com/fx.G, call to example.com/fx.source
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+type MyErr struct{ code int }
+
+func (*MyErr) Error() string { return "my" }
+
+var ErrX error = mk()
+
+func mk() error {
+	var p *MyErr
+	return p
+}
+
+func source(n int) error {
+	if n == 0 {
+		var p *MyErr
+		return p
+	}
+	return errors.New("x")
+}
+
+func /*@g*/G(n int) error {
+	err := source(n)
+	if err == ErrX {
+		return err
+	}
+	return nil
+}

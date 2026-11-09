@@ -1,0 +1,37 @@
+ErrX = &MyErr{} is Fresh, a non-nil pointer, so a typed nil *MyErr is never == to it: it is removed where err == ErrX holds.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:19:12-13: Error Set of example.com/fx.G: 0 entries
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+type MyErr struct{ code int }
+
+func (*MyErr) Error() string { return "my" }
+
+var ErrX error = &MyErr{code: 1}
+
+func source(n int) error {
+	if n == 0 {
+		var p *MyErr
+		return p
+	}
+	return errors.New("x")
+}
+
+func /*@g*/G(n int) error {
+	err := source(n)
+	if err == ErrX {
+		return err
+	}
+	return nil
+}

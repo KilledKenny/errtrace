@@ -431,7 +431,9 @@ func decideTree(tbl *errset.Table, id errset.ValueID, node func(errset.Value) (V
 // the value of the same variable (os.ErrNotExist and fs.ErrNotExist), and
 // differs from it for sure when both values are pointers allocated for
 // their own variables, or when their dynamic types are known and differ;
-// otherwise the two may hold the same value. A
+// otherwise the two may hold the same value. A typed nil differs from a
+// Fresh Sentinel, which holds a non-nil pointer, but may equal any other
+// Sentinel of its type, which may hold a nil pointer of that type. A
 // Concrete Type of a comparable type may be equal to it unless the
 // Sentinel's dynamic type is known to differ: two equal struct values are
 // ==, and a pointer may be the one stored in the variable. Only a new
@@ -457,11 +459,21 @@ func equalVerdict(v errset.Value, g errset.Guard) (Verdict, string) {
 		return Maybe, "sentinel " + qualifiedName(v.Var) + " may be the same value as " + qualifiedName(g.Var)
 	case errset.Concrete:
 		t := unalias(v.Type)
-		if v.TypedNil || t == nil || !types.Comparable(t) {
+		if t == nil || !types.Comparable(t) {
 			return No, ""
 		}
 		if g.Type != nil && !types.Identical(t, unalias(g.Type)) {
 			return No, ""
+		}
+		if v.TypedNil {
+			if g.Fresh {
+				// The Sentinel holds a non-nil pointer allocated for it.
+				return No, ""
+			}
+			// The Sentinel may hold a nil pointer of the same type
+			// (var ErrX error = (*T)(nil), or one returned by its
+			// initializer), and two such interface values are ==.
+			return Maybe, "typed nil " + typeString(t) + " may equal " + g.Var.Name()
 		}
 		if ptr, ok := t.Underlying().(*types.Pointer); ok {
 			switch {

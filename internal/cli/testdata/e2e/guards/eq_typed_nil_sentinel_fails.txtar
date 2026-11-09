@@ -1,0 +1,47 @@
+ErrX holds a typed nil *MyErr, so the typed nil source returns may be == to it: where err == ErrX fails it is kept and possibly handled.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:19:12-13: Error Set of example.com/fx.G: 2 entries, 1 possibly handled
+$WORK/a.go:14:10-11: concrete *example.com/fx.MyErr [typed nil]
+	possibly handled:
+		$WORK/a.go:21:5-16: comparison with example.com/fx.ErrX: typed nil *example.com/fx.MyErr may equal ErrX
+	path (origin → target):
+		$WORK/a.go:14:10-11: in example.com/fx.source
+		$WORK/a.go:20:9-18: in example.com/fx.G, call to example.com/fx.source
+$WORK/a.go:16:9-24: opaque errors.New "x"
+	path (origin → target):
+		$WORK/a.go:16:9-24: in example.com/fx.source
+		$WORK/a.go:20:9-18: in example.com/fx.G, call to example.com/fx.source
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+type MyErr struct{ code int }
+
+func (*MyErr) Error() string { return "my" }
+
+var ErrX error = (*MyErr)(nil)
+
+func source(n int) error {
+	if n == 0 {
+		var p *MyErr
+		return p
+	}
+	return errors.New("x")
+}
+
+func /*@g*/G(n int) error {
+	err := source(n)
+	if err == ErrX {
+		return nil
+	}
+	return err
+}
