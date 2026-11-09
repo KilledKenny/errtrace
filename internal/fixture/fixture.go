@@ -376,6 +376,17 @@ func Extract(t *testing.T, path string) (string, *txtar.Archive) {
 	return dir, ar
 }
 
+// Args returns the arguments of the archive's args section, with its
+// markers substituted. It fails the test if a marker is malformed.
+func Args(t *testing.T, ar *txtar.Archive) []string {
+	t.Helper()
+	args, err := substitute(string(section(ar, sectionArgs)), ar)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return args
+}
+
 // Pos returns the point span named by ref, a "file.go:@name" marker
 // reference (or any position the span grammar accepts), resolved against
 // the module directory. It fails the test if ref is malformed.

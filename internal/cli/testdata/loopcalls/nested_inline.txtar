@@ -1,0 +1,29 @@
+The inline equivalent of nested.txtar.
+-- args --
+a.go:@q
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrB = errors.New("b")
+var ErrC = errors.New("c")
+
+func /*@q*/Q(n, m int) error {
+	err := ErrB
+	for i := 0; i < n; i++ {
+		err = fmt.Errorf("p1: %w", err)
+		for j := 0; j < m; j++ {
+			err = fmt.Errorf("p2: %w", err)
+			err = errors.Join(err, ErrC)
+		}
+	}
+	return err
+}

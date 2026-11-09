@@ -1,0 +1,33 @@
+Nested loops that wrap through three helpers, one of them errors.Join, at the default chain depth.
+-- args --
+a.go:@q
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrB = errors.New("b")
+var ErrC = errors.New("c")
+
+func p1(e error) error { return fmt.Errorf("p1: %w", e) }
+func p2(e error) error { return fmt.Errorf("p2: %w", e) }
+func p3(e error) error { return errors.Join(e, ErrC) }
+
+func /*@q*/Q(n, m int) error {
+	err := ErrB
+	for i := 0; i < n; i++ {
+		err = p1(err)
+		for j := 0; j < m; j++ {
+			err = p2(err)
+			err = p3(err)
+		}
+	}
+	return err
+}
