@@ -446,14 +446,29 @@ func (a *analyzer) constructed(typ types.Type, alloc *ssa.Alloc) {
 	// The field is nil on a path with no store to it. With more than one
 	// store, the slice of Unwrap() []error is one of them, not all.
 	base.MayHoldNil = !a.storedOnEveryPath(stores) || (m.multi && len(stores) > 1)
+	// A pointer to the value, or to the field, that escapes (to a call,
+	// a closure, memory) may be used to write the field: it may then hold
+	// nil or a value errtrace does not track.
+	var escaped []wrapped
+	if fieldMayBeWritten(alloc, m.field) {
+		base.MayHoldNil = true
+		u := a.unresolvedAt(alloc, pos, errset.Memory, "field of "+typeString(unalias(typ))+" may be written through an escaped pointer")
+		if a.flat {
+			a.addInner([]errset.ValueID{u}, alloc)
+		}
+		escaped = a.madeAt(alloc, u)
+	}
 	if !m.multi {
 		var vals []wrapped
 		for _, st := range stores {
 			vals = append(vals, a.operand(st.Val, alloc)...)
 			base.MayHoldNil = base.MayHoldNil || a.mayBeNil(st.Val, pointOf(st))
 		}
-		operands = append(operands, vals)
+		operands = append(operands, append(vals, escaped...))
 	} else {
+		if escaped != nil {
+			operands = append(operands, escaped)
+		}
 		for _, st := range stores {
 			if elems, ok := sliceElems(st.Val); ok {
 				for _, e := range elems {
@@ -486,6 +501,55 @@ func (a *analyzer) constructed(typ types.Type, alloc *ssa.Alloc) {
 		return
 	}
 	a.addFacts(facts)
+}
+
+// fieldMayBeWritten reports whether field f of the struct that alloc
+// allocates may be written other than by a direct store to its address:
+// alloc, or the field's address, is used other than to load it, to make
+// an interface of it or return it (the error value, directly or through
+// a ChangeType), or by a DebugRef. A call (a method like w.clear() or a helper taking w), a
+// store of the pointer, a closure capture or a Phi lets the pointer
+// escape; a store to *alloc overwrites the whole struct.
+func fieldMayBeWritten(alloc *ssa.Alloc, f int) bool {
+	for _, r := range *alloc.Referrers() {
+		switch r := r.(type) {
+		case *ssa.FieldAddr:
+			if r.Field != f {
+				continue
+			}
+			for _, rr := range *r.Referrers() {
+				switch rr := rr.(type) {
+				case *ssa.Store:
+					if rr.Addr != r || rr.Val == r {
+						return true
+					}
+				case *ssa.UnOp:
+					if rr.Op != token.MUL {
+						return true
+					}
+				case *ssa.DebugRef:
+				default:
+					return true
+				}
+			}
+		case *ssa.ChangeType:
+			for _, rr := range *r.Referrers() {
+				switch rr.(type) {
+				case *ssa.MakeInterface, *ssa.Return, *ssa.DebugRef:
+				default:
+					return true
+				}
+			}
+		case *ssa.MakeInterface, *ssa.Return, *ssa.DebugRef:
+		case *ssa.UnOp:
+			if r.Op != token.MUL {
+				return true
+			}
+		default:
+			return true
+		}
+	}
+	return false
 }
 
 // fieldStores returns the stores to field f of the struct that alloc

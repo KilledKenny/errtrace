@@ -1,0 +1,57 @@
+errors.Is through a custom Unwrap whose field a helper may clear: the pointer escapes to clearW(w), so where the check fails the wrapper is kept and possibly handled.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:23:12-13: Error Set of example.com/fx.G: 2 entries, 1 unresolved, 2 possibly handled
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	wrap chain (origin → target):
+		$WORK/a.go:16:7-24: *example.com/fx.W.Unwrap
+	possibly handled:
+		$WORK/a.go:25:5-27: errors.Is with io.EOF: wrapped value may be nil
+	path (origin → target):
+		$WORK/a.go:16:17-23: in example.com/fx.source
+		$WORK/a.go:24:9-18: in example.com/fx.G, call to example.com/fx.source
+$WORK/a.go:16:7-24: unresolved(memory): field of *example.com/fx.W may be written through an escaped pointer
+	wrap chain (origin → target):
+		$WORK/a.go:16:7-24: *example.com/fx.W.Unwrap
+	possibly handled:
+		$WORK/a.go:25:5-27: errors.Is with io.EOF: unresolved value
+	path (origin → target):
+		$WORK/a.go:16:7-24: in example.com/fx.source
+		$WORK/a.go:24:9-18: in example.com/fx.G, call to example.com/fx.source
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"io"
+)
+
+type W struct{ inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.inner }
+
+func clearW(w *W) { w.inner = nil }
+
+func source(n int) error {
+	w := &W{inner: io.EOF}
+	if n == 0 {
+		clearW(w)
+	}
+	return w
+}
+
+func /*@g*/G(n int) error {
+	err := source(n)
+	if errors.Is(err, io.EOF) {
+		return nil
+	}
+	return err
+}
