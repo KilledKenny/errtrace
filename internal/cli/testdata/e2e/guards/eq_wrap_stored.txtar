@@ -1,0 +1,56 @@
+source stores the Wraps it returns (fmt.Errorf with %w, a custom-Unwrap literal) into ErrX outside init: they may be ErrX's value, so they are kept where err == ErrX holds.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:26:12-13: Error Set of example.com/fx.G: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	wrap chain (origin → target):
+		$WORK/a.go:21:7-30: *example.com/fx.WrapErr.Unwrap
+	path (origin → target):
+		$WORK/a.go:21:23-29: in example.com/fx.source
+		$WORK/a.go:27:9-18: in example.com/fx.G, call to example.com/fx.source
+$GOROOT/src/io/io.go:*: sentinel io.ErrUnexpectedEOF
+	wrap chain (origin → target):
+		$WORK/a.go:17:8-48: fmt.Errorf "f: %w"
+	path (origin → target):
+		$WORK/a.go:17:28-47: in example.com/fx.source
+		$WORK/a.go:27:9-18: in example.com/fx.G, call to example.com/fx.source
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"fmt"
+	"io"
+)
+
+type WrapErr struct{ inner error }
+
+func (e *WrapErr) Error() string { return "wrap: " + e.inner.Error() }
+func (e *WrapErr) Unwrap() error { return e.inner }
+
+var ErrX error
+
+func source(n int) error {
+	if n == 0 {
+		e := fmt.Errorf("f: %w", io.ErrUnexpectedEOF)
+		ErrX = e
+		return e
+	}
+	e := &WrapErr{inner: io.EOF}
+	ErrX = e
+	return e
+}
+
+func /*@g*/G(n int) error {
+	err := source(n)
+	if err == ErrX {
+		return err
+	}
+	return nil
+}

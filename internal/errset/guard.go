@@ -51,6 +51,11 @@ type Guard struct {
 	// follow from Var and are not part of the guard's identity.
 	Canon *types.Var
 	Fresh bool
+	// Unstable reports that Canon is assigned outside its package's
+	// initialization, so the value a Sentinel node loaded from it may not
+	// be the one the check loads. It follows from Var and is not part of
+	// the guard's identity.
+	Unstable bool
 	// Type is the target type of a GuardAs or GuardAssert, and the
 	// dynamic type of the Sentinel of a GuardEqual or GuardIs when
 	// errtrace knows it.

@@ -25,6 +25,10 @@ type SentinelInfo struct {
 	// variables whose Canons differ and are both Fresh hold different
 	// values.
 	Fresh bool
+	// Unstable reports that Canon is stored to outside its package's init
+	// function (or its address is used): two loads of it may give
+	// different values.
+	Unstable bool
 }
 
 // Sentinels finds and caches what errtrace knows about the values of
@@ -157,7 +161,11 @@ func (s *Sentinels) compute(g *ssa.Global, visiting map[any]bool, depth int) Sen
 	if !iface {
 		out.Type = unalias(p.Elem())
 	}
-	if visiting[g] || depth > maxDynDepth || s.unstable[g] {
+	if s.unstable[g] {
+		out.Unstable = true
+		return out
+	}
+	if visiting[g] || depth > maxDynDepth {
 		return out
 	}
 	visiting[g] = true
@@ -175,7 +183,7 @@ func (s *Sentinels) compute(g *ssa.Global, visiting map[any]bool, depth int) Sen
 	if len(stores) == 1 {
 		if h := s.aliasOf(stores[0].Val, visiting, depth+1); h != nil {
 			hi := s.compute(h, visiting, depth+1)
-			out.Canon, out.Fresh = hi.Canon, hi.Fresh
+			out.Canon, out.Fresh, out.Unstable = hi.Canon, hi.Fresh, hi.Unstable
 		} else {
 			out.Fresh = s.fresh(stores[0].Val, visiting, depth+1)
 		}

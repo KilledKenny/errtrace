@@ -70,7 +70,12 @@ func TestApplyGuard(t *testing.T) {
 		want flow.Outcome
 	}{
 		{"eq false removes the sentinel", sEOF, errset.Guard{Kind: errset.GuardEqual, Var: eof}, flow.Remove},
-		{"eq false keeps a wrap of it", wrapped, errset.Guard{Kind: errset.GuardEqual, Var: eof}, flow.Keep},
+		{"eq false keeps a wrap of it", wrapped, errset.Guard{Kind: errset.GuardEqual, Var: eof, Canon: eof, Fresh: true}, flow.Keep},
+		{"eq false notes a wrap that a sentinel not Fresh may hold", wrapped, errset.Guard{Kind: errset.GuardEqual, Var: eof}, flow.Note},
+		{"eq true keeps a wrap that a sentinel not Fresh may hold", wrapped, errset.Guard{Kind: errset.GuardEqual, Var: eof, Holds: true}, flow.Keep},
+		{"eq true removes a wrap against a Fresh sentinel", wrapped, errset.Guard{Kind: errset.GuardEqual, Var: eof, Canon: eof, Fresh: true, Holds: true}, flow.Remove},
+		{"eq false notes the sentinel of an unstable variable", sEOF, errset.Guard{Kind: errset.GuardEqual, Var: eof, Canon: eof, Unstable: true}, flow.Note},
+		{"eq true keeps the sentinel of an unstable variable", sEOF, errset.Guard{Kind: errset.GuardEqual, Var: eof, Canon: eof, Unstable: true, Holds: true}, flow.Keep},
 		{"eq true removes another sentinel", sUnexp, errset.Guard{Kind: errset.GuardEqual, Var: eof, Canon: eof, Fresh: true, Holds: true}, flow.Remove},
 		{"eq true keeps a sentinel that may alias", unfresh, errset.Guard{Kind: errset.GuardEqual, Var: eof, Canon: eof, Fresh: true, Holds: true}, flow.Keep},
 		{"eq false notes a sentinel that may alias", unfresh, errset.Guard{Kind: errset.GuardEqual, Var: eof, Canon: eof, Fresh: true}, flow.Note},

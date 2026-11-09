@@ -221,7 +221,7 @@ func recognise(cond ssa.Value, sents *Sentinels) []condGuard {
 
 // sentinelGuard returns a GuardEqual or GuardIs with the Sentinel v.
 func sentinelGuard(kind errset.GuardKind, v *types.Var, inf SentinelInfo) errset.Guard {
-	return errset.Guard{Kind: kind, Var: v, Type: inf.Type, Canon: canonVar(inf, v), Fresh: inf.Fresh}
+	return errset.Guard{Kind: kind, Var: v, Type: inf.Type, Canon: canonVar(inf, v), Fresh: inf.Fresh, Unstable: inf.Unstable}
 }
 
 // globalOf returns the package-level variable v loads, or nil.
@@ -442,11 +442,21 @@ func decideTree(tbl *errset.Table, id errset.ValueID, node func(errset.Value) (V
 // errors.As target, a parameter or a load may be the Sentinel's own.
 // Pointers to distinct zero-size variables may be == (Go spec,
 // Comparison operators), so neither they nor Fresh Sentinels of such
-// types (see Sentinels.fresh) are taken as different.
+// types (see Sentinels.fresh) are taken as different. An Opaque Error or
+// a library Wrap is a new allocation too, decided by
+// newLibraryErrorVerdict; a custom-Unwrap Wrap is decided as the
+// allocated Concrete Type it is. Two loads of a variable that is
+// assigned outside init (Unstable) may give different values, so a
+// Sentinel of that variable may differ from it.
 func equalVerdict(v errset.Value, g errset.Guard) (Verdict, string) {
 	switch v.Kind {
 	case errset.Sentinel:
 		if v.Var == g.Var || sentinelCanon(v.Canon, v.Var) == sentinelCanon(g.Canon, g.Var) {
+			if g.Unstable {
+				// The variable may have been reassigned between the
+				// load that made the node and the one the check makes.
+				return Maybe, qualifiedName(g.Var) + " is reassigned outside its initialization"
+			}
 			return Yes, ""
 		}
 		if v.Fresh && g.Fresh {
@@ -493,8 +503,55 @@ func equalVerdict(v errset.Value, g errset.Guard) (Verdict, string) {
 			return Maybe, "pointer of type " + typeString(t) + " may be the value of " + g.Var.Name()
 		}
 		return Maybe, "value of comparable type " + typeString(t) + " may equal " + g.Var.Name()
+	case errset.Opaque:
+		return newLibraryErrorVerdict(g, "opaque error")
+	case errset.Wrap:
+		if v.WrapKind == errset.WrapUnwrapMethod {
+			// A composite literal of the wrapper type: a new value of
+			// v.Type, decided as a Concrete Type Origin allocated there.
+			return equalVerdict(errset.Value{Kind: errset.Concrete, Type: v.Type, Allocated: true}, g)
+		}
+		return newLibraryErrorVerdict(g, "wrapped error")
 	}
 	return No, ""
+}
+
+// newLibraryErrorVerdict says whether a new error made by a library
+// function (an Opaque Error from errors.New or fmt.Errorf, a Wrap from
+// fmt.Errorf with %w, errors.Join or errtrace.Wrap) is == to the Sentinel
+// of g. Such an error is a pointer allocated by the call, so it differs
+// from a Fresh Sentinel, which holds a pointer allocated for it alone,
+// and from a Sentinel whose dynamic type is known to be another one than
+// the unexported types of those packages. Otherwise the Sentinel may
+// hold that very pointer (stored into it outside init, or cached by the
+// function that initializes it).
+func newLibraryErrorVerdict(g errset.Guard, what string) (Verdict, string) {
+	if g.Fresh {
+		return No, ""
+	}
+	if g.Type != nil && !isLibraryErrorType(g.Type) {
+		return No, ""
+	}
+	return Maybe, what + " may be the value of " + g.Var.Name()
+}
+
+// libraryErrorPkgs are the packages whose unexported error types the
+// errors errtrace models as Opaque Errors and library Wraps may have.
+var libraryErrorPkgs = map[string]bool{"errors": true, "fmt": true, "braces.dev/errtrace": true}
+
+// isLibraryErrorType reports whether t may be the dynamic type of an
+// error made by errors.New, fmt.Errorf, errors.Join or errtrace.Wrap: a
+// pointer to a named type of one of those packages.
+func isLibraryErrorType(t types.Type) bool {
+	p, ok := unalias(t).Underlying().(*types.Pointer)
+	if !ok {
+		return false
+	}
+	n, ok := types.Unalias(p.Elem()).(*types.Named)
+	if !ok || n.Obj().Pkg() == nil {
+		return false
+	}
+	return libraryErrorPkgs[n.Obj().Pkg().Path()]
 }
 
 // mayBeZeroSize reports whether values of t may have size zero: an empty

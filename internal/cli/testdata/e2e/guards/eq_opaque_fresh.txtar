@@ -1,0 +1,29 @@
+ErrX holds an errors.New error allocated for it alone, so the new opaque error source returns is never == to it and is removed where err == ErrX holds.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:11:12-13: Error Set of example.com/fx.G: 0 entries
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var ErrX = errors.New("x")
+
+func source() error {
+	return errors.New("other")
+}
+
+func /*@g*/G() error {
+	err := source()
+	if err == ErrX {
+		return err
+	}
+	return nil
+}
