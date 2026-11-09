@@ -262,15 +262,15 @@ func TestCapLeavesFollowsLeaves(t *testing.T) {
 		t.Fatalf("Leaves = %d, want 3", n)
 	}
 	got := tbl.CapLeaves(top, 1)
-	if len(got) != 1 || !reflect.DeepEqual(got[0].From, []int{0, 1}) || tbl.Leaves(got[0].Value) != 2 {
-		t.Errorf("CapLeaves(top, 1) = %+v, want one value whose leaves are sb (0) and a single truncated sa (1)", got)
+	if len(got) != 1 || !reflect.DeepEqual(got[0].From, [][]int{{0}, {1, 2}}) || tbl.Leaves(got[0].Value) != 2 {
+		t.Errorf("CapLeaves(top, 1) = %+v, want one value whose leaves are sb (0) and a single truncated sa (1 and 2)", got)
 	}
 	got = tbl.CapLeaves(top, 0)
-	if len(got) != 2 || !reflect.DeepEqual(got[0].From, []int{0}) || !reflect.DeepEqual(got[1].From, []int{1}) {
-		t.Errorf("CapLeaves(top, 0) = %+v, want truncated sb from 0 and truncated sa from 1", got)
+	if len(got) != 2 || !reflect.DeepEqual(got[0].From, [][]int{{0}}) || !reflect.DeepEqual(got[1].From, [][]int{{1, 2}}) {
+		t.Errorf("CapLeaves(top, 0) = %+v, want truncated sb from 0 and truncated sa from 1 and 2", got)
 	}
 	got = tbl.CapLeaves(top, 5)
-	if len(got) != 1 || got[0].Value != top || !reflect.DeepEqual(got[0].From, []int{0, 1, 2}) {
+	if len(got) != 1 || got[0].Value != top || !reflect.DeepEqual(got[0].From, [][]int{{0}, {1}, {2}}) {
 		t.Errorf("CapLeaves(top, 5) = %+v, want top unchanged", got)
 	}
 }

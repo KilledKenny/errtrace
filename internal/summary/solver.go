@@ -112,7 +112,7 @@ func (s *Solver) SolveSite(ctx context.Context, fn *ssa.Function, site ssa.CallI
 // site's dependencies must have been solved with SolveSite.
 func (s *Solver) SiteFacts(fn *ssa.Function, site ssa.CallInstruction, index int) []Fact {
 	var fs factSet
-	s.expandCall(fn, site, index, &fs, make(map[ssa.CallInstruction]bool))
+	s.expandCall(fn, site, index, &fs, make(map[callKey]*cycle))
 	return fs.facts
 }
 

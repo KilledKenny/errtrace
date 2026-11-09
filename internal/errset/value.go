@@ -390,14 +390,15 @@ func (t *Table) Cap(id ValueID, limit int) []ValueID {
 type Capped struct {
 	// Value is the capped value tree.
 	Value ValueID
-	// From maps each leaf of Value, in leaf order, to the index of the
-	// leaf of the original tree it is.
-	From []int
+	// From maps each leaf of Value, in leaf order, to the indices of the
+	// leaves of the original tree it stands for: one, or several where
+	// capping merged equal leaves or inner values.
+	From [][]int
 }
 
 // CapLeaves is Cap, which also says where each leaf of the capped values
 // was in the original tree, so per-leaf information follows the leaves.
-// Of equal leaves or inner values merged by capping, the first is kept.
+// Equal leaves or inner values merged by capping keep all their indices.
 func (t *Table) CapLeaves(id ValueID, limit int) []Capped {
 	return t.capAt(id, 0, limit, 0)
 }
@@ -421,30 +422,37 @@ func (t *Table) capAt(id ValueID, level, limit, base int) []Capped {
 		if !changed {
 			return []Capped{{Value: id, From: seq(base, t.leaves[id])}}
 		}
-		var from []int
+		var from [][]int
+		start := make(map[ValueID]int)
 		v.Inner = nil
 		for _, c := range inner {
-			if slices.Contains(v.Inner, c.Value) {
+			if at, ok := start[c.Value]; ok {
+				for i, f := range c.From {
+					from[at+i] = append(from[at+i], f...)
+				}
 				continue
 			}
+			start[c.Value] = len(from)
 			v.Inner = append(v.Inner, c.Value)
-			from = append(from, c.From...)
+			for _, f := range c.From {
+				from = append(from, slices.Clone(f))
+			}
 		}
 		return []Capped{{Value: t.Intern(v), From: from}}
 	case Truncated:
 		if t.Get(v.Inner[0]).Kind.IsLeaf() {
-			return []Capped{{Value: id, From: []int{base}}}
+			return []Capped{{Value: id, From: [][]int{{base}}}}
 		}
 		return t.truncateLeaves(v.Inner[0], base)
 	}
-	return []Capped{{Value: id, From: []int{base}}}
+	return []Capped{{Value: id, From: [][]int{{base}}}}
 }
 
-// seq returns n consecutive indices from base.
-func seq(base, n int) []int {
-	out := make([]int, n)
+// seq returns n consecutive indices from base, one per leaf.
+func seq(base, n int) [][]int {
+	out := make([][]int, n)
 	for i := range out {
-		out[i] = base + i
+		out[i] = []int{base + i}
 	}
 	return out
 }
@@ -453,17 +461,19 @@ func seq(base, n int) []int {
 // tree id, whose first leaf has index base.
 func (t *Table) truncateLeaves(id ValueID, base int) []Capped {
 	var out []Capped
-	seen := make(map[ValueID]bool)
+	seen := make(map[ValueID]int)
 	next := base
 	var walk func(ValueID)
 	walk = func(id ValueID) {
 		v := t.Get(id)
 		if v.Kind.IsLeaf() {
-			if !seen[id] {
-				seen[id] = true
+			if at, ok := seen[id]; ok {
+				out[at].From[0] = append(out[at].From[0], next)
+			} else {
+				seen[id] = len(out)
 				out = append(out, Capped{
 					Value: t.Intern(Value{Kind: Truncated, Site: v.Site, Pos: v.Pos, Inner: []ValueID{id}}),
-					From:  []int{next},
+					From:  [][]int{{next}},
 				})
 			}
 			next++

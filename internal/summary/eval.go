@@ -17,7 +17,7 @@ func (s *Solver) evaluate(fn *ssa.Function) []ResultSummary {
 	out := make([]ResultSummary, len(lf.Results))
 	for i, r := range lf.Results {
 		var fs factSet
-		active := make(map[ssa.CallInstruction]bool)
+		active := make(map[callKey]*cycle)
 		for _, f := range r.Facts {
 			s.expand(fn, f, &fs, active)
 		}
@@ -31,11 +31,8 @@ func (s *Solver) evaluate(fn *ssa.Function) []ResultSummary {
 // leaf keeps its own provenance: a local leaf enters fn where f says it
 // does, a leaf from a call has the call's sources.
 //
-// active holds the call sites being expanded. A call whose argument
-// depends on its own result (err = f(err) in a loop) is not expanded
-// again inside itself: the values that flow around such a loop are the
-// ones that enter it, which the outer expansion already adds.
-func (s *Solver) expand(fn *ssa.Function, f flow.Fact, fs *factSet, active map[ssa.CallInstruction]bool) {
+// active holds the call sites being expanded (see expandCall).
+func (s *Solver) expand(fn *ssa.Function, f flow.Fact, fs *factSet, active map[callKey]*cycle) {
 	for _, sub := range s.mapTree(f.Value, func(id errset.ValueID, k int) []subst {
 		v := s.tbl.Get(id)
 		site, ok := v.Site.(ssa.CallInstruction)
@@ -54,16 +51,62 @@ func (s *Solver) expand(fn *ssa.Function, f flow.Fact, fs *factSet, active map[s
 	}
 }
 
+// callKey is one error result of a call site.
+type callKey struct {
+	site  ssa.CallInstruction
+	index int
+}
+
+// cycle is the state of a call site result being expanded: approx is the
+// current approximation of its values, used where the site's argument
+// depends on its own result, and hit says whether that happened.
+type cycle struct {
+	approx []Fact
+	hit    bool
+}
+
 // expandCall adds to fs the values that error result index of the call
 // site in fn can carry: the facts of every Candidate's summary, with the
 // site's arguments substituted for the Candidate's parameters.
-func (s *Solver) expandCall(fn *ssa.Function, site ssa.CallInstruction, index int, fs *factSet, active map[ssa.CallInstruction]bool) {
-	if active[site] {
+//
+// A call whose argument depends on its own result (err = f(err) in a
+// loop) is solved to a fixpoint: inside itself the site stands for its
+// values so far, starting with none, and it is expanded again until they
+// stop changing. Each round can add a Wrap if the callee wraps, so the
+// chain depth cap (applied by mapTree) is what makes the values finite;
+// the overflow becomes Truncated, as for a loop that wraps inline.
+func (s *Solver) expandCall(fn *ssa.Function, site ssa.CallInstruction, index int, fs *factSet, active map[callKey]*cycle) {
+	key := callKey{site, index}
+	if c := active[key]; c != nil {
+		c.hit = true
+		for _, f := range c.approx {
+			fs.add(f.Value, f.Leaves)
+		}
 		return
 	}
-	active[site] = true
-	defer delete(active, site)
+	c := &cycle{}
+	active[key] = c
+	defer delete(active, key)
 
+	// The values only grow from round to round and are bounded by the
+	// cap; the round limit is a safeguard against a non-monotone round.
+	limit := 4 * (s.chainDepth() + 2)
+	for round := 0; ; round++ {
+		var cur factSet
+		c.hit = false
+		s.expandCallOnce(fn, site, index, &cur, active)
+		if !c.hit || round == limit || sameValues(cur.facts, c.approx) {
+			for _, f := range cur.facts {
+				fs.add(f.Value, f.Leaves)
+			}
+			return
+		}
+		c.approx = cur.facts
+	}
+}
+
+// expandCallOnce is one round of expandCall.
+func (s *Solver) expandCallOnce(fn *ssa.Function, site ssa.CallInstruction, index int, fs *factSet, active map[callKey]*cycle) {
 	here := local(1, Source{Kind: Local, Site: site})
 	common := site.Common()
 	dynamic := s.res.IsDynamic(site)
@@ -138,7 +181,7 @@ type subst struct {
 // site's format and operands, and Error Origins and Unresolved values stay
 // as they are. Each leaf gets the source via, naming the callee leaf it
 // comes from, with the leaf's sources in fn if it came from an argument.
-func (s *Solver) substitute(fn *ssa.Function, site ssa.CallInstruction, g *ssa.Function, id errset.ValueID, via Source, active map[ssa.CallInstruction]bool) []subst {
+func (s *Solver) substitute(fn *ssa.Function, site ssa.CallInstruction, g *ssa.Function, id errset.ValueID, via Source, active map[callKey]*cycle) []subst {
 	return s.mapTree(id, func(id errset.ValueID, k int) []subst {
 		via := via
 		via.CalleeLeaf = k
@@ -186,7 +229,7 @@ func (s *Solver) substitute(fn *ssa.Function, site ssa.CallInstruction, g *ssa.F
 // the callee's parameters, as if fn called fmt.Errorf itself at the site.
 // The Wraps made are placed at the site, where the format is. Each leaf
 // gets the source via, with its sources in fn as argument sources.
-func (s *Solver) forwardedErrorf(fn *ssa.Function, site ssa.CallInstruction, v errset.Value, via Source, active map[ssa.CallInstruction]bool) []subst {
+func (s *Solver) forwardedErrorf(fn *ssa.Function, site ssa.CallInstruction, v errset.Value, via Source, active map[callKey]*cycle) []subst {
 	c := site.Common()
 	format, args := argument(c, v.Index), argument(c, v.ArgIndex)
 	if format == nil || args == nil {
@@ -255,7 +298,11 @@ func (s *Solver) mapTree(id errset.ValueID, leaf func(errset.ValueID, int) []sub
 		for _, c := range s.tbl.CapLeaves(sub.value, s.chainDepth()) {
 			leaves := make([][]Source, len(c.From))
 			for i, from := range c.From {
-				leaves[i] = sub.leaves[from]
+				for _, k := range from {
+					for _, src := range sub.leaves[k] {
+						leaves[i] = addSource(leaves[i], src)
+					}
+				}
 			}
 			out = append(out, subst{value: c.Value, leaves: leaves})
 		}

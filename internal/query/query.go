@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"go/token"
 	"go/types"
+	"testing"
 
 	"golang.org/x/tools/go/ssa"
 
@@ -94,6 +95,11 @@ func (r *Result) entries(solver *summary.Solver, fn *ssa.Function, facts []summa
 	var out []errset.Entry
 	for _, f := range facts {
 		entries := errset.Flatten(r.Table, r.top(f.Value))
+		if len(entries) != len(f.Leaves) && testing.Testing() {
+			// A fact has one source list per leaf; under go test a
+			// mismatch fails loudly instead of losing paths.
+			panic(fmt.Sprintf("query: fact %v has %d leaves but %d leaf source lists", f.Value, len(entries), len(f.Leaves)))
+		}
 		for k := range entries {
 			if k < len(f.Leaves) {
 				entries[k].Path, _ = solver.Path(fn, f.Leaves[k])
