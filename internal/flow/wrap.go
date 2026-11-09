@@ -140,7 +140,7 @@ func (a *analyzer) operand(v ssa.Value) []wrapped {
 		a.inner(func() { a.walk(v) })
 		return nil
 	}
-	c := &analyzer{tbl: a.tbl, fn: a.fn, at: a.at, seen: make(map[ssa.Value]bool), opts: a.opts, depth: a.depth + 1}
+	c := &analyzer{tbl: a.tbl, fn: a.fn, at: a.at, seen: make(map[ssa.Value]bool), opts: a.opts, depth: a.depth + 1, captured: a.captured, active: a.active}
 	c.flat = c.depth >= a.opts.chainDepth()
 	c.walk(v)
 	var out []wrapped

@@ -73,7 +73,9 @@ type Target struct {
 
 // KeepReachable narrows the Funcs of a generic Target to the instances
 // for which reachable reports true: those the analysed program can run.
-// If none is reachable, Funcs are left as they are. It does nothing for a
+// If none is reachable, Funcs are left as they are, and the caller adds
+// them as extra roots with the unreachable-Target warning; this fallback is
+// the intended S06 behaviour until S12 revisits the roots. It does nothing for a
 // Target that is not generic.
 func (t *Target) KeepReachable(reachable func(*ssa.Function) bool) {
 	if t.Generic == nil {

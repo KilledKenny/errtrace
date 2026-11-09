@@ -1,0 +1,35 @@
+A call of an interface method value names the real method, not the bound
+and pointer wrappers.
+-- args --
+a.go:@run
+-- stdout --
+$WORK/a.go:13:14-17: Error Set of example.com/fx.run: 1 entries
+$WORK/a.go:5:5-9: sentinel example.com/fx.ErrV
+	path (origin → target):
+		$WORK/a.go:11:31-35: in (example.com/fx.V).Get
+		$WORK/a.go:15:9-12: in example.com/fx.run, call to (example.com/fx.V).Get (dynamic (example.com/fx.Getter).Get: 1 of 1 candidates)
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import "errors"
+
+var ErrV = errors.New("v")
+
+type Getter interface{ Get() error }
+
+type V struct{}
+
+func (V) Get() error { return ErrV }
+
+func /*@run*/run(g Getter) error {
+	f := g.Get
+	return f()
+}
+
+func main() {
+	_ = run(&V{})
+}

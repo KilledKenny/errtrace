@@ -1,0 +1,37 @@
+A captured err reassigned from itself resolves the inner read to the stored
+values.
+-- args --
+a.go:@closure
+-- stdout --
+$WORK/a.go:11:21-25: Error Set of example.com/fx.selfWrap$1: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:9:15-21: in example.com/fx.selfWrap
+		$WORK/a.go:11:43-46: in example.com/fx.selfWrap$1
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	wrap chain (origin → target):
+		$WORK/a.go:10:8-32: fmt.Errorf "x: %w"
+	path (origin → target):
+		$WORK/a.go:9:15-21: in example.com/fx.selfWrap
+		$WORK/a.go:11:43-46: in example.com/fx.selfWrap$1
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+)
+
+func selfWrap() func() error {
+	err := error(io.EOF)
+	err = fmt.Errorf("x: %w", err)
+	return /*@closure*/func() error { return err }
+}
+
+func main() {
+	_ = selfWrap()()
+}

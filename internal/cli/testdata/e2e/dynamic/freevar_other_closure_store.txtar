@@ -1,0 +1,31 @@
+A captured err that another closure also writes is not complete: the load is
+unresolved(memory).
+-- args --
+a.go:@closure
+-- stdout --
+$WORK/a.go:11:21-25: Error Set of example.com/fx.setInside$2: 1 entries, 1 unresolved
+$WORK/a.go:8:6-9: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/a.go:8:6-9: in example.com/fx.setInside
+		$WORK/a.go:11:43-46: in example.com/fx.setInside$2
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import "errors"
+
+var ErrA = errors.New("a")
+
+func setInside() func() error {
+	var err error
+	g := func() { err = ErrA }
+	g()
+	return /*@closure*/func() error { return err }
+}
+
+func main() {
+	_ = setInside()()
+}

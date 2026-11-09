@@ -274,7 +274,9 @@ list of Wrap nodes from that leaf outwards to the top-level value. Each entry ha
 - `Path` (the Propagation Path, see below), `MorePaths int` (how many other
   distinct paths were found, shown as `[+N more paths]`);
 - `PossiblyHandled []GuardNote` (S07);
-- `Group` (S06: the dynamic call site the entry is grouped under, if any).
+- grouping (S06) is not an `Entry` field: the text renderer computes it from
+  the dynamic hop of `Path` nearest the Target (see Output format, Grouping);
+  S11's JSON can derive it from the path hops the same way.
 
 Two entries are the same when their leaf and chain are equal. Paths don't count:
 duplicates are merged and `MorePaths` is increased. Entries are ordered by
@@ -687,7 +689,9 @@ position Target to a declaration or a call site, including generic instances.
   origin**. Its body gets no call-graph edges (`callgraph-algorithms`, §4
   Generics), so it must not be analysed. Collect the instances with
   `fn.Origin() == generic`. In S02, scanning `ssautil.AllFunctions(prog)` once is
-  acceptable; S06 replaces it with the reachable slice. If there are no
+  acceptable; S06 narrows those instances to the ones in the reachable slice
+  (`Target.KeepReachable`), keeping all of them, added as extra roots with the
+  unreachable warning, when none is reachable (until S12). If there are no
   instances, `Funcs` is empty; S06 turns that into `unresolved(no-instances)`.
 - CLI: after `Resolve` succeeds, `-debug=target` prints
   `target: <kind> <name> funcs=[...] span=<span>` to stderr. stdout stays empty,

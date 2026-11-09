@@ -145,6 +145,12 @@ type analyzer struct {
 	// walked: its facts were added before, so a walk that adds nothing
 	// does not show the value is nil.
 	revisits int
+	// captured, if set, is a captured local variable that only its
+	// creator writes (see StoredFacts): a load of it stands for its
+	// stores, except those whose values are being walked (in active,
+	// shared with child analyzers), which cuts err = wrap(err) cycles.
+	captured *ssa.Alloc
+	active   map[*ssa.Store]bool
 }
 
 // LeafSource returns where leaf k of the fact's value enters the function.
@@ -345,6 +351,16 @@ func (a *analyzer) load(v *ssa.UnOp) bool {
 func (a *analyzer) local(load *ssa.UnOp, alloc *ssa.Alloc) {
 	if alloc.Comment == "complit" {
 		a.constructed(load.Type(), alloc)
+		return
+	}
+	if alloc == a.captured {
+		for _, r := range *alloc.Referrers() {
+			if st, ok := r.(*ssa.Store); ok && st.Addr == alloc && !a.active[st] {
+				a.active[st] = true
+				a.walk(st.Val)
+				delete(a.active, st)
+			}
+		}
 		return
 	}
 	if alloc.Heap {

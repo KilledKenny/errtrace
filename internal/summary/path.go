@@ -160,7 +160,20 @@ func (s *Solver) sourcePath(fn *ssa.Function, src Source) (best, bool) {
 		hop.Candidates = len(s.res.Callees(site))
 		hop.CandidatesBefore = hop.Candidates
 	}
-	path := slices.Concat(arg.path, callee.path, errset.Path{hop})
+	inner := callee.path
+	if n := len(inner); n > 0 && src.Callee.Synthetic != "" && inner[n-1].Func == hop.Callee && inner[n-1].Callee != "" {
+		// A call of a synthetic wrapper (a bound method or a pointer
+		// receiver wrapper): name the function it calls, and drop the hop
+		// inside the wrapper, which has no source of its own.
+		w := inner[n-1]
+		hop.Callee = w.Callee
+		if !hop.Dynamic && w.Dynamic {
+			hop.Dynamic, hop.Method = true, w.Method
+			hop.Candidates, hop.CandidatesBefore = w.Candidates, w.CandidatesBefore
+		}
+		inner = inner[:n-1]
+	}
+	path := slices.Concat(arg.path, inner, errset.Path{hop})
 	dynamic := arg.dynamic + callee.dynamic
 	if src.Dynamic {
 		dynamic++

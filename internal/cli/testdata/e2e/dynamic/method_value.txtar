@@ -6,13 +6,11 @@ $WORK/a.go:19:14-17: Error Set of example.com/fx.run: 2 entries
 $GOROOT/src/io/io.go:*: sentinel io.EOF
 	path (origin → target):
 		$WORK/a.go:14:10-16: in (*example.com/fx.T).Load
-		$WORK/a.go:12:13-17: in (*example.com/fx.T).Load$bound, call to (*example.com/fx.T).Load
-		$WORK/a.go:21:9-12: in example.com/fx.run, call to (*example.com/fx.T).Load$bound
+		$WORK/a.go:21:9-12: in example.com/fx.run, call to (*example.com/fx.T).Load
 $WORK/a.go:8:5-12: sentinel example.com/fx.ErrLoad
 	path (origin → target):
 		$WORK/a.go:16:9-16: in (*example.com/fx.T).Load
-		$WORK/a.go:12:13-17: in (*example.com/fx.T).Load$bound, call to (*example.com/fx.T).Load
-		$WORK/a.go:21:9-12: in example.com/fx.run, call to (*example.com/fx.T).Load$bound
+		$WORK/a.go:21:9-12: in example.com/fx.run, call to (*example.com/fx.T).Load
 -- go.mod --
 module example.com/fx
 
