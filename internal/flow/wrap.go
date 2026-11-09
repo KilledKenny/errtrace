@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"fmt"
 	"go/constant"
 	"go/token"
 	"go/types"
@@ -95,22 +96,25 @@ func arrayStores(alloc *ssa.Alloc) ([]ssa.Value, bool) {
 }
 
 // MayCarryError reports whether the operand v can hold an error: its type
-// is an error type or another interface, or it converts an error type to
-// an interface.
+// is an error type or another interface, or it converts a type that
+// implements error to an interface. A value of type T whose pointer type
+// alone implements error does not: fmt.Errorf's a[i].(error) fails on it.
 func MayCarryError(v ssa.Value) bool {
 	if mi, ok := v.(*ssa.MakeInterface); ok {
-		return IsErrorType(mi.X.Type())
+		return types.Implements(mi.X.Type(), errorIface)
 	}
 	return IsErrorType(v.Type()) || types.IsInterface(v.Type())
 }
 
 // operand returns the values v can carry as the inner value of a Wrap made
-// by this analyzer. Below the Wrap Chain depth limit it returns v's leaves
-// under Truncated markers. In flat mode the leaves are added to the
-// analyzer's own facts and operand returns nothing.
+// by this analyzer. Leaves that lie below more Wraps than the Wrap Chain
+// depth limit allows are returned under Truncated markers; a chain of
+// exactly the limit is kept whole, as errset.Table.Cap does. In flat mode
+// (at the limit) the operand's leaves are added to the analyzer's own
+// facts, marked as cut, and operand returns nothing.
 func (a *analyzer) operand(v ssa.Value) []errset.ValueID {
 	if a.flat {
-		a.walk(v)
+		a.inner(func() { a.walk(v) })
 		return nil
 	}
 	c := &analyzer{tbl: a.tbl, fn: a.fn, at: a.at, seen: make(map[ssa.Value]bool), opts: a.opts, depth: a.depth + 1}
@@ -120,7 +124,7 @@ func (a *analyzer) operand(v ssa.Value) []errset.ValueID {
 	seen := make(map[errset.ValueID]bool)
 	for _, f := range c.facts {
 		id := f.Value
-		if c.flat {
+		if f.cut {
 			l := a.tbl.Get(id)
 			id = a.tbl.Intern(errset.Value{Kind: errset.Truncated, Site: l.Site, Pos: l.Pos, Inner: []errset.ValueID{id}})
 		}
@@ -132,11 +136,36 @@ func (a *analyzer) operand(v ssa.Value) []errset.ValueID {
 	return out
 }
 
+// inner runs walk, in flat mode, for the inner values of a Wrap: the leaves
+// it adds are cut. Each value is walked at most once inside and once
+// outside of Wraps, which keeps wrapping loops finite.
+func (a *analyzer) inner(walk func()) {
+	if a.cut {
+		walk()
+		return
+	}
+	if a.seenCut == nil {
+		a.seenCut = make(map[ssa.Value]bool)
+	}
+	saved := a.seen
+	a.seen, a.cut = a.seenCut, true
+	defer func() { a.seen, a.cut = saved, false }()
+	walk()
+}
+
+// addInner adds, in flat mode, leaves that are the inner values of a Wrap.
+func (a *analyzer) addInner(ids []errset.ValueID, src any) {
+	a.inner(func() { a.addAll(ids, src) })
+}
+
 // wraps returns one Wrap like base for each combination of the values of
-// operands, one value per operand, at most maxCombos. Operands without
-// values (always nil) are left out; if none is left there is no Wrap.
+// operands, one value per operand, at most maxCombos. When combinations are
+// dropped an unresolved(fixpoint-limit) value is returned with them, so the
+// Error Set does not claim to be complete. Operands without values (always
+// nil) are left out; if none is left there is no Wrap.
 func (a *analyzer) wraps(base errset.Value, operands [][]errset.ValueID) []errset.ValueID {
 	combos := [][]errset.ValueID{nil}
+	dropped := false
 	for _, op := range operands {
 		if len(op) == 0 {
 			continue
@@ -145,6 +174,7 @@ func (a *analyzer) wraps(base errset.Value, operands [][]errset.ValueID) []errse
 		for _, c := range combos {
 			for _, id := range op {
 				if len(next) == maxCombos {
+					dropped = true
 					break
 				}
 				next = append(next, append(c[:len(c):len(c)], id))
@@ -155,12 +185,16 @@ func (a *analyzer) wraps(base errset.Value, operands [][]errset.ValueID) []errse
 	if len(combos) == 1 && len(combos[0]) == 0 {
 		return nil
 	}
-	out := make([]errset.ValueID, len(combos))
+	out := make([]errset.ValueID, len(combos), len(combos)+1)
 	for i, c := range combos {
 		w := base
 		w.Kind = errset.Wrap
 		w.Inner = c
 		out[i] = a.tbl.Intern(w)
+	}
+	if dropped {
+		out = append(out, a.unresolvedAt(base.Site, base.Pos, errset.FixpointLimit,
+			fmt.Sprintf("more than %d combinations of wrapped values", maxCombos)))
 	}
 	return out
 }
@@ -198,12 +232,16 @@ func (a *analyzer) errorf(site any, pos token.Pos, format, args ssa.Value) {
 	}
 	u := a.unresolvedAt(site, pos, errset.DynamicFormat, "format of fmt.Errorf is not a constant")
 	if a.flat {
-		a.add(u, site)
+		a.addInner([]errset.ValueID{u}, site)
 	}
 	operands := [][]errset.ValueID{{u}}
 	ops, ok := VarargsOperands(args)
 	if !ok {
-		operands = append(operands, a.notFollowed(site, pos, "operands of fmt.Errorf"))
+		nf := a.notFollowed(site, pos, "operands of fmt.Errorf")
+		if a.flat {
+			a.addInner(nf, site)
+		}
+		operands = append(operands, nf)
 	}
 	for _, op := range ops {
 		if op != nil && MayCarryError(op) {
@@ -227,7 +265,7 @@ func (a *analyzer) constErrorf(site any, pos token.Pos, format string, args ssa.
 			return
 		}
 		if a.flat {
-			a.addAll(a.notFollowed(site, pos, "operands of fmt.Errorf"), site)
+			a.addInner(a.notFollowed(site, pos, "operands of fmt.Errorf"), site)
 			return
 		}
 		a.addAll(a.wraps(errset.Value{Site: site, Pos: pos, WrapKind: errset.WrapErrorf, Format: format},
@@ -241,11 +279,15 @@ func (a *analyzer) constErrorf(site any, pos token.Pos, format string, args ssa.
 	}
 	var operands [][]errset.ValueID
 	for _, i := range wrapped {
-		if op := ops[i]; op != nil && MayCarryError(op) {
+		if op := ops[i]; op != nil && MayCarryError(op) && !isNilConst(op) {
 			operands = append(operands, a.operand(op))
 		}
 	}
 	if a.flat {
+		if len(operands) == 0 {
+			// As below: nothing is wrapped.
+			a.add(opaque, site)
+		}
 		return
 	}
 	ids := a.wraps(errset.Value{Site: site, Pos: pos, WrapKind: errset.WrapErrorf, Format: format}, operands)
@@ -255,6 +297,11 @@ func (a *analyzer) constErrorf(site any, pos token.Pos, format string, args ssa.
 		ids = []errset.ValueID{opaque}
 	}
 	a.addAll(ids, site)
+}
+
+func isNilConst(v ssa.Value) bool {
+	c, ok := v.(*ssa.Const)
+	return ok && c.IsNil()
 }
 
 // notFollowed is the inner value of a Wrap whose operands are passed in a
@@ -271,7 +318,7 @@ func (a *analyzer) join(call *ssa.Call, args ssa.Value) {
 	ops, ok := VarargsOperands(args)
 	if !ok {
 		if a.flat {
-			a.addAll(a.notFollowed(call, pos, "operands of errors.Join"), call)
+			a.addInner(a.notFollowed(call, pos, "operands of errors.Join"), call)
 			return
 		}
 		a.addAll(a.wraps(base, [][]errset.ValueID{a.notFollowed(call, pos, "operands of errors.Join")}), call)
@@ -315,7 +362,7 @@ func (a *analyzer) constructed(typ types.Type, alloc *ssa.Alloc) {
 	if m.kind == unwrapOther {
 		u := a.unresolvedAt(alloc, pos, errset.Memory, typeString(unalias(typ))+".Unwrap not modelled")
 		if a.flat {
-			a.add(u, alloc)
+			a.addInner([]errset.ValueID{u}, alloc)
 			return
 		}
 		a.addAll(a.wraps(base, [][]errset.ValueID{{u}}), alloc)
@@ -342,7 +389,7 @@ func (a *analyzer) constructed(typ types.Type, alloc *ssa.Alloc) {
 			}
 			u := a.unresolvedAt(alloc, pos, errset.Memory, "slice returned by "+typeString(unalias(typ))+".Unwrap not followed")
 			if a.flat {
-				a.add(u, alloc)
+				a.addInner([]errset.ValueID{u}, alloc)
 			}
 			operands = append(operands, []errset.ValueID{u})
 		}

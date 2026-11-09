@@ -2,7 +2,7 @@ A loop that wraps its own error builds an unbounded chain: with -chain-depth=3 t
 -- args --
 -chain-depth=3 a.go:@f
 -- stdout --
-$WORK/a.go:10:12-13: Error Set of example.com/fx.F: 4 entries
+$WORK/a.go:10:12-13: Error Set of example.com/fx.F: 5 entries
 $WORK/a.go:8:5-9: sentinel example.com/fx.ErrX
 	path (origin → target):
 		$WORK/a.go:11:9-13: in example.com/fx.F
@@ -13,6 +13,13 @@ $WORK/a.go:8:5-9: sentinel example.com/fx.ErrX
 		$WORK/a.go:13:9-42: in example.com/fx.F
 $WORK/a.go:8:5-9: sentinel example.com/fx.ErrX
 	wrap chain (origin → target):
+		$WORK/a.go:13:9-42: fmt.Errorf "step %d: %w"
+		$WORK/a.go:13:9-42: fmt.Errorf "step %d: %w"
+	path (origin → target):
+		$WORK/a.go:13:9-42: in example.com/fx.F
+$WORK/a.go:8:5-9: sentinel example.com/fx.ErrX
+	wrap chain (origin → target):
+		$WORK/a.go:13:9-42: fmt.Errorf "step %d: %w"
 		$WORK/a.go:13:9-42: fmt.Errorf "step %d: %w"
 		$WORK/a.go:13:9-42: fmt.Errorf "step %d: %w"
 	path (origin → target):

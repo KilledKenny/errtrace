@@ -219,8 +219,18 @@ flags:
 		name, usage := flag.UnquoteUsage(f)
 		fmt.Fprintf(w, "  -%s %s\n    \t%s", f.Name, name, usage)
 		if f.DefValue != "" {
-			fmt.Fprintf(w, " (default %q)", f.DefValue)
+			// As flag.PrintDefaults: only string defaults are quoted.
+			if g, ok := f.Value.(flag.Getter); ok && isString(g.Get()) {
+				fmt.Fprintf(w, " (default %q)", f.DefValue)
+			} else {
+				fmt.Fprintf(w, " (default %s)", f.DefValue)
+			}
 		}
 		fmt.Fprintln(w)
 	})
+}
+
+func isString(v any) bool {
+	_, ok := v.(string)
+	return ok
 }

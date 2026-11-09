@@ -22,6 +22,9 @@ type Fact struct {
 	// Source is the ssa.Value (or, for an implicit conversion, the
 	// ssa.DebugRef of its operand) where Value enters the function.
 	Source any
+	// cut is set, inside an analyzer at the Wrap Chain depth limit, for a
+	// leaf found below a further Wrap: its chain is longer than the limit.
+	cut bool
 }
 
 // ResultFacts are the local facts of one error result.
@@ -126,15 +129,20 @@ type analyzer struct {
 	// then walked through to their operands' leaves, which the caller
 	// marks Truncated.
 	flat bool
+	// cut is set in flat mode while walking the operands of a wrapping
+	// call: the leaves found then lie below the depth limit and are
+	// marked Truncated. seenCut is the seen set of that walk.
+	cut     bool
+	seenCut map[ssa.Value]bool
 }
 
 func (a *analyzer) add(id errset.ValueID, src any) {
 	for _, f := range a.facts {
-		if f.Value == id && f.Source == src {
+		if f.Value == id && f.Source == src && f.cut == a.cut {
 			return
 		}
 	}
-	a.facts = append(a.facts, Fact{Value: id, Source: src})
+	a.facts = append(a.facts, Fact{Value: id, Source: src, cut: a.cut})
 }
 
 // posOf returns a valid position for v: its own, its operand's for an

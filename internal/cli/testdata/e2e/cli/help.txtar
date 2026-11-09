@@ -11,7 +11,7 @@ the Target's error result, with its Propagation Path.
 
 flags:
   -chain-depth N
-    	max Wrap Chain depth N before truncation (default "8")
+    	max Wrap Chain depth N before truncation (default 8)
   -p patterns
     	comma-separated package patterns to load (default "./...")
   -tags list

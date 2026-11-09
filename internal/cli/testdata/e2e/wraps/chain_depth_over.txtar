@@ -1,0 +1,31 @@
+A chain one Wrap deeper than -chain-depth is cut: with -chain-depth=1 two nested %w give one Wrap and [chain truncated].
+-- args --
+-chain-depth=1 a.go:@h
+-- stdout --
+$WORK/a.go:14:12-13: Error Set of example.com/fx.H: 1 entries
+$WORK/a.go:8:5-9: sentinel example.com/fx.ErrX [chain truncated]
+	wrap chain (origin → target):
+		$WORK/a.go:15:9-53: fmt.Errorf "b %w"
+	path (origin → target):
+		$WORK/a.go:15:9-53: in example.com/fx.H
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrX = errors.New("x")
+
+func /*@g*/G() error {
+	return fmt.Errorf("a %w", ErrX)
+}
+
+func /*@h*/H() error {
+	return fmt.Errorf("b %w", fmt.Errorf("a %w", ErrX))
+}

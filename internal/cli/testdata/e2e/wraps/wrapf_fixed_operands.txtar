@@ -1,0 +1,36 @@
+Known v1 limitation: a helper that forwards only its format (wrapf(format string, err error) calling fmt.Errorf(format, err)) is not Errorf-like, so its result is unresolved(dynamic-format) with the operand kept as a possible wrap, even when every caller passes a constant format.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:12:12-13: Error Set of example.com/fx.F: 2 entries, 1 unresolved
+$WORK/a.go:8:5-9: sentinel example.com/fx.ErrX
+	wrap chain (origin → target):
+		$WORK/a.go:10:53-76: fmt.Errorf with dynamic format
+	path (origin → target):
+		$WORK/a.go:12:46-50: in example.com/fx.F
+		$WORK/a.go:10:53-76: in example.com/fx.wrapf
+		$WORK/a.go:12:31-51: in example.com/fx.F, call to example.com/fx.wrapf
+$WORK/a.go:10:53-76: unresolved(dynamic-format): format of fmt.Errorf is not a constant
+	wrap chain (origin → target):
+		$WORK/a.go:10:53-76: fmt.Errorf with dynamic format
+	path (origin → target):
+		$WORK/a.go:12:46-50: in example.com/fx.F
+		$WORK/a.go:10:53-76: in example.com/fx.wrapf
+		$WORK/a.go:12:31-51: in example.com/fx.F, call to example.com/fx.wrapf
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrX = errors.New("x")
+
+func wrapf(format string, err error) error { return fmt.Errorf(format, err) }
+
+func /*@f*/F() error { return wrapf("f: %w", ErrX) }
