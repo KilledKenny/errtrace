@@ -12,9 +12,12 @@ import (
 	"os/signal"
 	"strings"
 
+	"golang.org/x/tools/go/ssa"
+
 	"github.com/killedKenny/errtrace/internal/load"
 	"github.com/killedKenny/errtrace/internal/query"
 	"github.com/killedKenny/errtrace/internal/render"
+	"github.com/killedKenny/errtrace/internal/resolve"
 	"github.com/killedKenny/errtrace/internal/span"
 	"github.com/killedKenny/errtrace/internal/target"
 )
@@ -58,6 +61,10 @@ func Main(args []string, stdout, stderr io.Writer) int {
 	return Run(ctx, Options{Args: args, Dir: dir, Env: os.Environ(), Stdout: stdout, Stderr: stderr})
 }
 
+// DefaultFanout is the default of -fanout: entries are grouped under a
+// dynamic call site with at least this many Candidates.
+const DefaultFanout = 8
+
 // debugModes are the values accepted by the hidden -debug flag.
 var debugModes = []string{"target", "timing", "summary"}
 
@@ -69,6 +76,7 @@ type config struct {
 	tags       string
 	patterns   string
 	chainDepth int
+	fanout     int
 	debug      map[string]bool
 }
 
@@ -113,6 +121,9 @@ func run(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) error
 	if cfg.chainDepth < 1 {
 		return usageError{fmt.Errorf("invalid -chain-depth %d (want at least 1)", cfg.chainDepth)}
 	}
+	if cfg.fanout < 0 {
+		return usageError{fmt.Errorf("invalid -fanout %d (want 0 or more)", cfg.fanout)}
+	}
 	if fs.NArg() != 1 {
 		return usageError{fmt.Errorf("expected exactly one Target argument, got %d", fs.NArg())}
 	}
@@ -137,6 +148,10 @@ func run(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) error
 	if err != nil {
 		return err
 	}
+	resolver, err := newResolver(ctx, prog, tgt, opts.Stderr, cfg.debug["timing"])
+	if err != nil {
+		return err
+	}
 	if cfg.debug["target"] {
 		names := make([]string, len(tgt.Funcs))
 		for i, fn := range tgt.Funcs {
@@ -145,7 +160,7 @@ func run(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) error
 		fmt.Fprintf(opts.Stderr, "target: %s %s funcs=[%s] span=%s\n",
 			tgt.Kind, tgt.Name, strings.Join(names, " "), tgt.Span)
 	}
-	res, err := query.Run(ctx, prog, tgt, query.Options{ChainDepth: cfg.chainDepth})
+	res, err := query.Run(ctx, prog, tgt, query.Options{ChainDepth: cfg.chainDepth, Resolver: resolver})
 	if err != nil {
 		return err
 	}
@@ -158,7 +173,43 @@ func run(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) error
 		Table:      res.Table,
 		Entries:    res.Entries,
 		Locator:    res,
+		Fanout:     cfg.fanout,
 	})
+}
+
+// newResolver builds the VTA Resolver from the main and init roots of the
+// loaded program. A generic Target is narrowed to its reachable instances.
+// Target functions that are not reachable from the roots are added as
+// roots, with a warning: their parameters have no callers to take
+// Candidates from.
+func newResolver(ctx context.Context, prog *load.Program, tgt *target.Target, stderr io.Writer, timing bool) (*resolve.VTA, error) {
+	var initial []*ssa.Package
+	for _, p := range prog.Initial {
+		if sp := prog.SSAPackage(p); sp != nil {
+			initial = append(initial, sp)
+		}
+	}
+	v, err := resolve.NewVTA(ctx, prog.SSA, resolve.Roots(prog.SSA, initial))
+	if err != nil {
+		return nil, err
+	}
+	tgt.KeepReachable(v.Reachable)
+	var unreachable []*ssa.Function
+	for _, fn := range tgt.Funcs {
+		if !v.Reachable(fn) {
+			unreachable = append(unreachable, fn)
+		}
+	}
+	if len(unreachable) > 0 {
+		fmt.Fprintf(stderr, "%s: warning: target not reachable from main/init; parameters may lack candidates\n", BinaryName)
+		if v, err = v.WithRoots(ctx, unreachable); err != nil {
+			return nil, err
+		}
+	}
+	if timing {
+		fmt.Fprintf(stderr, "timing: cha=%s vta1=%s vta2=%s\n", v.Timing.CHA, v.Timing.VTA1, v.Timing.VTA2)
+	}
+	return v, nil
 }
 
 // splitList splits a comma-separated flag value, dropping empty elements.
@@ -179,6 +230,7 @@ func newFlagSet() (*flag.FlagSet, *config) {
 	fs.StringVar(&cfg.tags, "tags", "", "comma-separated `list` of build tags")
 	fs.StringVar(&cfg.patterns, "p", "./...", "comma-separated package `patterns` to load")
 	fs.IntVar(&cfg.chainDepth, "chain-depth", query.DefaultChainDepth, "max Wrap Chain depth `N` before truncation")
+	fs.IntVar(&cfg.fanout, "fanout", DefaultFanout, "group entries under dynamic call sites with at least `N` Candidates (0 = never group)")
 	fs.String("debug", "", "comma-separated `list` of "+strings.Join(debugModes, ",")+" (stderr only)")
 	return fs, cfg
 }

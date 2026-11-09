@@ -1,0 +1,20 @@
+A generic function that is never instantiated has nothing to analyse.
+-- args --
+a.go:@never
+-- stdout --
+$WORK/a.go:5:16-21: Error Set of example.com/fx.Never: 1 entries, 1 unresolved
+$WORK/a.go:5:16-21: unresolved(no-instances): generic function example.com/fx.Never has no instances in the loaded program
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import "errors"
+
+func /*@never*/Never[T any](v T) (T, error) {
+	return v, errors.New("never")
+}
+
+func main() {}

@@ -29,6 +29,8 @@ $WORK/a.go:8:5-9: sentinel example.com/fx.ErrX [chain truncated] [+1 more paths]
 		$WORK/a.go:14:29-35: in example.com/fx.F, call to example.com/fx.F
 		$WORK/a.go:14:29-35: in example.com/fx.F, call to example.com/fx.F
 		$WORK/a.go:14:29-35: in example.com/fx.F, call to example.com/fx.F
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
 -- go.mod --
 module example.com/fx
 

@@ -1,0 +1,55 @@
+A closure returning a captured err has the Origins its creator assigns to it.
+-- args --
+a.go:@closure
+-- stdout --
+$WORK/a.go:24:21-25: Error Set of example.com/fx.outer$1: 3 entries
+$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid
+	path (origin → target):
+		$WORK/a.go:20:9-22: in example.com/fx.outer
+		$WORK/a.go:25:10-13: in example.com/fx.outer$1
+$GOROOT/src/os/error.go:*: sentinel os.ErrNotExist
+	path (origin → target):
+		$WORK/a.go:14:14-28: in example.com/fx.open
+		$WORK/a.go:22:12-22: in example.com/fx.outer, call to example.com/fx.open
+		$WORK/a.go:25:10-13: in example.com/fx.outer$1
+$WORK/a.go:8:5-13: sentinel example.com/fx.ErrEmpty
+	path (origin → target):
+		$WORK/a.go:12:15-23: in example.com/fx.open
+		$WORK/a.go:22:12-22: in example.com/fx.outer, call to example.com/fx.open
+		$WORK/a.go:25:10-13: in example.com/fx.outer$1
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"os"
+)
+
+var ErrEmpty = errors.New("empty")
+
+func open(name string) (*os.File, error) {
+	if name == "" {
+		return nil, ErrEmpty
+	}
+	return nil, os.ErrNotExist
+}
+
+func outer(name string) func() error {
+	var err error
+	if name == "-" {
+		err = os.ErrInvalid
+	} else {
+		_, err = open(name)
+	}
+	return /*@closure*/func() error {
+		return err
+	}
+}
+
+func main() {
+	_ = outer(os.Args[0])()
+}

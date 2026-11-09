@@ -88,9 +88,11 @@ func TestDebugModes(t *testing.T) {
 		t.Errorf("valid -debug list: code %d, stdout %q; want 0 and stdout %q (debug output goes to stderr only)", code, out.String(), wantOut)
 	}
 	lines := strings.Split(strings.TrimSuffix(errb.String(), "\n"), "\n")
-	if len(lines) != 3 || !strings.HasPrefix(lines[0], "timing: load=") || !strings.Contains(lines[0], " ssa=") ||
-		!strings.HasPrefix(lines[1], "target: declaration example.com/fx.F funcs=[example.com/fx.F] span=") ||
-		lines[2] != "summary: functions=1 sccs=1" {
-		t.Errorf("valid -debug list: stderr = %q, want a timing, a target and a summary line", errb.String())
+	if len(lines) != 5 || !strings.HasPrefix(lines[0], "timing: load=") || !strings.Contains(lines[0], " ssa=") ||
+		lines[1] != BinaryName+": warning: target not reachable from main/init; parameters may lack candidates" ||
+		!strings.HasPrefix(lines[2], "timing: cha=") || !strings.Contains(lines[2], " vta1=") || !strings.Contains(lines[2], " vta2=") ||
+		!strings.HasPrefix(lines[3], "target: declaration example.com/fx.F funcs=[example.com/fx.F] span=") ||
+		lines[4] != "summary: functions=1 sccs=1" {
+		t.Errorf("valid -debug list: stderr = %q, want a timing, a warning, a call-graph timing, a target and a summary line", errb.String())
 	}
 }

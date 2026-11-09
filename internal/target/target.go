@@ -64,6 +64,30 @@ type Target struct {
 	// SiteByFunc maps each of Funcs to its call instruction of the call
 	// site. It is nil for a declaration.
 	SiteByFunc map[*ssa.Function]ssa.CallInstruction
+	// Generic is, for a Target in a generic function, the generic
+	// function (the declaration, or the one enclosing the call site),
+	// whose body is never analysed; Funcs are its instances. It is nil
+	// otherwise.
+	Generic *ssa.Function
+}
+
+// KeepReachable narrows the Funcs of a generic Target to the instances
+// for which reachable reports true: those the analysed program can run.
+// If none is reachable, Funcs are left as they are. It does nothing for a
+// Target that is not generic.
+func (t *Target) KeepReachable(reachable func(*ssa.Function) bool) {
+	if t.Generic == nil {
+		return
+	}
+	var keep []*ssa.Function
+	for _, fn := range t.Funcs {
+		if reachable(fn) {
+			keep = append(keep, fn)
+		}
+	}
+	if len(keep) > 0 {
+		t.Funcs = keep
+	}
 }
 
 // errNoTarget is the error for a position that names nothing errtrace can
@@ -193,10 +217,11 @@ func declTarget(prog *load.Program, info *types.Info, ssaPkg *ssa.Package, decl 
 		return nil, fmt.Errorf("%s has no error result", fn)
 	}
 	return &Target{
-		Kind:  Declaration,
-		Name:  fn.String(),
-		Span:  span.Of(prog.Fset, decl.Name.Pos(), decl.Name.End()),
-		Funcs: instances(prog, fn),
+		Kind:    Declaration,
+		Name:    fn.String(),
+		Span:    span.Of(prog.Fset, decl.Name.Pos(), decl.Name.End()),
+		Funcs:   instances(prog, fn),
+		Generic: genericOf(fn),
 	}, nil
 }
 
@@ -209,10 +234,11 @@ func closureTarget(prog *load.Program, ssaPkg *ssa.Package, path []ast.Node, lit
 		return nil, fmt.Errorf("%s has no error result", fn)
 	}
 	return &Target{
-		Kind:  Declaration,
-		Name:  fn.String(),
-		Span:  span.Of(prog.Fset, lit.Type.Func, lit.Type.Func+token.Pos(len("func"))),
-		Funcs: instances(prog, fn),
+		Kind:    Declaration,
+		Name:    fn.String(),
+		Span:    span.Of(prog.Fset, lit.Type.Func, lit.Type.Func+token.Pos(len("func"))),
+		Funcs:   instances(prog, fn),
+		Generic: genericOf(fn),
 	}, nil
 }
 
@@ -244,6 +270,7 @@ func callTarget(prog *load.Program, info *types.Info, ssaPkg *ssa.Package, path 
 		Funcs:      instances(prog, enclosing),
 		Site:       site,
 		SiteByFunc: make(map[*ssa.Function]ssa.CallInstruction),
+		Generic:    genericOf(enclosing),
 	}
 	for _, fn := range t.Funcs {
 		s := site
@@ -287,6 +314,15 @@ func instances(prog *load.Program, fn *ssa.Function) []*ssa.Function {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].String() < out[j].String() })
 	return out
+}
+
+// genericOf returns fn if it is generic (see isGeneric), and nil
+// otherwise.
+func genericOf(fn *ssa.Function) *ssa.Function {
+	if isGeneric(fn) {
+		return fn
+	}
+	return nil
 }
 
 // isGeneric reports whether fn or a function enclosing it has type

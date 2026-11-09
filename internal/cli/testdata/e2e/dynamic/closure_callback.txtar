@@ -1,0 +1,25 @@
+A callback is resolved to the closure passed to it.
+-- args --
+a.go:@apply
+-- stdout --
+$WORK/a.go:7:16-21: Error Set of example.com/fx.apply: 1 entries
+$WORK/a.go:5:5-9: sentinel example.com/fx.ErrX
+	path (origin → target):
+		$WORK/a.go:10:34-38: in example.com/fx.main$1
+		$WORK/a.go:7:54-58: in example.com/fx.apply, call to example.com/fx.main$1 (dynamic function value cb: 1 of 1 candidates)
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import "errors"
+
+var ErrX = errors.New("x")
+
+func /*@apply*/apply(cb func() error) error { return cb() }
+
+func main() {
+	_ = apply(func() error { return ErrX })
+}

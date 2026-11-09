@@ -1,0 +1,36 @@
+Method values passed as callbacks: the Candidate is the method itself, and
+the callback's arguments go to the method's parameters after its bound
+receiver.
+-- args --
+a.go:@apply
+-- stdout --
+$WORK/a.go:12:16-21: Error Set of example.com/fx.apply: 1 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	wrap chain (origin → target):
+		$WORK/a.go:10:44-68: fmt.Errorf "t: %w"
+	path (origin → target):
+		$WORK/a.go:12:62-68: in example.com/fx.apply
+		$WORK/a.go:10:64-67: in (*example.com/fx.T).Wrap
+		$WORK/a.go:12:59-69: in example.com/fx.apply, call to (*example.com/fx.T).Wrap (dynamic function value cb: 1 of 1 candidates)
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+)
+
+type T struct{}
+
+func (t *T) Wrap(err error) error { return fmt.Errorf("t: %w", err) }
+
+func /*@apply*/apply(cb func(error) error) error { return cb(io.EOF) }
+
+func main() {
+	t := &T{}
+	_ = apply(t.Wrap)
+}

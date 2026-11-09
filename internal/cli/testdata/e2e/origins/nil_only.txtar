@@ -3,6 +3,8 @@ A function that only returns nil has an empty Error Set.
 a.go:@f
 -- stdout --
 $WORK/a.go:3:12-13: Error Set of example.com/fx.F: 0 entries
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
 -- go.mod --
 module example.com/fx
 

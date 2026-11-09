@@ -8,6 +8,8 @@ $WORK/a.go:5:43-46: unresolved(depends-on-caller): parameter err (error)
 		$WORK/a.go:5:43-46: in example.com/fx.F
 		$WORK/a.go:3:33-34: in example.com/fx.id
 		$WORK/a.go:5:40-47: in example.com/fx.F, call to example.com/fx.id
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
 -- go.mod --
 module example.com/fx
 

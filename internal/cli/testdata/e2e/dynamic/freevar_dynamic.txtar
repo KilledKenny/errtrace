@@ -1,0 +1,32 @@
+A closure returned by its creator and called elsewhere through a function
+value: its captured err has the Origins the creator assigned.
+-- args --
+a.go:@use
+-- stdout --
+$WORK/a.go:12:14-17: Error Set of example.com/fx.use: 1 entries
+$WORK/a.go:5:5-10: sentinel example.com/fx.ErrMk
+	path (origin → target):
+		$WORK/a.go:8:9-14: in example.com/fx.mk
+		$WORK/a.go:9:31-34: in example.com/fx.mk$1
+		$WORK/a.go:12:49-52: in example.com/fx.use, call to example.com/fx.mk$1 (dynamic function value f: 1 of 1 candidates)
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import "errors"
+
+var ErrMk = errors.New("mk")
+
+func mk() func() error {
+	err := ErrMk
+	return func() error { return err }
+}
+
+func /*@use*/use(f func() error) error { return f() }
+
+func main() {
+	_ = use(mk())
+}

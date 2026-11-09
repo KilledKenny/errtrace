@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"go/types"
+
 	"golang.org/x/tools/go/ssa"
 
 	"github.com/killedKenny/errtrace/internal/errset"
@@ -35,7 +37,9 @@ type Solver struct {
 	local map[*ssa.Function]*flow.LocalFacts
 	sites map[*ssa.Function][]ssa.CallInstruction
 	args  map[argKey][]flow.Fact
-	sums  map[*ssa.Function]*Summary
+	// bindings caches the binding facts of captured variables.
+	bindings map[bindingKey]bindingFacts
+	sums     map[*ssa.Function]*Summary
 	// order lists the summarised functions in the order they were solved
 	// (callees first).
 	order []*ssa.Function
@@ -52,6 +56,21 @@ type Solver struct {
 	transfer func(*ssa.Function) []ResultSummary
 }
 
+// bindingKey is one captured variable of a closure, read as one type.
+type bindingKey struct {
+	fn    *ssa.Function
+	index int
+	typ   types.Type
+}
+
+// bindingFacts are the values bound to a captured variable, as local facts
+// of the closure's creator.
+type bindingFacts struct {
+	creator *ssa.Function
+	facts   []flow.Fact
+	ok      bool
+}
+
 type argKey struct {
 	fn *ssa.Function
 	v  ssa.Value
@@ -63,13 +82,14 @@ type argKey struct {
 // ChainDepth also caps the Wrap Chains that substitution builds).
 func NewSolver(tbl *errset.Table, res resolve.Resolver, opts flow.Options) *Solver {
 	s := &Solver{
-		tbl:   tbl,
-		res:   res,
-		opts:  opts,
-		local: make(map[*ssa.Function]*flow.LocalFacts),
-		sites: make(map[*ssa.Function][]ssa.CallInstruction),
-		args:  make(map[argKey][]flow.Fact),
-		sums:  make(map[*ssa.Function]*Summary),
+		tbl:      tbl,
+		res:      res,
+		opts:     opts,
+		local:    make(map[*ssa.Function]*flow.LocalFacts),
+		sites:    make(map[*ssa.Function][]ssa.CallInstruction),
+		args:     make(map[argKey][]flow.Fact),
+		bindings: make(map[bindingKey]bindingFacts),
+		sums:     make(map[*ssa.Function]*Summary),
 	}
 	s.transfer = s.evaluate
 	return s
@@ -107,7 +127,7 @@ func (s *Solver) Solve(ctx context.Context, fns []*ssa.Function) error {
 // SolveSite computes the summaries that the error results of the call site
 // in fn depend on: those of its callees and of the calls in its arguments.
 func (s *Solver) SolveSite(ctx context.Context, fn *ssa.Function, site ssa.CallInstruction) error {
-	return s.Solve(ctx, s.callees(s.sitesFrom(fn, []ssa.CallInstruction{site})))
+	return s.Solve(ctx, s.callees(s.sitesFrom([]ssa.CallInstruction{site})))
 }
 
 // SiteFacts returns the values that error result index of the call site in
@@ -171,9 +191,28 @@ func (s *Solver) argFacts(fn *ssa.Function, v ssa.Value, at ssa.Instruction) []f
 	return facts
 }
 
+// binding returns the values that the FreeVar v of the closure fn can
+// hold, as local facts of the function that created fn (see
+// flow.BindingFacts). It reports false if v is not one of fn's captured
+// variables or its bindings are not known.
+func (s *Solver) binding(fn *ssa.Function, v errset.Value) (*ssa.Function, []flow.Fact, bool) {
+	if v.Kind != errset.FreeVar || v.Fn != fn.String() {
+		return nil, nil, false
+	}
+	k := bindingKey{fn, v.Index, v.Type}
+	b, ok := s.bindings[k]
+	if !ok {
+		b.creator, b.facts, b.ok = flow.BindingFacts(s.tbl, fn, v.Index, v.Type, s.opts)
+		s.bindings[k] = b
+	}
+	return b.creator, b.facts, b.ok
+}
+
 // demandSites returns the call sites whose results can reach fn's error
-// results: the calls its results come from, and the calls in the error
-// arguments of those calls (which a callee may return as a parameter).
+// results: the calls its results come from, the calls in the error
+// arguments of those calls (which a callee may return as a parameter), and
+// the calls in the creating function whose results a closure's captured
+// variables are bound to. Sites may be in functions other than fn.
 func (s *Solver) demandSites(fn *ssa.Function) []ssa.CallInstruction {
 	sites, ok := s.sites[fn]
 	if ok {
@@ -182,18 +221,18 @@ func (s *Solver) demandSites(fn *ssa.Function) []ssa.CallInstruction {
 	var initial []ssa.CallInstruction
 	for _, r := range s.localFacts(fn).Results {
 		for _, f := range r.Facts {
-			initial = s.appendCallRefSites(initial, f.Value)
+			initial = s.appendCallRefSites(fn, initial, f.Value)
 		}
 	}
-	sites = s.sitesFrom(fn, initial)
+	sites = s.sitesFrom(initial)
 	s.sites[fn] = sites
 	return sites
 }
 
 // sitesFrom returns initial and, transitively, the calls found in the
-// error-typed arguments (and closure bindings) of those calls, without
-// duplicates.
-func (s *Solver) sitesFrom(fn *ssa.Function, initial []ssa.CallInstruction) []ssa.CallInstruction {
+// error-typed arguments (and closure bindings) of those calls, each in the
+// function that contains it, without duplicates.
+func (s *Solver) sitesFrom(initial []ssa.CallInstruction) []ssa.CallInstruction {
 	seen := make(map[ssa.CallInstruction]bool)
 	var out []ssa.CallInstruction
 	work := append([]ssa.CallInstruction(nil), initial...)
@@ -205,9 +244,10 @@ func (s *Solver) sitesFrom(fn *ssa.Function, initial []ssa.CallInstruction) []ss
 		}
 		seen[site] = true
 		out = append(out, site)
+		fn := site.Parent()
 		for _, v := range errorOperands(site) {
 			for _, f := range s.argFacts(fn, v, site) {
-				work = s.appendCallRefSites(work, f.Value)
+				work = s.appendCallRefSites(fn, work, f.Value)
 			}
 		}
 	}
@@ -246,17 +286,24 @@ func errorOperands(site ssa.CallInstruction) []ssa.Value {
 }
 
 // appendCallRefSites appends the sites of the CallRef leaves of the value
-// tree id.
-func (s *Solver) appendCallRefSites(sites []ssa.CallInstruction, id errset.ValueID) []ssa.CallInstruction {
+// tree id of fn, and those of the values bound to its FreeVar leaves in
+// the function that created the closure fn.
+func (s *Solver) appendCallRefSites(fn *ssa.Function, sites []ssa.CallInstruction, id errset.ValueID) []ssa.CallInstruction {
 	v := s.tbl.Get(id)
 	switch v.Kind {
 	case errset.CallRef:
 		if site, ok := v.Site.(ssa.CallInstruction); ok {
 			sites = append(sites, site)
 		}
+	case errset.FreeVar:
+		if creator, facts, ok := s.binding(fn, v); ok {
+			for _, f := range facts {
+				sites = s.appendCallRefSites(creator, sites, f.Value)
+			}
+		}
 	case errset.Wrap, errset.Truncated:
 		for _, in := range v.Inner {
-			sites = s.appendCallRefSites(sites, in)
+			sites = s.appendCallRefSites(fn, sites, in)
 		}
 	}
 	return sites

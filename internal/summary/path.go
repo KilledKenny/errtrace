@@ -6,6 +6,7 @@ import (
 	"golang.org/x/tools/go/ssa"
 
 	"github.com/killedKenny/errtrace/internal/errset"
+	"github.com/killedKenny/errtrace/internal/flow"
 )
 
 // node is a leaf of a fact of a summary: leaf number leaf of a value of
@@ -121,12 +122,22 @@ func (s *Solver) bestOf(fn *ssa.Function, srcs []Source) (best, bool) {
 }
 
 // sourcePath returns the path through one source of a value in fn: hop 0
-// for a local source; for a source through a call, the path of the
-// argument substituted into the callee (if any), then the callee's path,
-// then the call.
+// for a local source; for a captured variable, the path of the bound value
+// in the closure's creator, then the read in fn; for a source through a
+// call, the path of the argument substituted into the callee (if any),
+// then the callee's path, then the call (with the method and Candidate
+// count of a dynamic call).
 func (s *Solver) sourcePath(fn *ssa.Function, src Source) (best, bool) {
-	if src.Kind == Local {
+	switch src.Kind {
+	case Local:
 		return best{path: errset.Path{{Site: src.Site, Func: fn.String()}}}, true
+	case Captured:
+		arg, ok := s.bestOf(src.ArgFn, src.ArgSources)
+		if !ok {
+			return best{}, false
+		}
+		path := slices.Concat(arg.path, errset.Path{{Site: src.Site, Func: fn.String()}})
+		return best{path: path, dynamic: arg.dynamic}, true
 	}
 	callee, ok := s.paths[node{src.Callee, src.CalleeResult, src.CalleeValue, src.CalleeLeaf}]
 	if !ok {
@@ -138,12 +149,18 @@ func (s *Solver) sourcePath(fn *ssa.Function, src Source) (best, bool) {
 			return best{}, false
 		}
 	}
-	path := slices.Concat(arg.path, callee.path, errset.Path{{
+	hop := errset.Hop{
 		Site:    src.Site,
 		Func:    fn.String(),
 		Callee:  src.Callee.String(),
 		Dynamic: src.Dynamic,
-	}})
+	}
+	if site, ok := src.Site.(ssa.CallInstruction); ok && src.Dynamic {
+		hop.Method = flow.CalleeName(site.Common())
+		hop.Candidates = len(s.res.Callees(site))
+		hop.CandidatesBefore = hop.Candidates
+	}
+	path := slices.Concat(arg.path, callee.path, errset.Path{hop})
 	dynamic := arg.dynamic + callee.dynamic
 	if src.Dynamic {
 		dynamic++

@@ -1,0 +1,93 @@
+Nine Candidates at one interface call are grouped with the default -fanout.
+-- args --
+a.go:@use
+-- stdout --
+$WORK/a.go:61:14-17: Error Set of example.com/fx.use: 9 entries
+$WORK/a.go:61:43-50: group of 9 entries via dynamic call to (example.com/fx.Getter).Get (9 candidates) in example.com/fx.use
+	$WORK/a.go:7:5-9: sentinel example.com/fx.Err1 (candidate (example.com/fx.T1).Get)
+	$WORK/a.go:13:5-9: sentinel example.com/fx.Err2 (candidate (example.com/fx.T2).Get)
+	$WORK/a.go:19:5-9: sentinel example.com/fx.Err3 (candidate (example.com/fx.T3).Get)
+	$WORK/a.go:25:5-9: sentinel example.com/fx.Err4 (candidate (example.com/fx.T4).Get)
+	$WORK/a.go:31:5-9: sentinel example.com/fx.Err5 (candidate (example.com/fx.T5).Get)
+	$WORK/a.go:37:5-9: sentinel example.com/fx.Err6 (candidate (example.com/fx.T6).Get)
+	$WORK/a.go:43:5-9: sentinel example.com/fx.Err7 (candidate (example.com/fx.T7).Get)
+	$WORK/a.go:49:5-9: sentinel example.com/fx.Err8 (candidate (example.com/fx.T8).Get)
+	$WORK/a.go:55:5-9: sentinel example.com/fx.Err9 (candidate (example.com/fx.T9).Get)
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import "errors"
+
+type Getter interface{ Get() error }
+
+var Err1 = errors.New("e1")
+
+type T1 struct{}
+
+func (T1) Get() error { return Err1 }
+
+var Err2 = errors.New("e2")
+
+type T2 struct{}
+
+func (T2) Get() error { return Err2 }
+
+var Err3 = errors.New("e3")
+
+type T3 struct{}
+
+func (T3) Get() error { return Err3 }
+
+var Err4 = errors.New("e4")
+
+type T4 struct{}
+
+func (T4) Get() error { return Err4 }
+
+var Err5 = errors.New("e5")
+
+type T5 struct{}
+
+func (T5) Get() error { return Err5 }
+
+var Err6 = errors.New("e6")
+
+type T6 struct{}
+
+func (T6) Get() error { return Err6 }
+
+var Err7 = errors.New("e7")
+
+type T7 struct{}
+
+func (T7) Get() error { return Err7 }
+
+var Err8 = errors.New("e8")
+
+type T8 struct{}
+
+func (T8) Get() error { return Err8 }
+
+var Err9 = errors.New("e9")
+
+type T9 struct{}
+
+func (T9) Get() error { return Err9 }
+
+func /*@use*/use(g Getter) error { return g.Get() }
+
+func main() {
+	_ = use(T1{})
+	_ = use(T2{})
+	_ = use(T3{})
+	_ = use(T4{})
+	_ = use(T5{})
+	_ = use(T6{})
+	_ = use(T7{})
+	_ = use(T8{})
+	_ = use(T9{})
+}

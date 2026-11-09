@@ -1,0 +1,55 @@
+A generic Target's Error Set is the union over its instances; Must is
+followed through each instance, and the callback of each Map instance
+resolves to the closure it was instantiated with.
+-- args --
+-debug=target a.go:@map
+-- stdout --
+$WORK/a.go:14:14-17: Error Set of example.com/fx.Map: 2 entries
+$WORK/a.go:6:2-8: sentinel example.com/fx.ErrInt
+	path (origin → target):
+		$WORK/a.go:27:60-66: in example.com/fx.main$1
+		$WORK/a.go:17:18-22: in example.com/fx.Map[int], call to example.com/fx.main$1 (dynamic function value f: 1 of 1 candidates)
+		$WORK/a.go:11:12-15: in example.com/fx.Must[int]
+		$WORK/a.go:17:13-23: in example.com/fx.Map[int], call to example.com/fx.Must[int]
+$WORK/a.go:7:2-8: sentinel example.com/fx.ErrStr
+	path (origin → target):
+		$WORK/a.go:28:71-77: in example.com/fx.main$2
+		$WORK/a.go:17:18-22: in example.com/fx.Map[string], call to example.com/fx.main$2 (dynamic function value f: 1 of 1 candidates)
+		$WORK/a.go:11:12-15: in example.com/fx.Must[string]
+		$WORK/a.go:17:13-23: in example.com/fx.Map[string], call to example.com/fx.Must[string]
+-- stderr --
+target: declaration example.com/fx.Map funcs=[example.com/fx.Map[int] example.com/fx.Map[string]] span=$WORK/a.go:14:14-17
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import "errors"
+
+var (
+	ErrInt = errors.New("int")
+	ErrStr = errors.New("str")
+)
+
+func Must[T any](v T, err error) (T, error) {
+	return v, err
+}
+
+func /*@map*/Map[T any](xs []T, f func(T) (T, error)) ([]T, error) {
+	var out []T
+	for _, x := range xs {
+		y, err := Must(f(x))
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, y)
+	}
+	return out, nil
+}
+
+func main() {
+	_, _ = Map([]int{1}, func(i int) (int, error) { return i, ErrInt })
+	_, _ = Map([]string{"a"}, func(s string) (string, error) { return s, ErrStr })
+}

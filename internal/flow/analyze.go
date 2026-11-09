@@ -392,12 +392,15 @@ func (a *analyzer) call(call *ssa.Call, index int) {
 		}
 		return
 	}
+	// Fn tells apart the CallRefs of the instances of a generic
+	// function, whose calls share their positions.
 	a.add(a.tbl.Intern(errset.Value{
 		Kind:   errset.CallRef,
 		Site:   call,
 		Pos:    a.posOf(call),
 		Detail: CalleeName(common),
 		Index:  index,
+		Fn:     a.fn.String(),
 	}), call)
 }
 

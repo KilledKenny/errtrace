@@ -48,13 +48,29 @@ type Options struct {
 	// ChainDepth is the most Wraps a Wrap Chain can have before it is
 	// marked truncated; zero means DefaultChainDepth.
 	ChainDepth int
+	// Resolver finds the Candidates of call sites; nil means the static
+	// Resolver, which knows no Candidates of dynamic calls.
+	Resolver resolve.Resolver
 }
 
 // Run computes the Error Set of tgt in prog.
 func Run(ctx context.Context, prog *load.Program, tgt *target.Target, opts Options) (*Result, error) {
 	r := &Result{Target: tgt, Table: errset.NewTable(), prog: prog}
-	solver := summary.NewSolver(r.Table, resolve.Static{}, flow.Options{ChainDepth: opts.ChainDepth})
+	var res resolve.Resolver = resolve.Static{}
+	if opts.Resolver != nil {
+		res = opts.Resolver
+	}
+	solver := summary.NewSolver(r.Table, res, flow.Options{ChainDepth: opts.ChainDepth})
 	var entries []errset.Entry
+	if len(tgt.Funcs) == 0 && tgt.Generic != nil {
+		// A generic Target with no instances: nothing can be analysed.
+		id := r.Table.Intern(errset.Value{
+			Kind: errset.Unresolved, Site: tgt.Generic, Pos: tgt.Generic.Pos(),
+			Unresolved: errset.NoInstances,
+			Detail:     fmt.Sprintf("generic function %s has no instances in the loaded program", tgt.Generic),
+		})
+		entries = append(entries, errset.Entry{Leaf: id})
+	}
 	switch tgt.Kind {
 	case target.Declaration:
 		if err := solver.Solve(ctx, tgt.Funcs); err != nil {
@@ -157,7 +173,8 @@ func (r *Result) Unresolved() int { return errset.CountUnresolved(r.Table, r.Ent
 
 // Locate returns the span of a value's or hop's Site: the identifier of a
 // variable (a Sentinel), or the source expression of an SSA value or
-// instruction. It reports false if the site has no known position.
+// instruction (for an instruction of a synthetic wrapper, the name of the
+// function it wraps). It reports false if the site has no known position.
 func (r *Result) Locate(site any) (span.Span, bool) {
 	switch s := site.(type) {
 	case types.Object:
@@ -165,9 +182,22 @@ func (r *Result) Locate(site any) (span.Span, bool) {
 			return span.Of(r.prog.Fset, s.Pos(), s.Pos()+token.Pos(len(s.Name()))), true
 		}
 	case ssa.Value:
-		return r.prog.SpanOfValue(s)
+		if sp, ok := r.prog.SpanOfValue(s); ok {
+			return sp, true
+		}
 	case ssa.Instruction:
-		return r.prog.SpanOfInstr(s)
+		if sp, ok := r.prog.SpanOfInstr(s); ok {
+			return sp, true
+		}
+	}
+	// An instruction of a synthetic wrapper (such as a bound method
+	// wrapper) has no position: use that of the function it wraps.
+	if instr, ok := site.(ssa.Instruction); ok {
+		if fn := instr.Parent(); fn != nil && fn.Synthetic != "" {
+			if obj := fn.Object(); obj != nil && obj.Pos().IsValid() {
+				return span.Of(r.prog.Fset, obj.Pos(), obj.Pos()+token.Pos(len(obj.Name()))), true
+			}
+		}
 	}
 	return span.Span{}, false
 }

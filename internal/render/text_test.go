@@ -101,3 +101,58 @@ func TestTextEmpty(t *testing.T) {
 		t.Errorf("Text = %q, want %q", got, want)
 	}
 }
+
+func TestTextFanout(t *testing.T) {
+	pkg := types.NewPackage("example.com/fx", "fx")
+	errType := types.Universe.Lookup("error").Type()
+	tbl := errset.NewTable()
+	var entries []errset.Entry
+	dyn := func(site string, n int, callee string) errset.Hop {
+		return errset.Hop{Site: site, Func: "example.com/fx.use", Callee: callee, Dynamic: true,
+			Method: "(example.com/fx.Getter).Get", Candidates: n, CandidatesBefore: n}
+	}
+	for i, name := range []string{"ErrA", "ErrB", "ErrC"} {
+		id := tbl.Intern(errset.Value{Kind: errset.Sentinel, Site: "1:" + string(rune('1'+i)), Var: types.NewVar(token.NoPos, pkg, name, errType)})
+		callee := "(example.com/fx." + name[3:] + ").Get"
+		entries = append(entries, errset.Entry{Leaf: id, Path: errset.Path{
+			{Site: "2:1", Func: callee},
+			dyn("7:9", 3, callee),
+		}})
+	}
+	// A dynamic site with fewer Candidates than the fan-out is not grouped.
+	other := tbl.Intern(errset.Value{Kind: errset.Sentinel, Site: "1:9", Var: types.NewVar(token.NoPos, pkg, "ErrD", errType)})
+	entries = append(entries, errset.Entry{Leaf: other, Path: errset.Path{{Site: "3:1", Func: "example.com/fx.D"}, dyn("8:9", 1, "example.com/fx.D")}})
+	in := Input{
+		TargetSpan: span.Span{File: "/m/a.go", Start: span.Point{Line: 9, Col: 6, Offset: -1}, End: span.Point{Line: 9, Col: 10, Offset: -1}},
+		TargetName: "example.com/fx.use",
+		Table:      tbl,
+		Entries:    entries,
+		Locator:    fakeLocator{},
+		Fanout:     3,
+	}
+	var b strings.Builder
+	if err := Text(&b, in); err != nil {
+		t.Fatal(err)
+	}
+	want := `/m/a.go:9:6-10: Error Set of example.com/fx.use: 4 entries
+/m/a.go:1:9-9: sentinel example.com/fx.ErrD
+	path (origin → target):
+		/m/a.go:3:1-1: in example.com/fx.D
+		/m/a.go:8:9-9: in example.com/fx.use, call to example.com/fx.D (dynamic (example.com/fx.Getter).Get: 1 of 1 candidates)
+/m/a.go:7:9-9: group of 3 entries via dynamic call to (example.com/fx.Getter).Get (3 candidates) in example.com/fx.use
+	/m/a.go:1:1-1: sentinel example.com/fx.ErrA (candidate (example.com/fx.A).Get)
+	/m/a.go:1:2-2: sentinel example.com/fx.ErrB (candidate (example.com/fx.B).Get)
+	/m/a.go:1:3-3: sentinel example.com/fx.ErrC (candidate (example.com/fx.C).Get)
+`
+	if got := b.String(); got != want {
+		t.Errorf("Text with fan-out 3 =\n%s\nwant\n%s", got, want)
+	}
+	in.Fanout = 4
+	b.Reset()
+	if err := Text(&b, in); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(b.String(), "group of") {
+		t.Errorf("Text with fan-out 4 grouped entries:\n%s", b.String())
+	}
+}

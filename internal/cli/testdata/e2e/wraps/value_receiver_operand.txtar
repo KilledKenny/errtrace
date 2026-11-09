@@ -6,6 +6,8 @@ $WORK/a.go:9:12-13: Error Set of example.com/fx.G: 1 entries
 $WORK/a.go:10:9-28: opaque fmt.Errorf "%w"
 	path (origin → target):
 		$WORK/a.go:10:9-28: in example.com/fx.G
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
 -- go.mod --
 module example.com/fx
 

@@ -13,6 +13,8 @@ $WORK/a.go:11:31-63: unresolved(dynamic-format): format of fmt.Errorf is not a c
 		$WORK/a.go:11:31-63: fmt.Errorf with dynamic format
 	path (origin → target):
 		$WORK/a.go:11:31-63: in example.com/fx.F
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
 -- go.mod --
 module example.com/fx
 

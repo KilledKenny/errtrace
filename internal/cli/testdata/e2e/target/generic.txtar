@@ -7,6 +7,7 @@ $WORK/a.go:6:13-17: unresolved(no-candidates): dynamic call to function value f 
 	path (origin → target):
 		$WORK/a.go:6:13-17: in example.com/fx.Map[int]
 -- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
 target: declaration example.com/fx.Map funcs=[example.com/fx.Map[int] example.com/fx.Map[string]] span=$WORK/a.go:3:14-17
 -- go.mod --
 module example.com/fx

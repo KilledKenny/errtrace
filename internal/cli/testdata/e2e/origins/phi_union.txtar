@@ -9,6 +9,8 @@ $GOROOT/src/io/io.go:*: sentinel io.EOF
 $WORK/a.go:14:9-17: concrete *example.com/fx.MyErr
 	path (origin → target):
 		$WORK/a.go:14:9-17: in example.com/fx.F
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
 -- go.mod --
 module example.com/fx
 

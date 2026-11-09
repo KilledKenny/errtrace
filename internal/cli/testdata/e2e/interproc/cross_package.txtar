@@ -11,6 +11,8 @@ $WORK/store/store.go:15:9-17: concrete *example.com/fx/store.Error
 	path (origin → target):
 		$WORK/store/store.go:15:9-17: in example.com/fx/store.Get
 		$WORK/a.go:5:31-42: in example.com/fx.A, call to example.com/fx/store.Get
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
 -- go.mod --
 module example.com/fx
 

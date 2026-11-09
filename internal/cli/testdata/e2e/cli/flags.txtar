@@ -4,6 +4,7 @@ The -tags and -p flags are accepted and passed to package loading.
 -- stdout --
 $WORK/a.go:3:12-13: Error Set of example.com/fx.F: 0 entries
 -- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
 -- exit --
 0
 -- go.mod --

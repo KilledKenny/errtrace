@@ -1,0 +1,27 @@
+Closures capturing an error by reference (assigned in the creator) and by
+value (a parameter that is never reassigned).
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"io"
+)
+
+func ByRef(cond bool) func() error {
+	var err error
+	if cond {
+		err = io.EOF
+	} else {
+		err = errors.New("boom")
+	}
+	return func() error { return err }
+}
+
+func ByValue(err error) func() error {
+	return func() error { return err }
+}

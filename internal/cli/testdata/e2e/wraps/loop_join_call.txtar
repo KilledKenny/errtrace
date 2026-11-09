@@ -39,6 +39,8 @@ $WORK/a.go:11:2-6: sentinel example.com/fx.ErrY [chain truncated] [+1 more paths
 		$WORK/a.go:21:39-43: in example.com/fx.Q
 		$WORK/a.go:16:55-56: in example.com/fx.pass
 		$WORK/a.go:21:28-37: in example.com/fx.Q, call to example.com/fx.pass
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
 -- go.mod --
 module example.com/fx
 

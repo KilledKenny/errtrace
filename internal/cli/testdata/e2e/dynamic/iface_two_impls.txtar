@@ -1,0 +1,48 @@
+An interface call resolves to the Candidates main creates: A and B, not C.
+-- args --
+a.go:@use
+-- stdout --
+$WORK/a.go:25:14-17: Error Set of example.com/fx.use: 2 entries
+$WORK/a.go:6:2-6: sentinel example.com/fx.ErrA
+	path (origin → target):
+		$WORK/a.go:15:31-35: in (example.com/fx.A).Get
+		$WORK/a.go:25:43-50: in example.com/fx.use, call to (example.com/fx.A).Get (dynamic (example.com/fx.Getter).Get: 2 of 2 candidates)
+$WORK/a.go:7:2-6: sentinel example.com/fx.ErrB
+	path (origin → target):
+		$WORK/a.go:19:32-36: in (*example.com/fx.B).Get
+		$WORK/a.go:25:43-50: in example.com/fx.use, call to (*example.com/fx.B).Get (dynamic (example.com/fx.Getter).Get: 2 of 2 candidates)
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import "errors"
+
+var (
+	ErrA = errors.New("a")
+	ErrB = errors.New("b")
+	ErrC = errors.New("c")
+)
+
+type Getter interface{ Get() error }
+
+type A struct{}
+
+func (A) Get() error { return ErrA }
+
+type B struct{}
+
+func (*B) Get() error { return ErrB }
+
+type C struct{}
+
+func (C) Get() error { return ErrC }
+
+func /*@use*/use(g Getter) error { return g.Get() }
+
+func main() {
+	_ = use(A{})
+	_ = use(&B{})
+}

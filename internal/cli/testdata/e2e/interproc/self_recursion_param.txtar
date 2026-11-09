@@ -8,6 +8,8 @@ $WORK/a.go:5:5-9: sentinel example.com/fx.ErrX
 		$WORK/a.go:14:36-40: in example.com/fx.g
 		$WORK/a.go:9:10-11: in example.com/fx.f
 		$WORK/a.go:14:31-41: in example.com/fx.g, call to example.com/fx.f
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
 -- go.mod --
 module example.com/fx
 

@@ -108,6 +108,9 @@ const (
 	// iteration cap of its SCC, or an error result whose set of values
 	// passed the size cap.
 	FixpointLimit UnresolvedKind = "fixpoint-limit"
+	// NoInstances is a generic declaration Target that has no
+	// instantiation in the loaded program, so there is nothing to analyse.
+	NoInstances UnresolvedKind = "no-instances"
 )
 
 // WrapKind says how a Wrap was made.

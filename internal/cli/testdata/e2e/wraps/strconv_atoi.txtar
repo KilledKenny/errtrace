@@ -36,6 +36,8 @@ $GOROOT/src/strconv/atoi.go:*: opaque errors.New
 		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseInt, call to strconv.ParseUint
 		$GOROOT/src/strconv/atoi.go:*: in strconv.Atoi, call to strconv.ParseInt
 		$WORK/a.go:5:46-61: in example.com/fx.F, call to strconv.Atoi
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
 -- go.mod --
 module example.com/fx
 

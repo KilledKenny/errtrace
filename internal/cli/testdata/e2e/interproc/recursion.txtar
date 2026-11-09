@@ -11,6 +11,7 @@ $WORK/a.go:7:2-8: sentinel example.com/fx.ErrOdd
 		$WORK/a.go:19:10-16: in example.com/fx.odd
 		$WORK/a.go:14:9-19: in example.com/fx.even, call to example.com/fx.odd
 -- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
 summary: functions=2 sccs=1
 -- go.mod --
 module example.com/fx

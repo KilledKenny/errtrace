@@ -1,11 +1,14 @@
-A closure that returns a captured error: it depends on the enclosing function.
+A closure that returns a captured parameter: its values are those of the enclosing function's parameter, which depend on the caller.
 -- args --
 a.go:@f
 -- stdout --
 $WORK/a.go:4:15-19: Error Set of example.com/fx.Outer$1: 1 entries, 1 unresolved
-$WORK/a.go:5:10-13: unresolved(depends-on-caller): captured variable err (error)
+$WORK/a.go:3:12-15: unresolved(depends-on-caller): parameter err (error)
 	path (origin → target):
+		$WORK/a.go:3:12-15: in example.com/fx.Outer
 		$WORK/a.go:5:10-13: in example.com/fx.Outer$1
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
 -- go.mod --
 module example.com/fx
 

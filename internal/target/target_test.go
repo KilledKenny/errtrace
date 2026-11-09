@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/tools/go/ssa"
+
 	"github.com/killedKenny/errtrace/internal/fixture"
 	"github.com/killedKenny/errtrace/internal/target"
 )
@@ -123,5 +125,35 @@ func TestResolveErrors(t *testing.T) {
 				t.Errorf("error = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestKeepReachable(t *testing.T) {
+	t.Parallel()
+	l := load(t)
+	tgt, err := target.Resolve(l.Program, l.Pos(t, "a.go:@generic_decl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tgt.Generic == nil || tgt.Generic.String() != "example.com/fx.Map" {
+		t.Fatalf("Generic = %v, want example.com/fx.Map", tgt.Generic)
+	}
+	all, _ := describe(l, tgt)
+	tgt.KeepReachable(func(fn *ssa.Function) bool { return false })
+	if got, _ := describe(l, tgt); got != all {
+		t.Errorf("no reachable instance: Funcs = %s, want them kept: %s", got, all)
+	}
+	tgt.KeepReachable(func(fn *ssa.Function) bool { return fn.String() == "example.com/fx.Map[string]" })
+	if got, _ := describe(l, tgt); got != "example.com/fx.Map[string]" {
+		t.Errorf("Funcs = %s, want example.com/fx.Map[string]", got)
+	}
+
+	decl, err := target.Resolve(l.Program, l.Pos(t, "a.go:@decl_name"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	decl.KeepReachable(func(*ssa.Function) bool { return false })
+	if decl.Generic != nil || len(decl.Funcs) != 1 {
+		t.Errorf("non-generic Target: Generic %v, Funcs %v", decl.Generic, decl.Funcs)
 	}
 }

@@ -21,6 +21,12 @@ type Hop struct {
 	Callee string
 	// Dynamic reports whether a call hop is a dynamic call.
 	Dynamic bool
+	// Method names what a dynamic call hop calls through: the interface
+	// method ((io.Reader).Read) or the function value.
+	Method string
+	// Candidates is how many Candidates a dynamic call hop has, and
+	// CandidatesBefore how many it had before narrowing.
+	Candidates, CandidatesBefore int
 }
 
 // Path is a Propagation Path, from the Error Origin (or Unresolved place)

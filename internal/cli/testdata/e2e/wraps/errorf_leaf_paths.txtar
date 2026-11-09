@@ -14,6 +14,8 @@ $WORK/a.go:10:2-6: sentinel example.com/fx.ErrY
 		$WORK/a.go:15:31-63: fmt.Errorf "%w %w"
 	path (origin → target):
 		$WORK/a.go:15:58-62: in example.com/fx.P
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
 -- go.mod --
 module example.com/fx
 

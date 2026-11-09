@@ -6,6 +6,8 @@ $WORK/a.go:5:12-13: Error Set of example.com/fx.F: 1 entries
 $GOROOT/src/io/io.go:*: sentinel io.ErrUnexpectedEOF [+1 more paths]
 	path (origin → target):
 		$WORK/a.go:7:13-32: in example.com/fx.F
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
 -- go.mod --
 module example.com/fx
 

@@ -9,6 +9,8 @@ $GOROOT/src/io/io.go:*: sentinel io.EOF
 		$WORK/a.go:9:34-37: in example.com/fx.F, call to example.com/fx.g
 		$WORK/a.go:5:33-34: in example.com/fx.id
 		$WORK/a.go:9:31-38: in example.com/fx.F, call to example.com/fx.id
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
 -- go.mod --
 module example.com/fx
 

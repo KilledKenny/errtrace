@@ -8,6 +8,8 @@ $WORK/a.go:8:5-9: sentinel example.com/fx.ErrX [chain truncated]
 		$WORK/a.go:15:9-53: fmt.Errorf "b %w"
 	path (origin → target):
 		$WORK/a.go:15:47-51: in example.com/fx.H
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
 -- go.mod --
 module example.com/fx
 

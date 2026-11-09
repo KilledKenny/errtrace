@@ -60,12 +60,17 @@ func (s *Solver) passes(pass func(*evalState)) {
 }
 
 // expand adds to fs the values of the local fact f of fn, with the calls
-// it refers to (CallRef values) replaced by their callees' summaries. Each
-// leaf keeps its own provenance: a local leaf enters fn where f says it
-// does, a leaf from a call has the call's sources.
+// it refers to (CallRef values) replaced by their callees' summaries, and
+// the variables a closure fn captured (FreeVar values) replaced by the
+// values its creator bound to them. Each leaf keeps its own provenance: a
+// local leaf enters fn where f says it does, a leaf from a call has the
+// call's sources, and a captured leaf has its sources in the creator.
 func (s *Solver) expand(fn *ssa.Function, f flow.Fact, fs *factSet, st *evalState) {
 	for _, sub := range s.mapTree(f.Value, func(id errset.ValueID, k int) []subst {
 		v := s.tbl.Get(id)
+		if creator, facts, ok := s.binding(fn, v); ok {
+			return s.captured(creator, facts, f.LeafSource(k), st)
+		}
 		site, ok := v.Site.(ssa.CallInstruction)
 		if v.Kind != errset.CallRef || !ok {
 			return []subst{{value: id, leaves: local(1, Source{Kind: Local, Site: f.LeafSource(k)})}}
@@ -80,6 +85,25 @@ func (s *Solver) expand(fn *ssa.Function, f flow.Fact, fs *factSet, st *evalStat
 	}) {
 		fs.add(sub.value, sub.leaves)
 	}
+}
+
+// captured expands the facts bound to a captured variable in creator, the
+// function that created the closure that reads the variable at site. Each
+// leaf gets a Captured source: read at site, from its sources in creator.
+func (s *Solver) captured(creator *ssa.Function, facts []flow.Fact, site any, st *evalState) []subst {
+	var fs factSet
+	for _, bf := range facts {
+		s.expand(creator, bf, &fs, st)
+	}
+	out := make([]subst, len(fs.facts))
+	for i, f := range fs.facts {
+		leaves := make([][]Source, len(f.Leaves))
+		for j, srcs := range f.Leaves {
+			leaves[j] = []Source{{Kind: Captured, Site: site, ArgFn: creator, ArgSources: srcs}}
+		}
+		out[i] = subst{value: f.Value, leaves: leaves}
+	}
+	return out
 }
 
 // callKey is one error result of a call site.
@@ -231,8 +255,9 @@ type subst struct {
 
 // substitute maps the value id of callee g's summary into fn at the call
 // site: Param(i) becomes the values of the site's argument i in fn, a
-// FreeVar of an immediately applied closure captured by value becomes the
-// values of its binding, an ErrorfLike value is evaluated against the
+// FreeVar still in the summary (that of a synthetic closure, such as a
+// bound method wrapper) of an immediately applied closure captured by
+// value becomes the values of its binding, an ErrorfLike value is evaluated against the
 // site's format and operands, and Error Origins and Unresolved values stay
 // as they are. Each leaf gets the source via, naming the callee leaf it
 // comes from, with the leaf's sources in fn if it came from an argument.
@@ -242,12 +267,12 @@ func (s *Solver) substitute(fn *ssa.Function, site ssa.CallInstruction, g *ssa.F
 		via.CalleeLeaf = k
 		v := s.tbl.Get(id)
 		if v.Kind == errset.ErrorfLike && v.Fn == g.String() {
-			return s.forwardedErrorf(fn, site, v, via, st)
+			return s.forwardedErrorf(fn, site, g, v, via, st)
 		}
 		var operand ssa.Value
 		switch {
 		case v.Kind == errset.Param && v.Fn == g.String():
-			operand = argument(site.Common(), v.Index)
+			operand = argument(site.Common(), g, v.Index)
 		case v.Kind == errset.FreeVar && v.Fn == g.String():
 			if mc, ok := site.Common().Value.(*ssa.MakeClosure); ok && mc.Fn == g && v.Index < len(mc.Bindings) {
 				// A variable captured by reference is a pointer; only a
@@ -284,9 +309,9 @@ func (s *Solver) substitute(fn *ssa.Function, site ssa.CallInstruction, g *ssa.F
 // the callee's parameters, as if fn called fmt.Errorf itself at the site.
 // The Wraps made are placed at the site, where the format is. Each leaf
 // gets the source via, with its sources in fn as argument sources.
-func (s *Solver) forwardedErrorf(fn *ssa.Function, site ssa.CallInstruction, v errset.Value, via Source, st *evalState) []subst {
+func (s *Solver) forwardedErrorf(fn *ssa.Function, site ssa.CallInstruction, g *ssa.Function, v errset.Value, via Source, st *evalState) []subst {
 	c := site.Common()
-	format, args := argument(c, v.Index), argument(c, v.ArgIndex)
+	format, args := argument(c, g, v.Index), argument(c, g, v.ArgIndex)
 	if format == nil || args == nil {
 		return []subst{{value: s.unresolved(site, errset.DynamicFormat, "format of fmt.Errorf is not a constant"), leaves: local(1, via)}}
 	}
@@ -323,16 +348,21 @@ func (s *Solver) forwardedErrorf(fn *ssa.Function, site ssa.CallInstruction, v e
 	return out
 }
 
-// argument returns the operand of a call that the callee's parameter i
-// receives, or nil.
-func argument(c *ssa.CallCommon, i int) ssa.Value {
+// argument returns the operand of a call that parameter i of the callee g
+// receives, or nil. The receiver of an interface call is parameter 0. A
+// Candidate of a function value may have more parameters than the call has
+// arguments: a method reached through its method value, whose bound
+// receiver comes first and is not an operand of the call.
+func argument(c *ssa.CallCommon, g *ssa.Function, i int) ssa.Value {
 	if c.IsInvoke() {
 		if i == 0 {
 			return c.Value
 		}
 		i--
+	} else if shift := len(g.Params) - len(c.Args); shift > 0 {
+		i -= shift
 	}
-	if i < len(c.Args) {
+	if i >= 0 && i < len(c.Args) {
 		return c.Args[i]
 	}
 	return nil
