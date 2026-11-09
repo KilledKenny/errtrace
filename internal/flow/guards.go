@@ -432,10 +432,13 @@ func decideTree(tbl *errset.Table, id errset.ValueID, node func(errset.Value) (V
 // differs from it for sure when both values are pointers allocated for
 // their own variables, or when their dynamic types are known and differ;
 // otherwise the two may hold the same value. A
-// Concrete Type of a comparable non-pointer type may be equal to it: two
-// equal struct values are ==, so unless the Sentinel's dynamic type is
-// known to differ it is undecided. A pointer made by the program is a new
-// pointer, never the Sentinel's.
+// Concrete Type of a comparable type may be equal to it unless the
+// Sentinel's dynamic type is known to differ: two equal struct values are
+// ==, and a pointer may be the one stored in the variable. Only a pointer
+// to a type of non-zero size against a Fresh Sentinel differs for sure.
+// Pointers to distinct zero-size variables may be == (Go spec,
+// Comparison operators), so neither they nor Fresh Sentinels of such
+// types (see Sentinels.fresh) are taken as different.
 func equalVerdict(v errset.Value, g errset.Guard) (Verdict, string) {
 	switch v.Kind {
 	case errset.Sentinel:
@@ -455,15 +458,55 @@ func equalVerdict(v errset.Value, g errset.Guard) (Verdict, string) {
 		if v.TypedNil || t == nil || !types.Comparable(t) {
 			return No, ""
 		}
-		if _, ok := t.Underlying().(*types.Pointer); ok {
-			return No, ""
-		}
 		if g.Type != nil && !types.Identical(t, unalias(g.Type)) {
 			return No, ""
+		}
+		if ptr, ok := t.Underlying().(*types.Pointer); ok {
+			switch {
+			case mayBeZeroSize(ptr.Elem()):
+				// Pointers to distinct zero-size variables may be ==
+				// (the runtime points them all at one address).
+				return Maybe, "pointer to zero-size type " + typeString(ptr.Elem()) + " may equal " + g.Var.Name()
+			case g.Fresh:
+				// The Sentinel's pointer was allocated for it alone.
+				return No, ""
+			}
+			// The Sentinel's value may be a pointer the program also
+			// returns (stored to it outside init, or cached by the
+			// function that initializes it).
+			return Maybe, "pointer of type " + typeString(t) + " may be the value of " + g.Var.Name()
 		}
 		return Maybe, "value of comparable type " + typeString(t) + " may equal " + g.Var.Name()
 	}
 	return No, ""
+}
+
+// mayBeZeroSize reports whether values of t may have size zero: an empty
+// struct, an array of length zero, a struct or array of such, or a type
+// parameter.
+func mayBeZeroSize(t types.Type) bool {
+	return mayBeZeroSizeDepth(t, 0)
+}
+
+func mayBeZeroSizeDepth(t types.Type, depth int) bool {
+	if depth > maxDynDepth {
+		return true
+	}
+	if _, ok := unalias(t).(*types.TypeParam); ok {
+		return true
+	}
+	switch u := unalias(t).Underlying().(type) {
+	case *types.Struct:
+		for i := range u.NumFields() {
+			if !mayBeZeroSizeDepth(u.Field(i).Type(), depth+1) {
+				return false
+			}
+		}
+		return true
+	case *types.Array:
+		return u.Len() == 0 || mayBeZeroSizeDepth(u.Elem(), depth+1)
+	}
+	return false
 }
 
 // sentinelCanon returns canon, or v if canon is nil.

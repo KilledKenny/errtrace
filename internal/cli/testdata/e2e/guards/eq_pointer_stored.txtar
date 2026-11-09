@@ -1,0 +1,39 @@
+source stores the pointer it returns into ErrX: the concrete *MyErr may be ErrX's value, so it is kept where err == ErrX holds.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:17:12-13: Error Set of example.com/fx.G: 1 entries
+$WORK/a.go:12:7-22: concrete *example.com/fx.MyErr
+	path (origin → target):
+		$WORK/a.go:12:7-22: in example.com/fx.source
+		$WORK/a.go:18:9-17: in example.com/fx.G, call to example.com/fx.source
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+type MyErr struct{ code int }
+
+func (*MyErr) Error() string { return "my" }
+
+var ErrX error = errors.New("x")
+
+func source() error {
+	e := &MyErr{code: 1}
+	ErrX = e
+	return e
+}
+
+func /*@g*/G() error {
+	err := source()
+	if err == ErrX {
+		return err
+	}
+	return nil
+}

@@ -1,0 +1,33 @@
+err == ErrA where ErrA and ErrB are both &ZeroErr{} and source returns ErrB: the two may be the same pointer, so ErrB is kept where the check holds.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:11:12-13: Error Set of example.com/fx.G: 1 entries
+$WORK/a.go:7:11-15: sentinel example.com/fx.ErrB
+	path (origin → target):
+		$WORK/a.go:9:30-34: in example.com/fx.source
+		$WORK/a.go:12:9-17: in example.com/fx.G, call to example.com/fx.source
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+type ZeroErr struct{}
+
+func (*ZeroErr) Error() string { return "zero" }
+
+var ErrA, ErrB error = &ZeroErr{}, &ZeroErr{}
+
+func source() error { return ErrB }
+
+func /*@g*/G() error {
+	err := source()
+	if err == ErrA {
+		return err
+	}
+	return nil
+}

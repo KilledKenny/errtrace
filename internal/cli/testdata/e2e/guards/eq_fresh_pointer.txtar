@@ -1,0 +1,29 @@
+err == ErrX where ErrX = &MyErr{} (a non-zero-size type, allocated for ErrX alone) and source returns a new &MyErr{}: they are never ==, so the concrete *MyErr is removed where the check holds.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:11:12-13: Error Set of example.com/fx.G: 0 entries
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+type MyErr struct{ code int }
+
+func (*MyErr) Error() string { return "my" }
+
+var ErrX error = &MyErr{code: 1}
+
+func source() error { return &MyErr{code: 2} }
+
+func /*@g*/G() error {
+	err := source()
+	if err == ErrX {
+		return err
+	}
+	return nil
+}

@@ -223,14 +223,16 @@ func (s *Sentinels) aliasOf(v ssa.Value, visiting map[any]bool, depth int) *ssa.
 }
 
 // fresh reports whether v is always a pointer allocated where v is made
-// (maybe converted to an interface), not one stored anywhere else.
+// (maybe converted to an interface), not one stored anywhere else, to a
+// type of non-zero size.
 func (s *Sentinels) fresh(v ssa.Value, visiting map[any]bool, depth int) bool {
 	if depth > maxDynDepth {
 		return false
 	}
 	switch v := v.(type) {
 	case *ssa.Alloc:
-		return v.Heap
+		// Pointers to distinct zero-size variables may be ==.
+		return v.Heap && !mayBeZeroSize(v.Type().Underlying().(*types.Pointer).Elem())
 	case *ssa.MakeInterface:
 		if _, ok := v.X.Type().Underlying().(*types.Pointer); !ok {
 			// A value of a non-pointer type may equal another one.
