@@ -81,6 +81,9 @@ type argKey struct {
 // Candidates of call sites with res and analyses functions with opts (whose
 // ChainDepth also caps the Wrap Chains that substitution builds).
 func NewSolver(tbl *errset.Table, res resolve.Resolver, opts flow.Options) *Solver {
+	if opts.Sentinels == nil {
+		opts.Sentinels = flow.NewSentinels()
+	}
 	s := &Solver{
 		tbl:      tbl,
 		res:      res,

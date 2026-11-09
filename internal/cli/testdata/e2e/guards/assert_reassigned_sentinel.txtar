@@ -1,0 +1,37 @@
+ErrX is initialized with errors.New but reassigned to &MyErr{} in init(): its dynamic type is unknown, so a type assertion to *MyErr that holds keeps it.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:15:12-13: Error Set of example.com/fx.G: 1 entries
+$WORK/a.go:9:5-9: sentinel example.com/fx.ErrX
+	path (origin → target):
+		$WORK/a.go:13:30-34: in example.com/fx.source
+		$WORK/a.go:16:9-17: in example.com/fx.G, call to example.com/fx.source
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+type MyErr struct{}
+
+func (*MyErr) Error() string { return "my" }
+
+var ErrX error = errors.New("x")
+
+func init() { ErrX = &MyErr{} }
+
+func source() error { return ErrX }
+
+func /*@g*/G() error {
+	err := source()
+	if _, ok := err.(*MyErr); ok {
+		return err
+	}
+	return nil
+}

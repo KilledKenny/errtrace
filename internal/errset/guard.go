@@ -47,6 +47,10 @@ type Guard struct {
 	Pos token.Pos
 	// Var is the Sentinel of a GuardEqual or GuardIs.
 	Var *types.Var
+	// Canon and Fresh are those of the Sentinel Var (see Value); they
+	// follow from Var and are not part of the guard's identity.
+	Canon *types.Var
+	Fresh bool
 	// Type is the target type of a GuardAs or GuardAssert, and the
 	// dynamic type of the Sentinel of a GuardEqual or GuardIs when
 	// errtrace knows it.

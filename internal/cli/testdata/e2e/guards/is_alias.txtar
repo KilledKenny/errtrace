@@ -1,0 +1,41 @@
+errors.Is(err, os.ErrNotExist) where source returns fs.ErrNotExist: os.ErrNotExist is the same value, so the wrapped fs.ErrNotExist is kept on the guarded path.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:17:12-13: Error Set of example.com/fx.G: 1 entries
+$GOROOT/src/io/fs/fs.go:*: sentinel io/fs.ErrNotExist
+	wrap chain (origin → target):
+		$WORK/a.go:20:10-40: fmt.Errorf "missing: %w"
+	path (origin → target):
+		$WORK/a.go:12:10-24: in example.com/fx.source
+		$WORK/a.go:18:9-18: in example.com/fx.G, call to example.com/fx.source
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+)
+
+func source(n int) error {
+	if n == 0 {
+		return fs.ErrNotExist
+	}
+	return errors.New("x")
+}
+
+func /*@g*/G(n int) error {
+	err := source(n)
+	if errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("missing: %w", err)
+	}
+	return nil
+}

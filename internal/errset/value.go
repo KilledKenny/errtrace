@@ -153,6 +153,12 @@ type Value struct {
 
 	// Var is the variable of a Sentinel.
 	Var *types.Var
+	// Canon is the variable whose value a Sentinel's Var holds (Var
+	// itself, or io.EOF for var ErrX = io.EOF), and Fresh reports that
+	// Canon's value is a pointer allocated for it alone. Both follow from
+	// Var and are not part of the value's identity.
+	Canon *types.Var
+	Fresh bool
 	// Type is the type of a Concrete Type Origin, the dynamic type of a
 	// Sentinel when errtrace knows it (its declared type, or that of its
 	// initializer), the wrapper type of a custom-Unwrap Wrap, and the type

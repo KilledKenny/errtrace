@@ -68,6 +68,9 @@ type Options struct {
 	// have; the values below a deeper Wrap are marked Truncated. Zero means
 	// DefaultChainDepth.
 	ChainDepth int
+	// Sentinels caches what errtrace knows about package-level variables
+	// for the run. If nil, each analysis makes its own.
+	Sentinels *Sentinels
 }
 
 func (o Options) chainDepth() int {
@@ -516,6 +519,15 @@ func (a *analyzer) memory(v ssa.Value, detail string) {
 	}), v)
 }
 
+// sentinels returns the analyzer's Sentinels, making one if its options
+// have none.
+func (a *analyzer) sentinels() *Sentinels {
+	if a.opts.Sentinels == nil {
+		a.opts.Sentinels = NewSentinels()
+	}
+	return a.opts.Sentinels
+}
+
 func (a *analyzer) sentinel(g *ssa.Global, typ types.Type) errset.ValueID {
 	obj, _ := g.Object().(*types.Var)
 	if obj == nil {
@@ -525,10 +537,11 @@ func (a *analyzer) sentinel(g *ssa.Global, typ types.Type) errset.ValueID {
 			Unresolved: errset.Memory, Detail: "load of global " + g.Name(),
 		})
 	}
+	inf := a.sentinels().Info(g)
 	if typ == nil {
-		typ = SentinelType(g)
+		typ = inf.Type
 	}
-	return a.tbl.Intern(errset.Value{Kind: errset.Sentinel, Site: obj, Pos: obj.Pos(), Var: obj, Type: typ})
+	return a.tbl.Intern(errset.Value{Kind: errset.Sentinel, Site: obj, Pos: obj.Pos(), Var: obj, Type: typ, Canon: canonVar(inf, obj), Fresh: inf.Fresh})
 }
 
 func (a *analyzer) concrete(typ types.Type, site ssa.Value, typedNil bool) errset.ValueID {

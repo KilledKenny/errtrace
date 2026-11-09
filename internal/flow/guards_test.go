@@ -47,9 +47,19 @@ func TestApplyGuard(t *testing.T) {
 	}
 	eof := io.Var("EOF").Object().(*types.Var)
 	unexpected := io.Var("ErrUnexpectedEOF").Object().(*types.Var)
+	sents := flow.NewSentinels()
+	eofInfo := sents.Info(io.Var("EOF"))
+	if !eofInfo.Fresh || eofInfo.Canon != io.Var("EOF") {
+		t.Fatalf("Info(io.EOF) = %+v, want a Fresh value of its own", eofInfo)
+	}
+	unexpInfo := sents.Info(io.Var("ErrUnexpectedEOF"))
 	tbl := errset.NewTable()
-	sEOF := tbl.Intern(errset.Value{Kind: errset.Sentinel, Var: eof})
-	sUnexp := tbl.Intern(errset.Value{Kind: errset.Sentinel, Var: unexpected})
+	sEOF := tbl.Intern(errset.Value{Kind: errset.Sentinel, Var: eof, Canon: eof, Fresh: true})
+	sUnexp := tbl.Intern(errset.Value{Kind: errset.Sentinel, Var: unexpected, Canon: unexpected, Fresh: unexpInfo.Fresh})
+	// Values whose Canon and Fresh are set by hand (they follow from Var
+	// and are not part of a value's identity, so each needs its own Var).
+	unfresh := tbl.Intern(errset.Value{Kind: errset.Sentinel, Var: io.Var("ErrShortBuffer").Object().(*types.Var)})
+	alias := tbl.Intern(errset.Value{Kind: errset.Sentinel, Var: io.Var("ErrNoProgress").Object().(*types.Var), Canon: eof})
 	wrapped := tbl.Intern(errset.Value{Kind: errset.Wrap, WrapKind: errset.WrapErrorf, Format: "w: %w", Inner: []errset.ValueID{sEOF}})
 	unres := tbl.Intern(errset.Value{Kind: errset.Unresolved, Unresolved: errset.Memory, Detail: "x"})
 	param := tbl.Intern(errset.Value{Kind: errset.Param, Fn: "f", Name: "err"})
@@ -61,11 +71,14 @@ func TestApplyGuard(t *testing.T) {
 	}{
 		{"eq false removes the sentinel", sEOF, errset.Guard{Kind: errset.GuardEqual, Var: eof}, flow.Remove},
 		{"eq false keeps a wrap of it", wrapped, errset.Guard{Kind: errset.GuardEqual, Var: eof}, flow.Keep},
-		{"eq true removes another sentinel", sUnexp, errset.Guard{Kind: errset.GuardEqual, Var: eof, Holds: true}, flow.Remove},
+		{"eq true removes another sentinel", sUnexp, errset.Guard{Kind: errset.GuardEqual, Var: eof, Canon: eof, Fresh: true, Holds: true}, flow.Remove},
+		{"eq true keeps a sentinel that may alias", unfresh, errset.Guard{Kind: errset.GuardEqual, Var: eof, Canon: eof, Fresh: true, Holds: true}, flow.Keep},
+		{"eq false notes a sentinel that may alias", unfresh, errset.Guard{Kind: errset.GuardEqual, Var: eof, Canon: eof, Fresh: true}, flow.Note},
+		{"eq false removes an alias", alias, errset.Guard{Kind: errset.GuardEqual, Var: eof, Canon: eof, Fresh: true}, flow.Remove},
 		{"eq false notes an unresolved value", unres, errset.Guard{Kind: errset.GuardEqual, Var: eof}, flow.Note},
 		{"eq true keeps an unresolved value", unres, errset.Guard{Kind: errset.GuardEqual, Var: eof, Holds: true}, flow.Keep},
 		{"is false removes a wrapped sentinel", wrapped, errset.Guard{Kind: errset.GuardIs, Var: eof}, flow.Remove},
-		{"is true removes another sentinel", sUnexp, errset.Guard{Kind: errset.GuardIs, Var: eof, Holds: true}, flow.Remove},
+		{"is true removes another sentinel", sUnexp, errset.Guard{Kind: errset.GuardIs, Var: eof, Canon: eof, Fresh: true, Holds: true}, flow.Remove},
 		{"nil true removes everything", unres, errset.Guard{Kind: errset.GuardNil, Holds: true}, flow.Remove},
 		{"a param is pending", param, errset.Guard{Kind: errset.GuardIs, Var: eof}, flow.Pending},
 		{"a helper notes on its false outcome", sEOF, errset.Guard{Kind: errset.GuardHelper, Detail: "guarded by call to h"}, flow.Note},
