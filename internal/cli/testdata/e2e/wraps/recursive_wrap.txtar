@@ -1,0 +1,51 @@
+A recursive function that wraps its own result: the summary fixpoint terminates because substitution caps the chain at -chain-depth, and the deepest entry is truncated (no fixpoint-limit).
+-- args --
+-chain-depth=2 a.go:@f
+-- stdout --
+$WORK/a.go:10:12-13: Error Set of example.com/fx.F: 4 entries
+$WORK/a.go:8:5-9: sentinel example.com/fx.ErrX
+	path (origin → target):
+		$WORK/a.go:12:10-14: in example.com/fx.F
+$WORK/a.go:8:5-9: sentinel example.com/fx.ErrX
+	wrap chain (origin → target):
+		$WORK/a.go:14:9-36: fmt.Errorf "r: %w"
+	path (origin → target):
+		$WORK/a.go:12:10-14: in example.com/fx.F
+		$WORK/a.go:14:29-35: in example.com/fx.F, call to example.com/fx.F
+$WORK/a.go:8:5-9: sentinel example.com/fx.ErrX
+	wrap chain (origin → target):
+		$WORK/a.go:14:9-36: fmt.Errorf "r: %w"
+		$WORK/a.go:14:9-36: fmt.Errorf "r: %w"
+	path (origin → target):
+		$WORK/a.go:12:10-14: in example.com/fx.F
+		$WORK/a.go:14:29-35: in example.com/fx.F, call to example.com/fx.F
+		$WORK/a.go:14:29-35: in example.com/fx.F, call to example.com/fx.F
+$WORK/a.go:8:5-9: sentinel example.com/fx.ErrX [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:14:9-36: fmt.Errorf "r: %w"
+		$WORK/a.go:14:9-36: fmt.Errorf "r: %w"
+	path (origin → target):
+		$WORK/a.go:12:10-14: in example.com/fx.F
+		$WORK/a.go:14:29-35: in example.com/fx.F, call to example.com/fx.F
+		$WORK/a.go:14:29-35: in example.com/fx.F, call to example.com/fx.F
+		$WORK/a.go:14:29-35: in example.com/fx.F, call to example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrX = errors.New("x")
+
+func /*@f*/F(n int) error {
+	if n == 0 {
+		return ErrX
+	}
+	return fmt.Errorf("r: %w", F(n-1))
+}

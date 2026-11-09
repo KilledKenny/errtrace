@@ -1,0 +1,32 @@
+An Unwrap that computes its result is not modelled: the wrapper holds unresolved(memory).
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:17:12-13: Error Set of example.com/fx.F: 1 entries, 1 unresolved
+$WORK/a.go:17:31-48: unresolved(memory): *example.com/fx.lazyErr.Unwrap not modelled
+	wrap chain (origin → target):
+		$WORK/a.go:17:31-48: *example.com/fx.lazyErr.Unwrap
+	path (origin → target):
+		$WORK/a.go:17:31-48: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var ErrX = errors.New("x")
+
+type lazyErr struct{ code int }
+
+func (e *lazyErr) Error() string { return "lazy" }
+func (e *lazyErr) Unwrap() error {
+	if e.code > 0 {
+		return ErrX
+	}
+	return nil
+}
+
+func /*@f*/F() error { return &lazyErr{code: 1} }

@@ -1,0 +1,28 @@
+A helper that forwards its format and operands to fmt.Errorf is evaluated at each caller against the caller's constant format: ErrX is wrapped and there is no dynamic-format entry.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:12:12-13: Error Set of example.com/fx.F: 1 entries
+$WORK/a.go:8:5-9: sentinel example.com/fx.ErrX
+	wrap chain (origin → target):
+		$WORK/a.go:12:31-51: fmt.Errorf "y: %w"
+	path (origin → target):
+		$WORK/a.go:10:55-82: in example.com/fx.wrapf
+		$WORK/a.go:12:31-51: in example.com/fx.F, call to example.com/fx.wrapf
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrX = errors.New("x")
+
+func wrapf(format string, args ...any) error { return fmt.Errorf(format, args...) }
+
+func /*@f*/F() error { return wrapf("y: %w", ErrX) }

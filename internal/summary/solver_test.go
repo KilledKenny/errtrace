@@ -9,6 +9,7 @@ import (
 
 	"github.com/killedKenny/errtrace/internal/errset"
 	"github.com/killedKenny/errtrace/internal/fixture"
+	"github.com/killedKenny/errtrace/internal/flow"
 	"github.com/killedKenny/errtrace/internal/resolve"
 )
 
@@ -30,7 +31,7 @@ func TestSubstitutionMapsParam(t *testing.T) {
 	t.Parallel()
 	pkg := loadSolverFixture(t)
 	tbl := errset.NewTable()
-	s := NewSolver(tbl, resolve.Static{})
+	s := NewSolver(tbl, resolve.Static{}, flow.Options{})
 	a, id := pkg.Func("A"), pkg.Func("id")
 	if err := s.Solve(t.Context(), []*ssa.Function{a}); err != nil {
 		t.Fatal(err)
@@ -59,7 +60,7 @@ func TestSelfRecursionConverges(t *testing.T) {
 	t.Parallel()
 	pkg := loadSolverFixture(t)
 	tbl := errset.NewTable()
-	s := NewSolver(tbl, resolve.Static{})
+	s := NewSolver(tbl, resolve.Static{}, flow.Options{})
 	if err := s.Solve(t.Context(), []*ssa.Function{pkg.Func("Caller")}); err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +73,7 @@ func TestFixpointLimit(t *testing.T) {
 	t.Parallel()
 	pkg := loadSolverFixture(t)
 	tbl := errset.NewTable()
-	s := NewSolver(tbl, resolve.Static{})
+	s := NewSolver(tbl, resolve.Static{}, flow.Options{})
 	loop := pkg.Func("Loop")
 	// A transfer function that never converges: every round adds a new
 	// value.
@@ -103,7 +104,7 @@ func TestSizeCap(t *testing.T) {
 	t.Parallel()
 	pkg := loadSolverFixture(t)
 	tbl := errset.NewTable()
-	s := NewSolver(tbl, resolve.Static{})
+	s := NewSolver(tbl, resolve.Static{}, flow.Options{})
 	s.transfer = func(fn *ssa.Function) []ResultSummary {
 		var facts []Fact
 		for i := range maxValues + 5 {

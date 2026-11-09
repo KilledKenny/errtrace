@@ -167,3 +167,52 @@ func TestSortIsStableAndRanked(t *testing.T) {
 		t.Errorf("CountUnresolved = %d, want 1", n)
 	}
 }
+
+func TestCap(t *testing.T) {
+	_, a, b := testVars()
+	tbl := NewTable()
+	sa := tbl.Intern(Value{Kind: Sentinel, Var: a})
+	sb := tbl.Intern(Value{Kind: Sentinel, Var: b})
+	wrap := func(format string, inner ...ValueID) ValueID {
+		return tbl.Intern(Value{Kind: Wrap, WrapKind: WrapErrorf, Format: format, Inner: inner})
+	}
+	strs := func(ids []ValueID) string {
+		var out []string
+		for _, id := range ids {
+			out = append(out, tbl.String(id))
+		}
+		return strings.Join(out, " | ")
+	}
+	w1 := wrap("1: %w", sa)
+	w2 := wrap("2: %w %w", w1, sb)
+	w3 := wrap("3: %w", w2)
+
+	tests := []struct {
+		name  string
+		id    ValueID
+		limit int
+		want  string
+	}{
+		{"leaf", sa, 1, "sentinel example.com/fx.ErrA"},
+		{"within limit", w3, 3, tbl.String(w3)},
+		{"cut innermost", w3, 2, `wrap(errorf fmt.Errorf "3: %w")[wrap(errorf fmt.Errorf "2: %w %w")[truncated[sentinel example.com/fx.ErrA]; sentinel example.com/fx.ErrB]]`},
+		{"cut below the top", w3, 1, `wrap(errorf fmt.Errorf "3: %w")[truncated[sentinel example.com/fx.ErrA]; truncated[sentinel example.com/fx.ErrB]]`},
+		{"cut the top", w2, 0, "truncated[sentinel example.com/fx.ErrA] | truncated[sentinel example.com/fx.ErrB]"},
+	}
+	for _, tc := range tests {
+		if got := strs(tbl.Cap(tc.id, tc.limit)); got != tc.want {
+			t.Errorf("%s: Cap = %s, want %s", tc.name, got, tc.want)
+		}
+	}
+
+	// A Truncated marker over a Wrap is pushed down to the leaves, and
+	// capping is idempotent, which keeps fixpoints over capped trees finite.
+	tw := tbl.Intern(Value{Kind: Truncated, Inner: []ValueID{w1}})
+	if got, want := strs(tbl.Cap(tw, 5)), "truncated[sentinel example.com/fx.ErrA]"; got != want {
+		t.Errorf("Cap(truncated wrap) = %s, want %s", got, want)
+	}
+	once := tbl.Cap(w3, 1)
+	if twice := tbl.Cap(once[0], 1); !reflect.DeepEqual(once, twice) {
+		t.Errorf("Cap is not idempotent: %v then %v", once, twice)
+	}
+}

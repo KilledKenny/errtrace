@@ -66,9 +66,10 @@ var hiddenFlags = map[string]bool{"debug": true}
 
 // config holds the parsed flags.
 type config struct {
-	tags     string
-	patterns string
-	debug    map[string]bool
+	tags       string
+	patterns   string
+	chainDepth int
+	debug      map[string]bool
 }
 
 // usageError is an error caused by how the command was invoked; the usage
@@ -109,6 +110,9 @@ func run(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) error
 		return usageError{err}
 	}
 	cfg.debug = debug
+	if cfg.chainDepth < 1 {
+		return usageError{fmt.Errorf("invalid -chain-depth %d (want at least 1)", cfg.chainDepth)}
+	}
 	if fs.NArg() != 1 {
 		return usageError{fmt.Errorf("expected exactly one Target argument, got %d", fs.NArg())}
 	}
@@ -141,7 +145,7 @@ func run(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) error
 		fmt.Fprintf(opts.Stderr, "target: %s %s funcs=[%s] span=%s\n",
 			tgt.Kind, tgt.Name, strings.Join(names, " "), tgt.Span)
 	}
-	res, err := query.Run(ctx, prog, tgt)
+	res, err := query.Run(ctx, prog, tgt, query.Options{ChainDepth: cfg.chainDepth})
 	if err != nil {
 		return err
 	}
@@ -174,6 +178,7 @@ func newFlagSet() (*flag.FlagSet, *config) {
 	fs.SetOutput(io.Discard) // Run reports errors and usage itself.
 	fs.StringVar(&cfg.tags, "tags", "", "comma-separated `list` of build tags")
 	fs.StringVar(&cfg.patterns, "p", "./...", "comma-separated package `patterns` to load")
+	fs.IntVar(&cfg.chainDepth, "chain-depth", query.DefaultChainDepth, "max Wrap Chain depth `N` before truncation")
 	fs.String("debug", "", "comma-separated `list` of "+strings.Join(debugModes, ",")+" (stderr only)")
 	return fs, cfg
 }

@@ -1,0 +1,28 @@
+An explicit index wraps only operand 2. Operand 1 is an error printed with %v, so it is not in the set, and the result is a Wrap, not an Opaque Error.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:13:12-13: Error Set of example.com/fx.F: 1 entries
+$WORK/a.go:10:2-6: sentinel example.com/fx.ErrB
+	wrap chain (origin → target):
+		$WORK/a.go:13:31-73: fmt.Errorf "%[2]w then %[1]v"
+	path (origin → target):
+		$WORK/a.go:13:31-73: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"fmt"
+)
+
+var (
+	ErrA = errors.New("a")
+	ErrB = errors.New("b")
+)
+
+func /*@f*/F() error { return fmt.Errorf("%[2]w then %[1]v", ErrA, ErrB) }

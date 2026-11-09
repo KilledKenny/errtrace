@@ -1,0 +1,48 @@
+braces.dev/errtrace.Wrap (matched on its package path and name, here a local stand-in module) is a Wrap of its operand.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:11:12-13: Error Set of example.com/fx.F: 1 entries
+$WORK/a.go:9:5-9: sentinel example.com/fx.ErrX
+	wrap chain (origin → target):
+		$WORK/a.go:11:31-50: errtrace.Wrap
+	path (origin → target):
+		$WORK/a.go:11:31-50: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+
+require braces.dev/errtrace v0.0.0
+
+replace braces.dev/errtrace => ./errtrace
+-- a.go --
+package fx
+
+import (
+	"errors"
+
+	"braces.dev/errtrace"
+)
+
+var ErrX = errors.New("x")
+
+func /*@f*/F() error { return errtrace.Wrap(ErrX) }
+-- errtrace/go.mod --
+module braces.dev/errtrace
+
+go 1.24
+-- errtrace/errtrace.go --
+package errtrace
+
+type wrapped struct{ err error }
+
+func (w *wrapped) Error() string { return w.err.Error() }
+func (w *wrapped) Unwrap() error { return w.err }
+
+func Wrap(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &wrapped{err}
+}

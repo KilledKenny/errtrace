@@ -1,0 +1,25 @@
+fmt.Errorf with one %w wraps its operand: the sentinel is in the set, with a wrap chain line for the fmt.Errorf call.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:10:12-13: Error Set of example.com/fx.F: 1 entries
+$WORK/a.go:8:5-9: sentinel example.com/fx.ErrX
+	wrap chain (origin → target):
+		$WORK/a.go:10:31-59: fmt.Errorf "load: %w"
+	path (origin → target):
+		$WORK/a.go:10:31-59: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrX = errors.New("x")
+
+func /*@f*/F() error { return fmt.Errorf("load: %w", ErrX) }

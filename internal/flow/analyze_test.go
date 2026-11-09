@@ -24,7 +24,7 @@ func TestAnalyze(t *testing.T) {
 	}
 	for name, want := range tests {
 		tbl := errset.NewTable()
-		lf := flow.Analyze(tbl, pkg.Func(name))
+		lf := flow.Analyze(tbl, pkg.Func(name), flow.Options{})
 		var results []string
 		for _, r := range lf.Results {
 			var facts []string
@@ -56,7 +56,7 @@ func TestValueFacts(t *testing.T) {
 	}
 	tbl := errset.NewTable()
 	var got []string
-	for _, f := range flow.ValueFacts(tbl, fn, call.Call.Args[0], call) {
+	for _, f := range flow.ValueFacts(tbl, fn, call.Call.Args[0], call, flow.Options{}) {
 		got = append(got, tbl.String(f.Value))
 	}
 	if want := "param example.com/fx.Args#1 err; sentinel io.EOF"; strings.Join(got, "; ") != want {

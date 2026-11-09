@@ -1,0 +1,30 @@
+A helper that wraps its parameter: the caller's argument is substituted into the Wrap.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:12:12-13: Error Set of example.com/fx.F: 1 entries
+$WORK/a.go:8:5-9: sentinel example.com/fx.ErrX
+	wrap chain (origin → target):
+		$WORK/a.go:12:36-58: errors.Join
+		$WORK/a.go:10:37-64: fmt.Errorf "wrap: %w"
+	path (origin → target):
+		$WORK/a.go:12:36-58: in example.com/fx.F
+		$WORK/a.go:10:37-64: in example.com/fx.wrap
+		$WORK/a.go:12:31-59: in example.com/fx.F, call to example.com/fx.wrap
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrX = errors.New("x")
+
+func wrap(err error) error { return fmt.Errorf("wrap: %w", err) }
+
+func /*@f*/F() error { return wrap(errors.Join(ErrX, nil)) }

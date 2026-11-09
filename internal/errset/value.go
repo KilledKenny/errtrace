@@ -47,6 +47,12 @@ const (
 	// CallRef is symbolic: result Index of the call at Site, to be replaced
 	// by the callee's summary.
 	CallRef
+	// ErrorfLike is symbolic: the result of a fmt.Errorf call in function
+	// Fn whose format is Fn's parameter Index and whose operands are the
+	// variadic parameter ArgIndex (a forwarded format, as in
+	// wrapf(format string, args ...any)). Each caller evaluates it against
+	// its own arguments into a Wrap or an Opaque Error.
+	ErrorfLike
 )
 
 var kindNames = [...]string{
@@ -59,6 +65,7 @@ var kindNames = [...]string{
 	Param:      "param",
 	FreeVar:    "freevar",
 	CallRef:    "callref",
+	ErrorfLike: "errorf-like",
 }
 
 // String returns the lower-case name of k.
@@ -92,6 +99,10 @@ const (
 	// DependsOnCaller is a parameter or captured variable that reaches the
 	// top of a Query: its errors depend on the caller.
 	DependsOnCaller UnresolvedKind = "depends-on-caller"
+	// DynamicFormat is a fmt.Errorf whose format is neither a constant nor
+	// a format forwarded from a caller, so which operands it wraps is not
+	// known.
+	DynamicFormat UnresolvedKind = "dynamic-format"
 	// FixpointLimit is a summary that did not converge within the
 	// iteration cap of its SCC, or an error result whose set of values
 	// passed the size cap.
@@ -149,7 +160,9 @@ type Value struct {
 
 	// WrapKind is the kind of a Wrap.
 	WrapKind WrapKind
-	// Format is the format string of an errorf Wrap.
+	// Format is the format string of an errorf Wrap. It is empty when the
+	// format is not a constant (dynamic-format): the Wrap then holds the
+	// Unresolved dynamic-format value and the operands it may wrap.
 	Format string
 	// Inner are the wrapped values of a Wrap, or the single value under a
 	// Truncated marker.
@@ -163,8 +176,12 @@ type Value struct {
 	// Fn is the SSA name of the function a Param or FreeVar belongs to.
 	Fn string
 	// Index is the parameter index of a Param, the free variable index of
-	// a FreeVar, or the result index of a CallRef.
+	// a FreeVar, the result index of a CallRef, or the format parameter
+	// index of an ErrorfLike.
 	Index int
+	// ArgIndex is the index of the variadic operands parameter of an
+	// ErrorfLike.
+	ArgIndex int
 	// Name is the source name of a Param or FreeVar.
 	Name string
 }
@@ -187,6 +204,7 @@ type key struct {
 	detail      string
 	fn          string
 	index       int
+	argIndex    int
 	name        string
 }
 
@@ -205,6 +223,7 @@ func keyOf(v Value) key {
 		detail:      v.Detail,
 		fn:          v.Fn,
 		index:       v.Index,
+		argIndex:    v.ArgIndex,
 		name:        v.Name,
 	}
 	if v.Type != nil {
@@ -305,16 +324,22 @@ func (t *Table) String(id ValueID) string {
 		return fmt.Sprintf("freevar %s#%d %s", v.Fn, v.Index, v.Name)
 	case CallRef:
 		return fmt.Sprintf("callref %s #%d", v.Detail, v.Index)
+	case ErrorfLike:
+		return fmt.Sprintf("errorf-like %s format#%d args#%d", v.Fn, v.Index, v.ArgIndex)
 	}
 	return v.Kind.String()
 }
 
 // WrapDescription returns how the Wrap id is described in a Wrap Chain:
-// fmt.Errorf "<fmt>", errors.Join, <type>.Unwrap or errtrace.Wrap.
+// fmt.Errorf "<fmt>", errors.Join, <type>.Unwrap or errtrace.Wrap (and
+// "fmt.Errorf with dynamic format" for a format that is not constant).
 func (t *Table) WrapDescription(id ValueID) string {
 	v := t.Get(id)
 	switch v.WrapKind {
 	case WrapErrorf:
+		if v.Format == "" {
+			return "fmt.Errorf with dynamic format"
+		}
 		return "fmt.Errorf " + strconv.Quote(v.Format)
 	case WrapJoin:
 		return "errors.Join"
@@ -327,4 +352,80 @@ func (t *Table) WrapDescription(id ValueID) string {
 		return "errtrace.Wrap"
 	}
 	return string(v.WrapKind)
+}
+
+// Cap limits the Wrap Chains of the value tree id to at most limit Wraps:
+// a Wrap that would be the (limit+1)th on the way from the top down to a
+// leaf is replaced by a Truncated marker over each leaf below it. Truncated
+// markers are kept directly above leaves. The result is usually the single
+// rebuilt value; it has several values only when id itself is cut (limit
+// 0). Interning keeps capped trees finite, so a fixpoint over them
+// terminates.
+func (t *Table) Cap(id ValueID, limit int) []ValueID {
+	return t.capAt(id, 0, limit)
+}
+
+func (t *Table) capAt(id ValueID, level, limit int) []ValueID {
+	v := t.Get(id)
+	switch v.Kind {
+	case Wrap:
+		if level >= limit {
+			return t.truncateLeaves(id)
+		}
+		var inner []ValueID
+		changed := false
+		for _, in := range v.Inner {
+			c := t.capAt(in, level+1, limit)
+			changed = changed || len(c) != 1 || c[0] != in
+			inner = append(inner, c...)
+		}
+		if !changed {
+			return []ValueID{id}
+		}
+		v.Inner = dedupIDs(inner)
+		return []ValueID{t.Intern(v)}
+	case Truncated:
+		if t.Get(v.Inner[0]).Kind.IsLeaf() {
+			return []ValueID{id}
+		}
+		return t.truncateLeaves(v.Inner[0])
+	}
+	return []ValueID{id}
+}
+
+// truncateLeaves returns a Truncated marker over each distinct leaf of the
+// tree id.
+func (t *Table) truncateLeaves(id ValueID) []ValueID {
+	var out []ValueID
+	seen := make(map[ValueID]bool)
+	var walk func(ValueID)
+	walk = func(id ValueID) {
+		v := t.Get(id)
+		if v.Kind.IsLeaf() {
+			if !seen[id] {
+				seen[id] = true
+				out = append(out, t.Intern(Value{Kind: Truncated, Site: v.Site, Pos: v.Pos, Inner: []ValueID{id}}))
+			}
+			return
+		}
+		for _, in := range v.Inner {
+			walk(in)
+		}
+	}
+	walk(id)
+	return out
+}
+
+func dedupIDs(ids []ValueID) []ValueID {
+	out := ids[:0:0]
+	for _, id := range ids {
+		dup := false
+		for _, o := range out {
+			dup = dup || o == id
+		}
+		if !dup {
+			out = append(out, id)
+		}
+	}
+	return out
 }

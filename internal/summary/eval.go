@@ -82,6 +82,14 @@ func (s *Solver) expandCall(fn *ssa.Function, site ssa.CallInstruction, index in
 	}
 	for _, g := range callees {
 		if name, ok := flow.Intrinsic(g); ok {
+			if call, isCall := site.(*ssa.Call); isCall && index == 0 {
+				// Model the intrinsic at the site, as a returned call
+				// to it is modelled.
+				for _, af := range s.argFacts(fn, call, call) {
+					s.expand(fn, af, fs, active)
+				}
+				continue
+			}
 			fs.add(s.tbl.Intern(errset.Value{Kind: errset.Opaque, Site: site, Pos: common.Pos(), Constructor: name}), here)
 			continue
 		}
@@ -134,11 +142,15 @@ type subst struct {
 // substitute maps the value id of callee g's summary into fn at the call
 // site: Param(i) becomes the values of the site's argument i in fn, a
 // FreeVar of an immediately applied closure captured by value becomes the
-// values of its binding, and Error Origins and Unresolved values stay as
-// they are.
+// values of its binding, an ErrorfLike value is evaluated against the
+// site's format and operands, and Error Origins and Unresolved values stay
+// as they are.
 func (s *Solver) substitute(fn *ssa.Function, site ssa.CallInstruction, g *ssa.Function, id errset.ValueID, active map[ssa.CallInstruction]bool) []subst {
 	return s.mapTree(id, func(id errset.ValueID) []subst {
 		v := s.tbl.Get(id)
+		if v.Kind == errset.ErrorfLike && v.Fn == g.String() {
+			return s.forwardedErrorf(fn, site, v, active)
+		}
 		var operand ssa.Value
 		switch {
 		case v.Kind == errset.Param && v.Fn == g.String():
@@ -168,6 +180,35 @@ func (s *Solver) substitute(fn *ssa.Function, site ssa.CallInstruction, g *ssa.F
 	})
 }
 
+// forwardedErrorf evaluates the ErrorfLike value v of the callee at site
+// in fn: the site's format argument and variadic operands take the place of
+// the callee's parameters, as if fn called fmt.Errorf itself at the site.
+// The Wraps made are placed at the site, where the format is.
+func (s *Solver) forwardedErrorf(fn *ssa.Function, site ssa.CallInstruction, v errset.Value, active map[ssa.CallInstruction]bool) []subst {
+	c := site.Common()
+	format, args := argument(c, v.Index), argument(c, v.ArgIndex)
+	if format == nil || args == nil {
+		return []subst{{value: s.unresolved(site, errset.DynamicFormat, "format of fmt.Errorf is not a constant")}}
+	}
+	var fs factSet
+	for _, af := range flow.ErrorfFacts(s.tbl, fn, site, site, c.Pos(), format, args, s.opts) {
+		s.expand(fn, af, &fs, active)
+	}
+	out := make([]subst, len(fs.facts))
+	for i, f := range fs.facts {
+		// A value made at the site itself needs no argument path: the
+		// call hop already names the site.
+		var srcs []Source
+		for _, src := range f.Sources {
+			if src.Kind != Local || src.Site != site {
+				srcs = append(srcs, src)
+			}
+		}
+		out[i] = subst{value: f.Value, sources: srcs}
+	}
+	return out
+}
+
 // argument returns the operand of a call that the callee's parameter i
 // receives, or nil.
 func argument(c *ssa.CallCommon, i int) ssa.Value {
@@ -185,8 +226,30 @@ func argument(c *ssa.CallCommon, i int) ssa.Value {
 
 // mapTree maps every leaf of the value tree id with leaf and rebuilds the
 // Wraps around the results: a Wrap whose inner values map to several
-// values each becomes one Wrap per combination (at most maxValues).
+// values each becomes one Wrap per combination (at most maxValues). The
+// rebuilt trees are capped at the chain depth limit.
 func (s *Solver) mapTree(id errset.ValueID, leaf func(errset.ValueID) []subst) []subst {
+	v := s.tbl.Get(id)
+	if v.Kind != errset.Wrap && v.Kind != errset.Truncated {
+		return leaf(id)
+	}
+	var out []subst
+	for _, sub := range s.mapTreeRaw(id, leaf) {
+		for _, c := range s.tbl.Cap(sub.value, s.chainDepth()) {
+			out = append(out, subst{value: c, sources: sub.sources})
+		}
+	}
+	return out
+}
+
+func (s *Solver) chainDepth() int {
+	if s.opts.ChainDepth <= 0 {
+		return flow.DefaultChainDepth
+	}
+	return s.opts.ChainDepth
+}
+
+func (s *Solver) mapTreeRaw(id errset.ValueID, leaf func(errset.ValueID) []subst) []subst {
 	v := s.tbl.Get(id)
 	if v.Kind != errset.Wrap && v.Kind != errset.Truncated {
 		return leaf(id)
@@ -195,7 +258,7 @@ func (s *Solver) mapTree(id errset.ValueID, leaf func(errset.ValueID) []subst) [
 	var inner [][]errset.ValueID
 	inner = append(inner, nil)
 	for _, in := range v.Inner {
-		subs := s.mapTree(in, leaf)
+		subs := s.mapTreeRaw(in, leaf)
 		var nextCombos []subst
 		var nextInner [][]errset.ValueID
 		for ci, c := range combos {

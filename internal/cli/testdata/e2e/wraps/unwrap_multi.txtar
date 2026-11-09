@@ -1,0 +1,35 @@
+A value-receiver Unwrap() []error that returns a field set to a slice literal wraps every element.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:15:12-13: Error Set of example.com/fx.F: 2 entries
+$WORK/a.go:6:2-6: sentinel example.com/fx.ErrA
+	wrap chain (origin → target):
+		$WORK/a.go:15:31-66: example.com/fx.multiErr.Unwrap
+	path (origin → target):
+		$WORK/a.go:15:31-66: in example.com/fx.F
+$WORK/a.go:7:2-6: sentinel example.com/fx.ErrB
+	wrap chain (origin → target):
+		$WORK/a.go:15:31-66: example.com/fx.multiErr.Unwrap
+	path (origin → target):
+		$WORK/a.go:15:31-66: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var (
+	ErrA = errors.New("a")
+	ErrB = errors.New("b")
+)
+
+type multiErr struct{ errs []error }
+
+func (m multiErr) Error() string   { return "multi" }
+func (m multiErr) Unwrap() []error { return m.errs }
+
+func /*@f*/F() error { return multiErr{errs: []error{ErrA, ErrB}} }

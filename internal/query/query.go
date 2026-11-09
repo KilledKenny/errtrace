@@ -39,10 +39,20 @@ type Result struct {
 	prog *load.Program
 }
 
+// DefaultChainDepth is the default Wrap Chain depth limit of a Query.
+const DefaultChainDepth = flow.DefaultChainDepth
+
+// Options configures a Query.
+type Options struct {
+	// ChainDepth is the most Wraps a Wrap Chain can have before it is
+	// marked truncated; zero means DefaultChainDepth.
+	ChainDepth int
+}
+
 // Run computes the Error Set of tgt in prog.
-func Run(ctx context.Context, prog *load.Program, tgt *target.Target) (*Result, error) {
+func Run(ctx context.Context, prog *load.Program, tgt *target.Target, opts Options) (*Result, error) {
 	r := &Result{Target: tgt, Table: errset.NewTable(), prog: prog}
-	solver := summary.NewSolver(r.Table, resolve.Static{})
+	solver := summary.NewSolver(r.Table, resolve.Static{}, flow.Options{ChainDepth: opts.ChainDepth})
 	var entries []errset.Entry
 	switch tgt.Kind {
 	case target.Declaration:
@@ -92,7 +102,8 @@ func (r *Result) entries(solver *summary.Solver, fn *ssa.Function, facts []summa
 }
 
 // top maps a summary value to what it is at the top of a Query:
-// parameters and captured variables depend on the caller. Wraps are
+// parameters and captured variables depend on the caller, and a format
+// forwarded to fmt.Errorf from a parameter is a dynamic format. Wraps are
 // rebuilt around their mapped inner values.
 func (r *Result) top(id errset.ValueID) errset.ValueID {
 	v := r.Table.Get(id)
@@ -108,6 +119,12 @@ func (r *Result) top(id errset.ValueID) errset.ValueID {
 			Kind: errset.Unresolved, Site: v.Site, Pos: v.Pos,
 			Unresolved: errset.DependsOnCaller,
 			Detail:     fmt.Sprintf("captured variable %s (%s)", v.Name, types.TypeString(v.Type, nil)),
+		})
+	case errset.ErrorfLike:
+		return r.Table.Intern(errset.Value{
+			Kind: errset.Unresolved, Site: v.Site, Pos: v.Pos,
+			Unresolved: errset.DynamicFormat,
+			Detail:     fmt.Sprintf("format of fmt.Errorf comes from parameter %s of %s", v.Name, v.Fn),
 		})
 	case errset.Wrap, errset.Truncated:
 		inner := make([]errset.ValueID, len(v.Inner))

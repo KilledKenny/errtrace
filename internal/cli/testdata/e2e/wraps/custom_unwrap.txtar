@@ -1,0 +1,27 @@
+A composite literal of a type whose Unwrap returns a field is a Wrap of the value stored in that field.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:12:12-13: Error Set of example.com/fx.F: 1 entries
+$WORK/a.go:5:5-9: sentinel example.com/fx.ErrX
+	wrap chain (origin → target):
+		$WORK/a.go:12:31-52: *example.com/fx.wrapErr.Unwrap
+	path (origin → target):
+		$WORK/a.go:12:31-52: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var ErrX = errors.New("x")
+
+type wrapErr struct{ inner error }
+
+func (w *wrapErr) Error() string { return "wrap: " + w.inner.Error() }
+func (w *wrapErr) Unwrap() error { return w.inner }
+
+func /*@f*/F() error { return &wrapErr{inner: ErrX} }

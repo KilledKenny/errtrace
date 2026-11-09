@@ -1,0 +1,18 @@
+Querying the forwarding helper itself: its format comes from its caller, so the set is unresolved(dynamic-format).
+-- args --
+a.go:@wrapf
+-- stdout --
+$WORK/a.go:5:16-21: Error Set of example.com/fx.wrapf: 1 entries, 1 unresolved
+$WORK/a.go:5:65-92: unresolved(dynamic-format): format of fmt.Errorf comes from parameter format of example.com/fx.wrapf
+	path (origin → target):
+		$WORK/a.go:5:65-92: in example.com/fx.wrapf
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "fmt"
+
+func /*@wrapf*/wrapf(format string, args ...any) error { return fmt.Errorf(format, args...) }

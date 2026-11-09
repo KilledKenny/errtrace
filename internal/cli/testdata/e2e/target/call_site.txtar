@@ -2,19 +2,50 @@ A call-site Target on the Sel of a selector, inside a defer statement.
 -- args --
 -debug=target a.go:@sel
 -- stdout --
-$WORK/a.go:10:8-25: Error Set of call to f.Close in example.com/fx.Load: 3 entries
+$WORK/a.go:10:8-25: Error Set of call to f.Close in example.com/fx.Load: 6 entries, 1 unresolved
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Close, call to internal/poll.errClosing
+		$GOROOT/src/os/file_unix.go:*: in (*os.file).close, call to (*internal/poll.FD).Close
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Close, call to (*os.file).close
+		$WORK/a.go:10:8-25: in example.com/fx.Load, call to (*os.File).Close
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrFileClosing
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Close, call to internal/poll.errClosing
+		$GOROOT/src/os/file_unix.go:*: in (*os.file).close, call to (*internal/poll.FD).Close
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Close, call to (*os.file).close
+		$WORK/a.go:10:8-25: in example.com/fx.Load, call to (*os.File).Close
 $GOROOT/src/os/error.go:*: sentinel os.ErrInvalid
 	path (origin → target):
 		$GOROOT/src/os/file_posix.go:*: in (*os.File).Close
+		$WORK/a.go:10:8-25: in example.com/fx.Load, call to (*os.File).Close
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/os/file_unix.go:*: in (*os.file).close
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Close, call to (*os.file).close
 		$WORK/a.go:10:8-25: in example.com/fx.Load, call to (*os.File).Close
 $GOROOT/src/os/file_unix.go:*: concrete syscall.Errno
 	path (origin → target):
 		$GOROOT/src/os/file_unix.go:*: in (*os.file).close
 		$GOROOT/src/os/file_posix.go:*: in (*os.File).Close, call to (*os.file).close
 		$WORK/a.go:10:8-25: in example.com/fx.Load, call to (*os.File).Close
-$GOROOT/src/os/file_unix.go:*: concrete *io/fs.PathError
+$GOROOT/src/internal/poll/fd_unixjs.go:*: unresolved(no-candidates): dynamic call to function value internal/poll.CloseFunc
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
 	path (origin → target):
-		$GOROOT/src/os/file_unix.go:*: in (*os.file).close
+		$GOROOT/src/internal/poll/fd_unixjs.go:*: in (*internal/poll.SysFile).destroy
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).destroy, call to (*internal/poll.SysFile).destroy
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).decref, call to (*internal/poll.FD).destroy
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Close, call to (*internal/poll.FD).decref
+		$GOROOT/src/os/file_unix.go:*: in (*os.file).close, call to (*internal/poll.FD).Close
 		$GOROOT/src/os/file_posix.go:*: in (*os.File).Close, call to (*os.file).close
 		$WORK/a.go:10:8-25: in example.com/fx.Load, call to (*os.File).Close
 -- stderr --

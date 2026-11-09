@@ -1,0 +1,26 @@
+%v of an error does not wrap it: only the Opaque Error is in the set.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:10:12-13: Error Set of example.com/fx.F: 1 entries
+$WORK/a.go:12:9-33: opaque fmt.Errorf "x: %v"
+	path (origin → target):
+		$WORK/a.go:12:9-33: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrX = errors.New("x")
+
+func /*@f*/F() error {
+	err := ErrX
+	return fmt.Errorf("x: %v", err)
+}

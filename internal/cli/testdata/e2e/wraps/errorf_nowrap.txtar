@@ -1,0 +1,18 @@
+fmt.Errorf without %w is an Opaque Error named by its format.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:5:12-13: Error Set of example.com/fx.F: 1 entries
+$WORK/a.go:5:36-59: opaque fmt.Errorf "bad %d"
+	path (origin → target):
+		$WORK/a.go:5:36-59: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "fmt"
+
+func /*@f*/F(x int) error { return fmt.Errorf("bad %d", x) }

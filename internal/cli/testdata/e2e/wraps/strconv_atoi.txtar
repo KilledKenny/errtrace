@@ -1,0 +1,48 @@
+Stdlib oracle (go-errorlint's table lists strconv.ErrSyntax and strconv.ErrRange for strconv.Atoi), derived from the stdlib source: both sentinels are in the set, each wrapped by *strconv.NumError.Unwrap.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:5:12-13: Error Set of example.com/fx.F: 4 entries
+$GOROOT/src/strconv/atoi.go:*: sentinel strconv.ErrRange
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/atoi.go:*: *strconv.NumError.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/atoi.go:*: in strconv.rangeError
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseInt, call to strconv.rangeError
+		$GOROOT/src/strconv/atoi.go:*: in strconv.Atoi, call to strconv.ParseInt
+		$WORK/a.go:5:46-61: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/strconv/atoi.go:*: sentinel strconv.ErrSyntax
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/atoi.go:*: *strconv.NumError.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/atoi.go:*: in strconv.syntaxError
+		$GOROOT/src/strconv/atoi.go:*: in strconv.Atoi, call to strconv.syntaxError
+		$WORK/a.go:5:46-61: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/strconv/atoi.go:*: opaque errors.New
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/atoi.go:*: *strconv.NumError.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/atoi.go:*: in strconv.baseError
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseUint, call to strconv.baseError
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseInt, call to strconv.ParseUint
+		$GOROOT/src/strconv/atoi.go:*: in strconv.Atoi, call to strconv.ParseInt
+		$WORK/a.go:5:46-61: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/strconv/atoi.go:*: opaque errors.New
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/atoi.go:*: *strconv.NumError.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/atoi.go:*: in strconv.bitSizeError
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseUint, call to strconv.bitSizeError
+		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseInt, call to strconv.ParseUint
+		$GOROOT/src/strconv/atoi.go:*: in strconv.Atoi, call to strconv.ParseInt
+		$WORK/a.go:5:46-61: in example.com/fx.F, call to strconv.Atoi
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "strconv"
+
+func /*@f*/F(s string) (int, error) { return strconv.Atoi(s) }

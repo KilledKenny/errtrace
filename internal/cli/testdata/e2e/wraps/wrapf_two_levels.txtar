@@ -1,0 +1,35 @@
+A format forwarded through two helpers is still evaluated at the caller with the constant format; the operand comes from a call.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:16:12-13: Error Set of example.com/fx.F: 1 entries
+$WORK/a.go:8:5-9: sentinel example.com/fx.ErrX
+	wrap chain (origin → target):
+		$WORK/a.go:16:36-63: fmt.Errorf "n=%d: %w"
+	path (origin → target):
+		$WORK/a.go:14:27-31: in example.com/fx.get
+		$WORK/a.go:16:57-62: in example.com/fx.F, call to example.com/fx.get
+		$WORK/a.go:10:55-82: in example.com/fx.wrapf
+		$WORK/a.go:12:55-77: in example.com/fx.outer, call to example.com/fx.wrapf
+		$WORK/a.go:16:36-63: in example.com/fx.F, call to example.com/fx.outer
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrX = errors.New("x")
+
+func wrapf(format string, args ...any) error { return fmt.Errorf(format, args...) }
+
+func outer(format string, args ...any) error { return wrapf(format, args...) }
+
+func get() error { return ErrX }
+
+func /*@f*/F(n int) error { return outer("n=%d: %w", n, get()) }

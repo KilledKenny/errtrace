@@ -28,8 +28,9 @@ type Stats struct {
 
 // Solver computes Summaries on demand. It is not safe for concurrent use.
 type Solver struct {
-	tbl *errset.Table
-	res resolve.Resolver
+	tbl  *errset.Table
+	res  resolve.Resolver
+	opts flow.Options
 
 	local map[*ssa.Function]*flow.LocalFacts
 	sites map[*ssa.Function][]ssa.CallInstruction
@@ -54,12 +55,14 @@ type argKey struct {
 	at ssa.Instruction
 }
 
-// NewSolver returns a Solver that interns values in tbl and finds the
-// Candidates of call sites with res.
-func NewSolver(tbl *errset.Table, res resolve.Resolver) *Solver {
+// NewSolver returns a Solver that interns values in tbl, finds the
+// Candidates of call sites with res and analyses functions with opts (whose
+// ChainDepth also caps the Wrap Chains that substitution builds).
+func NewSolver(tbl *errset.Table, res resolve.Resolver, opts flow.Options) *Solver {
 	s := &Solver{
 		tbl:   tbl,
 		res:   res,
+		opts:  opts,
 		local: make(map[*ssa.Function]*flow.LocalFacts),
 		sites: make(map[*ssa.Function][]ssa.CallInstruction),
 		args:  make(map[argKey][]flow.Fact),
@@ -145,7 +148,7 @@ func (s *Solver) callees(sites []ssa.CallInstruction) []*ssa.Function {
 func (s *Solver) localFacts(fn *ssa.Function) *flow.LocalFacts {
 	lf, ok := s.local[fn]
 	if !ok {
-		lf = flow.Analyze(s.tbl, fn)
+		lf = flow.Analyze(s.tbl, fn, s.opts)
 		s.local[fn] = lf
 	}
 	return lf
@@ -156,7 +159,7 @@ func (s *Solver) argFacts(fn *ssa.Function, v ssa.Value, at ssa.Instruction) []f
 	k := argKey{fn, v, at}
 	facts, ok := s.args[k]
 	if !ok {
-		facts = flow.ValueFacts(s.tbl, fn, v, at)
+		facts = flow.ValueFacts(s.tbl, fn, v, at, s.opts)
 		s.args[k] = facts
 	}
 	return facts
@@ -206,8 +209,10 @@ func (s *Solver) sitesFrom(fn *ssa.Function, initial []ssa.CallInstruction) []ss
 }
 
 // errorOperands returns the operands of a call that a callee's Param or
-// FreeVar can stand for and that may carry an error: the receiver and
-// arguments, and the bindings of an immediately applied closure.
+// FreeVar (or a Wrap the call makes) can stand for and that may carry an
+// error: the receiver and arguments, the operands packed into a variadic
+// argument (those of fmt.Errorf, errors.Join or a forwarding wrapf), and
+// the bindings of an immediately applied closure.
 func errorOperands(site ssa.CallInstruction) []ssa.Value {
 	c := site.Common()
 	var ops []ssa.Value
@@ -222,6 +227,13 @@ func errorOperands(site ssa.CallInstruction) []ssa.Value {
 	for _, v := range ops {
 		if flow.IsErrorType(v.Type()) {
 			out = append(out, v)
+			continue
+		}
+		packed, _ := flow.VarargsOperands(v)
+		for _, p := range packed {
+			if p != nil && flow.MayCarryError(p) {
+				out = append(out, p)
+			}
 		}
 	}
 	return out

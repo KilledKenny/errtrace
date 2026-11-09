@@ -44,11 +44,38 @@ type LocalFacts struct {
 	Results []ResultFacts
 }
 
+// DefaultChainDepth is the Wrap Chain depth limit used when
+// Options.ChainDepth is not set.
+const DefaultChainDepth = 8
+
+// maxCombos caps the number of Wraps one wrapping call can make from the
+// combinations of its operands' values.
+const maxCombos = 1024
+
+// Options configures the intraprocedural analysis.
+type Options struct {
+	// ChainDepth is the most Wraps a Wrap Chain built in one function can
+	// have; the values below a deeper Wrap are marked Truncated. Zero means
+	// DefaultChainDepth.
+	ChainDepth int
+}
+
+func (o Options) chainDepth() int {
+	if o.ChainDepth <= 0 {
+		return DefaultChainDepth
+	}
+	return o.ChainDepth
+}
+
 // Analyze computes the local facts of fn's error results by walking the
 // definitions of every returned value backwards. Values are interned in
-// tbl. Calls are not followed: their results become CallRef values. A
-// function without a body has no facts.
-func Analyze(tbl *errset.Table, fn *ssa.Function) *LocalFacts {
+// tbl. Calls are not followed: their results become CallRef values, except
+// for intrinsics (errors.New, fmt.Errorf, errors.Join, errtrace.Wrap),
+// which become Error Origins and Wraps. A Concrete Type built from a
+// composite literal whose type has a modelled Unwrap method becomes a Wrap
+// of the value stored in the unwrapped field. A function without a body
+// has no facts.
+func Analyze(tbl *errset.Table, fn *ssa.Function, opts Options) *LocalFacts {
 	lf := &LocalFacts{Fn: fn}
 	for _, idx := range ErrorResults(fn.Signature) {
 		lf.Results = append(lf.Results, ResultFacts{Index: idx})
@@ -56,7 +83,7 @@ func Analyze(tbl *errset.Table, fn *ssa.Function) *LocalFacts {
 	if len(lf.Results) == 0 || fn.Blocks == nil {
 		return lf
 	}
-	a := &analyzer{tbl: tbl, fn: fn}
+	a := &analyzer{tbl: tbl, fn: fn, opts: opts}
 	for _, b := range fn.Blocks {
 		ret, ok := b.Instrs[len(b.Instrs)-1].(*ssa.Return)
 		if !ok {
@@ -78,8 +105,8 @@ func Analyze(tbl *errset.Table, fn *ssa.Function) *LocalFacts {
 // instruction at (such as an argument of a call): the abstract values v can
 // carry, found by walking its definitions backwards exactly as Analyze does
 // for a returned value. Values are interned in tbl.
-func ValueFacts(tbl *errset.Table, fn *ssa.Function, v ssa.Value, at ssa.Instruction) []Fact {
-	a := &analyzer{tbl: tbl, fn: fn, at: at, seen: make(map[ssa.Value]bool)}
+func ValueFacts(tbl *errset.Table, fn *ssa.Function, v ssa.Value, at ssa.Instruction, opts Options) []Fact {
+	a := &analyzer{tbl: tbl, fn: fn, at: at, seen: make(map[ssa.Value]bool), opts: opts}
 	a.walk(v)
 	return a.facts
 }
@@ -92,6 +119,13 @@ type analyzer struct {
 	at    ssa.Instruction
 	seen  map[ssa.Value]bool
 	facts []Fact
+	opts  Options
+	// depth is the number of Wraps above the values this analyzer finds.
+	depth int
+	// flat is set below the Wrap Chain depth limit: wrapping calls are
+	// then walked through to their operands' leaves, which the caller
+	// marks Truncated.
+	flat bool
 }
 
 func (a *analyzer) add(id errset.ValueID, src any) {
@@ -143,7 +177,7 @@ func (a *analyzer) walk(v ssa.Value) {
 		return
 	case *ssa.Alloc:
 		// A pointer-typed error result built in place: &T{...} or new(T).
-		a.add(a.concrete(v.Type(), v, false), v)
+		a.constructed(v.Type(), v)
 		return
 	case *ssa.UnOp:
 		if a.load(v) {
@@ -189,7 +223,7 @@ func (a *analyzer) makeInterface(mi *ssa.MakeInterface) {
 		}
 		if alloc, ok := x.X.(*ssa.Alloc); ok && x.Op == token.MUL && alloc.Comment == "complit" {
 			// A value-typed composite literal: local T (complit); *t.
-			a.add(a.concrete(x.Type(), alloc, false), alloc)
+			a.constructed(x.Type(), alloc)
 			return
 		}
 	case *ssa.Const:
@@ -205,8 +239,20 @@ func (a *analyzer) makeInterface(mi *ssa.MakeInterface) {
 			return
 		}
 	case *ssa.Alloc:
-		a.add(a.concrete(x.Type(), x, false), x)
+		a.constructed(x.Type(), x)
 		return
+	case *ssa.Call:
+		// A call returning a concrete error type (func f() *NumError):
+		// its summary says what it builds, Wraps included.
+		if IsErrorType(x.Type()) {
+			a.call(x, 0)
+			return
+		}
+	case *ssa.Extract:
+		if call, ok := x.Tuple.(*ssa.Call); ok && IsErrorType(x.Type()) {
+			a.call(call, x.Index)
+			return
+		}
 	}
 	a.add(a.concrete(mi.X.Type(), mi, false), mi)
 }
@@ -261,7 +307,7 @@ func (a *analyzer) load(v *ssa.UnOp) bool {
 // accordingly.
 func (a *analyzer) local(load *ssa.UnOp, alloc *ssa.Alloc) {
 	if alloc.Comment == "complit" {
-		a.add(a.concrete(load.Type(), alloc, false), alloc)
+		a.constructed(load.Type(), alloc)
 		return
 	}
 	if alloc.Heap {
@@ -287,17 +333,26 @@ func (a *analyzer) local(load *ssa.UnOp, alloc *ssa.Alloc) {
 	}
 }
 
-// call records result index of call: an Opaque Error for errors.New, and
-// a CallRef otherwise.
+// call records result index of call: an Opaque Error for errors.New, the
+// Wraps or Opaque Error of the other intrinsics, and a CallRef otherwise.
 func (a *analyzer) call(call *ssa.Call, index int) {
 	common := call.Common()
-	if name, ok := Intrinsic(common.StaticCallee()); ok && name == "errors.New" {
-		v := errset.Value{Kind: errset.Opaque, Site: call, Pos: a.posOf(call), Constructor: "errors.New"}
-		if c, ok := common.Args[0].(*ssa.Const); ok && c.Value != nil {
-			v.Message = constMessage(c)
-			v.HasMessage = true
+	if name, ok := Intrinsic(common.StaticCallee()); ok && index == 0 {
+		switch name {
+		case "errors.New":
+			v := errset.Value{Kind: errset.Opaque, Site: call, Pos: a.posOf(call), Constructor: "errors.New"}
+			if c, ok := common.Args[0].(*ssa.Const); ok && c.Value != nil {
+				v.Message = constMessage(c)
+				v.HasMessage = true
+			}
+			a.add(a.tbl.Intern(v), call)
+		case "fmt.Errorf":
+			a.errorf(call, a.posOf(call), common.Args[0], common.Args[1])
+		case "errors.Join":
+			a.join(call, common.Args[0])
+		case "errtrace.Wrap":
+			a.bracesWrap(call, common.Args[0])
 		}
-		a.add(a.tbl.Intern(v), call)
 		return
 	}
 	a.add(a.tbl.Intern(errset.Value{
@@ -403,7 +458,10 @@ func CalleeName(c *ssa.CallCommon) string {
 // itself instead of analysing their bodies, keyed on package path and
 // name, with the name they are shown under.
 var intrinsics = map[[2]string]string{
-	{"errors", "New"}: "errors.New",
+	{"errors", "New"}:               "errors.New",
+	{"errors", "Join"}:              "errors.Join",
+	{"fmt", "Errorf"}:               "fmt.Errorf",
+	{"braces.dev/errtrace", "Wrap"}: "errtrace.Wrap",
 }
 
 // Intrinsic reports whether fn is an intrinsic: a package-level function,
