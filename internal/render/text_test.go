@@ -56,7 +56,7 @@ func TestText(t *testing.T) {
 				{Site: "6:3", Func: "example.com/fx.Load", Callee: "example.com/fx.inner"},
 			}},
 			{Leaf: typedNil, Path: errset.Path{{Site: "2:9", Func: "example.com/fx.Load"}}},
-			{Leaf: opaque},
+			{Leaf: opaque, PossiblyHandled: []errset.GuardNote{{Site: "3:2", Reason: "guarded by call to example.com/fx.isRetryable"}}},
 			{Leaf: unknown},
 			{Leaf: unres, Path: errset.Path{{Site: "4:9", Func: "example.com/fx.Load"}}},
 		},
@@ -66,7 +66,7 @@ func TestText(t *testing.T) {
 	if err := Text(&b, in); err != nil {
 		t.Fatal(err)
 	}
-	want := `/m/a.go:9:6-10: Error Set of example.com/fx.Load: 5 entries, 1 unresolved
+	want := `/m/a.go:9:6-10: Error Set of example.com/fx.Load: 5 entries, 1 unresolved, 1 possibly handled
 /m/a.go:1:5-5: sentinel example.com/fx.ErrX [chain truncated] [+2 more paths]
 	wrap chain (origin → target):
 		/m/a.go:5:9-9: fmt.Errorf "load: %w"
@@ -77,6 +77,8 @@ func TestText(t *testing.T) {
 	path (origin → target):
 		/m/a.go:2:9-9: in example.com/fx.Load
 /m/a.go:3:9-9: opaque errors.New "a \"b\""
+	possibly handled:
+		/m/a.go:3:2-2: guarded by call to example.com/fx.isRetryable
 -: opaque
 /m/a.go:4:9-9: unresolved(memory): load of field err of *example.com/fx.S
 	path (origin → target):

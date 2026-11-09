@@ -63,15 +63,15 @@ func StoredFacts(tbl *errset.Table, fn *ssa.Function, alloc *ssa.Alloc, opts Opt
 		return nil
 	}
 	escapes := writtenElsewhere(alloc, true, make(map[ssa.Value]bool))
-	a := &analyzer{tbl: tbl, fn: fn, at: alloc, opts: opts, seen: make(map[ssa.Value]bool)}
+	a := &analyzer{tbl: tbl, fn: fn, at: alloc, pt: pointOf(alloc), opts: opts, seen: make(map[seenKey]bool)}
 	if !escapes {
 		a.captured = alloc
 		a.active = make(map[*ssa.Store]bool)
 	}
 	for _, r := range *refs {
 		if st, ok := r.(*ssa.Store); ok && st.Addr == alloc && st.Parent() == fn {
-			a.at = st
-			a.seen = make(map[ssa.Value]bool)
+			a.at, a.pt = st, pointOf(st)
+			a.seen = make(map[seenKey]bool)
 			if a.active != nil {
 				a.active[st] = true
 			}
@@ -80,7 +80,7 @@ func StoredFacts(tbl *errset.Table, fn *ssa.Function, alloc *ssa.Alloc, opts Opt
 		}
 	}
 	if escapes {
-		a.at = alloc
+		a.at, a.pt = alloc, pointOf(alloc)
 		a.memory(alloc, "load of escaping variable "+alloc.Comment)
 	}
 	return a.facts

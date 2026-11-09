@@ -25,7 +25,7 @@ import (
 // own parameters. site and pos are the site and position of the values
 // made. Values are interned in tbl.
 func ErrorfFacts(tbl *errset.Table, fn *ssa.Function, at ssa.Instruction, site any, pos token.Pos, format, args ssa.Value, opts Options) []Fact {
-	a := &analyzer{tbl: tbl, fn: fn, at: at, seen: make(map[ssa.Value]bool), opts: opts}
+	a := &analyzer{tbl: tbl, fn: fn, at: at, pt: pointOf(at), seen: make(map[seenKey]bool), opts: opts}
 	a.errorf(site, pos, format, args)
 	return a.facts
 }
@@ -129,18 +129,23 @@ func (a *analyzer) madeAt(src any, ids ...errset.ValueID) []wrapped {
 }
 
 // operand returns the values v can carry as the inner value of a Wrap made
-// by this analyzer, each with where its leaves enter the function. Leaves
+// by this analyzer at site, each with where its leaves enter the function
+// and under the guards that hold for v at site. Leaves
 // that lie below more Wraps than the Wrap Chain depth limit allows are
 // returned under Truncated markers; a chain of exactly the limit is kept
 // whole, as errset.Table.Cap does. In flat mode (at the limit) the
 // operand's leaves are added to the analyzer's own facts, marked as cut,
 // and operand returns nothing.
-func (a *analyzer) operand(v ssa.Value) []wrapped {
+func (a *analyzer) operand(v ssa.Value, site any) []wrapped {
 	if a.flat {
 		a.inner(func() { a.walk(v) })
 		return nil
 	}
-	c := &analyzer{tbl: a.tbl, fn: a.fn, at: a.at, seen: make(map[ssa.Value]bool), opts: a.opts, depth: a.depth + 1, captured: a.captured, active: a.active}
+	pt := a.pt
+	if instr, ok := site.(ssa.Instruction); ok && instr.Block() != nil {
+		pt = pointOf(instr)
+	}
+	c := &analyzer{tbl: a.tbl, fn: a.fn, at: a.at, pt: pt, gd: a.gd, seen: make(map[seenKey]bool), opts: a.opts, depth: a.depth + 1, captured: a.captured, active: a.active}
 	c.flat = c.depth >= a.opts.chainDepth()
 	c.walk(v)
 	var out []wrapped
@@ -172,11 +177,11 @@ func (a *analyzer) inner(walk func()) {
 		return
 	}
 	if a.seenCut == nil {
-		a.seenCut = make(map[ssa.Value]bool)
+		a.seenCut = make(map[seenKey]bool)
 	}
-	saved := a.seen
-	a.seen, a.cut = a.seenCut, true
-	defer func() { a.seen, a.cut = saved, false }()
+	saved, guards, noGuards := a.seen, a.guards, a.noGuards
+	a.seen, a.cut, a.guards, a.noGuards = a.seenCut, true, nil, true
+	defer func() { a.seen, a.cut, a.guards, a.noGuards = saved, false, guards, noGuards }()
 	walk()
 }
 
@@ -287,7 +292,7 @@ func (a *analyzer) errorf(site any, pos token.Pos, format, args ssa.Value) {
 	}
 	for _, op := range ops {
 		if op != nil && MayCarryError(op) {
-			operands = append(operands, a.operand(op))
+			operands = append(operands, a.operand(op, site))
 		}
 	}
 	if !a.flat {
@@ -322,7 +327,7 @@ func (a *analyzer) constErrorf(site any, pos token.Pos, format string, args ssa.
 	var operands [][]wrapped
 	for _, i := range verbs {
 		if op := ops[i]; op != nil && MayCarryError(op) && !isNilConst(op) {
-			operands = append(operands, a.operand(op))
+			operands = append(operands, a.operand(op, site))
 		}
 	}
 	if a.flat {
@@ -370,7 +375,7 @@ func (a *analyzer) join(call *ssa.Call, args ssa.Value) {
 	var operands [][]wrapped
 	for _, op := range ops {
 		if op != nil {
-			operands = append(operands, a.operand(op))
+			operands = append(operands, a.operand(op, call))
 		}
 	}
 	if !a.flat {
@@ -380,7 +385,7 @@ func (a *analyzer) join(call *ssa.Call, args ssa.Value) {
 
 // bracesWrap models braces.dev/errtrace.Wrap(err): a Wrap of err, or nil.
 func (a *analyzer) bracesWrap(call *ssa.Call, err ssa.Value) {
-	vals := a.operand(err)
+	vals := a.operand(err, call)
 	if !a.flat {
 		a.addFacts(a.wraps(errset.Value{Site: call, Pos: a.posOf(call), WrapKind: errset.WrapBraces}, [][]wrapped{vals}))
 	}
@@ -417,7 +422,7 @@ func (a *analyzer) constructed(typ types.Type, alloc *ssa.Alloc) {
 	if !m.multi {
 		var vals []wrapped
 		for _, v := range stored {
-			vals = append(vals, a.operand(v)...)
+			vals = append(vals, a.operand(v, alloc)...)
 		}
 		operands = append(operands, vals)
 	} else {
@@ -425,7 +430,7 @@ func (a *analyzer) constructed(typ types.Type, alloc *ssa.Alloc) {
 			if elems, ok := sliceElems(v); ok {
 				for _, e := range elems {
 					if e != nil {
-						operands = append(operands, a.operand(e))
+						operands = append(operands, a.operand(e, alloc))
 					}
 				}
 				continue

@@ -1,0 +1,60 @@
+errors.Is replacing fs.ErrNotExist with ErrLocal: ErrLocal is added and fs.ErrNotExist removed.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:27:12-13: Error Set of example.com/fx.G: 4 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:16:10-16: in example.com/fx.source
+		$WORK/a.go:28:9-18: in example.com/fx.G, call to example.com/fx.source
+$WORK/a.go:25:5-13: sentinel example.com/fx.ErrLocal
+	path (origin → target):
+		$WORK/a.go:30:10-18: in example.com/fx.G
+$WORK/a.go:20:10-18: concrete *example.com/fx.MyErr
+	path (origin → target):
+		$WORK/a.go:20:10-18: in example.com/fx.source
+		$WORK/a.go:28:9-18: in example.com/fx.G, call to example.com/fx.source
+$WORK/a.go:22:9-24: opaque errors.New "x"
+	path (origin → target):
+		$WORK/a.go:22:9-24: in example.com/fx.source
+		$WORK/a.go:28:9-18: in example.com/fx.G, call to example.com/fx.source
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"io"
+	"io/fs"
+)
+
+type MyErr struct{}
+
+func (*MyErr) Error() string { return "my" }
+
+func source(n int) error {
+	switch n {
+	case 0:
+		return io.EOF
+	case 1:
+		return fs.ErrNotExist
+	case 2:
+		return &MyErr{}
+	}
+	return errors.New("x")
+}
+
+var ErrLocal = errors.New("local")
+
+func /*@g*/G(n int) error {
+	err := source(n)
+	if errors.Is(err, fs.ErrNotExist) {
+		return ErrLocal
+	}
+	return err
+}

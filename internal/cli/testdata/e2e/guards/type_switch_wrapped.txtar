@@ -1,0 +1,41 @@
+A type switch only checks the top level: MyErr wrapped by fmt.Errorf is kept.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:15:12-13: Error Set of example.com/fx.G: 1 entries
+$WORK/a.go:12:29-37: concrete *example.com/fx.MyErr
+	wrap chain (origin → target):
+		$WORK/a.go:12:9-38: fmt.Errorf "w: %w"
+	path (origin → target):
+		$WORK/a.go:12:29-37: in example.com/fx.source2
+		$WORK/a.go:16:9-18: in example.com/fx.G, call to example.com/fx.source2
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"fmt"
+)
+
+type MyErr struct{}
+
+func (*MyErr) Error() string { return "my" }
+
+func source2() error {
+	return fmt.Errorf("w: %w", &MyErr{})
+}
+
+func /*@g*/G() error {
+	err := source2()
+	switch err.(type) {
+	case *MyErr:
+		return nil
+	default:
+		return err
+	}
+}

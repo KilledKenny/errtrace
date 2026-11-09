@@ -3,6 +3,7 @@ package summary
 import (
 	"fmt"
 	"go/types"
+	"slices"
 
 	"golang.org/x/tools/go/ssa"
 
@@ -79,11 +80,11 @@ func (s *Solver) expand(fn *ssa.Function, f flow.Fact, fs *factSet, st *evalStat
 		s.expandCall(fn, site, v.Index, &calls, st)
 		out := make([]subst, len(calls.facts))
 		for i, c := range calls.facts {
-			out[i] = subst{value: c.Value, leaves: c.Leaves}
+			out[i] = subst{value: c.Value, leaves: c.Leaves, notes: c.Notes}
 		}
 		return out
 	}) {
-		fs.add(sub.value, sub.leaves)
+		fs.add(sub.value, sub.leaves, sub.notes)
 	}
 }
 
@@ -101,7 +102,7 @@ func (s *Solver) captured(creator *ssa.Function, facts []flow.Fact, site any, st
 		for j, srcs := range f.Leaves {
 			leaves[j] = []Source{{Kind: Captured, Site: site, ArgFn: creator, ArgSources: srcs}}
 		}
-		out[i] = subst{value: f.Value, leaves: leaves}
+		out[i] = subst{value: f.Value, leaves: leaves, notes: f.Notes}
 	}
 	return out
 }
@@ -147,7 +148,7 @@ func (s *Solver) expandCall(fn *ssa.Function, site ssa.CallInstruction, index in
 	key := callKey{site, index}
 	addAll := func(facts []Fact) {
 		for _, f := range facts {
-			fs.add(f.Value, f.Leaves)
+			fs.add(f.Value, f.Leaves, f.Notes)
 		}
 	}
 	if facts, ok := st.final[key]; ok {
@@ -191,7 +192,7 @@ func (s *Solver) expandCallOnce(fn *ssa.Function, site ssa.CallInstruction, inde
 	dynamic := s.res.IsDynamic(site)
 	callees := s.res.Callees(site)
 	if len(callees) == 0 {
-		fs.add(s.unresolved(site, errset.NoCandidates, "dynamic call to "+flow.CalleeName(common)), here)
+		fs.add(s.unresolved(site, errset.NoCandidates, "dynamic call to "+flow.CalleeName(common)), here, nil)
 		return
 	}
 	for _, g := range callees {
@@ -204,11 +205,11 @@ func (s *Solver) expandCallOnce(fn *ssa.Function, site ssa.CallInstruction, inde
 				}
 				continue
 			}
-			fs.add(s.tbl.Intern(errset.Value{Kind: errset.Opaque, Site: site, Pos: common.Pos(), Constructor: name}), here)
+			fs.add(s.tbl.Intern(errset.Value{Kind: errset.Opaque, Site: site, Pos: common.Pos(), Constructor: name}), here, nil)
 			continue
 		}
 		if g.Blocks == nil {
-			fs.add(s.unresolved(site, errset.NoBody, g.String()+" has no body"), here)
+			fs.add(s.unresolved(site, errset.NoBody, g.String()+" has no body"), here, nil)
 			continue
 		}
 		sum := s.sums[g]
@@ -217,7 +218,7 @@ func (s *Solver) expandCallOnce(fn *ssa.Function, site ssa.CallInstruction, inde
 			res = sum.Result(index)
 		}
 		if res == nil {
-			fs.add(s.unresolved(site, errset.Memory, fmt.Sprintf("result %d of %s is not tracked", index, g)), here)
+			fs.add(s.unresolved(site, errset.Memory, fmt.Sprintf("result %d of %s is not tracked", index, g)), here, nil)
 			continue
 		}
 		for _, gf := range res.Facts {
@@ -230,7 +231,7 @@ func (s *Solver) expandCallOnce(fn *ssa.Function, site ssa.CallInstruction, inde
 				Dynamic:      dynamic,
 			}
 			for _, sub := range s.substitute(fn, site, g, gf.Value, via, st) {
-				fs.add(sub.value, sub.leaves)
+				fs.add(sub.value, sub.leaves, errset.AddNotes(slices.Clone(gf.Notes), sub.notes...))
 			}
 		}
 	}
@@ -247,10 +248,11 @@ func (s *Solver) unresolved(site ssa.CallInstruction, kind errset.UnresolvedKind
 }
 
 // subst is one value a value tree maps to, with the sources of each of its
-// leaves.
+// leaves and the guards that possibly handled it.
 type subst struct {
 	value  errset.ValueID
 	leaves [][]Source
+	notes  []errset.GuardNote
 }
 
 // substitute maps the value id of callee g's summary into fn at the call
@@ -298,7 +300,7 @@ func (s *Solver) substitute(fn *ssa.Function, site ssa.CallInstruction, g *ssa.F
 				src.ArgSources = srcs
 				leaves[j] = []Source{src}
 			}
-			out[i] = subst{value: f.Value, leaves: leaves}
+			out[i] = subst{value: f.Value, leaves: leaves, notes: f.Notes}
 		}
 		return out
 	})
@@ -343,7 +345,7 @@ func (s *Solver) forwardedErrorf(fn *ssa.Function, site ssa.CallInstruction, g *
 				leaves[j] = addSource(leaves[j], src)
 			}
 		}
-		out[i] = subst{value: f.Value, leaves: leaves}
+		out[i] = subst{value: f.Value, leaves: leaves, notes: f.Notes}
 	}
 	return out
 }
@@ -371,11 +373,12 @@ func argument(c *ssa.CallCommon, g *ssa.Function, i int) ssa.Value {
 // mapTree maps every leaf of the value tree id with leaf, which gets the
 // leaf and its index in leaf order, and rebuilds the Wraps around the
 // results: a Wrap whose inner values map to several values each becomes
-// one Wrap per combination (at most maxValues). Leaf sources follow their
-// leaves. The rebuilt trees are capped at the chain depth limit.
+// one Wrap per combination (at most maxValues). The guards of a Guarded
+// value are applied to the values its inner value maps to (see
+// applyGuards). Leaf sources follow their leaves. The rebuilt trees are
+// capped at the chain depth limit.
 func (s *Solver) mapTree(id errset.ValueID, leaf func(errset.ValueID, int) []subst) []subst {
-	v := s.tbl.Get(id)
-	if v.Kind != errset.Wrap && v.Kind != errset.Truncated {
+	if s.tbl.Get(id).Kind.IsLeaf() {
 		return leaf(id, 0)
 	}
 	var out []subst
@@ -389,7 +392,7 @@ func (s *Solver) mapTree(id errset.ValueID, leaf func(errset.ValueID, int) []sub
 					}
 				}
 			}
-			out = append(out, subst{value: c.Value, leaves: leaves})
+			out = append(out, subst{value: c.Value, leaves: leaves, notes: sub.notes})
 		}
 	}
 	return out
@@ -406,8 +409,17 @@ func (s *Solver) chainDepth() int {
 // has index base.
 func (s *Solver) mapTreeRaw(id errset.ValueID, base int, leaf func(errset.ValueID, int) []subst) []subst {
 	v := s.tbl.Get(id)
-	if v.Kind != errset.Wrap && v.Kind != errset.Truncated {
+	if v.Kind.IsLeaf() {
 		return leaf(id, base)
+	}
+	if v.Kind == errset.Guarded {
+		var out []subst
+		for _, sub := range s.mapTreeRaw(v.Inner[0], base, leaf) {
+			if sub, ok := s.applyGuards(sub, v.Guards); ok {
+				out = append(out, sub)
+			}
+		}
+		return out
 	}
 	combos := []subst{{}}
 	var inner [][]errset.ValueID
@@ -423,7 +435,10 @@ func (s *Solver) mapTreeRaw(id errset.ValueID, base int, leaf func(errset.ValueI
 				if len(nextCombos) == maxValues {
 					break
 				}
-				nextCombos = append(nextCombos, subst{leaves: append(c.leaves[:len(c.leaves):len(c.leaves)], sub.leaves...)})
+				nextCombos = append(nextCombos, subst{
+					leaves: append(c.leaves[:len(c.leaves):len(c.leaves)], sub.leaves...),
+					notes:  errset.AddNotes(slices.Clone(c.notes), sub.notes...),
+				})
 				nextInner = append(nextInner, append(inner[ci][:len(inner[ci]):len(inner[ci])], sub.value))
 			}
 		}
@@ -435,4 +450,33 @@ func (s *Solver) mapTreeRaw(id errset.ValueID, base int, leaf func(errset.ValueI
 		combos[i].value = s.tbl.Intern(w)
 	}
 	return combos
+}
+
+// applyGuards applies guards to the value of sub (see flow.ApplyGuard). It
+// reports false if a guard removes the value. A guard that cannot be
+// decided yet, because the value holds symbolic values such as a Param, is
+// kept pending in a Guarded value, to be applied where a caller
+// substitutes them.
+func (s *Solver) applyGuards(sub subst, guards []errset.Guard) (subst, bool) {
+	var pending []errset.Guard
+	for _, g := range guards {
+		switch outcome, note := flow.ApplyGuard(s.tbl, sub.value, g); outcome {
+		case flow.Remove:
+			return subst{}, false
+		case flow.Note:
+			sub.notes = errset.AddNotes(slices.Clone(sub.notes), note)
+		case flow.Pending:
+			pending = append(pending, g)
+		}
+	}
+	if len(pending) > 0 {
+		v := s.tbl.Get(sub.value)
+		inner := sub.value
+		if v.Kind == errset.Guarded {
+			pending = append(slices.Clone(v.Guards), pending...)
+			inner = v.Inner[0]
+		}
+		sub.value = s.tbl.Intern(errset.Value{Kind: errset.Guarded, Site: v.Site, Pos: v.Pos, Inner: []errset.ValueID{inner}, Guards: pending})
+	}
+	return sub, true
 }

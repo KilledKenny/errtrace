@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"go/token"
 	"go/types"
+	"slices"
 	"testing"
 
 	"golang.org/x/tools/go/ssa"
@@ -110,7 +111,12 @@ func Run(ctx context.Context, prog *load.Program, tgt *target.Target, opts Optio
 func (r *Result) entries(solver *summary.Solver, fn *ssa.Function, facts []summary.Fact) []errset.Entry {
 	var out []errset.Entry
 	for _, f := range facts {
-		entries := errset.Flatten(r.Table, r.top(f.Value))
+		top, notes, ok := r.top(f.Value)
+		if !ok {
+			continue
+		}
+		notes = errset.AddNotes(slices.Clone(f.Notes), notes...)
+		entries := errset.Flatten(r.Table, top)
 		if len(entries) != len(f.Leaves) && testing.Testing() {
 			// A fact has one source list per leaf; under go test a
 			// mismatch fails loudly instead of losing paths.
@@ -121,6 +127,7 @@ func (r *Result) entries(solver *summary.Solver, fn *ssa.Function, facts []summa
 				entries[k].Path, _ = solver.Path(fn, f.Leaves[k])
 				entries[k].MorePaths = len(f.Leaves[k]) - 1
 			}
+			entries[k].PossiblyHandled = notes
 		}
 		out = append(out, entries...)
 	}
@@ -130,9 +137,51 @@ func (r *Result) entries(solver *summary.Solver, fn *ssa.Function, facts []summa
 // top maps a summary value to what it is at the top of a Query:
 // parameters and captured variables depend on the caller, and a format
 // forwarded to fmt.Errorf from a parameter is a dynamic format. Wraps are
-// rebuilt around their mapped inner values.
-func (r *Result) top(id errset.ValueID) errset.ValueID {
+// rebuilt around their mapped inner values. The pending guards of a
+// Guarded value are applied to its mapped value: top reports false if
+// they remove it, and returns the guards that possibly handled it.
+func (r *Result) top(id errset.ValueID) (errset.ValueID, []errset.GuardNote, bool) {
 	v := r.Table.Get(id)
+	switch v.Kind {
+	case errset.Guarded:
+		inner, notes, ok := r.top(v.Inner[0])
+		if !ok {
+			return 0, nil, false
+		}
+		for _, g := range v.Guards {
+			switch outcome, note := flow.ApplyGuard(r.Table, inner, g); outcome {
+			case flow.Remove:
+				return 0, nil, false
+			case flow.Note:
+				notes = errset.AddNotes(notes, note)
+			}
+		}
+		return inner, notes, true
+	case errset.Wrap, errset.Truncated:
+		inner := make([]errset.ValueID, len(v.Inner))
+		var notes []errset.GuardNote
+		changed := false
+		for i, in := range v.Inner {
+			id, n, ok := r.top(in)
+			if !ok {
+				return 0, nil, false
+			}
+			inner[i] = id
+			notes = errset.AddNotes(notes, n...)
+			changed = changed || inner[i] != in
+		}
+		if !changed {
+			return id, notes, true
+		}
+		v.Inner = inner
+		return r.Table.Intern(v), notes, true
+	}
+	return r.leafTop(v), nil, true
+}
+
+// leafTop maps a leaf value v to what it is at the top of a Query (see
+// top).
+func (r *Result) leafTop(v errset.Value) errset.ValueID {
 	switch v.Kind {
 	case errset.Param:
 		return r.Table.Intern(errset.Value{
@@ -152,24 +201,15 @@ func (r *Result) top(id errset.ValueID) errset.ValueID {
 			Unresolved: errset.DynamicFormat,
 			Detail:     fmt.Sprintf("format of fmt.Errorf comes from parameter %s of %s", v.Name, v.Fn),
 		})
-	case errset.Wrap, errset.Truncated:
-		inner := make([]errset.ValueID, len(v.Inner))
-		changed := false
-		for i, in := range v.Inner {
-			inner[i] = r.top(in)
-			changed = changed || inner[i] != in
-		}
-		if !changed {
-			return id
-		}
-		v.Inner = inner
-		return r.Table.Intern(v)
 	}
-	return id
+	return r.Table.Intern(v)
 }
 
 // Unresolved returns the number of entries with an Unresolved leaf.
 func (r *Result) Unresolved() int { return errset.CountUnresolved(r.Table, r.Entries) }
+
+// PossiblyHandled returns the number of entries marked possibly handled.
+func (r *Result) PossiblyHandled() int { return errset.CountPossiblyHandled(r.Entries) }
 
 // Locate returns the span of a value's or hop's Site: the identifier of a
 // variable (a Sentinel), or the source expression of an SSA value or

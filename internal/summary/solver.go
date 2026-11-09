@@ -301,7 +301,7 @@ func (s *Solver) appendCallRefSites(fn *ssa.Function, sites []ssa.CallInstructio
 				sites = s.appendCallRefSites(creator, sites, f.Value)
 			}
 		}
-	case errset.Wrap, errset.Truncated:
+	case errset.Wrap, errset.Truncated, errset.Guarded:
 		for _, in := range v.Inner {
 			sites = s.appendCallRefSites(fn, sites, in)
 		}

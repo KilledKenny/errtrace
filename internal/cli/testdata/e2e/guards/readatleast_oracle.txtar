@@ -1,0 +1,38 @@
+io.ReadAtLeast replaces EOF by ErrUnexpectedEOF only when n > 0: io.EOF stays, with ErrShortBuffer and ErrUnexpectedEOF.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:9:12-13: Error Set of example.com/fx.G: 3 entries
+$GOROOT/src/io/io.go:*: sentinel io.ErrShortBuffer
+	path (origin → target):
+		$GOROOT/src/io/io.go:*: in io.ReadAtLeast
+		$WORK/a.go:10:12-58: in example.com/fx.G, call to io.ReadAtLeast
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$GOROOT/src/strings/reader.go:*: in (*strings.Reader).Read
+		$GOROOT/src/io/io.go:*: in io.ReadAtLeast, call to (*strings.Reader).Read (dynamic (io.Reader).Read: 1 of 1 candidates)
+		$WORK/a.go:10:12-58: in example.com/fx.G, call to io.ReadAtLeast
+$GOROOT/src/io/io.go:*: sentinel io.ErrUnexpectedEOF
+	path (origin → target):
+		$GOROOT/src/io/io.go:*: in io.ReadAtLeast
+		$WORK/a.go:10:12-58: in example.com/fx.G, call to io.ReadAtLeast
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"io"
+	"strings"
+)
+
+
+func /*@g*/G(buf []byte) error {
+	_, err := io.ReadAtLeast(strings.NewReader("x"), buf, 4)
+	return err
+}
+

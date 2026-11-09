@@ -49,6 +49,9 @@ type Entry struct {
 	Path Path
 	// MorePaths is how many other distinct Propagation Paths were found.
 	MorePaths int
+	// PossiblyHandled are the guards that might have removed the entry on
+	// its way to the Target but that errtrace cannot decide.
+	PossiblyHandled []GuardNote
 }
 
 // Flatten turns the value tree rooted at top into entries, one per leaf,
@@ -68,6 +71,8 @@ func Flatten(t *Table, top ValueID) []Entry {
 			}
 		case Truncated:
 			walk(v.Inner[0], outer, true)
+		case Guarded:
+			walk(v.Inner[0], outer, truncated)
 		default:
 			chain := make([]ValueID, len(outer))
 			for i, w := range outer {
@@ -85,7 +90,9 @@ func Flatten(t *Table, top ValueID) []Entry {
 // format and type), not by its wrapped values: the same leaf under one
 // errors.Join is one entry whatever the Join's other operands are. The
 // first entry's Path and Chain are kept; every other distinct Path adds to
-// MorePaths. The order of first occurrences is kept.
+// MorePaths. A merged entry is possibly handled only by the guards that
+// every one of its entries is possibly handled by. The order of first
+// occurrences is kept.
 func Dedup(t *Table, entries []Entry) []Entry {
 	type group struct {
 		entry Entry
@@ -127,6 +134,7 @@ func Dedup(t *Table, entries []Entry) []Entry {
 			continue
 		}
 		g.entry.MorePaths += e.MorePaths
+		g.entry.PossiblyHandled = IntersectNotes(g.entry.PossiblyHandled, e.PossiblyHandled)
 		if !slices.ContainsFunc(g.paths, func(p Path) bool { return slices.Equal(p, e.Path) }) {
 			g.paths = append(g.paths, e.Path)
 			g.entry.MorePaths++

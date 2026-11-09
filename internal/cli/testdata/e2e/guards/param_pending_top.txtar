@@ -1,0 +1,27 @@
+A declaration Query on a function that guards its parameter: the parameter depends on the caller and is possibly handled by the guard.
+-- args --
+a.go:@filter
+-- stdout --
+$WORK/a.go:5:17-23: Error Set of example.com/fx.Filter: 1 entries, 1 unresolved, 1 possibly handled
+$WORK/a.go:6:5-8: unresolved(depends-on-caller): parameter err (error)
+	possibly handled:
+		$WORK/a.go:6:5-18: comparison with io.EOF: unresolved value
+	path (origin → target):
+		$WORK/a.go:6:5-8: in example.com/fx.Filter
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "io"
+
+func /*@filter*/Filter(err error) error {
+	if err == io.EOF {
+		return nil
+	}
+	return err
+}

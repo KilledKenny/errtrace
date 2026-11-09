@@ -1,0 +1,62 @@
+A negated errors.Is guarding a wrap: only io.EOF reaches the wrap, the others are returned as they are.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:26:12-13: Error Set of example.com/fx.G: 4 entries
+$GOROOT/src/io/fs/fs.go:*: sentinel io/fs.ErrNotExist
+	path (origin → target):
+		$WORK/a.go:19:10-24: in example.com/fx.source
+		$WORK/a.go:27:9-18: in example.com/fx.G, call to example.com/fx.source
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	wrap chain (origin → target):
+		$WORK/a.go:31:9-35: fmt.Errorf "eof: %w"
+	path (origin → target):
+		$WORK/a.go:17:10-16: in example.com/fx.source
+		$WORK/a.go:27:9-18: in example.com/fx.G, call to example.com/fx.source
+$WORK/a.go:21:10-18: concrete *example.com/fx.MyErr
+	path (origin → target):
+		$WORK/a.go:21:10-18: in example.com/fx.source
+		$WORK/a.go:27:9-18: in example.com/fx.G, call to example.com/fx.source
+$WORK/a.go:23:9-24: opaque errors.New "x"
+	path (origin → target):
+		$WORK/a.go:23:9-24: in example.com/fx.source
+		$WORK/a.go:27:9-18: in example.com/fx.G, call to example.com/fx.source
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"io/fs"
+)
+
+type MyErr struct{}
+
+func (*MyErr) Error() string { return "my" }
+
+func source(n int) error {
+	switch n {
+	case 0:
+		return io.EOF
+	case 1:
+		return fs.ErrNotExist
+	case 2:
+		return &MyErr{}
+	}
+	return errors.New("x")
+}
+
+func /*@g*/G(n int) error {
+	err := source(n)
+	if !errors.Is(err, io.EOF) {
+		return err
+	}
+	return fmt.Errorf("eof: %w", err)
+}

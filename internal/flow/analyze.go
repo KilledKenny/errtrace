@@ -83,8 +83,11 @@ func (o Options) chainDepth() int {
 // for intrinsics (errors.New, fmt.Errorf, errors.Join, errtrace.Wrap),
 // which become Error Origins and Wraps. A Concrete Type built from a
 // composite literal whose type has a modelled Unwrap method becomes a Wrap
-// of the value stored in the unwrapped field. A function without a body
-// has no facts.
+// of the value stored in the unwrapped field. A value under guards that
+// hold on its return path (err == io.EOF is false there, errors.Is
+// returned true, ...) becomes a Guarded value, which the summaries filter
+// once its symbolic values are known. A function without a body has no
+// facts.
 func Analyze(tbl *errset.Table, fn *ssa.Function, opts Options) *LocalFacts {
 	lf := &LocalFacts{Fn: fn}
 	for _, idx := range ErrorResults(fn.Signature) {
@@ -101,8 +104,8 @@ func Analyze(tbl *errset.Table, fn *ssa.Function, opts Options) *LocalFacts {
 		}
 		for i := range lf.Results {
 			r := &lf.Results[i]
-			a.at = ret
-			a.seen = make(map[ssa.Value]bool)
+			a.at, a.pt = ret, point{b: ret.Block()}
+			a.seen = make(map[seenKey]bool)
 			a.facts = r.Facts
 			a.walk(ret.Results[r.Index])
 			r.Facts = a.facts
@@ -116,7 +119,7 @@ func Analyze(tbl *errset.Table, fn *ssa.Function, opts Options) *LocalFacts {
 // carry, found by walking its definitions backwards exactly as Analyze does
 // for a returned value. Values are interned in tbl.
 func ValueFacts(tbl *errset.Table, fn *ssa.Function, v ssa.Value, at ssa.Instruction, opts Options) []Fact {
-	a := &analyzer{tbl: tbl, fn: fn, at: at, seen: make(map[ssa.Value]bool), opts: opts}
+	a := &analyzer{tbl: tbl, fn: fn, at: at, pt: pointOf(at), seen: make(map[seenKey]bool), opts: opts}
 	a.walk(v)
 	return a.facts
 }
@@ -127,7 +130,7 @@ type analyzer struct {
 	tbl   *errset.Table
 	fn    *ssa.Function
 	at    ssa.Instruction
-	seen  map[ssa.Value]bool
+	seen  map[seenKey]bool
 	facts []Fact
 	opts  Options
 	// depth is the number of Wraps above the values this analyzer finds.
@@ -140,7 +143,7 @@ type analyzer struct {
 	// call: the leaves found then lie below the depth limit and are
 	// marked Truncated. seenCut is the seen set of that walk.
 	cut     bool
-	seenCut map[ssa.Value]bool
+	seenCut map[seenKey]bool
 	// revisits counts the walks of a non-nil value that was already
 	// walked: its facts were added before, so a walk that adds nothing
 	// does not show the value is nil.
@@ -151,6 +154,36 @@ type analyzer struct {
 	// shared with child analyzers), which cuts err = wrap(err) cycles.
 	captured *ssa.Alloc
 	active   map[*ssa.Store]bool
+
+	// pt is the point where the walked value is used, which says which
+	// guards hold for it (see guardsAt); gd are the function's guards,
+	// shared with child analyzers.
+	pt point
+	gd *funcGuards
+	// guards are the guards that hold for the value being walked, sorted
+	// by id: the facts found are filtered by them (as Guarded values).
+	guards []guardUse
+	// noGuards is set while walking, in flat mode, the inner values of a
+	// Wrap: a guard of the Wrap is not a guard of each inner value.
+	noGuards bool
+}
+
+// seenKey is a value walked at a point under a set of guards: the same
+// value reached on another path, or with other guards, gives other facts.
+type seenKey struct {
+	v      ssa.Value
+	pt     point
+	guards string
+}
+
+// pointOf returns the point at the instruction instr: the end of its
+// block (an If is the last instruction of a block, so the guards that
+// hold there are those that hold at instr).
+func pointOf(instr ssa.Instruction) point {
+	if instr == nil {
+		return point{}
+	}
+	return point{b: instr.Block()}
 }
 
 // LeafSource returns where leaf k of the fact's value enters the function.
@@ -165,10 +198,11 @@ func (a *analyzer) add(id errset.ValueID, src any) {
 	a.addFact(Fact{Value: id, Source: src})
 }
 
-// addFact adds f, marked as cut if the analyzer is, unless it is there
-// already.
+// addFact adds f, marked as cut if the analyzer is and under the guards
+// that hold for the walked value, unless it is there already.
 func (a *analyzer) addFact(f Fact) {
 	f.cut = a.cut
+	f.Value = a.guarded(f.Value)
 	for _, g := range a.facts {
 		if g.Value == f.Value && g.Source == f.Source && g.cut == f.cut && slices.Equal(g.Leaves, f.Leaves) {
 			return
@@ -192,22 +226,31 @@ func (a *analyzer) posOf(v ssa.Value) token.Pos {
 }
 
 func (a *analyzer) walk(v ssa.Value) {
-	if a.seen[v] {
+	saved := a.guards
+	defer func() { a.guards = saved }()
+	a.matchGuards(v)
+	k := seenKey{v, a.pt, a.guardsKey()}
+	if a.seen[k] {
 		if !isNilConst(v) {
 			a.revisits++
 		}
 		return
 	}
-	a.seen[v] = true
+	a.seen[k] = true
 	switch v := v.(type) {
 	case *ssa.Const:
 		if v.IsNil() {
 			return // no error
 		}
 	case *ssa.Phi:
-		for _, e := range v.Edges {
+		// Each edge's value is used on its edge, where the guards of the
+		// predecessor hold.
+		pt := a.pt
+		for i, e := range v.Edges {
+			a.pt = point{b: v.Block().Preds[i], edgeTo: v.Block()}
 			a.walk(e)
 		}
+		a.pt = pt
 		return
 	case *ssa.ChangeInterface:
 		a.walk(v.X)
@@ -353,10 +396,13 @@ func (a *analyzer) local(load *ssa.UnOp, alloc *ssa.Alloc) {
 		a.constructed(load.Type(), alloc)
 		return
 	}
+	pt := a.pt
+	defer func() { a.pt = pt }()
 	if alloc == a.captured {
 		for _, r := range *alloc.Referrers() {
 			if st, ok := r.(*ssa.Store); ok && st.Addr == alloc && !a.active[st] {
 				a.active[st] = true
+				a.pt = pointOf(st)
 				a.walk(st.Val)
 				delete(a.active, st)
 			}
@@ -372,6 +418,8 @@ func (a *analyzer) local(load *ssa.UnOp, alloc *ssa.Alloc) {
 		switch r := r.(type) {
 		case *ssa.Store:
 			if r.Addr == alloc {
+				// A stored value is used at its store.
+				a.pt = pointOf(r)
 				a.walk(r.Val)
 				continue
 			}

@@ -1,0 +1,45 @@
+A type with a custom Is method under errors.Is is kept and marked possibly handled.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:21:12-13: Error Set of example.com/fx.G: 1 entries, 1 possibly handled
+$WORK/a.go:18:9-17: concrete *example.com/fx.IsErr
+	possibly handled:
+		$WORK/a.go:23:5-27: errors.Is with io.EOF: custom Is method of *example.com/fx.IsErr
+	path (origin → target):
+		$WORK/a.go:18:9-17: in example.com/fx.src
+		$WORK/a.go:22:9-15: in example.com/fx.G, call to example.com/fx.src
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"io"
+)
+
+
+type IsErr struct{}
+
+func (*IsErr) Error() string          { return "is" }
+func (*IsErr) Is(target error) bool { return target == io.EOF }
+
+func src(n int) error {
+	if n == 0 {
+		return io.EOF
+	}
+	return &IsErr{}
+}
+
+func /*@g*/G(n int) error {
+	err := src(n)
+	if errors.Is(err, io.EOF) {
+		return nil
+	}
+	return err
+}

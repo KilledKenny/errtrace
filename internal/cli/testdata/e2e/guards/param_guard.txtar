@@ -1,0 +1,27 @@
+A guard on a parameter is applied where the caller passes io.EOF: nothing remains.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:15:12-13: Error Set of example.com/fx.G: 0 entries
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"io"
+)
+
+
+func filter(err error) error {
+	if err == io.EOF {
+		return nil
+	}
+	return err
+}
+
+func /*@g*/G() error { return filter(io.EOF) }

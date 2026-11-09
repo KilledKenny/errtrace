@@ -44,10 +44,12 @@ const noSpan = "-"
 
 // Text writes in as text:
 //
-//	<target-span>: Error Set of <target>: <N> entries[, <U> unresolved]
+//	<target-span>: Error Set of <target>: <N> entries[, <U> unresolved][, <H> possibly handled]
 //	<entry-span>: <label>[ [typed nil]][ [chain truncated]][ [+K more paths]]
 //		wrap chain (origin → target):
 //			<wrap-span>: <wrap description>
+//		possibly handled:
+//			<guard-span>: <reason>
 //		path (origin → target):
 //			<hop-span>: in <function>
 //			<hop-span>: in <caller>, call to <callee>[ (dynamic <method>: <k> of <n> candidates)]
@@ -62,6 +64,9 @@ func Text(w io.Writer, in Input) error {
 	fmt.Fprintf(&b, "%s: Error Set of %s: %d entries", in.TargetSpan, in.TargetName, len(in.Entries))
 	if u := errset.CountUnresolved(in.Table, in.Entries); u > 0 {
 		fmt.Fprintf(&b, ", %d unresolved", u)
+	}
+	if h := errset.CountPossiblyHandled(in.Entries); h > 0 {
+		fmt.Fprintf(&b, ", %d possibly handled", h)
 	}
 	b.WriteByte('\n')
 	groups, grouped := groupEntries(in.Entries, in.Fanout)
@@ -102,6 +107,12 @@ func (in Input) entry(b *strings.Builder, e errset.Entry) {
 		b.WriteString("\twrap chain (origin → target):\n")
 		for _, wid := range e.Chain {
 			fmt.Fprintf(b, "\t\t%s: %s\n", in.locate(in.Table.Get(wid).Site), in.Table.WrapDescription(wid))
+		}
+	}
+	if len(e.PossiblyHandled) > 0 {
+		b.WriteString("\tpossibly handled:\n")
+		for _, n := range e.PossiblyHandled {
+			fmt.Fprintf(b, "\t\t%s: %s\n", in.locate(n.Site), n.Reason)
 		}
 	}
 	if len(e.Path) > 0 {

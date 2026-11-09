@@ -54,6 +54,12 @@ const (
 	// wrapf(format string, args ...any)). Each caller evaluates it against
 	// its own arguments into a Wrap or an Opaque Error.
 	ErrorfLike
+	// Guarded is symbolic: the value tree Inner[0] filtered by Guards that
+	// could not be decided yet, because the tree holds symbolic values
+	// (such as a Param, whose pending guards apply when a caller
+	// substitutes its argument). It has the leaves of its inner value and
+	// only exists inside summaries.
+	Guarded
 )
 
 var kindNames = [...]string{
@@ -67,6 +73,7 @@ var kindNames = [...]string{
 	FreeVar:    "freevar",
 	CallRef:    "callref",
 	ErrorfLike: "errorf-like",
+	Guarded:    "guarded",
 }
 
 // String returns the lower-case name of k.
@@ -83,7 +90,7 @@ func (k Kind) IsOrigin() bool { return k == Sentinel || k == Concrete || k == Op
 // IsLeaf reports whether a value of kind k is a leaf of a value tree: an
 // Error Origin, an Unresolved place, or (only inside summaries) a symbolic
 // value.
-func (k Kind) IsLeaf() bool { return k != Wrap && k != Truncated }
+func (k Kind) IsLeaf() bool { return k != Wrap && k != Truncated && k != Guarded }
 
 // UnresolvedKind says why a value is Unresolved. The set is closed.
 type UnresolvedKind string
@@ -188,6 +195,8 @@ type Value struct {
 	ArgIndex int
 	// Name is the source name of a Param or FreeVar.
 	Name string
+	// Guards are the pending guards of a Guarded value.
+	Guards []Guard
 }
 
 // key is the identity of a Value: every field except Site, in comparable
@@ -210,6 +219,7 @@ type key struct {
 	index       int
 	argIndex    int
 	name        string
+	guards      string
 }
 
 func keyOf(v Value) key {
@@ -229,6 +239,7 @@ func keyOf(v Value) key {
 		index:       v.Index,
 		argIndex:    v.ArgIndex,
 		name:        v.Name,
+		guards:      guardsKey(v.Guards),
 	}
 	if v.Type != nil {
 		k.typ = types.TypeString(v.Type, nil)
@@ -278,6 +289,7 @@ func (t *Table) Intern(v Value) ValueID {
 	}
 	id := ValueID(len(t.values))
 	v.Inner = append([]ValueID(nil), v.Inner...)
+	v.Guards = slices.Clone(v.Guards)
 	n := 0
 	for _, in := range v.Inner {
 		n += t.leaves[in]
@@ -345,6 +357,12 @@ func (t *Table) String(id ValueID) string {
 		return fmt.Sprintf("callref %s #%d", v.Detail, v.Index)
 	case ErrorfLike:
 		return fmt.Sprintf("errorf-like %s format#%d args#%d", v.Fn, v.Index, v.ArgIndex)
+	case Guarded:
+		parts := make([]string, len(v.Guards))
+		for i, g := range v.Guards {
+			parts[i] = fmt.Sprintf("%s %t", g, g.Holds)
+		}
+		return fmt.Sprintf("guarded(%s)[%s]", strings.Join(parts, "; "), t.String(v.Inner[0]))
 	}
 	return v.Kind.String()
 }
@@ -447,6 +465,19 @@ func (t *Table) capAt(id ValueID, level, limit, base int) []Capped {
 			return []Capped{{Value: id, From: [][]int{{base}}}}
 		}
 		return t.truncateLeaves(v.Inner[0], base)
+	case Guarded:
+		// Guards don't count as Wraps: cap the inner value and keep the
+		// guards over each capped value.
+		inner := t.capAt(v.Inner[0], level, limit, base)
+		if len(inner) == 1 && inner[0].Value == v.Inner[0] {
+			return []Capped{{Value: id, From: seq(base, t.leaves[id])}}
+		}
+		for i := range inner {
+			w := v
+			w.Inner = []ValueID{inner[i].Value}
+			inner[i].Value = t.Intern(w)
+		}
+		return inner
 	}
 	return []Capped{{Value: id, From: [][]int{{base}}}}
 }
@@ -461,7 +492,9 @@ func seq(base, n int) [][]int {
 }
 
 // truncateLeaves returns a Truncated marker over each distinct leaf of the
-// tree id, whose first leaf has index base.
+// tree id, whose first leaf has index base. Pending guards of Guarded
+// values in the cut part are dropped, which keeps more values, never
+// fewer.
 func (t *Table) truncateLeaves(id ValueID, base int) []Capped {
 	var out []Capped
 	seen := make(map[ValueID]int)

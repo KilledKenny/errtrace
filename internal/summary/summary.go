@@ -117,6 +117,9 @@ type Fact struct {
 	// leaf order, each ranked (see MaxSources). A leaf under a Wrap has
 	// its own sources: the Wrap's other operands may come from elsewhere.
 	Leaves [][]Source
+	// Notes are the guards that might have removed the value on its way
+	// here but could not be decided: the value is possibly handled.
+	Notes []errset.GuardNote
 }
 
 // local returns the provenance of a value of n leaves that all have the
@@ -158,15 +161,17 @@ func (s *Summary) Result(index int) *ResultSummary {
 }
 
 // factSet collects facts in insertion order, merging the sources of the
-// leaves of equal values.
+// leaves of equal values. A value is possibly handled only by the guards
+// noted on every way it was added: one way without a note means it also
+// arrives unhandled.
 type factSet struct {
 	facts []Fact
 	index map[errset.ValueID]int
 }
 
 // add adds the value id whose leaves have the sources leaves (one list
-// per leaf).
-func (fs *factSet) add(id errset.ValueID, leaves [][]Source) {
+// per leaf), possibly handled by the guards of notes.
+func (fs *factSet) add(id errset.ValueID, leaves [][]Source, notes []errset.GuardNote) {
 	if fs.index == nil {
 		fs.index = make(map[errset.ValueID]int)
 	}
@@ -174,7 +179,9 @@ func (fs *factSet) add(id errset.ValueID, leaves [][]Source) {
 	if !ok {
 		i = len(fs.facts)
 		fs.index[id] = i
-		fs.facts = append(fs.facts, Fact{Value: id, Leaves: make([][]Source, len(leaves))})
+		fs.facts = append(fs.facts, Fact{Value: id, Leaves: make([][]Source, len(leaves)), Notes: slices.Clone(notes)})
+	} else {
+		fs.facts[i].Notes = errset.IntersectNotes(fs.facts[i].Notes, notes)
 	}
 	f := &fs.facts[i]
 	for k, srcs := range leaves {

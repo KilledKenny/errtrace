@@ -1,0 +1,54 @@
+Functions whose returns are guarded by checks on err, for the dominance-based guard collection.
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "io"
+
+func g(n int) error {
+	if n == 0 {
+		return io.EOF
+	}
+	return io.ErrUnexpectedEOF
+}
+
+// And returns err only where both checks of the && chain held.
+func And(n int) error {
+	err := g(n)
+	if err != nil && err != io.EOF {
+		return err
+	}
+	return nil
+}
+
+// Or returns err only where both checks of the || chain failed.
+func Or(n int) error {
+	err := g(n)
+	if err == io.EOF || err == io.ErrUnexpectedEOF {
+		return nil
+	}
+	return err
+}
+
+// NotDominating checks err in a branch that does not dominate the return.
+func NotDominating(n int) error {
+	err := g(n)
+	if n > 0 {
+		if err == io.EOF {
+			n++
+		}
+	}
+	return err
+}
+
+// Edge sets err to nil on one edge of the merge before the return.
+func Edge(n int) error {
+	err := g(n)
+	if err == io.EOF {
+		err = nil
+	}
+	return err
+}
