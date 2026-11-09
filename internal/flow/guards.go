@@ -535,9 +535,12 @@ func newLibraryErrorVerdict(g errset.Guard, what string) (Verdict, string) {
 	return Maybe, what + " may be the value of " + g.Var.Name()
 }
 
+// bracesErrtracePath is the import path of the errtrace library.
+const bracesErrtracePath = "braces.dev/errtrace"
+
 // libraryErrorPkgs are the packages whose unexported error types the
 // errors errtrace models as Opaque Errors and library Wraps may have.
-var libraryErrorPkgs = map[string]bool{"errors": true, "fmt": true, "braces.dev/errtrace": true}
+var libraryErrorPkgs = map[string]bool{"errors": true, "fmt": true, bracesErrtracePath: true}
 
 // isLibraryErrorType reports whether t may be the dynamic type of an
 // error made by errors.New, fmt.Errorf, errors.Join or errtrace.Wrap: a
@@ -618,9 +621,12 @@ func nodeType(v errset.Value) types.Type {
 
 // typeVerdict says whether a node's dynamic type is target (or implements
 // it, for an interface target). An Opaque Error and the Wraps made by
-// fmt.Errorf, errors.Join and errtrace.Wrap have types of their own that
-// only have Error (and Unwrap) methods: they match an interface target
-// that needs no more, and may match one that needs Unwrap; an Opaque
+// fmt.Errorf and errors.Join have types of their own that only have Error
+// (and Unwrap) methods: they match an interface target that needs no
+// more, and may match one that needs Unwrap. errtrace.Wrap's wrapper type
+// has more methods, which errtrace does not model: it matches an
+// interface target that needs only Error and may match any other
+// interface target (or a type of the errtrace package itself); an Opaque
 // Error, whose type errtrace does not model, may match any interface
 // target. So may a Sentinel whose dynamic type errtrace does not know,
 // which may match a concrete target too.
@@ -647,6 +653,18 @@ func typeVerdict(v errset.Value, target types.Type) (Verdict, string) {
 		}
 		return Maybe, "opaque error"
 	case errset.Wrap:
+		if v.WrapKind == errset.WrapBraces {
+			// errtrace.Wrap's wrapper type is the library's own and its
+			// method set varies by version (Format, LogValue, TracePC,
+			// ...), so only Error is known.
+			if isIface && methodsWithin(iface, "Error") {
+				return Yes, ""
+			}
+			if isIface || inPackage(target, bracesErrtracePath) {
+				return Maybe, "wrapper type of " + string(v.WrapKind)
+			}
+			return No, ""
+		}
 		if !isIface {
 			return No, ""
 		}
@@ -658,6 +676,17 @@ func typeVerdict(v errset.Value, target types.Type) (Verdict, string) {
 		}
 	}
 	return No, ""
+}
+
+// inPackage reports whether t, or the type it points to, is a named type
+// declared in the package with the given path.
+func inPackage(t types.Type, path string) bool {
+	t = unalias(t)
+	if p, ok := t.(*types.Pointer); ok {
+		t = unalias(p.Elem())
+	}
+	n, ok := t.(*types.Named)
+	return ok && n.Obj().Pkg() != nil && n.Obj().Pkg().Path() == path
 }
 
 // typeMatches reports whether a value of dynamic type t is assignable to

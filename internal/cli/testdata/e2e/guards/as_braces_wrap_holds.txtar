@@ -1,0 +1,80 @@
+errors.As to an interface that errtrace.Wrap's wrapper type may implement (fmt.Formatter): the Wrap is kept on the path where the check holds.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:13:12-13: Error Set of example.com/fx.G: 1 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	wrap chain (origin → target):
+		$WORK/a.go:11:30-51: errtrace.Wrap
+	path (origin → target):
+		$WORK/a.go:11:44-50: in example.com/fx.source
+		$WORK/a.go:14:9-17: in example.com/fx.G, call to example.com/fx.source
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+
+require braces.dev/errtrace v0.0.0
+
+replace braces.dev/errtrace => ./errtrace
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"fmt"
+	"io"
+
+	"braces.dev/errtrace"
+)
+
+func source() error { return errtrace.Wrap(io.EOF) }
+
+func /*@g*/G() error {
+	err := source()
+	var f fmt.Formatter
+	if errors.As(err, &f) {
+		return err
+	}
+	return nil
+}
+
+func /*@h*/H() error {
+	err := source()
+	var f fmt.Formatter
+	if errors.As(err, &f) {
+		return nil
+	}
+	return err
+}
+-- errtrace/go.mod --
+module braces.dev/errtrace
+
+go 1.24
+-- errtrace/errtrace.go --
+package errtrace
+
+import (
+	"fmt"
+	"log/slog"
+)
+
+type errTrace struct {
+	err error
+	pc  uintptr
+}
+
+func (e *errTrace) Error() string                  { return e.err.Error() }
+func (e *errTrace) Unwrap() error                  { return e.err }
+func (e *errTrace) Format(s fmt.State, verb rune)  { fmt.Fprint(s, e.err) }
+func (e *errTrace) LogValue() slog.Value           { return slog.StringValue(e.err.Error()) }
+func (e *errTrace) TracePC() uintptr               { return e.pc }
+
+func Wrap(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &errTrace{err: err}
+}
