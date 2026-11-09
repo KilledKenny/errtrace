@@ -47,7 +47,9 @@ type Guard struct {
 	Pos token.Pos
 	// Var is the Sentinel of a GuardEqual or GuardIs.
 	Var *types.Var
-	// Type is the target type of a GuardAs or GuardAssert.
+	// Type is the target type of a GuardAs or GuardAssert, and the
+	// dynamic type of the Sentinel of a GuardEqual or GuardIs when
+	// errtrace knows it.
 	Type types.Type
 	// Detail names the helper of a GuardHelper ("call to
 	// example.com/fx.isRetryable"), or why it is not modelled.

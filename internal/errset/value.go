@@ -153,9 +153,10 @@ type Value struct {
 
 	// Var is the variable of a Sentinel.
 	Var *types.Var
-	// Type is the type of a Concrete Type Origin or of a pointer Sentinel,
-	// the wrapper type of a custom-Unwrap Wrap, and the type of a Param or
-	// FreeVar.
+	// Type is the type of a Concrete Type Origin, the dynamic type of a
+	// Sentinel when errtrace knows it (its declared type, or that of its
+	// initializer), the wrapper type of a custom-Unwrap Wrap, and the type
+	// of a Param or FreeVar.
 	Type types.Type
 	// TypedNil marks a Concrete Type Origin that is a nil pointer in a
 	// non-nil interface.

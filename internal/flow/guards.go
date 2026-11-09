@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"golang.org/x/tools/go/ssa"
 
@@ -168,7 +169,7 @@ func recognise(cond ssa.Value) []condGuard {
 		}
 		pos := positive == (c.Op == token.EQL)
 		x, y := c.X, c.Y
-		if isNilConst(x) || globalVar(x) != nil {
+		if xv, _ := globalVar(x); isNilConst(x) || xv != nil {
 			x, y = y, x
 		}
 		if !types.IsInterface(x.Type()) {
@@ -177,8 +178,8 @@ func recognise(cond ssa.Value) []condGuard {
 		if isNilConst(y) {
 			return []condGuard{mk(x, errset.Guard{Kind: errset.GuardNil}, pos)}
 		}
-		if v := globalVar(y); v != nil {
-			return []condGuard{mk(x, errset.Guard{Kind: errset.GuardEqual, Var: v}, pos)}
+		if v, g := globalVar(y); v != nil {
+			return []condGuard{mk(x, errset.Guard{Kind: errset.GuardEqual, Var: v, Type: SentinelType(g)}, pos)}
 		}
 	case *ssa.Extract:
 		ta, ok := c.Tuple.(*ssa.TypeAssert)
@@ -193,8 +194,8 @@ func recognise(cond ssa.Value) []condGuard {
 		if callee != nil && callee.Pkg != nil && callee.Pkg.Pkg.Path() == "errors" && callee.Signature.Recv() == nil && len(common.Args) == 2 {
 			switch callee.Name() {
 			case "Is":
-				if v := globalVar(common.Args[1]); v != nil {
-					return []condGuard{mk(common.Args[0], errset.Guard{Kind: errset.GuardIs, Var: v}, positive)}
+				if v, g := globalVar(common.Args[1]); v != nil {
+					return []condGuard{mk(common.Args[0], errset.Guard{Kind: errset.GuardIs, Var: v, Type: SentinelType(g)}, positive)}
 				}
 				return []condGuard{mk(common.Args[0], errset.Guard{Kind: errset.GuardHelper, Detail: "errors.Is with a target that is not a sentinel"}, positive)}
 			case "As":
@@ -219,19 +220,28 @@ func recognise(cond ssa.Value) []condGuard {
 	return nil
 }
 
-// globalVar returns the variable of a load of a package-level variable,
-// or nil.
-func globalVar(v ssa.Value) *types.Var {
+// globalOf returns the package-level variable v loads, or nil.
+func globalOf(v ssa.Value) *ssa.Global {
 	u, ok := stripConv(v).(*ssa.UnOp)
 	if !ok || u.Op != token.MUL {
 		return nil
 	}
-	g, ok := u.X.(*ssa.Global)
-	if !ok {
-		return nil
+	g, _ := u.X.(*ssa.Global)
+	return g
+}
+
+// globalVar returns the variable of a load of a package-level variable,
+// and its Global, or nil.
+func globalVar(v ssa.Value) (*types.Var, *ssa.Global) {
+	g := globalOf(v)
+	if g == nil {
+		return nil, nil
 	}
 	obj, _ := g.Object().(*types.Var)
-	return obj
+	if obj == nil {
+		return nil, nil
+	}
+	return obj, g
 }
 
 // asTarget returns the type errors.As assigns to through target, the
@@ -251,7 +261,7 @@ func asTarget(target ssa.Value) types.Type {
 // matchGuards adds to the analyzer's guards those that hold at its point
 // and test v.
 func (a *analyzer) matchGuards(v ssa.Value) {
-	if a.noGuards || a.fn == nil || a.fn.Blocks == nil {
+	if a.fn == nil || a.fn.Blocks == nil {
 		return
 	}
 	if a.gd == nil {
@@ -321,10 +331,7 @@ func Decide(tbl *errset.Table, id errset.ValueID, g errset.Guard) (Verdict, stri
 		return Maybe, ""
 	case errset.GuardEqual:
 		return decideTop(tbl, id, func(v errset.Value) (Verdict, string) {
-			if v.Kind == errset.Sentinel && v.Var == g.Var {
-				return Yes, ""
-			}
-			return No, ""
+			return equalVerdict(v, g)
 		})
 	case errset.GuardAssert:
 		return decideTop(tbl, id, func(v errset.Value) (Verdict, string) {
@@ -332,8 +339,8 @@ func Decide(tbl *errset.Table, id errset.ValueID, g errset.Guard) (Verdict, stri
 		})
 	case errset.GuardIs:
 		return decideTree(tbl, id, func(v errset.Value) (Verdict, string) {
-			if v.Kind == errset.Sentinel && v.Var == g.Var {
-				return Yes, ""
+			if verdict, why := equalVerdict(v, g); verdict != No {
+				return verdict, why
 			}
 			if t := nodeType(v); t != nil && hasMethod(t, "Is") {
 				return Maybe, "custom Is method of " + typeString(t)
@@ -414,9 +421,38 @@ func decideTree(tbl *errset.Table, id errset.ValueID, node func(errset.Value) (V
 	return No, ""
 }
 
+// equalVerdict says whether a node is == to the Sentinel of g (a
+// GuardEqual or GuardIs, whose Type is the Sentinel's dynamic type when
+// errtrace knows it). Only that Sentinel is equal to it for sure. A
+// Concrete Type of a comparable non-pointer type may be equal to it: two
+// equal struct values are ==, so unless the Sentinel's dynamic type is
+// known to differ it is undecided. A pointer made by the program is a new
+// pointer, never the Sentinel's.
+func equalVerdict(v errset.Value, g errset.Guard) (Verdict, string) {
+	switch v.Kind {
+	case errset.Sentinel:
+		if v.Var == g.Var {
+			return Yes, ""
+		}
+	case errset.Concrete:
+		t := unalias(v.Type)
+		if v.TypedNil || t == nil || !types.Comparable(t) {
+			return No, ""
+		}
+		if _, ok := t.Underlying().(*types.Pointer); ok {
+			return No, ""
+		}
+		if g.Type != nil && !types.Identical(t, unalias(g.Type)) {
+			return No, ""
+		}
+		return Maybe, "value of comparable type " + typeString(t) + " may equal " + g.Var.Name()
+	}
+	return No, ""
+}
+
 // nodeType returns the dynamic type of a value tree node, if errtrace
-// knows it: that of a Concrete Type, a pointer Sentinel, or a custom
-// Unwrap Wrap.
+// knows it: that of a Concrete Type, of a Sentinel whose type or
+// initializer gives it (see SentinelType), or of a custom Unwrap Wrap.
 func nodeType(v errset.Value) types.Type {
 	switch v.Kind {
 	case errset.Concrete, errset.Sentinel:
@@ -435,8 +471,8 @@ func nodeType(v errset.Value) types.Type {
 // only have Error (and Unwrap) methods: they match an interface target
 // that needs no more, and may match one that needs Unwrap; an Opaque
 // Error, whose type errtrace does not model, may match any interface
-// target. A Sentinel of interface type has
-// no known dynamic type and is taken not to match.
+// target. So may a Sentinel whose dynamic type errtrace does not know,
+// which may match a concrete target too.
 func typeVerdict(v errset.Value, target types.Type) (Verdict, string) {
 	if t := nodeType(v); t != nil {
 		if typeMatches(t, target) {
@@ -446,6 +482,11 @@ func typeVerdict(v errset.Value, target types.Type) (Verdict, string) {
 	}
 	iface, isIface := target.Underlying().(*types.Interface)
 	switch v.Kind {
+	case errset.Sentinel:
+		if isIface && methodsWithin(iface, "Error") {
+			return Yes, ""
+		}
+		return Maybe, "sentinel " + v.Var.Name() + " of unknown dynamic type"
 	case errset.Opaque:
 		if !isIface {
 			return No, ""
@@ -543,4 +584,119 @@ func ApplyGuard(tbl *errset.Table, id errset.ValueID, g errset.Guard) (Outcome, 
 		return Note, errset.NoteOf(g, reason)
 	}
 	return Keep, errset.GuardNote{}
+}
+
+// sentinelTypes caches SentinelType per Global.
+var sentinelTypes sync.Map // *ssa.Global -> sentinelType
+
+type sentinelType struct{ t types.Type }
+
+// SentinelType returns the dynamic type of the value of the package-level
+// variable g, or nil if errtrace does not know it: g's own type if it is
+// not an interface, else the one type that every store to g in its
+// package's init function gives it. The stored values are followed
+// through conversions, loads of other package-level variables and calls
+// of functions whose every return gives the same type (errors.New gives
+// *errors.errorString). A Sentinel is taken to keep the value of its
+// initializer.
+func SentinelType(g *ssa.Global) types.Type {
+	if g == nil {
+		return nil
+	}
+	if c, ok := sentinelTypes.Load(g); ok {
+		return c.(sentinelType).t
+	}
+	t := globalDynType(g, make(map[any]bool), 0)
+	sentinelTypes.Store(g, sentinelType{t})
+	return t
+}
+
+// maxDynDepth bounds how deep dynType follows values.
+const maxDynDepth = 8
+
+func globalDynType(g *ssa.Global, visiting map[any]bool, depth int) types.Type {
+	p, ok := g.Type().Underlying().(*types.Pointer)
+	if !ok {
+		return nil
+	}
+	if !types.IsInterface(p.Elem()) {
+		return unalias(p.Elem())
+	}
+	if visiting[g] || g.Pkg == nil {
+		return nil
+	}
+	visiting[g] = true
+	defer delete(visiting, g)
+	init := g.Pkg.Func("init")
+	if init == nil {
+		return nil
+	}
+	var out types.Type
+	for _, b := range init.Blocks {
+		for _, instr := range b.Instrs {
+			st, ok := instr.(*ssa.Store)
+			if !ok || st.Addr != g {
+				continue
+			}
+			t := dynType(st.Val, visiting, depth+1)
+			if t == nil || (out != nil && !types.Identical(out, t)) {
+				return nil
+			}
+			out = t
+		}
+	}
+	return out
+}
+
+// dynType returns the dynamic type of the interface value v, if every
+// value it can have has the same one that errtrace can find, or nil.
+func dynType(v ssa.Value, visiting map[any]bool, depth int) types.Type {
+	if depth > maxDynDepth {
+		return nil
+	}
+	switch v := v.(type) {
+	case *ssa.MakeInterface:
+		if t := v.X.Type(); !types.IsInterface(t) {
+			return unalias(t)
+		}
+	case *ssa.ChangeInterface:
+		return dynType(v.X, visiting, depth+1)
+	case *ssa.UnOp:
+		if g, ok := v.X.(*ssa.Global); ok && v.Op == token.MUL {
+			return globalDynType(g, visiting, depth+1)
+		}
+	case *ssa.Phi:
+		return sameType(v.Edges, visiting, depth)
+	case *ssa.Call:
+		fn := v.Common().StaticCallee()
+		if fn == nil || fn.Blocks == nil || fn.Signature.Results().Len() != 1 || visiting[fn] {
+			return nil
+		}
+		visiting[fn] = true
+		defer delete(visiting, fn)
+		var results []ssa.Value
+		for _, b := range fn.Blocks {
+			if len(b.Instrs) == 0 {
+				continue
+			}
+			if r, ok := b.Instrs[len(b.Instrs)-1].(*ssa.Return); ok {
+				results = append(results, r.Results[0])
+			}
+		}
+		return sameType(results, visiting, depth)
+	}
+	return nil
+}
+
+// sameType returns the dynamic type all of vs have, or nil.
+func sameType(vs []ssa.Value, visiting map[any]bool, depth int) types.Type {
+	var out types.Type
+	for _, e := range vs {
+		t := dynType(e, visiting, depth+1)
+		if t == nil || (out != nil && !types.Identical(out, t)) {
+			return nil
+		}
+		out = t
+	}
+	return out
 }

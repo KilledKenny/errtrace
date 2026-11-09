@@ -87,10 +87,13 @@ update its decision here and in the ticket, and change the affected steps.
   switches. Apply them **per return path** using dominating branch conditions,
   and per phi edge. The body outcomes "return nil", "replace" and "wrap" fall out
   of this filtering. Cases errtrace can't decide (guards through helper functions,
-  custom `Is`/`As` methods, Opaque or Unresolved values under `errors.Is`, guards
-  whose effect reaches the return only through a merge that isn't a phi edge) **keep**
-  the entry and mark it `possibly handled` with the guard's position and a
-  reason. A guard never makes an entry disappear unless errtrace can prove it.
+  custom `Is`/`As` methods, Opaque or Unresolved values under `errors.Is`,
+  Sentinels whose dynamic type is unknown under type checks) **keep** the entry and
+  mark it `possibly handled` with the guard's position and a reason. A guard whose
+  effect reaches the return only through a merge that isn't a phi edge (a flag set
+  in the guarded body, say) is ignored: the entry is kept unchanged, without a note,
+  since most such Ifs do not handle the error at all. A guard never makes an entry
+  disappear unless errtrace can prove it.
   The full rule table is in [S07](#s07-guard-filtering-per-return-path).
 - **Rationale.** SSA has no refined copy of `err` after a check
   (`error-flows-in-ssa`, §3), so per-path filtering is the only option. Keeping

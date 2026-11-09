@@ -1,0 +1,42 @@
+A Concrete Type of a comparable value type may equal a Sentinel whose value has that type: where err == ErrV holds, V is kept; W, of another type, is never equal to ErrV and is removed.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:20:12-13: Error Set of example.com/fx.G: 1 entries
+$WORK/a.go:17:9-15: concrete example.com/fx.V
+	path (origin → target):
+		$WORK/a.go:17:9-15: in example.com/fx.source
+		$WORK/a.go:21:9-18: in example.com/fx.G, call to example.com/fx.source
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+type V struct{ s string }
+
+func (V) Error() string { return "v" }
+
+type W struct{ s string }
+
+func (W) Error() string { return "w" }
+
+var ErrV error = V{"a"}
+
+func source(n int) error {
+	if n == 0 {
+		return W{"a"}
+	}
+	return V{"a"}
+}
+
+func /*@g*/G(n int) error {
+	err := source(n)
+	if err == ErrV {
+		return err
+	}
+	return nil
+}

@@ -137,13 +137,13 @@ func (a *analyzer) madeAt(src any, ids ...errset.ValueID) []wrapped {
 // operand's leaves are added to the analyzer's own facts, marked as cut,
 // and operand returns nothing.
 func (a *analyzer) operand(v ssa.Value, site any) []wrapped {
-	if a.flat {
-		a.inner(func() { a.walk(v) })
-		return nil
-	}
 	pt := a.pt
 	if instr, ok := site.(ssa.Instruction); ok && instr.Block() != nil {
 		pt = pointOf(instr)
+	}
+	if a.flat {
+		a.inner(pt, func() { a.walk(v) })
+		return nil
 	}
 	c := &analyzer{tbl: a.tbl, fn: a.fn, at: a.at, pt: pt, gd: a.gd, seen: make(map[seenKey]bool), opts: a.opts, depth: a.depth + 1, captured: a.captured, active: a.active}
 	c.flat = c.depth >= a.opts.chainDepth()
@@ -168,26 +168,28 @@ func (a *analyzer) operand(v ssa.Value, site any) []wrapped {
 	return out
 }
 
-// inner runs walk, in flat mode, for the inner values of a Wrap: the leaves
-// it adds are cut. Each value is walked at most once inside and once
-// outside of Wraps, which keeps wrapping loops finite.
-func (a *analyzer) inner(walk func()) {
-	if a.cut {
-		walk()
-		return
+// inner runs walk, in flat mode, for the inner values of a Wrap used at
+// pt: the leaves it adds are cut. The guards of the Wrap are not guards of
+// its inner values, so walk starts without them; the guards that hold at
+// pt for an inner value apply to it, as they do above the depth limit.
+// Each value is walked at most once inside and once outside of Wraps,
+// which keeps wrapping loops finite.
+func (a *analyzer) inner(pt point, walk func()) {
+	seen, cut, guards, savedPt := a.seen, a.cut, a.guards, a.pt
+	defer func() { a.seen, a.cut, a.guards, a.pt = seen, cut, guards, savedPt }()
+	if !a.cut {
+		if a.seenCut == nil {
+			a.seenCut = make(map[seenKey]bool)
+		}
+		a.seen, a.cut = a.seenCut, true
 	}
-	if a.seenCut == nil {
-		a.seenCut = make(map[seenKey]bool)
-	}
-	saved, guards, noGuards := a.seen, a.guards, a.noGuards
-	a.seen, a.cut, a.guards, a.noGuards = a.seenCut, true, nil, true
-	defer func() { a.seen, a.cut, a.guards, a.noGuards = saved, false, guards, noGuards }()
+	a.guards, a.pt = nil, pt
 	walk()
 }
 
 // addInner adds, in flat mode, leaves that are the inner values of a Wrap.
 func (a *analyzer) addInner(ids []errset.ValueID, src any) {
-	a.inner(func() { a.addAll(ids, src) })
+	a.inner(a.pt, func() { a.addAll(ids, src) })
 }
 
 // wraps returns one Wrap like base for each combination of the values of

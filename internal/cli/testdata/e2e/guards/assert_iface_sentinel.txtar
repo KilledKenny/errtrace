@@ -1,0 +1,47 @@
+A Sentinel declared with an interface type keeps the dynamic type of its initializer: a comma-ok assertion to *MyErr keeps ErrMine, whose value is a *MyErr, and drops io.EOF, an *errors.errorString.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:21:12-13: Error Set of example.com/fx.G: 2 entries
+$WORK/a.go:9:5-12: sentinel example.com/fx.ErrMine
+	path (origin → target):
+		$WORK/a.go:16:10-17: in example.com/fx.source
+		$WORK/a.go:22:9-18: in example.com/fx.G, call to example.com/fx.source
+$WORK/a.go:18:9-17: concrete *example.com/fx.MyErr
+	path (origin → target):
+		$WORK/a.go:18:9-17: in example.com/fx.source
+		$WORK/a.go:22:9-18: in example.com/fx.G, call to example.com/fx.source
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "io"
+
+type MyErr struct{}
+
+func (*MyErr) Error() string { return "my" }
+
+var ErrMine error = &MyErr{}
+
+func source(n int) error {
+	switch n {
+	case 0:
+		return io.EOF
+	case 1:
+		return ErrMine
+	}
+	return &MyErr{}
+}
+
+func /*@g*/G(n int) error {
+	err := source(n)
+	if _, ok := err.(*MyErr); ok {
+		return err
+	}
+	return nil
+}

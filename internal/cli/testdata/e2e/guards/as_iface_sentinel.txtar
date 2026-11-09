@@ -1,0 +1,51 @@
+errors.As keeps on its true branch a Sentinel of interface type whose initializer has the target type, and removes it from the false branch.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:22:12-13: Error Set of example.com/fx.G: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:17:10-16: in example.com/fx.source
+		$WORK/a.go:23:9-18: in example.com/fx.G, call to example.com/fx.source
+$WORK/a.go:13:5-12: sentinel example.com/fx.ErrMine
+	wrap chain (origin → target):
+		$WORK/a.go:26:10-35: fmt.Errorf "my: %w"
+	path (origin → target):
+		$WORK/a.go:19:9-16: in example.com/fx.source
+		$WORK/a.go:23:9-18: in example.com/fx.G, call to example.com/fx.source
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"fmt"
+	"io"
+)
+
+type MyErr struct{}
+
+func (*MyErr) Error() string { return "my" }
+
+var ErrMine error = &MyErr{}
+
+func source(n int) error {
+	if n == 0 {
+		return io.EOF
+	}
+	return ErrMine
+}
+
+func /*@g*/G(n int) error {
+	err := source(n)
+	var pe *MyErr
+	if errors.As(err, &pe) {
+		return fmt.Errorf("my: %w", err)
+	}
+	return err
+}

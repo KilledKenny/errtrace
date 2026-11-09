@@ -163,9 +163,6 @@ type analyzer struct {
 	// guards are the guards that hold for the value being walked, sorted
 	// by id: the facts found are filtered by them (as Guarded values).
 	guards []guardUse
-	// noGuards is set while walking, in flat mode, the inner values of a
-	// Wrap: a guard of the Wrap is not a guard of each inner value.
-	noGuards bool
 }
 
 // seenKey is a value walked at a point under a set of guards: the same
@@ -527,6 +524,9 @@ func (a *analyzer) sentinel(g *ssa.Global, typ types.Type) errset.ValueID {
 			Kind: errset.Unresolved, Site: g, Pos: g.Pos(),
 			Unresolved: errset.Memory, Detail: "load of global " + g.Name(),
 		})
+	}
+	if typ == nil {
+		typ = SentinelType(g)
 	}
 	return a.tbl.Intern(errset.Value{Kind: errset.Sentinel, Site: obj, Pos: obj.Pos(), Var: obj, Type: typ})
 }
