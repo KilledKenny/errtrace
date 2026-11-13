@@ -306,13 +306,102 @@ func (a *analyzer) matchGuards(v ssa.Value) {
 	}
 	for _, u := range a.funcGuards().guardsAt(a.pt) {
 		if u.raw != v && u.operand != v {
-			continue
+			var ok bool
+			if u, ok = a.otherLoadGuard(u, v); !ok {
+				continue
+			}
 		}
 		i, found := slices.BinarySearchFunc(a.guards, u.id, func(x guardUse, id int) int { return x.id - id })
 		if !found {
 			a.guards = slices.Insert(slices.Clip(a.guards), i, u)
 		}
 	}
+}
+
+// otherLoadGuard returns the guard u, which tests a load of a local
+// variable, as a guard of v, another load of the same variable (SSA loads
+// a variable that was not lifted once per use: if errors.Is(err, io.EOF) {
+// ... }; return err). If no store to the variable can run between the two
+// loads, they give the same value and the guard applies as it is. If one
+// can, the guard cannot remove a value: it becomes a guard that only marks
+// the values possibly handled.
+func (a *analyzer) otherLoadGuard(u guardUse, v ssa.Value) (guardUse, bool) {
+	load, alloc := variableLoad(v)
+	if alloc == nil {
+		return u, false
+	}
+	tested, talloc := variableLoad(u.operand)
+	if talloc != alloc || tested == load {
+		return u, false
+	}
+	if a.sameBetween(alloc, tested, load) {
+		return u, true
+	}
+	if u.g.Kind == errset.GuardNil {
+		return u, false
+	}
+	u.g = errset.Guard{
+		Kind: errset.GuardHelper, Site: u.g.Site, Pos: u.g.Pos, Holds: u.g.Holds,
+		Detail: u.g.String() + " of an earlier value of " + alloc.Comment,
+	}
+	u.id += 1 << 24
+	return u, true
+}
+
+// variableLoad returns v as a load of a local variable, with the
+// variable, or nil.
+func variableLoad(v ssa.Value) (*ssa.UnOp, *ssa.Alloc) {
+	u, ok := v.(*ssa.UnOp)
+	if !ok || u.Op != token.MUL {
+		return nil, nil
+	}
+	alloc, ok := u.X.(*ssa.Alloc)
+	if !ok || alloc.Comment == "complit" {
+		return nil, nil
+	}
+	return u, alloc
+}
+
+// sameBetween reports whether the loads first and then of the variable
+// alloc are sure to give the same value when then runs after first: the
+// variable is written only by Stores of its own function (no closure
+// writes it and its address does not escape), and none of them can run
+// after first and before then.
+func (a *analyzer) sameBetween(alloc *ssa.Alloc, first, then *ssa.UnOp) bool {
+	w := variableWriters(alloc)
+	if w.escapes {
+		return false
+	}
+	for _, st := range w.stores {
+		if st.Parent() != a.fn || (mayFollow(first, st) && mayFollow(st, then)) {
+			return false
+		}
+	}
+	return true
+}
+
+// mayFollow reports whether instruction y can run after x: later in x's
+// block, or in a block reachable from it.
+func mayFollow(x, y ssa.Instruction) bool {
+	bx, by := x.Block(), y.Block()
+	if bx == by && before(x, y) {
+		return true
+	}
+	seen := make(map[*ssa.BasicBlock]bool)
+	work := append([]*ssa.BasicBlock(nil), bx.Succs...)
+	for len(work) > 0 {
+		b := work[len(work)-1]
+		work = work[:len(work)-1]
+		if seen[b] {
+			continue
+		}
+		seen[b] = true
+		if b == by {
+			return true
+		}
+		work = append(work, b.Succs...)
+	}
+	return false
 }
 
 // funcGuards returns the guards of the analyzer's function, shared with
@@ -704,6 +793,11 @@ func typeVerdict(v errset.Value, target types.Type) (Verdict, string) {
 		}
 		if methodsWithin(iface, "Error") {
 			return Yes, ""
+		}
+		if v.Constructor == "errors.New" || v.Constructor == "fmt.Errorf" {
+			// *errors.errorString and *fmt.errorString have no method
+			// but Error.
+			return No, ""
 		}
 		return Maybe, "opaque error"
 	case errset.Wrap:
