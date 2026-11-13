@@ -1,0 +1,51 @@
+A library (no main package): code outside the loaded program calls its
+exported functions and sets its exported variables and fields, so a
+Membership Query must not answer "no" where such code can make the answer
+yes.
+-- go.mod --
+module example.com/lib
+
+go 1.24
+-- lib.go --
+package lib
+
+import (
+	"errors"
+	"io"
+)
+
+var ErrX = errors.New("x")
+
+var _ = io.EOF
+
+var hook = func() error { return nil }
+
+func SetHook() { hook = func() error { return ErrX } }
+
+func Hook() error { return hook() }
+
+func init() { _ = Hook() }
+
+func Param(e error) error { return e }
+
+var Saved error
+
+func GetSaved() error { return Saved }
+
+func Callback(f func() error) error { return f() }
+
+type S struct {
+	err error
+	Err error
+}
+
+func (s *S) SetErr(e error) { s.err = e }
+
+func GetErr(s *S) error   { return s.err }
+func GetField(s *S) error { return s.Err }
+
+func unexported(e error) error { return e }
+
+var _ = unexported
+
+func Clean() error { return errors.New("clean") }

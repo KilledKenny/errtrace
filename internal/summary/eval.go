@@ -197,7 +197,13 @@ func (s *Solver) expandCallOnce(fn *ssa.Function, site ssa.CallInstruction, inde
 	}
 	for _, g := range callees {
 		if name, ok := flow.Intrinsic(g); ok {
-			if call, isCall := site.(*ssa.Call); isCall && index == 0 {
+			if dynamic && name != "errors.New" {
+				// The intrinsic is called through a function value: its
+				// operands are not modelled at such a call.
+				fs.add(s.unresolved(site, errset.Memory, "dynamic call to "+name+" is not modelled"), here, nil)
+				continue
+			}
+			if call, isCall := site.(*ssa.Call); isCall && index == 0 && !dynamic {
 				// Model the intrinsic at the site, as a returned call
 				// to it is modelled.
 				for _, af := range s.argFacts(fn, call, call) {

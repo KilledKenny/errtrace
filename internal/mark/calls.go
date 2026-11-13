@@ -203,6 +203,23 @@ func (a *analysis) retChanged(g *ssa.Function, r int, delta tags) {
 			}
 		}
 		if delta&free != 0 {
+			if a.unwrapMethod(g) {
+				// An Unwrap method that can return the Subject makes
+				// its receiver type a wrapper, and every wrapper is
+				// marked: the result is marked where the receiver is.
+				recv := argAt(site, g, 0)
+				if recv == nil {
+					continue
+				}
+				t := a.tagsOf(recv)
+				if !isInterface(recv.Type()) {
+					t = free
+				}
+				if t != 0 {
+					a.markResult(call, r, t, reason{kind: kUnwrap, from: valueRef(key{recv, 0}, t), site: site})
+				}
+				continue
+			}
 			a.markResult(call, r, free, reason{kind: kReturn, from: ref{kind: refRet, fn: g, idx: int32(r), free: true}, site: site, fn: g})
 			continue
 		}
@@ -408,4 +425,54 @@ func (a *analysis) vaEscapesNow(p *ssa.Parameter) bool {
 		}
 	}
 	return false
+}
+
+// unwrapMethod reports whether g is a method named Unwrap of a type that
+// can be an error.
+func (a *analysis) unwrapMethod(g *ssa.Function) bool {
+	recv := g.Signature.Recv()
+	return recv != nil && g.Name() == "Unwrap" && flow.IsErrorType(recv.Type())
+}
+
+// panicLoc is the value of the panics raised in fn.
+func (a *analysis) panicLoc(fn *ssa.Function) loc {
+	return loc{kind: locPanic, id: a.fnIndex[fn]}
+}
+
+// wakeRecovers marks the calls of recover that can see a panic raised in
+// the function of the panic location l: a recover in F sees the panics of
+// the functions that the functions deferring F call, directly or not (not
+// through a go statement).
+func (a *analysis) wakeRecovers(l loc) {
+	if len(a.recovers) == 0 || int(l.id) >= len(a.fns) {
+		return
+	}
+	// The functions that reach the panic.
+	reach := map[*ssa.Function]bool{a.fns[l.id]: true}
+	work := []*ssa.Function{a.fns[l.id]}
+	for len(work) > 0 {
+		g := work[len(work)-1]
+		work = work[:len(work)-1]
+		for _, site := range a.callers(g) {
+			if _, isGo := site.(*ssa.Go); isGo {
+				continue
+			}
+			if p := site.Parent(); !reach[p] {
+				reach[p] = true
+				work = append(work, p)
+			}
+		}
+	}
+	for _, rc := range a.recovers {
+		sees := false
+		for _, site := range a.callers(rc.fn) {
+			if _, isDefer := site.(*ssa.Defer); isDefer && reach[site.Parent()] {
+				sees = true
+				break
+			}
+		}
+		if sees {
+			a.mark(rc.k, free, reason{kind: kLoad, from: ref{kind: refLoc, l: l, free: true}, site: rc.k.v.(ssa.Instruction)})
+		}
+	}
 }

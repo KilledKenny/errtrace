@@ -2,7 +2,7 @@ An alias in -as names the type it stands for: *os.PathError is *io/fs.PathError.
 -- args --
 -as *os.PathError a.go:@f
 -- stdout --
-$WORK/a.go:9:12-13: *io/fs.PathError in Error Set of example.com/fx.F: maybe: 1 of 1 unresolved could carry it
+$WORK/a.go:9:12-13: *io/fs.PathError in Error Set of example.com/fx.F: maybe: 1 entries could carry it (1 unresolved)
 $WORK/a.go:9:35-40: unresolved(memory): load of field err of *example.com/fx.S
 	path (origin → target):
 		$WORK/a.go:9:35-40: in example.com/fx.F

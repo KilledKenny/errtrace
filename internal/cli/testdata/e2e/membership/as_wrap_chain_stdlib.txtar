@@ -1,0 +1,28 @@
+os.Open returns a *fs.PathError that wraps a syscall.Errno: the Concrete Type is in the Wrap Chain.
+-- args --
+-fanout=0 -as *io/fs.PathError a.go:@f
+-- stdout --
+$WORK/a.go:5:12-13: *io/fs.PathError in Error Set of example.com/fx.F: yes
+$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.OpenFile, call to os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.Open, call to os.OpenFile
+		$WORK/a.go:6:12-35: in example.com/fx.F, call to os.Open
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "os"
+
+func /*@f*/F() error {
+	_, err := os.Open("/nonexistent")
+	return err
+}

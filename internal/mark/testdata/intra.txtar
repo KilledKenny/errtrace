@@ -202,7 +202,18 @@ func Recover() (err error) {
 			err = r.(error)
 		}
 	}()
+	Panic()
 	return nil
+}
+
+// RecoverOther recovers, but nothing it calls panics with a Sentinel.
+func RecoverOther() (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = r.(error)
+		}
+	}()
+	return New()
 }
 
 func Closure() error {

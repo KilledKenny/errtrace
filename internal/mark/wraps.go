@@ -21,6 +21,8 @@ const (
 	modelErrorsUnwrap
 	// modelErrorsAs is errors.As.
 	modelErrorsAs
+	// modelErrorsIs is errors.Is.
+	modelErrorsIs
 	// modelAtomicStore is Store, Swap or CompareAndSwap of
 	// sync/atomic.Value or atomic.Pointer: its arguments are stored.
 	modelAtomicStore
@@ -76,6 +78,8 @@ func modelOf(fn *ssa.Function) model {
 				return modelErrorsUnwrap
 			case "As":
 				return modelErrorsAs
+			case "Is":
+				return modelErrorsIs
 			}
 		}
 	case "sync/atomic":
@@ -115,7 +119,7 @@ func (a *analysis) indexCall(site ssa.CallInstruction) {
 	call, _ := site.(*ssa.Call)
 	if b, ok := common.Value.(*ssa.Builtin); ok {
 		if b.Name() == "recover" && call != nil {
-			a.addReader(loc{kind: locPanic}, key{call, 0})
+			a.recovers = append(a.recovers, recoverCall{call.Parent(), key{call, 0}})
 		}
 		return
 	}
@@ -131,6 +135,14 @@ func (a *analysis) indexCall(site ssa.CallInstruction) {
 			}
 		case modelReflectInterface:
 			a.addReader(loc{kind: locReflect}, key{call, 0})
+		case modelReflectValueOf:
+			// A composite argument is not marked itself: what it holds
+			// is looked at when the pass settles (see run).
+			if len(common.Args) == 1 {
+				if mi, ok := common.Args[0].(*ssa.MakeInterface); ok && !a.markable(mi.X.Type()) {
+					a.reflectArgs = append(a.reflectArgs, mi.X.Type())
+				}
+			}
 		}
 		a.indexSlices(call)
 	}

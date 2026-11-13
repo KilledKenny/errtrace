@@ -19,12 +19,15 @@ import (
 
 // runMembership runs the Membership Query for subj on tgt, prints its
 // Verdict and returns the exit code of the Verdict.
-func runMembership(ctx context.Context, opts Options, cfg *config, prog *load.Program, tgt *target.Target, resolver *resolve.VTA, subj mark.Subject) (int, error) {
+func runMembership(ctx context.Context, opts Options, cfg *config, prog *load.Program, tgt *target.Target, resolver *resolve.VTA, subj mark.Subject, open []*ssa.Package) (int, error) {
+	if g := subj.Sentinel; g != nil && flow.NewSentinels().Info(g).Unstable {
+		fmt.Fprintf(opts.Stderr, "%s: warning: %s is assigned outside its initialization (or its address is used); the Verdict assumes it keeps its initial value\n", BinaryName, subj)
+	}
 	res, err := query.Membership(ctx, prog, tgt, query.MembershipOptions{
-		Options:      query.Options{ChainDepth: cfg.chainDepth, Resolver: resolver},
-		Subject:      subj,
-		Upper:        resolver.Upper(),
-		WholeProgram: resolver.WholeProgram(),
+		Options: query.Options{ChainDepth: cfg.chainDepth, Resolver: resolver},
+		Subject: subj,
+		Upper:   resolver.Upper(),
+		Open:    open,
 	})
 	if err != nil {
 		return 0, err
@@ -47,15 +50,12 @@ func runMembership(ctx context.Context, opts Options, cfg *config, prog *load.Pr
 			Table:      res.Table,
 			Locator:    res,
 		},
-		Subject:    subj.String(),
-		Verdict:    res.Verdict.String(),
-		Matches:    res.Matches,
-		Holes:      res.Holes,
-		Reached:    res.Reached,
-		Incomplete: res.Incomplete,
+		Subject: subj.String(),
+		Verdict: res.Verdict.String(),
+		Matches: res.Matches,
 	}
 	for _, c := range res.Carriers {
-		ce := render.CarrierEntry{Entry: c.Entry}
+		ce := render.CarrierEntry{Entry: c.Entry, Unresolved: c.Unresolved}
 		for _, s := range c.Trace {
 			ce.Trace = append(ce.Trace, render.TraceStep{Site: s.Site, Desc: s.Desc})
 		}
@@ -96,6 +96,13 @@ func resolveSubject(prog *load.Program, is, as string) (mark.Subject, error) {
 		return mark.Subject{Sentinel: g}, nil
 	}
 	rest, pointer := strings.CutPrefix(as, "*")
+	switch {
+	case strings.ContainsAny(rest, "*[]{}() "):
+		if i := strings.IndexByte(rest, '['); i > 0 && strings.HasSuffix(rest, "]") {
+			return mark.Subject{}, fmt.Errorf("-as %s: an instance of a generic type is not supported", as)
+		}
+		return mark.Subject{}, fmt.Errorf("-as %s: want a named type or a pointer to one: [*]<pkgpath>.<Name>", as)
+	}
 	pkg, name, err := lookupPackage(prog, "-as", rest)
 	if err != nil {
 		return mark.Subject{}, err

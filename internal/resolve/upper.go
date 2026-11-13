@@ -42,22 +42,34 @@ func (v *VTA) Upper() *Upper {
 // WholeProgram reports whether v's roots are only the main and init
 // functions it was built from, so that the functions VTA calls reachable
 // are all that can run and its Candidates are complete. It is false after
-// WithRoots added a Target that nothing reaches: such a Target has callers
+// WithRoots added a Target that nothing reaches (such a Target has callers
 // outside what VTA saw, so the Candidates of the calls it leads to may be
-// incomplete.
+// incomplete), and after SetOpen.
 func (v *VTA) WholeProgram() bool { return !v.extended }
+
+// SetOpen records that the program is not whole: it was loaded without a
+// main package, so code outside it calls its functions.
+func (v *VTA) SetOpen() { v.extended = true }
+
+// Reachable reports whether fn may run: in a whole program, whether the
+// roots reach it; otherwise always.
+func (u *Upper) Reachable(fn *ssa.Function) bool {
+	return !u.v.WholeProgram() || u.v.Reachable(fn)
+}
 
 // WholeProgram reports whether u trusts the Candidates of VTA (see
 // VTA.WholeProgram).
 func (u *Upper) WholeProgram() bool { return u.v.WholeProgram() }
 
-// trusted returns the VTA Candidates of the dynamic call site, if u uses
-// them for it.
+// trusted returns the callees VTA found for the dynamic call site, if u
+// uses them for it. They are the ones before splicing: the wrapper of a
+// promoted or bound method is the callee, not the method it calls, so that
+// the operands of the call are the parameters of the callee.
 func (u *Upper) trusted(site ssa.CallInstruction) []*ssa.Function {
 	if !u.v.WholeProgram() {
 		return nil
 	}
-	return u.v.callees[site]
+	return u.v.raw[site]
 }
 
 // Callees returns the functions that may run at site, sorted by name: the
@@ -149,7 +161,7 @@ func (u *Upper) Callers(fn *ssa.Function) []ssa.CallInstruction {
 	if u.v.WholeProgram() {
 		if u.vtaCallers == nil {
 			u.vtaCallers = make(map[*ssa.Function][]ssa.CallInstruction)
-			for site, fns := range u.v.callees {
+			for site, fns := range u.v.raw {
 				for _, g := range fns {
 					u.vtaCallers[g] = append(u.vtaCallers[g], site)
 				}

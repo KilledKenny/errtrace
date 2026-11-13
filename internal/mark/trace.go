@@ -152,6 +152,18 @@ func (a *analysis) describe(why reason, at ref) (Step, bool) {
 		return Step{Site: site(why.site), Desc: fmt.Sprintf("value of type %s, which may equal %s", typeString(why.typ), a.subj)}, true
 	case kSeedWrapper:
 		return Step{Site: site(why.site), Desc: fmt.Sprintf("value of type %s, which may wrap %s", typeString(why.typ), a.subj)}, true
+	case kSeedCaller:
+		name := "a parameter"
+		if p, ok := at.k.v.(*ssa.Parameter); ok {
+			name = "parameter " + p.Name()
+		}
+		var where any
+		if at.kind == refValue {
+			where = at.k.v
+		}
+		return Step{Site: where, Desc: fmt.Sprintf("%s of %s: a caller outside the loaded program may pass %s", name, why.fn, a.subj)}, true
+	case kSeedOpen:
+		return Step{Site: site(why.site), Desc: fmt.Sprintf("exported variable or field: code outside the loaded program may set it to %s", a.subj)}, true
 	case kSeedOpaque:
 		return Step{Site: site(why.site), Desc: why.text + ": it may hold anything"}, true
 	case kAssert:

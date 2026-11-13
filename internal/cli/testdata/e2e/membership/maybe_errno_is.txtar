@@ -1,0 +1,40 @@
+os.Open with -is io/fs.ErrNotExist: syscall.Errno has an Is method that reports it.
+-- args --
+-fanout=0 -is io/fs.ErrNotExist a.go:@f
+-- stdout --
+$WORK/a.go:5:12-13: io/fs.ErrNotExist in Error Set of example.com/fx.F: maybe: 1 entries could carry it (1 unresolved)
+$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.OpenFile, call to os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.Open, call to os.OpenFile
+		$WORK/a.go:6:12-35: in example.com/fx.F, call to os.Open
+	marked via (origin of io/fs.ErrNotExist → here):
+		$GOROOT/src/internal/oserror/errors.go:*: Sentinel internal/oserror.ErrNotExist
+		$GOROOT/src/syscall/syscall_unix.go:*: loaded from variable internal/oserror.ErrNotExist
+		$GOROOT/src/syscall/syscall_unix.go:*: value of type syscall.Errno, which may wrap io/fs.ErrNotExist
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: returned by syscall.errnoErr
+		$GOROOT/src/syscall/syscall_linux.go:*: returned by syscall.openat
+		$GOROOT/src/os/file_open_unix.go:*: returned by syscall.Open
+		$GOROOT/src/os/file_unix.go:*: returned by os.open
+		$GOROOT/src/os/file_unix.go:*: stored to variable e
+		$GOROOT/src/os/file_unix.go:*: loaded from variable e
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- exit --
+3
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "os"
+
+func /*@f*/F() error {
+	_, err := os.Open("/nonexistent")
+	return err
+}

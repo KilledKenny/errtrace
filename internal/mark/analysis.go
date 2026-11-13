@@ -120,6 +120,8 @@ const (
 	kReturn
 	kCapture
 	kAs
+	kSeedCaller
+	kSeedOpen
 )
 
 // reason is the first way a Mark was found.
@@ -231,6 +233,25 @@ type analysis struct {
 	// heldBy is set by isWrapper and holds (see isWrapper).
 	heldBy ref
 
+	// open are the packages code outside the program uses (see
+	// Options.Open); openLoads are the loads that code may have written.
+	open      map[*ssa.Package]bool
+	openLoads []key
+	// recovers are the calls of recover, by function.
+	recovers []recoverCall
+	// reflectArgs are the types of the composite values passed to
+	// reflect.ValueOf.
+	reflectArgs []types.Type
+	// guards caches deadBlocks; guardOK says that the Sentinel keeps the
+	// value of its initialization, so that a failed errors.Is excludes it.
+	guards  map[ssa.Value][]*ssa.BasicBlock
+	guardOK bool
+	// targets caches targetInfo.
+	targets map[*ssa.Function]*targetInfo
+	// dynNilable are the pointer types the Sentinel's value may have
+	// while being nil.
+	dynNilable []types.Type
+
 	markableCache map[types.Type]bool
 	wrapperCache  map[types.Type]bool
 	typeSeedCache map[types.Type]bool
@@ -245,6 +266,11 @@ type rawField struct {
 type opaqueSeed struct {
 	call *ssa.Call
 	text string
+}
+
+type recoverCall struct {
+	fn *ssa.Function
+	k  key
 }
 
 func newAnalysis(prog *ssa.Program, res Callees, subj Subject) *analysis {
@@ -274,6 +300,8 @@ func newAnalysis(prog *ssa.Program, res Callees, subj Subject) *analysis {
 		calleesCache:  make(map[ssa.CallInstruction][]*ssa.Function),
 		callersCache:  make(map[*ssa.Function][]ssa.CallInstruction),
 		models:        make(map[*ssa.Function]model),
+		guards:        make(map[ssa.Value][]*ssa.BasicBlock),
+		targets:       make(map[*ssa.Function]*targetInfo),
 		markableCache: make(map[types.Type]bool),
 		wrapperCache:  make(map[types.Type]bool),
 		typeSeedCache: make(map[types.Type]bool),
@@ -309,6 +337,18 @@ func (a *analysis) run(ctx context.Context) error {
 			changed = true
 			for _, s := range c.seeds {
 				a.mark(key{s, 0}, free, reason{kind: kSeedWrapper, from: a.heldBy, site: s.(ssa.Instruction), typ: c.typ})
+			}
+		}
+		// A composite value that holds a marked value and is passed to
+		// reflect.ValueOf puts it into reflection.
+		if l := (loc{kind: locReflect}); !a.locMarked(l) {
+			for _, t := range a.reflectArgs {
+				a.heldBy = ref{}
+				if a.holdsAny(t) {
+					a.markLoc(l, reason{kind: kFlow, from: a.heldBy})
+					changed = true
+					break
+				}
 			}
 		}
 		if !changed {
@@ -371,6 +411,10 @@ func (a *analysis) collect() {
 	// and referenced the functions that scanned bodies refer to.
 	helpers := make(map[*ssa.Function]bool)
 	referenced := make(map[*ssa.Function]bool)
+	// taken are the functions used as values (not only called), and
+	// refs the functions each function refers to.
+	taken := make(map[*ssa.Function]bool)
+	refs := make(map[*ssa.Function][]*ssa.Function)
 	for len(work) > 0 {
 		fn := work[len(work)-1]
 		work = work[:len(work)-1]
@@ -410,6 +454,10 @@ func (a *analysis) collect() {
 					}
 					if f, ok := (*r).(*ssa.Function); ok {
 						referenced[f] = true
+						refs[fn] = append(refs[fn], f)
+						if site, isCall := instr.(ssa.CallInstruction); !isCall || r != &site.Common().Value {
+							taken[f] = true
+						}
 						add(f)
 					}
 				}
@@ -421,7 +469,11 @@ func (a *analysis) collect() {
 				for i := range ms.Len() {
 					sel := ms.At(i)
 					if sel.Obj().(*types.Func).Signature().TypeParams() == nil {
-						add(a.prog.MethodValue(sel))
+						m := a.prog.MethodValue(sel)
+						if m != nil {
+							refs[fn] = append(refs[fn], m)
+						}
+						add(m)
 					}
 				}
 			}
@@ -438,6 +490,38 @@ func (a *analysis) collect() {
 		kept = append(kept, n)
 	}
 	list = kept
+	// Dead code: in a whole program, a function that the roots do not
+	// reach, that is not a method (reflection, encoding and templates
+	// call methods) and whose value is never taken cannot run, nor can
+	// what only such functions refer to.
+	if reach, ok := a.res.(interface{ Reachable(*ssa.Function) bool }); ok {
+		live := make(map[*ssa.Function]bool)
+		var stack []*ssa.Function
+		for _, n := range list {
+			fn := n.fn
+			if reach.Reachable(fn) || fn.Signature.Recv() != nil || taken[fn] || (fn.Synthetic != "" && fn.Parent() == nil) {
+				live[fn] = true
+				stack = append(stack, fn)
+			}
+		}
+		for len(stack) > 0 {
+			fn := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			for _, g := range refs[fn] {
+				if !live[g] {
+					live[g] = true
+					stack = append(stack, g)
+				}
+			}
+		}
+		kept = list[:0]
+		for _, n := range list {
+			if live[n.fn] {
+				kept = append(kept, n)
+			}
+		}
+		list = kept
+	}
 	sort.Slice(list, func(i, j int) bool {
 		x, y := list[i], list[j]
 		if x.name != y.name {
@@ -772,6 +856,9 @@ func (a *analysis) markLoc(l loc, why reason) {
 		}
 		a.mark(k, free, why)
 	}
+	if l.kind == locPanic {
+		a.wakeRecovers(l)
+	}
 	if l.kind == locVarargs {
 		from := ref{kind: refLoc, l: l, free: true}
 		for _, f := range a.forwards[l] {
@@ -912,6 +999,7 @@ func (a *analysis) propagate(k key, delta tags) {
 		return
 	}
 	v := k.v
+	dead := a.deadBlocks(v)
 	var prev ssa.Instruction
 	for _, r := range *refs {
 		if r == prev {
@@ -919,6 +1007,10 @@ func (a *analysis) propagate(k key, delta tags) {
 			continue
 		}
 		prev = r
+		if len(dead) > 0 && guarded(dead, v, r) {
+			// errors.Is(v, X) was false on every path to this use.
+			continue
+		}
 		switch x := r.(type) {
 		case *ssa.Phi:
 			a.mark(key{x, 0}, delta, reason{kind: kFlow, from: from, site: x})
@@ -980,7 +1072,7 @@ func (a *analysis) propagate(k key, delta tags) {
 			}
 		case *ssa.Panic:
 			if x.X == v {
-				a.markLoc(loc{kind: locPanic}, reason{kind: kStore, from: from, site: x})
+				a.markLoc(a.panicLoc(x.Parent()), reason{kind: kStore, from: from, site: x})
 			}
 		case ssa.CallInstruction:
 			a.callUse(k, delta, x)
@@ -1028,6 +1120,9 @@ func (a *analysis) index() {
 							for _, l := range locs[:n] {
 								a.addReader(l, key{x, 0})
 							}
+							if a.openAddr(x.X) {
+								a.openLoads = append(a.openLoads, key{x, 0})
+							}
 							if ia, ok := x.X.(*ssa.IndexAddr); ok {
 								if l, ok := sliceParam(ia.X); ok {
 									a.addReader(l, key{x, 0})
@@ -1045,6 +1140,9 @@ func (a *analysis) index() {
 						locs, n := a.fieldLocs(st, x.Field)
 						for _, l := range locs[:n] {
 							a.addReader(l, key{x, 0})
+						}
+						if a.openField(x.X.Type(), st, x.Field) {
+							a.openLoads = append(a.openLoads, key{x, 0})
 						}
 					}
 				case *ssa.Index:
@@ -1164,7 +1262,62 @@ func (a *analysis) setupSubject() {
 	for _, h := range a.class {
 		w.global(h, 0)
 	}
-	a.dynTypes, a.dynUnknown = w.types, w.unknown
+	a.dynTypes, a.dynUnknown, a.dynNilable = w.types, w.unknown, w.nilable
+	// A failed errors.Is(v, X) excludes X only if X is one value: every
+	// variable of the class is only initialized.
+	a.guardOK = true
+	for _, h := range a.class {
+		a.guardOK = a.guardOK && a.initOnly(h)
+	}
+}
+
+// initOnly reports whether the program only initializes the package-level
+// variable g: every store to it is in its package's initializer, there
+// is one, and its address is not used.
+func (a *analysis) initOnly(g *ssa.Global) bool {
+	if a.globalEsc[g] || len(a.globalStore[g]) == 0 || g.Pkg == nil {
+		return false
+	}
+	init := g.Pkg.Func("init")
+	for _, st := range a.globalStore[g] {
+		if st.Parent() != init {
+			return false
+		}
+	}
+	return true
+}
+
+// openAddr reports whether code outside the program may have written the
+// memory at addr (see Options.Open): an exported variable of an open
+// package that the program does not only initialize, or an exported field
+// of a struct type of an open package.
+func (a *analysis) openAddr(addr ssa.Value) bool {
+	if a.open == nil {
+		return false
+	}
+	switch x := addr.(type) {
+	case *ssa.Global:
+		return x.Pkg != nil && a.open[x.Pkg] && x.Object() != nil && x.Object().Exported() && !a.initOnly(x)
+	case *ssa.FieldAddr:
+		if st := structOf(x.X.Type()); st != nil && x.Field < st.NumFields() {
+			return a.openField(x.X.Type(), st, x.Field)
+		}
+	}
+	return false
+}
+
+func (a *analysis) openField(owner types.Type, st *types.Struct, i int) bool {
+	if a.open == nil || !st.Field(i).Exported() {
+		return false
+	}
+	if p := pointerElem(owner); p != nil {
+		owner = p
+	}
+	pkg := st.Field(i).Pkg()
+	if n, ok := types.Unalias(owner).(*types.Named); ok && n.Obj().Pkg() != nil {
+		pkg = n.Obj().Pkg()
+	}
+	return pkg != nil && a.open[a.prog.Package(pkg)]
 }
 
 // globalLoad returns the package-level variable that v loads, maybe
@@ -1197,6 +1350,21 @@ type typeWalk struct {
 	seen    map[any]bool
 	types   []types.Type
 	unknown bool
+	// nilable are the pointer types among types whose value may be nil
+	// (it is not an allocation made for the Sentinel).
+	nilable []types.Type
+}
+
+// addValue adds the type of the concrete value v.
+func (w *typeWalk) addValue(v ssa.Value) {
+	w.add(v.Type())
+	if _, isPtr := v.Type().Underlying().(*types.Pointer); !isPtr {
+		return
+	}
+	if _, isAlloc := v.(*ssa.Alloc); isAlloc {
+		return
+	}
+	w.nilable = append(w.nilable, v.Type())
 }
 
 const maxTypeWalk = 12
@@ -1226,6 +1394,18 @@ func (w *typeWalk) global(g *ssa.Global, depth int) {
 	}
 	if !isInterface(elem) {
 		w.add(elem)
+		if _, isPtr := elem.Underlying().(*types.Pointer); isPtr {
+			stores := w.a.globalStore[g]
+			nilable := len(stores) == 0 || w.a.globalEsc[g]
+			for _, st := range stores {
+				if _, isAlloc := st.Val.(*ssa.Alloc); !isAlloc {
+					nilable = true
+				}
+			}
+			if nilable {
+				w.nilable = append(w.nilable, elem)
+			}
+		}
 		return
 	}
 	if w.a.globalEsc[g] {
@@ -1252,14 +1432,14 @@ func (w *typeWalk) value(v ssa.Value, depth int) {
 			w.add(x.Type())
 		}
 	case *ssa.MakeInterface:
-		w.add(x.X.Type())
+		w.addValue(x.X)
 	case *ssa.ChangeInterface:
 		w.value(x.X, depth+1)
 	case *ssa.ChangeType:
 		if isInterface(x.X.Type()) {
 			w.value(x.X, depth+1)
 		} else {
-			w.add(x.Type())
+			w.addValue(x)
 		}
 	case *ssa.Phi:
 		for _, e := range x.Edges {
@@ -1283,7 +1463,7 @@ func (w *typeWalk) value(v ssa.Value, depth int) {
 		if isInterface(v.Type()) {
 			w.unknown = true
 		} else {
-			w.add(v.Type())
+			w.addValue(v)
 		}
 	}
 }
@@ -1316,6 +1496,24 @@ func (a *analysis) seed() {
 		// from then on.
 		for _, st := range a.globalStore[g] {
 			a.mark(key{st.Val, 0}, free, reason{kind: kSeedStored, site: st, text: why.text})
+		}
+	}
+	if a.open != nil {
+		for _, fn := range a.fns {
+			obj := fn.Object()
+			if fn.Pkg == nil || !a.open[fn.Pkg] || fn.Parent() != nil || obj == nil || !obj.Exported() {
+				continue
+			}
+			for i, p := range fn.Params {
+				a.mark(key{p, 0}, paramTag(i), reason{kind: kSeedCaller, fn: fn})
+			}
+		}
+		for _, k := range a.openLoads {
+			why := reason{kind: kSeedOpen}
+			if instr, ok := k.v.(ssa.Instruction); ok {
+				why.site = instr
+			}
+			a.mark(k, free, why)
 		}
 	}
 	for _, v := range a.typeSeeds {

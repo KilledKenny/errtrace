@@ -82,6 +82,7 @@ package mark
 
 import (
 	"context"
+	"fmt"
 	"go/types"
 
 	"golang.org/x/tools/go/ssa"
@@ -138,10 +139,38 @@ type Result struct {
 	a *analysis
 }
 
-// Run runs the upward pass for subj over every function of prog that has
-// a body, following the call edges of res.
+// Options configures the upward pass.
+type Options struct {
+	// Open are the packages of a program that is not whole (it was
+	// loaded without a main package): code outside the loaded program
+	// calls their exported functions and methods and writes their
+	// exported variables and fields. The pass then treats as possibly
+	// the Subject: the parameters of those functions (with their Param
+	// tag, as if a caller passed it), the loads of exported fields of
+	// their struct types, and the loads of their exported variables that
+	// the program does not only initialize. Nil means a closed world.
+	Open []*ssa.Package
+}
+
+// Run runs the upward pass for subj over the functions of prog,
+// following the call edges of res, in a closed world.
 func Run(ctx context.Context, prog *ssa.Program, res Callees, subj Subject) (*Result, error) {
+	return RunWith(ctx, prog, res, subj, Options{})
+}
+
+// RunWith runs the upward pass for subj over the functions of prog,
+// following the call edges of res. If res has a method
+// Reachable(*ssa.Function) bool, a function that it reports unreachable,
+// that is not a method and whose value is never taken is not scanned
+// (nothing can run it, not even reflection).
+func RunWith(ctx context.Context, prog *ssa.Program, res Callees, subj Subject, opts Options) (*Result, error) {
 	a := newAnalysis(prog, res, subj)
+	if len(opts.Open) > 0 {
+		a.open = make(map[*ssa.Package]bool)
+		for _, p := range opts.Open {
+			a.open[p] = true
+		}
+	}
 	if err := a.run(ctx); err != nil {
 		return nil, err
 	}
@@ -235,6 +264,71 @@ func (r *Result) SiteResultMarked(site ssa.CallInstruction, index int) bool {
 		return a.explicit(k)
 	}
 	return a.siteResultFromCallees(site, index)
+}
+
+// GlobalMarked reports whether the package-level variable g may hold the
+// Subject (or, for a variable of a composite type, hold it in its
+// memory).
+func (r *Result) GlobalMarked(g *ssa.Global) bool {
+	a := r.a
+	if g == nil || a.openAddr(g) {
+		return true
+	}
+	locs, n := a.addrLocs(g)
+	for _, l := range locs[:n] {
+		if a.locMarked(l) {
+			return true
+		}
+	}
+	elem := pointerElem(g.Type())
+	if elem == nil {
+		return true
+	}
+	if a.implicitQuery(elem) {
+		return true
+	}
+	return !a.markable(elem) && a.holdsAny(elem)
+}
+
+// TraceGlobal returns how the Mark reached the variable g (see Trace).
+func (r *Result) TraceGlobal(g *ssa.Global) []Step {
+	a := r.a
+	if g == nil {
+		return nil
+	}
+	locs, n := a.addrLocs(g)
+	for _, l := range locs[:n] {
+		if a.locMarked(l) {
+			return a.trace(ref{kind: refLoc, l: l})
+		}
+	}
+	return nil
+}
+
+// TypeMarked reports whether every value of the concrete type t is
+// marked: t is the Subject's type, a type whose values may equal the
+// Subject, or a wrapper of the Subject.
+func (r *Result) TypeMarked(t types.Type) bool {
+	return t != nil && r.a.implicitQuery(t)
+}
+
+// TraceType returns why every value of type t is marked (see
+// TypeMarked): the steps to the Mark that makes t a wrapper of the
+// Subject, and a step for the type itself.
+func (r *Result) TraceType(t types.Type) []Step {
+	a := r.a
+	if t == nil || !a.implicitQuery(t) {
+		return nil
+	}
+	last := Step{Desc: fmt.Sprintf("a value of type %s is or may wrap %s", typeString(t), a.subj)}
+	if a.typeSeed(t) || !a.potentialWrapper(t) {
+		return []Step{last}
+	}
+	a.heldBy = ref{}
+	if !a.isWrapper(t) {
+		return []Step{last}
+	}
+	return append(a.trace(a.heldBy), last)
 }
 
 // Stats returns the counts of the pass.

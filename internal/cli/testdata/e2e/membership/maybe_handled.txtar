@@ -11,6 +11,7 @@ $WORK/a.go:5:5-9: sentinel example.com/fx.ErrX
 		$WORK/a.go:14:9-17: in example.com/fx.G, call to example.com/fx.source
 -- stderr --
 errtrace: warning: target not reachable from main/init; parameters may lack candidates
+errtrace: warning: example.com/fx.ErrX is assigned outside its initialization (or its address is used); the Verdict assumes it keeps its initial value
 -- exit --
 3
 -- go.mod --

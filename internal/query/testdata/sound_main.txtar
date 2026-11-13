@@ -1,0 +1,303 @@
+A whole program whose functions return errors in ways a Membership Query
+must not answer "no" to: sound_test.go lists, for each function and
+Subject, what errors.Is or errors.As says when the program runs.
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- main.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"os"
+	"reflect"
+	"sync"
+)
+
+var ErrX = errors.New("x")
+var ErrZ = errors.New("z")
+
+// A Concrete Type in the Wrap Chain.
+
+type W struct{ inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.inner }
+
+func Custom() error { return &W{inner: errors.New("leaf")} }
+func Open() error   { _, err := os.Open("/nonexistent/zzz"); return err }
+func Sys() error    { return os.NewSyscallError("op", errors.New("leaf")) }
+func Nested() error { return fmt.Errorf("o: %w", &W{inner: errors.New("leaf")}) }
+
+// Resolved entries that hold the Sentinel without being it.
+
+var ErrY = fmt.Errorf("y: %w", ErrX)
+var saved error
+
+func init() { saved = ErrX }
+
+type errs []error
+
+func (e errs) Error() string   { return "es" }
+func (e errs) Unwrap() []error { return e }
+
+type my struct{ n int }
+
+func (*my) Error() string { return "m" }
+
+var ErrM error = &my{1}
+
+func A() error { return ErrY }
+func B() error { return saved }
+func C() error { return errs{ErrX} }
+func D() error { p := ErrM.(*my); return p }
+
+var once sync.Once
+var onceSaved error
+
+func OnceSaved() error {
+	once.Do(func() { onceSaved = ErrX })
+	return onceSaved
+}
+
+var ErrLate error
+
+func init() { ErrLate = ErrX }
+
+func Late() error { return ErrLate }
+
+type fnErr func() error
+
+func (f fnErr) Error() string { return "f" }
+func (f fnErr) Unwrap() error { return f() }
+
+func FuncWrap() error { return fnErr(func() error { return ErrX }) }
+
+type mapErr map[string]error
+
+func (m mapErr) Error() string { return "m" }
+func (m mapErr) Unwrap() error { return m["a"] }
+
+func MapWrap() error { return mapErr{"a": ErrX} }
+
+type chanErr chan error
+
+func (c chanErr) Error() string { return "c" }
+func (c chanErr) Unwrap() error { return <-c }
+
+func ChanWrap() error {
+	c := make(chanErr, 1)
+	c <- ErrX
+	return c
+}
+
+type Inner struct{ n int }
+
+func (Inner) Error() string { return "i" }
+
+type Outer struct{ Inner }
+
+func (o Outer) Unwrap() error { return o.Inner }
+
+func Embedded() error { return Outer{Inner{1}} }
+
+type V struct{ n int }
+
+func (V) Error() string { return "v" }
+
+var ErrV error = V{1}
+
+func Value() error { return V{1} }
+
+type E struct{ n int }
+
+func (*E) Error() string { return "e" }
+
+func mkE() error { return &E{1} }
+
+var ErrE = mkE()
+
+func RetE() error { return ErrE }
+
+func getNil() *E { return nil }
+
+var ErrP error = (*E)(nil)
+
+func TypedNil() error { return getNil() }
+
+// Intrinsics called through function values.
+
+var ef = fmt.Errorf
+var jf = errors.Join
+
+func DynErrorf() error { return ef("w: %w", ErrX) }
+func DynJoin() error   { return jf(ErrX) }
+
+// A method promoted through an embedded pointer.
+
+type PInner struct{ n int }
+
+func (i *PInner) Error() string { return "i" }
+func (i *PInner) Self() error   { return i }
+
+type selfer interface{ Self() error }
+type pouter struct{ *PInner }
+
+var ErrI error = &PInner{1}
+
+func mkSelfer() selfer { return pouter{ErrI.(*PInner)} }
+
+func Promoted() error { return mkSelfer().Self() }
+
+// Custom Is and As methods.
+
+type IsE struct{}
+
+func (IsE) Error() string   { return "e" }
+func (IsE) Is(t error) bool { return t == ErrX }
+
+func CustomIs() error { return IsE{} }
+
+type IsDeleg struct{ cause error }
+
+func (d *IsDeleg) Error() string   { return "d" }
+func (d *IsDeleg) Is(t error) bool { return errors.Is(d.cause, t) }
+
+func DelegIs() error { return &IsDeleg{ErrX} }
+
+type IsOpaque struct{ f func(error) bool }
+
+func (o IsOpaque) Error() string   { return "o" }
+func (o IsOpaque) Is(t error) bool { return o.f(t) }
+
+func OpaqueIs() error { return IsOpaque{func(t error) bool { return t == ErrX }} }
+
+type AsE struct{}
+
+func (AsE) Error() string { return "a" }
+func (AsE) As(t any) bool {
+	if p, ok := t.(**E); ok {
+		*p = &E{2}
+		return true
+	}
+	return false
+}
+
+func CustomAs() error { return AsE{} }
+
+type deep4 struct{ e error }
+type deep3 struct{ d deep4 }
+type deep2 struct{ d deep3 }
+type deep1 struct{ d deep2 }
+type DW struct{ d deep1 }
+
+func (w DW) Error() string   { return "w" }
+func (w DW) Is(t error) bool { return w.d.d.d.d.e == t }
+
+func Deep() error { var w DW; w.d.d.d.d.e = ErrX; return w }
+
+// Reflection on a struct that holds the Sentinel.
+
+type H struct{ E error }
+
+func Reflect() error { return reflect.ValueOf(H{ErrX}).Field(0).Interface().(error) }
+
+// Guards.
+
+func source(n int) error {
+	if n == 0 {
+		return ErrX
+	}
+	return nil
+}
+
+func wrapped(n int) error {
+	if n == 0 {
+		return fmt.Errorf("w: %w", ErrX)
+	}
+	return nil
+}
+
+// GuardIs never returns ErrX: errors.Is catches it.
+func GuardIs(n int) error {
+	err := source(n)
+	if errors.Is(err, ErrX) {
+		return nil
+	}
+	return err
+}
+
+// GuardNeq returns a Wrap of ErrX: != only excludes ErrX itself.
+func GuardNeq(n int) error {
+	err := wrapped(n)
+	if err != ErrX {
+		return err
+	}
+	return nil
+}
+
+// GuardNot returns err exactly when errors.Is holds.
+func GuardNot(n int) error {
+	err := source(n)
+	if !errors.Is(err, ErrX) {
+		return nil
+	}
+	return err
+}
+
+// GuardReassign assigns err again after the check.
+func GuardReassign(n int) error {
+	err := source(n)
+	if !errors.Is(err, ErrX) {
+		err = source(0)
+	}
+	return err
+}
+
+// GuardOther checks another Sentinel: ErrX passes.
+func GuardOther(n int) error {
+	err := source(n)
+	if errors.Is(err, ErrZ) {
+		return nil
+	}
+	return err
+}
+
+// A panic recovered into the result.
+
+func thrower(n int) {
+	if n == 0 {
+		panic(ErrX)
+	}
+}
+
+func Recovered(n int) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = r.(error)
+		}
+	}()
+	thrower(n)
+	return nil
+}
+
+// RecoveredOther recovers, but nothing it calls panics with ErrX.
+func RecoveredOther(n int) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = r.(error)
+		}
+	}()
+	return Clean()
+}
+
+func Clean() error { return errors.New("clean") }
+
+func main() {
+	fmt.Println(Custom(), Open(), Sys(), Nested(), A(), B(), C(), D(), OnceSaved(), Late(),
+		FuncWrap(), MapWrap(), ChanWrap(), Embedded(), Value(), RetE(), TypedNil(),
+		DynErrorf(), DynJoin(), Promoted(), CustomIs(), DelegIs(), OpaqueIs(), CustomAs(), Deep(), Reflect(),
+		GuardIs(0), GuardNeq(0), GuardNot(0), GuardReassign(1), GuardOther(0), Recovered(0), RecoveredOther(0), Clean(), ErrP)
+}

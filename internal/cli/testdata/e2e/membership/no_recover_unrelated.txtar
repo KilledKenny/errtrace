@@ -1,0 +1,33 @@
+A recover sees only the panics of what the deferring function calls: a panic with the Sentinel elsewhere does not make the recovered value a Carrier.
+-- args --
+-is example.com/fx.ErrX a.go:@f
+-- stdout --
+$WORK/a.go:11:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: no
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- exit --
+1
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var ErrX = errors.New("x")
+
+func Elsewhere() { panic(ErrX) }
+
+func work() {}
+
+func /*@f*/F() (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = r.(error)
+		}
+	}()
+	work()
+	return nil
+}

@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/ssa"
+	"golang.org/x/tools/go/ssa/ssautil"
 
 	"github.com/KilledKenny/errtrace/internal/load"
 	"github.com/KilledKenny/errtrace/internal/mark"
@@ -78,9 +79,7 @@ var debugModes = []string{"target", "timing", "summary"}
 // hiddenFlags are registered but left out of the usage text.
 var hiddenFlags = map[string]bool{"debug": true}
 
-// membershipFlags select a Membership Query. The usage text shows them,
-// and the exit codes of a Membership Query, only when one of them is on
-// the command line: without them the command prints what it always did.
+// membershipFlags select a Membership Query.
 var membershipFlags = map[string]bool{"is": true, "as": true}
 
 // config holds the parsed flags.
@@ -137,6 +136,19 @@ func runQuery(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) 
 		}
 		return 0, usageError{err}
 	}
+	membership := false
+	var empty error
+	fs.Visit(func(f *flag.Flag) {
+		if membershipFlags[f.Name] {
+			membership = true
+			if f.Value.String() == "" && empty == nil {
+				empty = fmt.Errorf("-%s needs a value", f.Name)
+			}
+		}
+	})
+	if empty != nil {
+		return 0, usageError{empty}
+	}
 	if cfg.is != "" && cfg.as != "" {
 		return 0, usageError{errors.New("-is and -as are mutually exclusive")}
 	}
@@ -175,14 +187,13 @@ func runQuery(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) 
 	if err != nil {
 		return 0, err
 	}
-	membership := cfg.is != "" || cfg.as != ""
 	var subj mark.Subject
 	if membership {
 		if subj, err = resolveSubject(prog, cfg.is, cfg.as); err != nil {
 			return 0, usageError{err}
 		}
 	}
-	resolver, err := newResolver(ctx, prog, tgt, opts.Stderr, cfg.debug["timing"])
+	resolver, open, err := newResolver(ctx, prog, tgt, opts.Stderr, cfg.debug["timing"])
 	if err != nil {
 		return 0, err
 	}
@@ -195,7 +206,7 @@ func runQuery(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) 
 			tgt.Kind, tgt.Name, strings.Join(names, " "), tgt.Span)
 	}
 	if membership {
-		return runMembership(ctx, opts, cfg, prog, tgt, resolver, subj)
+		return runMembership(ctx, opts, cfg, prog, tgt, resolver, subj, open)
 	}
 	res, err := query.Run(ctx, prog, tgt, query.Options{ChainDepth: cfg.chainDepth, Resolver: resolver})
 	if err != nil {
@@ -218,8 +229,9 @@ func runQuery(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) 
 // loaded program. A generic Target is narrowed to its reachable instances.
 // Target functions that are not reachable from the roots are added as
 // roots, with a warning: their parameters have no callers to take
-// Candidates from.
-func newResolver(ctx context.Context, prog *load.Program, tgt *target.Target, stderr io.Writer, timing bool) (*resolve.VTA, error) {
+// Candidates from. If the loaded packages have no main package, the
+// program is open: the Resolver is told so, and the packages are returned.
+func newResolver(ctx context.Context, prog *load.Program, tgt *target.Target, stderr io.Writer, timing bool) (*resolve.VTA, []*ssa.Package, error) {
 	var initial []*ssa.Package
 	for _, p := range prog.Initial {
 		if sp := prog.SSAPackage(p); sp != nil {
@@ -228,7 +240,12 @@ func newResolver(ctx context.Context, prog *load.Program, tgt *target.Target, st
 	}
 	v, err := resolve.NewVTA(ctx, prog.SSA, resolve.Roots(prog.SSA, initial))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	var open []*ssa.Package
+	if len(ssautil.MainPackages(initial)) == 0 {
+		v.SetOpen()
+		open = initial
 	}
 	tgt.KeepReachable(v.Reachable)
 	var unreachable []*ssa.Function
@@ -240,13 +257,13 @@ func newResolver(ctx context.Context, prog *load.Program, tgt *target.Target, st
 	if len(unreachable) > 0 {
 		fmt.Fprintf(stderr, "%s: warning: target not reachable from main/init; parameters may lack candidates\n", BinaryName)
 		if v, err = v.WithRoots(ctx, unreachable); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 	if timing {
 		fmt.Fprintf(stderr, "timing: cha=%s vta1=%s vta2=%s\n", v.Timing.CHA, v.Timing.VTA1, v.Timing.VTA2)
 	}
-	return v, nil
+	return v, open, nil
 }
 
 // splitList splits a comma-separated flag value, dropping empty elements.
@@ -293,17 +310,11 @@ func parseDebug(value string) (map[string]bool, error) {
 }
 
 func printUsage(w io.Writer, fs *flag.FlagSet) {
-	membership := false
-	fs.Visit(func(f *flag.Flag) { membership = membership || membershipFlags[f.Name] })
-	defer func() {
-		if membership {
-			fmt.Fprintf(w, `
+	defer fmt.Fprintf(w, `
 With -is or -as, %[1]s answers a Membership Query: whether that error is in
-the Target's Error Set. The exit status is the Verdict:
+the Target's Error Set. The exit status is then the Verdict:
   0 yes | 1 no | 3 maybe | 2 error
 `, BinaryName)
-		}
-	}()
 	fmt.Fprintf(w, `usage: %[1]s [flags] <target>
 
 %[1]s reports the Error Set of a Target: every Error Origin that can reach
@@ -315,7 +326,7 @@ the Target's error result, with its Propagation Path.
 flags:
 `, BinaryName)
 	fs.VisitAll(func(f *flag.Flag) {
-		if hiddenFlags[f.Name] || (membershipFlags[f.Name] && !membership) {
+		if hiddenFlags[f.Name] {
 			return
 		}
 		name, usage := flag.UnquoteUsage(f)

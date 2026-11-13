@@ -1,0 +1,45 @@
+-as does not take an instance of a generic type.
+-- args --
+-as example.com/fx.G[int] a.go:@f
+-- stdout --
+-- stderr --
+errtrace: -as example.com/fx.G[int]: an instance of a generic type is not supported
+usage: errtrace [flags] <target>
+
+errtrace reports the Error Set of a Target: every Error Origin that can reach
+the Target's error result, with its Propagation Path.
+
+<target> is a position in a Go file, with byte columns:
+  file.go:LINE:COL | file.go:#OFFSET | file.go:L:C-L2:C2 (the start is used)
+
+flags:
+  -as type
+    	Membership Query: is the Concrete Type type (such as '*io/fs.PathError') in the Error Set?
+  -chain-depth N
+    	max Wrap Chain depth N before truncation (default 8)
+  -fanout N
+    	group entries under dynamic call sites with at least N Candidates (0 = never group) (default 8)
+  -is pkgpath.Name
+    	Membership Query: is the Sentinel pkgpath.Name (such as io.EOF) in the Error Set?
+  -p patterns
+    	comma-separated package patterns to load (default "./...")
+  -tags list
+    	comma-separated list of build tags
+
+With -is or -as, errtrace answers a Membership Query: whether that error is in
+the Target's Error Set. The exit status is then the Verdict:
+  0 yes | 1 no | 3 maybe | 2 error
+-- exit --
+2
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+type G[T any] struct{ v T }
+
+func (G[T]) Error() string { return "g" }
+
+func /*@f*/F() error { return G[int]{} }

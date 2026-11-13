@@ -1,11 +1,13 @@
 package query_test
 
 import (
+	"go/types"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/ssa"
+	"golang.org/x/tools/go/ssa/ssautil"
 
 	"github.com/KilledKenny/errtrace/internal/errset"
 	"github.com/KilledKenny/errtrace/internal/fixture"
@@ -15,69 +17,133 @@ import (
 	"github.com/KilledKenny/errtrace/internal/target"
 )
 
-func TestMembership(t *testing.T) {
-	t.Parallel()
-	l := fixture.LoadProgram(t, filepath.Join("testdata", "membership.txtar"))
-	pkg := l.SSAPackage(l.Initial[0])
-	base, err := resolve.NewVTA(t.Context(), l.SSA, resolve.Roots(l.SSA, []*ssa.Package{pkg}))
+// program is a loaded fixture with its Resolver, set up as the CLI does.
+type program struct {
+	l    *fixture.Loaded
+	pkg  *ssa.Package
+	base *resolve.VTA
+	open []*ssa.Package
+}
+
+func loadProgram(t *testing.T, file string) *program {
+	t.Helper()
+	l := fixture.LoadProgram(t, filepath.Join("testdata", file))
+	p := &program{l: l, pkg: l.SSAPackage(l.Initial[0])}
+	initial := []*ssa.Package{p.pkg}
+	v, err := resolve.NewVTA(t.Context(), l.SSA, resolve.Roots(l.SSA, initial))
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(ssautil.MainPackages(initial)) == 0 {
+		v.SetOpen()
+		p.open = initial
+	}
+	p.base = v
+	return p
+}
+
+// subject resolves "is <pkgpath>.<Name>" or "as [*]<pkgpath>.<Name>"; a
+// name without a package path is in the fixture's package.
+func (p *program) subject(t *testing.T, s string) mark.Subject {
+	t.Helper()
+	kind, name, _ := strings.Cut(s, " ")
+	pointer := strings.HasPrefix(name, "*")
+	name = strings.TrimPrefix(name, "*")
+	pkg := p.pkg
+	if i := strings.LastIndex(name, "."); i >= 0 {
+		pkg = p.l.SSA.ImportedPackage(name[:i])
+		name = name[i+1:]
+	}
+	if pkg == nil {
+		t.Fatalf("subject %q: no such package", s)
+	}
+	switch kind {
+	case "is":
+		g, ok := pkg.Members[name].(*ssa.Global)
+		if !ok {
+			t.Fatalf("subject %q: no such variable", s)
+		}
+		return mark.Subject{Sentinel: g}
+	case "as":
+		obj, ok := pkg.Pkg.Scope().Lookup(name).(*types.TypeName)
+		if !ok {
+			t.Fatalf("subject %q: no such type", s)
+		}
+		typ := types.Unalias(obj.Type())
+		if pointer {
+			typ = types.NewPointer(typ)
+		}
+		return mark.Subject{Type: typ}
+	}
+	t.Fatalf("bad subject %q", s)
+	return mark.Subject{}
+}
+
+// membership runs the Membership Query of subj on the declaration of the
+// function fn of the fixture's package.
+func (p *program) membership(t *testing.T, fn string, subj mark.Subject) *query.MembershipResult {
+	t.Helper()
+	f := p.pkg.Func(fn)
+	if f == nil {
+		t.Fatalf("no function %s", fn)
+	}
+	tgt := &target.Target{Kind: target.Declaration, Name: f.String(), Funcs: []*ssa.Function{f}}
+	v := p.base
+	if !v.Reachable(f) {
+		var err error
+		if v, err = p.base.WithRoots(t.Context(), tgt.Funcs); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m, err := query.Membership(t.Context(), p.l.Program, tgt, query.MembershipOptions{
+		Options: query.Options{Resolver: v},
+		Subject: subj,
+		Upper:   v.Upper(),
+		Open:    p.open,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return m
+}
+
+func TestMembership(t *testing.T) {
+	t.Parallel()
+	p := loadProgram(t, "membership.txtar")
 	tests := []struct {
 		target, sentinel string
 		verdict          query.Verdict
 		matches          int
 		// carriers are the details of the Carriers' leaves, in order.
-		carriers            string
-		reached, incomplete bool
+		carriers string
+		reached  bool
 	}{
-		{"yes", "ErrX", query.Yes, 1, "", false, false},
-		{"yes", "ErrY", query.No, 0, "", false, false},
-		{"handled", "ErrU", query.Maybe, 1, "", false, false},
+		{"Yes", "ErrX", query.Yes, 1, "", false},
+		{"Yes", "ErrY", query.No, 0, "", false},
+		{"Handled", "ErrU", query.Maybe, 1, "", false},
 		// The key case: an Unresolved entry that cannot carry ErrX.
-		{"hole", "ErrX", query.No, 0, "", false, false},
+		{"Hole", "ErrX", query.No, 0, "", false},
 		// other matches the call and returns ErrY.
-		{"hole", "ErrY", query.Maybe, 0, "dynamic call to function value example.com/fx.hook", true, false},
-		{"stored", "ErrX", query.Maybe, 0, "load of field err of *example.com/fx.box", true, false},
-		{"stored", "ErrY", query.No, 0, "", false, false},
+		{"Hole", "ErrY", query.Maybe, 0, "dynamic call to function value example.com/fx.hook", true},
+		{"Stored", "ErrX", query.Maybe, 0, "load of field err of *example.com/fx.box", true},
+		{"Stored", "ErrY", query.No, 0, "", false},
 		// Of three Unresolved entries only the field that holds ErrX is a
 		// Carrier.
-		{"two", "ErrX", query.Maybe, 0, "load of field err of *example.com/fx.box", true, false},
-		{"two", "ErrY", query.Maybe, 0, "dynamic call to function value example.com/fx.hook", true, false},
-		// The guard removes ErrX: reached, but nothing carries it.
-		{"guarded", "ErrX", query.No, 0, "", true, false},
-		{"guarded", "ErrY", query.Yes, 1, "", false, false},
-		// Lib is not reachable from main: the same answer is not proven.
-		{"lib", "ErrX", query.Maybe, 0, "", true, true},
+		{"Two", "ErrX", query.Maybe, 0, "load of field err of *example.com/fx.box", true},
+		{"Two", "ErrY", query.Maybe, 0, "dynamic call to function value example.com/fx.hook", true},
+		// errors.Is(err, ErrX) guards the return: the upward pass stops
+		// the Mark there and does not reach the Target.
+		{"Guarded", "ErrX", query.No, 0, "", false},
+		{"Guarded", "ErrY", query.Yes, 1, "", false},
+		{"Lib", "ErrX", query.No, 0, "", false},
 	}
 	for _, tt := range tests {
-		tgt, err := target.Resolve(l.Program, l.Pos(t, "a.go:@"+tt.target))
-		if err != nil {
-			t.Fatal(err)
-		}
-		v := base
-		for _, fn := range tgt.Funcs {
-			if !v.Reachable(fn) {
-				if v, err = base.WithRoots(t.Context(), tgt.Funcs); err != nil {
-					t.Fatal(err)
-				}
-				break
-			}
-		}
-		m, err := query.Membership(t.Context(), l.Program, tgt, query.MembershipOptions{
-			Options:      query.Options{Resolver: v},
-			Subject:      mark.Subject{Sentinel: pkg.Members[tt.sentinel].(*ssa.Global)},
-			Upper:        v.Upper(),
-			WholeProgram: v.WholeProgram(),
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
+		m := p.membership(t, tt.target, p.subject(t, "is "+tt.sentinel))
 		var carriers []string
 		for _, c := range m.Carriers {
 			leaf := m.Table.Get(c.Entry.Leaf)
-			if leaf.Kind != errset.Unresolved {
-				t.Errorf("%s %s: Carrier %v is not Unresolved", tt.target, tt.sentinel, leaf.Kind)
+			if c.Unresolved != (leaf.Kind == errset.Unresolved) {
+				t.Errorf("%s %s: Carrier %v: Unresolved = %v", tt.target, tt.sentinel, leaf.Kind, c.Unresolved)
 			}
 			if len(c.Trace) == 0 {
 				t.Errorf("%s %s: Carrier %q has no trace", tt.target, tt.sentinel, leaf.Detail)
@@ -85,10 +151,10 @@ func TestMembership(t *testing.T) {
 			carriers = append(carriers, leaf.Detail)
 		}
 		got := strings.Join(carriers, "; ")
-		if m.Verdict != tt.verdict || len(m.Matches) != tt.matches || got != tt.carriers || m.Reached != tt.reached || m.Incomplete != tt.incomplete {
-			t.Errorf("Membership(%s, %s) = %v, %d matches, carriers %q, reached %v, incomplete %v; want %v, %d, %q, %v, %v",
-				tt.target, tt.sentinel, m.Verdict, len(m.Matches), got, m.Reached, m.Incomplete,
-				tt.verdict, tt.matches, tt.carriers, tt.reached, tt.incomplete)
+		if m.Verdict != tt.verdict || len(m.Matches) != tt.matches || got != tt.carriers || m.Reached != tt.reached {
+			t.Errorf("Membership(%s, %s) = %v, %d matches, carriers %q, reached %v; want %v, %d, %q, %v",
+				tt.target, tt.sentinel, m.Verdict, len(m.Matches), got, m.Reached,
+				tt.verdict, tt.matches, tt.carriers, tt.reached)
 		}
 	}
 }

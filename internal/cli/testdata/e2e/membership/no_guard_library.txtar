@@ -1,13 +1,12 @@
-The same guard in a library: the Target is not reachable from main or init, so the Candidates of its dynamic calls may be incomplete, and reaching the Target without a Carrier is not a proof: maybe, with 0 Carriers.
+The same guard in a library: errors.Is(err, X) stops the Mark of X in the upward pass too, so the Target is not reached: no.
 -- args --
 -is example.com/fx.ErrX a.go:@g
 -- stdout --
-$WORK/a.go:15:12-13: example.com/fx.ErrX in Error Set of example.com/fx.G: maybe: 0 of 0 unresolved could carry it
-	example.com/fx.ErrX reaches the target, which is not reachable from main/init: the Candidates of its dynamic calls may be incomplete
+$WORK/a.go:15:12-13: example.com/fx.ErrX in Error Set of example.com/fx.G: no
 -- stderr --
 errtrace: warning: target not reachable from main/init; parameters may lack candidates
 -- exit --
-3
+1
 -- go.mod --
 module example.com/fx
 

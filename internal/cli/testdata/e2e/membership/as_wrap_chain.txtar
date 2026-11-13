@@ -1,0 +1,27 @@
+A Concrete Type in the Wrap Chain is found by errors.As like a leaf: yes. The leaf here is an Opaque Error.
+-- args --
+-as *example.com/fx.W a.go:@f
+-- stdout --
+$WORK/a.go:10:12-13: *example.com/fx.W in Error Set of example.com/fx.F: yes
+$WORK/a.go:10:41-59: opaque errors.New "leaf"
+	wrap chain (origin → target):
+		$WORK/a.go:10:31-60: *example.com/fx.W.Unwrap
+	path (origin → target):
+		$WORK/a.go:10:41-59: in example.com/fx.F
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+type W struct{ inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.inner }
+
+func /*@f*/F() error { return &W{inner: errors.New("leaf")} }

@@ -111,7 +111,7 @@ func TestIntra(t *testing.T) {
 			"MakePlain": "-", "PlainTyped": "-",
 			"As": "0", "AsOther": "-", "AsPlain": "-",
 			"Assert": "0", "AssertPlain": "-",
-			"Recover": "0", "Closure": "0", "ClosureOther": "-",
+			"Closure": "0", "ClosureOther": "-",
 			"MakeVal": "-",
 		}},
 		{"is ErrY", map[string]string{

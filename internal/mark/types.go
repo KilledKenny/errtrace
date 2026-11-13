@@ -188,11 +188,21 @@ func (a *analysis) typeSeed(t types.Type) bool {
 // eqSeed reports whether a value of the concrete type t may be equal to
 // the Sentinel Subject's value without being a copy of it: t is
 // comparable, is not a pointer to memory of non-zero size (two such
-// pointers are equal only if they are the same pointer), and is a type the
-// Sentinel's value may have.
+// pointers are equal only if they are the same pointer, or both nil), and
+// is a type the Sentinel's value may have.
 func (a *analysis) eqSeed(t types.Type) bool {
 	if !types.Comparable(t) {
 		return false
+	}
+	if a.dynUnknown && flow.IsErrorType(t) {
+		// The value is not known: it may be a nil pointer of any type.
+		return true
+	}
+	for _, d := range a.dynNilable {
+		// Every nil pointer of the type is equal to a nil Sentinel.
+		if types.Identical(t, d) {
+			return true
+		}
 	}
 	if p, ok := t.Underlying().(*types.Pointer); ok && !mayBeZeroSize(p.Elem(), 0) {
 		return false
@@ -202,7 +212,7 @@ func (a *analysis) eqSeed(t types.Type) bool {
 			return true
 		}
 	}
-	return a.dynUnknown && flow.IsErrorType(t)
+	return false
 }
 
 // mayBeZeroSize reports whether a variable of type t may have size zero.
@@ -318,6 +328,21 @@ func (a *analysis) isWrapper(t types.Type) bool {
 			}
 		}
 	}
+	// A custom Is (for a Sentinel) or As (for a Concrete Type) method
+	// that may report the Subject.
+	name := "As"
+	if a.subj.Sentinel != nil {
+		name = "Is"
+	}
+	for i := range ms.Len() {
+		sel := ms.At(i)
+		if sel.Obj().Name() != name {
+			continue
+		}
+		if a.targetMatches(a.prog.MethodValue(sel)) {
+			return true
+		}
+	}
 	base := t
 	if p, ok := t.Underlying().(*types.Pointer); ok {
 		base = p.Elem()
@@ -325,13 +350,18 @@ func (a *analysis) isWrapper(t types.Type) bool {
 	return a.holds(base, 0)
 }
 
+// maxHoldDepth is how deep holds looks into structs nested by value.
+const maxHoldDepth = 8
+
 // holds reports whether a value of the composite type t holds a marked
 // value in its own storage: in a field (through embedded structs), or as
 // an element of a slice, array, map, channel or pointer that is t or a
 // field of t.
 func (a *analysis) holds(t types.Type, depth int) bool {
-	if depth > 3 {
-		return false
+	if depth > maxHoldDepth {
+		// Deeper is not looked at: it may hold anything.
+		a.heldBy = ref{}
+		return true
 	}
 	scalar := func(e types.Type, l loc) bool {
 		if a.implicit(e) {

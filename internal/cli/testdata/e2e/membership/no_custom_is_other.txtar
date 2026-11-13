@@ -1,0 +1,27 @@
+The Is method of E reports ErrX only: asked about another Sentinel, the answer is no.
+-- args --
+-is example.com/fx.ErrZ a.go:@f
+-- stdout --
+$WORK/a.go:13:12-13: example.com/fx.ErrZ in Error Set of example.com/fx.F: no
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- exit --
+1
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var ErrX = errors.New("x")
+var ErrZ = errors.New("z")
+
+type E struct{}
+
+func (E) Error() string   { return "e" }
+func (E) Is(t error) bool { return t == ErrX }
+
+func /*@f*/F() error { return E{} }

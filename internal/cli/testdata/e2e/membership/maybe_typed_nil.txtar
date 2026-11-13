@@ -1,0 +1,24 @@
+A function result of the Concrete Type converted to error: errors.As finds it even when it is a nil pointer, which the Error Set does not list. No entry is a Carrier.
+-- args --
+-as *example.com/fx.E a.go:@f
+-- stdout --
+$WORK/a.go:9:12-13: *example.com/fx.E in Error Set of example.com/fx.F: maybe: 0 entries could carry it (0 unresolved)
+	*example.com/fx.E may reach the target, but no entry of the Error Set shows how
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- exit --
+3
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+type E struct{ n int }
+
+func (*E) Error() string { return "e" }
+
+func get() *E { return nil }
+
+func /*@f*/F() error { return get() }

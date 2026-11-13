@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/ssa"
+	"golang.org/x/tools/go/ssa/ssautil"
 
 	"github.com/KilledKenny/errtrace/internal/fixture"
 	"github.com/KilledKenny/errtrace/internal/mark"
@@ -26,6 +27,10 @@ func upper(t *testing.T, extra ...string) func(l *fixture.Loaded) mark.Callees {
 		if err != nil {
 			t.Fatal(err)
 		}
+		if len(ssautil.MainPackages(initial)) == 0 {
+			// A library: no main package, so the program is not whole.
+			v.SetOpen()
+		}
 		if len(extra) > 0 {
 			var fns []*ssa.Function
 			for _, name := range extra {
@@ -46,6 +51,9 @@ func TestIntraWithCalls(t *testing.T) {
 			"Direct": "0", "Other": "-", "New": "-", "WrapV": "-", "JoinOther": "-",
 			"FieldOther": "-", "UnsetLoad": "-", "MapOther": "-", "Local": "-",
 			"MakePlain": "-", "AsOther": "-", "AsPlain": "-", "AssertPlain": "-", "ClosureOther": "-",
+			// A recover sees the panics of what the deferring function
+			// calls, and no others.
+			"Recover": "0", "RecoverOther": "-",
 		}},
 	})
 }
