@@ -1,0 +1,95 @@
+Membership Queries: every row of the Verdict table.
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrX = errors.New("x")
+var ErrY = errors.New("y")
+var ErrU = errors.New("u")
+
+func ResetU() { ErrU = errors.New("u2") }
+
+func /*@yes*/Yes() error { return fmt.Errorf("w: %w", ErrX) }
+
+func sourceU() error { return ErrU }
+
+func /*@handled*/Handled() error {
+	err := sourceU()
+	if err == ErrU {
+		return nil
+	}
+	return err
+}
+
+// hook is never set: the call has no Candidates. No function of the
+// program that matches it returns ErrX; other returns ErrY.
+var hook func(int, int) error
+
+func other(int, int) error { return ErrY }
+
+func /*@hole*/Hole() error {
+	if err := hook(1, 2); err != nil {
+		return err
+	}
+	return nil
+}
+
+type box struct {
+	err  error
+	last error
+}
+
+var b box
+
+func fill() {
+	b.err = ErrX
+}
+
+func /*@stored*/Stored() error { return b.err }
+
+func /*@two*/Two() error {
+	if err := hook(1, 2); err != nil {
+		return fmt.Errorf("two: %w", err)
+	}
+	if b.last != nil {
+		return b.last
+	}
+	return b.err
+}
+
+func sourceXY(n int) error {
+	if n == 0 {
+		return ErrX
+	}
+	return ErrY
+}
+
+func /*@guarded*/Guarded(n int) error {
+	err := sourceXY(n)
+	if errors.Is(err, ErrX) {
+		return nil
+	}
+	return err
+}
+
+func /*@lib*/Lib(n int) error { return Guarded(n) }
+
+func main() {
+	ResetU()
+	Yes()
+	Handled()
+	Hole()
+	fill()
+	Stored()
+	Two()
+	Guarded(1)
+	_ = other
+}
