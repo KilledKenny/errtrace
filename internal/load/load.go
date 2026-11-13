@@ -18,7 +18,7 @@ import (
 	"golang.org/x/tools/go/ssa"
 	"golang.org/x/tools/go/ssa/ssautil"
 
-	"github.com/killedKenny/errtrace/internal/span"
+	"github.com/KilledKenny/errtrace/internal/span"
 )
 
 // maxListedErrors is how many package errors a load error lists.

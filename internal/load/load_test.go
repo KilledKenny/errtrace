@@ -7,8 +7,8 @@ import (
 
 	"golang.org/x/tools/go/ssa"
 
-	"github.com/killedKenny/errtrace/internal/fixture"
-	"github.com/killedKenny/errtrace/internal/load"
+	"github.com/KilledKenny/errtrace/internal/fixture"
+	"github.com/KilledKenny/errtrace/internal/load"
 )
 
 func TestLoadTypeError(t *testing.T) {

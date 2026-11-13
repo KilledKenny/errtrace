@@ -30,8 +30,8 @@ import (
 
 	"golang.org/x/tools/txtar"
 
-	"github.com/killedKenny/errtrace/internal/load"
-	"github.com/killedKenny/errtrace/internal/span"
+	"github.com/KilledKenny/errtrace/internal/load"
+	"github.com/KilledKenny/errtrace/internal/span"
 )
 
 var update = flag.Bool("update", false, "rewrite the stdout, stderr and exit sections of fixtures")

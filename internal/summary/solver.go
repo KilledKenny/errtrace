@@ -8,9 +8,9 @@ import (
 
 	"golang.org/x/tools/go/ssa"
 
-	"github.com/killedKenny/errtrace/internal/errset"
-	"github.com/killedKenny/errtrace/internal/flow"
-	"github.com/killedKenny/errtrace/internal/resolve"
+	"github.com/KilledKenny/errtrace/internal/errset"
+	"github.com/KilledKenny/errtrace/internal/flow"
+	"github.com/KilledKenny/errtrace/internal/resolve"
 )
 
 const (

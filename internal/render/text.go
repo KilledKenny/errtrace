@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/killedKenny/errtrace/internal/errset"
-	"github.com/killedKenny/errtrace/internal/span"
+	"github.com/KilledKenny/errtrace/internal/errset"
+	"github.com/KilledKenny/errtrace/internal/span"
 )
 
 // Locator gives the span of a value's or Propagation Path hop's Site (see

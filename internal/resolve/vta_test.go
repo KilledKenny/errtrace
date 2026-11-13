@@ -6,8 +6,8 @@ import (
 
 	"golang.org/x/tools/go/ssa"
 
-	"github.com/killedKenny/errtrace/internal/fixture"
-	"github.com/killedKenny/errtrace/internal/resolve"
+	"github.com/KilledKenny/errtrace/internal/fixture"
+	"github.com/KilledKenny/errtrace/internal/resolve"
 )
 
 // dynamicCalls returns the dynamic call sites of fn, in order, without

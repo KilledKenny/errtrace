@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/killedKenny/errtrace/internal/fixture"
+	"github.com/KilledKenny/errtrace/internal/fixture"
 )
 
 // TestE2E runs every fixture under testdata/e2e through Run in-process.

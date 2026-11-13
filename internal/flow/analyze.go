@@ -9,7 +9,7 @@ import (
 
 	"golang.org/x/tools/go/ssa"
 
-	"github.com/killedKenny/errtrace/internal/errset"
+	"github.com/KilledKenny/errtrace/internal/errset"
 )
 
 // Fact is one abstract value that an error result of a function can carry,

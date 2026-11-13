@@ -6,7 +6,7 @@ package main
 import (
 	"os"
 
-	"github.com/killedKenny/errtrace/internal/cli"
+	"github.com/KilledKenny/errtrace/internal/cli"
 )
 
 func main() {

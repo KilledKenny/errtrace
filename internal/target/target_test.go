@@ -7,8 +7,8 @@ import (
 
 	"golang.org/x/tools/go/ssa"
 
-	"github.com/killedKenny/errtrace/internal/fixture"
-	"github.com/killedKenny/errtrace/internal/target"
+	"github.com/KilledKenny/errtrace/internal/fixture"
+	"github.com/KilledKenny/errtrace/internal/target"
 )
 
 func load(t *testing.T) *fixture.Loaded {

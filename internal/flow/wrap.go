@@ -8,8 +8,8 @@ import (
 
 	"golang.org/x/tools/go/ssa"
 
-	"github.com/killedKenny/errtrace/internal/errset"
-	"github.com/killedKenny/errtrace/internal/fmtverb"
+	"github.com/KilledKenny/errtrace/internal/errset"
+	"github.com/KilledKenny/errtrace/internal/fmtverb"
 )
 
 // This file models the calls and values that make Wraps: fmt.Errorf with

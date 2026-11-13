@@ -14,12 +14,12 @@ import (
 
 	"golang.org/x/tools/go/ssa"
 
-	"github.com/killedKenny/errtrace/internal/load"
-	"github.com/killedKenny/errtrace/internal/query"
-	"github.com/killedKenny/errtrace/internal/render"
-	"github.com/killedKenny/errtrace/internal/resolve"
-	"github.com/killedKenny/errtrace/internal/span"
-	"github.com/killedKenny/errtrace/internal/target"
+	"github.com/KilledKenny/errtrace/internal/load"
+	"github.com/KilledKenny/errtrace/internal/query"
+	"github.com/KilledKenny/errtrace/internal/render"
+	"github.com/KilledKenny/errtrace/internal/resolve"
+	"github.com/KilledKenny/errtrace/internal/span"
+	"github.com/KilledKenny/errtrace/internal/target"
 )
 
 // Exit codes, as in gopls.

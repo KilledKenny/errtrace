@@ -3,7 +3,7 @@ package flow
 import (
 	"testing"
 
-	"github.com/killedKenny/errtrace/internal/errset"
+	"github.com/KilledKenny/errtrace/internal/errset"
 )
 
 // TestWrapsCombinationCap checks that a Wrap whose operand combinations

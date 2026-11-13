@@ -17,13 +17,13 @@ import (
 
 	"golang.org/x/tools/go/ssa"
 
-	"github.com/killedKenny/errtrace/internal/errset"
-	"github.com/killedKenny/errtrace/internal/flow"
-	"github.com/killedKenny/errtrace/internal/load"
-	"github.com/killedKenny/errtrace/internal/resolve"
-	"github.com/killedKenny/errtrace/internal/span"
-	"github.com/killedKenny/errtrace/internal/summary"
-	"github.com/killedKenny/errtrace/internal/target"
+	"github.com/KilledKenny/errtrace/internal/errset"
+	"github.com/KilledKenny/errtrace/internal/flow"
+	"github.com/KilledKenny/errtrace/internal/load"
+	"github.com/KilledKenny/errtrace/internal/resolve"
+	"github.com/KilledKenny/errtrace/internal/span"
+	"github.com/KilledKenny/errtrace/internal/summary"
+	"github.com/KilledKenny/errtrace/internal/target"
 )
 
 // Result is the Error Set of one Query.

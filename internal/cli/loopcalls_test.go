@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/killedKenny/errtrace/internal/fixture"
+	"github.com/KilledKenny/errtrace/internal/fixture"
 )
 
 // TestLoopCallsMatchInline checks that loops wrapping through helper calls

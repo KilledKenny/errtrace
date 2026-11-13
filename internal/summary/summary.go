@@ -16,7 +16,7 @@ import (
 
 	"golang.org/x/tools/go/ssa"
 
-	"github.com/killedKenny/errtrace/internal/errset"
+	"github.com/KilledKenny/errtrace/internal/errset"
 )
 
 // SourceKind says how a fact reached a function's error result.

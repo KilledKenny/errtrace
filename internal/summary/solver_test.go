@@ -7,10 +7,10 @@ import (
 
 	"golang.org/x/tools/go/ssa"
 
-	"github.com/killedKenny/errtrace/internal/errset"
-	"github.com/killedKenny/errtrace/internal/fixture"
-	"github.com/killedKenny/errtrace/internal/flow"
-	"github.com/killedKenny/errtrace/internal/resolve"
+	"github.com/KilledKenny/errtrace/internal/errset"
+	"github.com/KilledKenny/errtrace/internal/fixture"
+	"github.com/KilledKenny/errtrace/internal/flow"
+	"github.com/KilledKenny/errtrace/internal/resolve"
 )
 
 func loadSolverFixture(t *testing.T) *ssa.Package {

@@ -14,9 +14,9 @@ import (
 	"golang.org/x/tools/go/ssa"
 	"golang.org/x/tools/go/ssa/ssautil"
 
-	"github.com/killedKenny/errtrace/internal/flow"
-	"github.com/killedKenny/errtrace/internal/load"
-	"github.com/killedKenny/errtrace/internal/span"
+	"github.com/KilledKenny/errtrace/internal/flow"
+	"github.com/KilledKenny/errtrace/internal/load"
+	"github.com/KilledKenny/errtrace/internal/span"
 )
 
 // Kind says whether a Target is a declaration or a call site.

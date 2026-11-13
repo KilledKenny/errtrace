@@ -9,7 +9,7 @@ import (
 
 	"golang.org/x/tools/go/ssa"
 
-	"github.com/killedKenny/errtrace/internal/errset"
+	"github.com/KilledKenny/errtrace/internal/errset"
 )
 
 // This file finds the guards that hold on a return path and decides what

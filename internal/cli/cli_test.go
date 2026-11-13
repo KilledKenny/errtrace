@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/killedKenny/errtrace/internal/fixture"
+	"github.com/KilledKenny/errtrace/internal/fixture"
 )
 
 func runInProcess(t *testing.T, args ...string) (stdout, stderr string, code int) {

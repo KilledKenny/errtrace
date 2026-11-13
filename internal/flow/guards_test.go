@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/killedKenny/errtrace/internal/errset"
-	"github.com/killedKenny/errtrace/internal/fixture"
-	"github.com/killedKenny/errtrace/internal/flow"
+	"github.com/KilledKenny/errtrace/internal/errset"
+	"github.com/KilledKenny/errtrace/internal/fixture"
+	"github.com/KilledKenny/errtrace/internal/flow"
 )
 
 // TestGuardCollection checks which guards Analyze finds for a returned

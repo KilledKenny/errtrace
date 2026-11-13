@@ -1,6 +1,6 @@
-module github.com/killedKenny/errtrace
+module github.com/KilledKenny/errtrace
 
-go 1.24.3
+go 1.27.4
 
 require golang.org/x/tools v0.39.1-0.20260109155911-b69ac100ecb7
 

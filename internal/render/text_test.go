@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/killedKenny/errtrace/internal/errset"
-	"github.com/killedKenny/errtrace/internal/span"
+	"github.com/KilledKenny/errtrace/internal/errset"
+	"github.com/KilledKenny/errtrace/internal/span"
 )
 
 // fakeLocator gives every string site the span "/m/a.go:<site>".

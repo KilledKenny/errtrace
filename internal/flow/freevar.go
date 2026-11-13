@@ -6,7 +6,7 @@ import (
 
 	"golang.org/x/tools/go/ssa"
 
-	"github.com/killedKenny/errtrace/internal/errset"
+	"github.com/KilledKenny/errtrace/internal/errset"
 )
 
 // BindingFacts returns the local facts, in the function that creates the
