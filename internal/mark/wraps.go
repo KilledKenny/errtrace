@@ -143,14 +143,14 @@ func (a *analysis) indexCall(site ssa.CallInstruction) {
 func (a *analysis) indexIntrinsic(call *ssa.Call, name string) {
 	args := call.Call.Args
 	var slice ssa.Value
+	wraps := true
 	switch name {
 	case "fmt.Errorf":
 		if len(args) != 2 {
 			return
 		}
 		if format, ok := constFormat(args[0]); ok && len(fmtverb.Wrapped(fmtverb.Parse(format, -1))) == 0 {
-			// It wraps nothing.
-			return
+			wraps = false
 		}
 		slice = args[1]
 	case "errors.Join":
@@ -168,9 +168,14 @@ func (a *analysis) indexIntrinsic(call *ssa.Call, name string) {
 			return
 		}
 		if alloc, ok := sl.X.(*ssa.Alloc); ok && onlyUsedBy(sl, call) {
+			// The array is read by the intrinsic alone: a store into
+			// it is an operand, not a store to memory.
 			a.varargs[alloc] = call
 			return
 		}
+	}
+	if !wraps {
+		return
 	}
 	if st, ok := slice.Type().Underlying().(*types.Slice); ok {
 		a.addReader(a.typedLoc(st.Elem()), key{call, 0})

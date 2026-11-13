@@ -37,14 +37,25 @@ func (a *analysis) callers(fn *ssa.Function) []ssa.CallInstruction {
 	return sites
 }
 
-// known reports whether the pass scanned the body of the callee g. The
-// result of a callee it did not scan (no body: assembly, linkname, cgo; or
-// an intrinsic called dynamically) is not known.
+// known reports whether the pass scanned the body of the callee g.
 func (a *analysis) known(g *ssa.Function) bool {
 	if g.Blocks == nil {
 		return false
 	}
 	_, ok := a.fnIndex[g]
+	return ok
+}
+
+// opaqueCallee reports whether the callee g, which the pass did not scan,
+// may return what it is passed: it has no body (assembly, linkname, cgo),
+// or it is an intrinsic called dynamically. Any other callee the pass did
+// not scan is a method that only reflection can reach (see collect), and
+// is not a callee at all.
+func (a *analysis) opaqueCallee(g *ssa.Function) bool {
+	if g.Blocks == nil {
+		return true
+	}
+	_, ok := a.intrinsic(g)
 	return ok
 }
 
@@ -142,7 +153,7 @@ func (a *analysis) linkArgs(k key, delta tags, site ssa.CallInstruction) {
 		if !a.known(g) {
 			// A callee without a body (or an intrinsic called
 			// dynamically) may return any of its arguments.
-			if call != nil {
+			if call != nil && a.opaqueCallee(g) {
 				t := a.tagsOf(v)
 				for r := range call.Call.Signature().Results().Len() {
 					a.markResult(call, r, t, reason{kind: kThrough, from: valueRef(k, t), site: site, fn: g})
@@ -224,6 +235,9 @@ func (a *analysis) siteResultFromCallees(site ssa.CallInstruction, index int) bo
 			// a dynamically called intrinsic wraps is not known here.
 			if _, ok := a.intrinsic(g); ok {
 				return true
+			}
+			if !a.opaqueCallee(g) {
+				continue
 			}
 			common := site.Common()
 			if common.IsInvoke() && a.tagsOf(common.Value) != 0 {

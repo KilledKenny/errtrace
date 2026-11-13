@@ -7,7 +7,6 @@ import (
 	"sort"
 
 	"golang.org/x/tools/go/ssa"
-	"golang.org/x/tools/go/ssa/ssautil"
 
 	"github.com/KilledKenny/errtrace/internal/flow"
 )
@@ -313,14 +312,48 @@ func isTemplate(fn *ssa.Function) bool {
 	return false
 }
 
-// collect lists the functions to scan, in a deterministic order.
+// collect lists the functions to scan, in a deterministic order: the
+// functions and declared methods of every package, and, from those, every
+// function an instruction refers to (function values, closures, bound
+// method wrappers) and every method of a type that an instruction converts
+// to an interface (the methods a dynamic call can reach).
+//
+// It does not use ssautil.AllFunctions: that also holds the methods of the
+// types reflection can reach from those, a set that differs from run to
+// run (ssa.Program.RuntimeTypes depends on map order). Such a method runs
+// only through reflection, which the pass does not follow anyway.
 func (a *analysis) collect() {
+	seen := make(map[*ssa.Function]bool)
+	var work []*ssa.Function
+	add := func(fn *ssa.Function) {
+		if fn != nil && !seen[fn] {
+			seen[fn] = true
+			work = append(work, fn)
+		}
+	}
+	for _, pkg := range a.prog.AllPackages() {
+		for _, m := range pkg.Members {
+			switch m := m.(type) {
+			case *ssa.Function:
+				add(m)
+			case *ssa.Type:
+				if named, ok := m.Type().(*types.Named); ok {
+					for i := range named.NumMethods() {
+						add(a.prog.FuncValue(named.Method(i)))
+					}
+				}
+			}
+		}
+	}
 	type named struct {
 		fn   *ssa.Function
 		name string
 	}
 	var list []named
-	for fn := range ssautil.AllFunctions(a.prog) {
+	var rands []*ssa.Value
+	for len(work) > 0 {
+		fn := work[len(work)-1]
+		work = work[:len(work)-1]
 		if fn.Blocks == nil || isTemplate(fn) {
 			continue
 		}
@@ -332,6 +365,33 @@ func (a *analysis) collect() {
 			continue
 		}
 		list = append(list, named{fn, fn.String()})
+		for _, anon := range fn.AnonFuncs {
+			add(anon)
+		}
+		for _, b := range fn.Blocks {
+			for _, instr := range b.Instrs {
+				rands = instr.Operands(rands[:0])
+				for _, r := range rands {
+					if r == nil || *r == nil {
+						continue
+					}
+					if f, ok := (*r).(*ssa.Function); ok {
+						add(f)
+					}
+				}
+				mi, ok := instr.(*ssa.MakeInterface)
+				if !ok || isInterface(mi.X.Type()) {
+					continue
+				}
+				ms := a.prog.MethodSets.MethodSet(mi.X.Type())
+				for i := range ms.Len() {
+					sel := ms.At(i)
+					if sel.Obj().(*types.Func).Signature().TypeParams() == nil {
+						add(a.prog.MethodValue(sel))
+					}
+				}
+			}
+		}
 	}
 	sort.Slice(list, func(i, j int) bool {
 		x, y := list[i], list[j]
