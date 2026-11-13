@@ -1,7 +1,6 @@
 package flow
 
 import (
-	"go/token"
 	"go/types"
 
 	"golang.org/x/tools/go/ssa"
@@ -50,84 +49,34 @@ func isAlloc(v ssa.Value) bool {
 	return ok
 }
 
-// StoredFacts returns the local facts of the values that fn stores to the
-// local variable alloc: the union over its stores, in instruction order. A
-// load of alloc inside a stored value (err = wrap(err)) stands for the same
-// stores. If the variable can be written other than by a Store in fn (its
-// address is passed to a call or stored elsewhere, or a closure writes it
-// through its captured reference), an Unresolved value of kind memory is
-// added, so the facts never claim more completeness than they have.
+// StoredFacts returns the local facts of the values stored to the local
+// variable alloc of fn: the union over fn's own stores, in instruction
+// order, and a StoreRef for every store made by a closure that captured the
+// variable. A load of alloc inside a stored value (err = wrap(err)) stands
+// for the same stores. If the variable can be written in a way errtrace
+// does not follow to a store (its address is passed to a call or stored
+// elsewhere), an Unresolved value of kind memory is added, so the facts
+// never claim more completeness than they have.
 func StoredFacts(tbl *errset.Table, fn *ssa.Function, alloc *ssa.Alloc, opts Options) []Fact {
-	refs := alloc.Referrers()
-	if refs == nil {
-		return nil
-	}
-	escapes := writtenElsewhere(alloc, true, make(map[ssa.Value]bool))
+	w := variableWriters(alloc)
 	a := &analyzer{tbl: tbl, fn: fn, at: alloc, pt: pointOf(alloc), opts: opts, seen: make(map[seenKey]bool)}
-	if !escapes {
-		a.captured = alloc
-		a.active = make(map[*ssa.Store]bool)
-	}
-	for _, r := range *refs {
-		if st, ok := r.(*ssa.Store); ok && st.Addr == alloc && st.Parent() == fn {
-			a.at, a.pt = st, pointOf(st)
-			a.seen = make(map[seenKey]bool)
-			if a.active != nil {
-				a.active[st] = true
-			}
-			a.walk(st.Val)
-			delete(a.active, st)
+	a.captured = alloc
+	a.active = make(map[*ssa.Store]bool)
+	for _, st := range w.stores {
+		if st.Parent() != fn {
+			a.at, a.pt = alloc, pointOf(alloc)
+			a.storeRef(st, alloc, alloc)
+			continue
 		}
+		a.at, a.pt = st, pointOf(st)
+		a.seen = make(map[seenKey]bool)
+		a.active[st] = true
+		a.walk(st.Val)
+		delete(a.active, st)
 	}
-	if escapes {
+	if w.escapes {
 		a.at, a.pt = alloc, pointOf(alloc)
-		a.memory(alloc, "load of escaping variable "+alloc.Comment)
+		a.memory(alloc, escapedVariable(alloc))
 	}
 	return a.facts
-}
-
-// writtenElsewhere reports whether the variable that addr points to (a
-// local Alloc, or a closure's FreeVar bound to it) may be written by
-// anything but a Store in the creator: a Store through a closure's
-// reference, or any use of the address other than a load, a debug
-// reference, or a binding into a closure that only reads it. creator is
-// set when addr is the Alloc itself, whose direct Stores are followed.
-func writtenElsewhere(addr ssa.Value, creator bool, seen map[ssa.Value]bool) bool {
-	if seen[addr] {
-		return false
-	}
-	seen[addr] = true
-	refs := addr.Referrers()
-	if refs == nil {
-		return false
-	}
-	for _, r := range *refs {
-		switch r := r.(type) {
-		case *ssa.Store:
-			if r.Addr != addr || !creator {
-				return true
-			}
-		case *ssa.UnOp:
-			if r.Op != token.MUL {
-				return true
-			}
-		case *ssa.DebugRef:
-		case *ssa.MakeClosure:
-			fn, ok := r.Fn.(*ssa.Function)
-			if !ok {
-				return true
-			}
-			for i, b := range r.Bindings {
-				if b != addr {
-					continue
-				}
-				if i >= len(fn.FreeVars) || writtenElsewhere(fn.FreeVars[i], false, seen) {
-					return true
-				}
-			}
-		default:
-			return true
-		}
-	}
-	return false
 }

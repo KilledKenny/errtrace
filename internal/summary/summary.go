@@ -31,6 +31,10 @@ const (
 	// enters the closure at Site, and came from the values the creating
 	// function (ArgFn) bound to the variable, with sources ArgSources.
 	Captured
+	// Stored is a fact loaded, at Site, from a place that another
+	// function writes: it is the value that function (ArgFn) stores with
+	// the instruction Store, where it has the sources ArgSources.
+	Stored
 )
 
 // MaxSources is how many sources a fact keeps, ranked local first, then
@@ -66,8 +70,12 @@ type Source struct {
 	// Dynamic reports whether a Via source's call is a dynamic call.
 	Dynamic bool
 	// ArgFn is, for a Captured source, the function that created the
-	// closure, where ArgSources are.
+	// closure, and, for a Stored source, the function that makes the
+	// store: where ArgSources are.
 	ArgFn *ssa.Function
+	// Store is, for a Stored source, the instruction of ArgFn that stores
+	// the value.
+	Store ssa.Instruction
 }
 
 // rank orders sources: local first, then static calls, then dynamic calls.
@@ -75,7 +83,7 @@ func (s Source) rank() int {
 	switch {
 	case s.Kind == Local, s.Kind == Captured:
 		return 0
-	case !s.Dynamic:
+	case s.Kind == Stored, !s.Dynamic:
 		return 1
 	}
 	return 2
@@ -84,7 +92,7 @@ func (s Source) rank() int {
 func sourceEqual(a, b Source) bool {
 	return a.Kind == b.Kind && a.Site == b.Site && a.Callee == b.Callee &&
 		a.CalleeResult == b.CalleeResult && a.CalleeValue == b.CalleeValue && a.CalleeLeaf == b.CalleeLeaf &&
-		a.Dynamic == b.Dynamic && a.ArgFn == b.ArgFn && slices.EqualFunc(a.ArgSources, b.ArgSources, sourceEqual)
+		a.Dynamic == b.Dynamic && a.ArgFn == b.ArgFn && a.Store == b.Store && slices.EqualFunc(a.ArgSources, b.ArgSources, sourceEqual)
 }
 
 // addSource adds src to srcs unless it is there already, keeping srcs

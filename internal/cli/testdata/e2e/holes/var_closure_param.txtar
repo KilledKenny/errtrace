@@ -1,0 +1,45 @@
+A closure that stores its own parameter: who calls the closure, and with what,
+is not followed from the variable, so the load is Unresolved for it; the
+closure's other store is found.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:9:12-13: Error Set of example.com/fx.F: 2 entries, 1 unresolved
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:16:9-15: in example.com/fx.F$1
+		$WORK/a.go:16:3-6: in example.com/fx.F$1
+		$WORK/a.go:18:9-12: in example.com/fx.F
+$WORK/a.go:13:10-11: unresolved(memory): variable err written from parameter e of example.com/fx.F$1
+	path (origin → target):
+		$WORK/a.go:13:10-11: in example.com/fx.F$1
+		$WORK/a.go:13:4-7: in example.com/fx.F$1
+		$WORK/a.go:18:9-12: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import "io"
+
+func each(f func(error)) {
+	f(io.ErrUnexpectedEOF)
+}
+
+func /*@f*/F(n int) error {
+	var err error
+	each(func(e error) {
+		if n > 0 {
+			err = e
+			return
+		}
+		err = io.EOF
+	})
+	return err
+}
+
+func main() {
+	_ = F(0)
+}

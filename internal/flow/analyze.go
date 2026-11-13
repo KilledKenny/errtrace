@@ -435,10 +435,14 @@ func (a *analyzer) load(v *ssa.UnOp) bool {
 }
 
 // local follows a load of a local variable that was not lifted to a
-// register (such as a named result in a function with defers) to the
-// values stored into it. If the variable's address escapes, or it is a
-// composite literal of a concrete error type, the load is classified
-// accordingly.
+// register (a named result in a function with defers, a variable a closure
+// captures) to the values stored into it: the stores of the analysed
+// function are walked where they are, and a store made by a closure that
+// captured the variable becomes a StoreRef, which the summaries resolve in
+// the closure. If the variable can be written in a way errtrace does not
+// follow to a store (its address is passed to a call, stored, converted
+// ...), an Unresolved value is added to the values found. A composite
+// literal of a concrete error type is classified as such.
 func (a *analyzer) local(load *ssa.UnOp, alloc *ssa.Alloc) {
 	if alloc.Comment == "complit" {
 		a.constructed(load.Type(), alloc)
@@ -446,39 +450,148 @@ func (a *analyzer) local(load *ssa.UnOp, alloc *ssa.Alloc) {
 	}
 	pt := a.pt
 	defer func() { a.pt = pt }()
-	if alloc == a.captured {
-		for _, r := range *alloc.Referrers() {
-			if st, ok := r.(*ssa.Store); ok && st.Addr == alloc && !a.active[st] {
-				a.active[st] = true
-				a.pt = pointOf(st)
-				a.walk(st.Val)
-				delete(a.active, st)
-			}
+	w := variableWriters(alloc)
+	for _, st := range w.stores {
+		switch {
+		case st.Parent() != a.fn:
+			a.pt = pt
+			a.storeRef(st, alloc, a.located(load, alloc))
+		case alloc != a.captured:
+			// A stored value is used at its store.
+			a.pt = pointOf(st)
+			a.walk(st.Val)
+		case !a.active[st]:
+			a.active[st] = true
+			a.pt = pointOf(st)
+			a.walk(st.Val)
+			delete(a.active, st)
 		}
+	}
+	if w.escapes {
+		a.pt = pt
+		a.memory(load, escapedVariable(alloc))
+	}
+}
+
+// located returns the load v of the variable alloc as the place a value
+// enters the function, or, if v has no position (the load of a named
+// result that a return makes after the deferred calls), the instruction
+// the analyzer walks for, or else (the return after a recovered panic)
+// the variable.
+func (a *analyzer) located(v ssa.Value, alloc *ssa.Alloc) any {
+	switch {
+	case v.Pos().IsValid():
+		return v
+	case a.at != nil && a.at.Pos().IsValid():
+		return a.at
+	case alloc.Pos().IsValid():
+		return alloc
+	}
+	return v
+}
+
+// escapedVariable is the detail of the Unresolved value of a local
+// variable that may be written other than by the stores errtrace found.
+func escapedVariable(alloc *ssa.Alloc) string {
+	return "variable " + alloc.Comment + " may be written through an escaped pointer"
+}
+
+// storeRef records the StoreRef of st, a store that a closure makes to
+// the captured variable alloc, loaded at src.
+func (a *analyzer) storeRef(st *ssa.Store, alloc *ssa.Alloc, src any) {
+	a.add(a.tbl.Intern(errset.Value{
+		Kind:  errset.StoreRef,
+		Site:  st,
+		Pos:   st.Pos(),
+		Fn:    st.Parent().String(),
+		Index: instrNumber(st),
+		Name:  alloc.Comment,
+	}), src)
+}
+
+// instrNumber returns the number of instr among the instructions of its
+// function, in block order.
+func instrNumber(instr ssa.Instruction) int {
+	n := 0
+	for _, b := range instr.Parent().Blocks {
+		if b != instr.Block() {
+			n += len(b.Instrs)
+			continue
+		}
+		for _, i := range b.Instrs {
+			if i == instr {
+				return n
+			}
+			n++
+		}
+	}
+	return n
+}
+
+// varWriters are the ways a local variable is written.
+type varWriters struct {
+	// stores are the Store instructions that write the variable: those of
+	// the function that declares it and those of every closure that
+	// captured it by reference (nested closures included), in the order
+	// of the variable's referrers.
+	stores []*ssa.Store
+	// escapes reports that the variable's address is used other than to
+	// load it, to store to it or to bind it into a closure: it may then be
+	// written by code errtrace does not attribute to it.
+	escapes bool
+}
+
+// variableWriters finds the writers of the local variable alloc. A
+// closure's body is always known, so however the closure itself is used
+// (called, deferred, run as a goroutine, passed on or stored), its writes
+// to the variable are its Stores through its FreeVar.
+func variableWriters(alloc *ssa.Alloc) varWriters {
+	var w varWriters
+	w.collect(alloc, make(map[ssa.Value]bool))
+	return w
+}
+
+func (w *varWriters) collect(addr ssa.Value, seen map[ssa.Value]bool) {
+	if seen[addr] {
 		return
 	}
-	if alloc.Heap {
-		a.memory(load, "load of escaping variable "+alloc.Comment)
+	seen[addr] = true
+	refs := addr.Referrers()
+	if refs == nil {
 		return
 	}
-	escapes := false
-	for _, r := range *alloc.Referrers() {
+	for _, r := range *refs {
 		switch r := r.(type) {
 		case *ssa.Store:
-			if r.Addr == alloc {
-				// A stored value is used at its store.
-				a.pt = pointOf(r)
-				a.walk(r.Val)
+			if r.Addr != addr || r.Val == addr {
+				w.escapes = true
 				continue
 			}
-			escapes = true
-		case *ssa.UnOp, *ssa.DebugRef:
+			w.stores = append(w.stores, r)
+		case *ssa.UnOp:
+			if r.Op != token.MUL {
+				w.escapes = true
+			}
+		case *ssa.DebugRef:
+		case *ssa.MakeClosure:
+			fn, ok := r.Fn.(*ssa.Function)
+			if !ok {
+				w.escapes = true
+				continue
+			}
+			for i, b := range r.Bindings {
+				if b != addr {
+					continue
+				}
+				if i >= len(fn.FreeVars) {
+					w.escapes = true
+					continue
+				}
+				w.collect(fn.FreeVars[i], seen)
+			}
 		default:
-			escapes = true
+			w.escapes = true
 		}
-	}
-	if escapes {
-		a.memory(load, "load of variable "+alloc.Comment+" whose address escapes")
 	}
 }
 

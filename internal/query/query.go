@@ -201,6 +201,14 @@ func (r *Result) leafTop(v errset.Value) errset.ValueID {
 			Unresolved: errset.DynamicFormat,
 			Detail:     fmt.Sprintf("format of fmt.Errorf comes from parameter %s of %s", v.Name, v.Fn),
 		})
+	case errset.StoreRef:
+		// The summaries resolve these; one that is left is a place the
+		// analysis did not see through.
+		return r.Table.Intern(errset.Value{
+			Kind: errset.Unresolved, Site: v.Site, Pos: v.Pos,
+			Unresolved: errset.Memory,
+			Detail:     fmt.Sprintf("variable %s written by %s", v.Name, v.Fn),
+		})
 	}
 	return r.Table.Intern(v)
 }

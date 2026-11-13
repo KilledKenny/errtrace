@@ -60,6 +60,12 @@ const (
 	// substitutes its argument). It has the leaves of its inner value and
 	// only exists inside summaries.
 	Guarded
+	// StoreRef is symbolic: the value that the Store instruction at Site,
+	// in closure Fn, writes to the local variable Name, which Fn captured
+	// by reference and another function loads. Index numbers the store
+	// within Fn. The summaries replace it by the stored value's facts in
+	// Fn; it only exists inside summaries.
+	StoreRef
 )
 
 var kindNames = [...]string{
@@ -74,6 +80,7 @@ var kindNames = [...]string{
 	CallRef:    "callref",
 	ErrorfLike: "errorf-like",
 	Guarded:    "guarded",
+	StoreRef:   "storeref",
 }
 
 // String returns the lower-case name of k.
@@ -202,16 +209,18 @@ type Value struct {
 	// Detail describes an Unresolved value, or the callee of a CallRef.
 	Detail string
 
-	// Fn is the SSA name of the function a Param or FreeVar belongs to.
+	// Fn is the SSA name of the function a Param or FreeVar belongs to,
+	// or of the closure that makes the store of a StoreRef.
 	Fn string
 	// Index is the parameter index of a Param, the free variable index of
-	// a FreeVar, the result index of a CallRef, or the format parameter
-	// index of an ErrorfLike.
+	// a FreeVar, the result index of a CallRef, the format parameter
+	// index of an ErrorfLike, or the number of a StoreRef's store in Fn.
 	Index int
 	// ArgIndex is the index of the variadic operands parameter of an
 	// ErrorfLike.
 	ArgIndex int
-	// Name is the source name of a Param or FreeVar.
+	// Name is the source name of a Param or FreeVar, or of the variable a
+	// StoreRef's store writes.
 	Name string
 	// Guards are the pending guards of a Guarded value.
 	Guards []Guard
@@ -379,6 +388,8 @@ func (t *Table) String(id ValueID) string {
 		return fmt.Sprintf("callref %s #%d", v.Detail, v.Index)
 	case ErrorfLike:
 		return fmt.Sprintf("errorf-like %s format#%d args#%d", v.Fn, v.Index, v.ArgIndex)
+	case StoreRef:
+		return fmt.Sprintf("storeref %s#%d %s", v.Fn, v.Index, v.Name)
 	case Guarded:
 		parts := make([]string, len(v.Guards))
 		for i, g := range v.Guards {

@@ -1,11 +1,14 @@
-A captured err that another closure also writes is not complete: the load is
-unresolved(memory).
+A captured err that another closure also writes: the closure that reads it
+gets the values of the other closure's store, through the variable of their
+creator.
 -- args --
 a.go:@closure
 -- stdout --
-$WORK/a.go:11:21-25: Error Set of example.com/fx.setInside$2: 1 entries, 1 unresolved
-$WORK/a.go:8:6-9: unresolved(memory): load of escaping variable err
+$WORK/a.go:11:21-25: Error Set of example.com/fx.setInside$2: 1 entries
+$WORK/a.go:5:5-9: sentinel example.com/fx.ErrA
 	path (origin → target):
+		$WORK/a.go:9:22-26: in example.com/fx.setInside$1
+		$WORK/a.go:9:16-19: in example.com/fx.setInside$1
 		$WORK/a.go:8:6-9: in example.com/fx.setInside
 		$WORK/a.go:11:43-46: in example.com/fx.setInside$2
 -- go.mod --

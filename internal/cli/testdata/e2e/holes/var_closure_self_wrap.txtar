@@ -1,0 +1,71 @@
+A closure that wraps the variable it writes: the Wrap holds the variable's
+other values and, through the closure again, itself, up to the chain depth
+(2 here).
+-- args --
+-chain-depth=2 a.go:@f
+-- stdout --
+$WORK/a.go:8:12-13: Error Set of example.com/fx.F: 4 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:9:9-15: in example.com/fx.F
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	wrap chain (origin → target):
+		$WORK/a.go:11:9-37: fmt.Errorf "retry: %w"
+	path (origin → target):
+		$WORK/a.go:9:9-15: in example.com/fx.F
+		$WORK/a.go:11:33-36: in example.com/fx.F$1
+		$WORK/a.go:11:3-6: in example.com/fx.F$1
+		$WORK/a.go:16:9-12: in example.com/fx.F
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	wrap chain (origin → target):
+		$WORK/a.go:11:9-37: fmt.Errorf "retry: %w"
+		$WORK/a.go:11:9-37: fmt.Errorf "retry: %w"
+	path (origin → target):
+		$WORK/a.go:9:9-15: in example.com/fx.F
+		$WORK/a.go:11:33-36: in example.com/fx.F$1
+		$WORK/a.go:11:3-6: in example.com/fx.F$1
+		$WORK/a.go:9:2-5: in example.com/fx.F
+		$WORK/a.go:11:33-36: in example.com/fx.F$1
+		$WORK/a.go:11:3-6: in example.com/fx.F$1
+		$WORK/a.go:16:9-12: in example.com/fx.F
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain truncated]
+	wrap chain (origin → target):
+		$WORK/a.go:11:9-37: fmt.Errorf "retry: %w"
+		$WORK/a.go:11:9-37: fmt.Errorf "retry: %w"
+	path (origin → target):
+		$WORK/a.go:9:9-15: in example.com/fx.F
+		$WORK/a.go:11:33-36: in example.com/fx.F$1
+		$WORK/a.go:11:3-6: in example.com/fx.F$1
+		$WORK/a.go:9:2-5: in example.com/fx.F
+		$WORK/a.go:11:33-36: in example.com/fx.F$1
+		$WORK/a.go:11:3-6: in example.com/fx.F$1
+		$WORK/a.go:9:2-5: in example.com/fx.F
+		$WORK/a.go:11:33-36: in example.com/fx.F$1
+		$WORK/a.go:11:3-6: in example.com/fx.F$1
+		$WORK/a.go:16:9-12: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+)
+
+func /*@f*/F(n int) error {
+	err := io.EOF
+	retry := func() {
+		err = fmt.Errorf("retry: %w", err)
+	}
+	for i := 0; i < n; i++ {
+		retry()
+	}
+	return err
+}
+
+func main() {
+	_ = F(0)
+}

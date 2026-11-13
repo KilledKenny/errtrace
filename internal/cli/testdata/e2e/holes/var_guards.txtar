@@ -1,0 +1,60 @@
+Guards and a variable written by a closure. A guard that holds for the stored
+value at the closure's store filters that value (e is not io.EOF where the
+closure stores it); a guard on the loaded value at its use in F filters every
+stored value (the loaded value is not ErrSkip where F returns it). The
+closure's other checks say nothing about the load.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:23:12-13: Error Set of example.com/fx.F: 1 entries
+$WORK/a.go:10:2-9: sentinel example.com/fx.ErrKeep
+	path (origin → target):
+		$WORK/a.go:20:9-16: in example.com/fx.source
+		$WORK/a.go:26:8-17: in example.com/fx.F$1, call to example.com/fx.source
+		$WORK/a.go:28:4-7: in example.com/fx.F$1
+		$WORK/a.go:31:9-12: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"io"
+)
+
+var (
+	ErrSkip = errors.New("skip")
+	ErrKeep = errors.New("keep")
+)
+
+func source(n int) error {
+	switch n {
+	case 0:
+		return io.EOF
+	case 1:
+		return ErrSkip
+	}
+	return ErrKeep
+}
+
+func /*@f*/F(n int) error {
+	var err error
+	func() {
+		e := source(n)
+		if e != io.EOF {
+			err = e
+		}
+	}()
+	got := err
+	if got == ErrSkip {
+		return nil
+	}
+	return got
+}
+
+func main() {
+	_ = F(0)
+}

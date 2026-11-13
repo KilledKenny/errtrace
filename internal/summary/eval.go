@@ -72,6 +72,9 @@ func (s *Solver) expand(fn *ssa.Function, f flow.Fact, fs *factSet, st *evalStat
 		if creator, facts, ok := s.binding(fn, v); ok {
 			return s.captured(creator, facts, f.LeafSource(k), st)
 		}
+		if store, ok := v.Site.(*ssa.Store); ok && v.Kind == errset.StoreRef {
+			return s.stored(fn, store, v, f.LeafSource(k), st)
+		}
 		site, ok := v.Site.(ssa.CallInstruction)
 		if v.Kind != errset.CallRef || !ok {
 			return []subst{{value: id, leaves: local(1, Source{Kind: Local, Site: f.LeafSource(k)})}}
@@ -107,9 +110,58 @@ func (s *Solver) captured(creator *ssa.Function, facts []flow.Fact, site any, st
 	return out
 }
 
-// callKey is one error result of a call site.
+// stored expands the StoreRef v: the value that the closure w stores with
+// the instruction store to a captured variable that is loaded at site in
+// fn. The stored value's facts are expanded in w, once per evaluation (a
+// store reached inside its own expansion, as for err = wrap(err), stands
+// for its values of the previous pass, like a call site: see expandCall).
+// Each leaf gets a Stored source: loaded at site, from its sources in w.
+// The symbolic values of fn itself stay (a closure that stores what it
+// captured of fn's parameters runs for the same call of fn); those of
+// other functions are made Unresolved, since the load cannot know them:
+// the closure's own parameters, whose arguments depend on who calls it,
+// and captured variables whose bindings are not known.
+func (s *Solver) stored(fn *ssa.Function, store *ssa.Store, v errset.Value, site any, st *evalState) []subst {
+	w := store.Parent()
+	facts := s.memoized(callKey{store, 0}, st, func(fs *factSet) {
+		for _, af := range s.argFacts(w, store.Val, store) {
+			s.expand(w, af, fs, st)
+		}
+	})
+	var out []subst
+	for _, f := range facts {
+		for _, sub := range s.mapTree(f.Value, func(id errset.ValueID, k int) []subst {
+			l := s.tbl.Get(id)
+			if l.Fn != fn.String() {
+				what := ""
+				switch l.Kind {
+				case errset.Param:
+					what = "parameter " + l.Name
+				case errset.FreeVar:
+					what = "captured variable " + l.Name
+				case errset.ErrorfLike:
+					what = "a format forwarded from parameter " + l.Name
+				}
+				if what != "" {
+					id = s.tbl.Intern(errset.Value{
+						Kind: errset.Unresolved, Site: l.Site, Pos: l.Pos,
+						Unresolved: errset.Memory,
+						Detail:     fmt.Sprintf("variable %s written from %s of %s", v.Name, what, l.Fn),
+					})
+				}
+			}
+			return []subst{{value: id, leaves: [][]Source{{{Kind: Stored, Site: site, ArgFn: w, Store: store, ArgSources: f.Leaves[k]}}}}}
+		}) {
+			out = append(out, subst{value: sub.value, leaves: sub.leaves, notes: errset.AddNotes(slices.Clone(f.Notes), sub.notes...)})
+		}
+	}
+	return out
+}
+
+// callKey is one error result of a call site, or, with index 0, the
+// value of a Store instruction (see stored).
 type callKey struct {
-	site  ssa.CallInstruction
+	site  any
 	index int
 }
 
@@ -145,30 +197,34 @@ func (st *evalState) taint() {
 // are not final: they are expanded once per pass until the values of the
 // pass stop changing (see evaluate). Every other site is expanded once.
 func (s *Solver) expandCall(fn *ssa.Function, site ssa.CallInstruction, index int, fs *factSet, st *evalState) {
-	key := callKey{site, index}
-	addAll := func(facts []Fact) {
-		for _, f := range facts {
-			fs.add(f.Value, f.Leaves, f.Notes)
-		}
+	for _, f := range s.memoized(callKey{site, index}, st, func(cur *factSet) {
+		s.expandCallOnce(fn, site, index, cur, st)
+	}) {
+		fs.add(f.Value, f.Leaves, f.Notes)
 	}
+}
+
+// memoized returns the values of key in the evaluation st, which compute
+// finds: computed once if they depend on no value still being solved, and
+// otherwise once per pass, with key standing for its values of the
+// previous pass where it is reached inside its own computation (see
+// expandCall).
+func (s *Solver) memoized(key callKey, st *evalState, compute func(*factSet)) []Fact {
 	if facts, ok := st.final[key]; ok {
-		addAll(facts)
-		return
+		return facts
 	}
 	if facts, ok := st.cur[key]; ok {
 		st.taint()
-		addAll(facts)
-		return
+		return facts
 	}
 	if st.onStack[key] {
 		st.taint()
-		addAll(st.prev[key])
-		return
+		return st.prev[key]
 	}
 	st.onStack[key] = true
 	st.tainted = append(st.tainted, false)
 	var cur factSet
-	s.expandCallOnce(fn, site, index, &cur, st)
+	compute(&cur)
 	n := len(st.tainted) - 1
 	tainted := st.tainted[n]
 	st.tainted = st.tainted[:n]
@@ -182,7 +238,7 @@ func (s *Solver) expandCall(fn *ssa.Function, site ssa.CallInstruction, index in
 	} else {
 		st.final[key] = cur.facts
 	}
-	addAll(cur.facts)
+	return cur.facts
 }
 
 // expandCallOnce is one round of expandCall.

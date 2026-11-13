@@ -222,9 +222,10 @@ func (s *Solver) demandSites(fn *ssa.Function) []ssa.CallInstruction {
 		return sites
 	}
 	var initial []ssa.CallInstruction
+	visited := make(map[*ssa.Store]bool)
 	for _, r := range s.localFacts(fn).Results {
 		for _, f := range r.Facts {
-			initial = s.appendCallRefSites(fn, initial, f.Value)
+			initial = s.appendCallRefSites(fn, initial, f.Value, visited)
 		}
 	}
 	sites = s.sitesFrom(initial)
@@ -237,6 +238,7 @@ func (s *Solver) demandSites(fn *ssa.Function) []ssa.CallInstruction {
 // function that contains it, without duplicates.
 func (s *Solver) sitesFrom(initial []ssa.CallInstruction) []ssa.CallInstruction {
 	seen := make(map[ssa.CallInstruction]bool)
+	visited := make(map[*ssa.Store]bool)
 	var out []ssa.CallInstruction
 	work := append([]ssa.CallInstruction(nil), initial...)
 	for len(work) > 0 {
@@ -250,7 +252,7 @@ func (s *Solver) sitesFrom(initial []ssa.CallInstruction) []ssa.CallInstruction 
 		fn := site.Parent()
 		for _, v := range errorOperands(site) {
 			for _, f := range s.argFacts(fn, v, site) {
-				work = s.appendCallRefSites(fn, work, f.Value)
+				work = s.appendCallRefSites(fn, work, f.Value, visited)
 			}
 		}
 	}
@@ -289,9 +291,12 @@ func errorOperands(site ssa.CallInstruction) []ssa.Value {
 }
 
 // appendCallRefSites appends the sites of the CallRef leaves of the value
-// tree id of fn, and those of the values bound to its FreeVar leaves in
-// the function that created the closure fn.
-func (s *Solver) appendCallRefSites(fn *ssa.Function, sites []ssa.CallInstruction, id errset.ValueID) []ssa.CallInstruction {
+// tree id of fn, those of the values bound to its FreeVar leaves in the
+// function that created the closure fn, and those of the values its
+// StoreRef leaves' stores write in their closures. visited holds the
+// stores already followed, which keeps a variable that is stored to
+// itself (err = wrap(err) in a closure) finite.
+func (s *Solver) appendCallRefSites(fn *ssa.Function, sites []ssa.CallInstruction, id errset.ValueID, visited map[*ssa.Store]bool) []ssa.CallInstruction {
 	v := s.tbl.Get(id)
 	switch v.Kind {
 	case errset.CallRef:
@@ -301,12 +306,19 @@ func (s *Solver) appendCallRefSites(fn *ssa.Function, sites []ssa.CallInstructio
 	case errset.FreeVar:
 		if creator, facts, ok := s.binding(fn, v); ok {
 			for _, f := range facts {
-				sites = s.appendCallRefSites(creator, sites, f.Value)
+				sites = s.appendCallRefSites(creator, sites, f.Value, visited)
+			}
+		}
+	case errset.StoreRef:
+		if st, ok := v.Site.(*ssa.Store); ok && !visited[st] {
+			visited[st] = true
+			for _, f := range s.argFacts(st.Parent(), st.Val, st) {
+				sites = s.appendCallRefSites(st.Parent(), sites, f.Value, visited)
 			}
 		}
 	case errset.Wrap, errset.Truncated, errset.Guarded:
 		for _, in := range v.Inner {
-			sites = s.appendCallRefSites(fn, sites, in)
+			sites = s.appendCallRefSites(fn, sites, in, visited)
 		}
 	}
 	return sites
