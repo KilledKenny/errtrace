@@ -25,7 +25,7 @@ import (
 func (s *Solver) evaluate(fn *ssa.Function) []ResultSummary {
 	lf := s.localFacts(fn)
 	var out []ResultSummary
-	s.passes(func(st *evalState) {
+	converged := s.passes(func(st *evalState) {
 		out = make([]ResultSummary, len(lf.Results))
 		for i, r := range lf.Results {
 			var fs factSet
@@ -35,16 +35,33 @@ func (s *Solver) evaluate(fn *ssa.Function) []ResultSummary {
 			out[i] = ResultSummary{Index: r.Index, Facts: fs.facts}
 		}
 	})
+	if !converged {
+		for i := range out {
+			out[i].Facts = appendFact(out[i].Facts, s.notConverged(fn), Source{Kind: Local, Site: fn})
+		}
+	}
 	return out
+}
+
+// notConverged is the Unresolved value of an evaluation, in fn, whose
+// passes did not reach a fixpoint: values may be missing.
+func (s *Solver) notConverged(fn *ssa.Function) errset.ValueID {
+	return s.tbl.Intern(errset.Value{
+		Kind: errset.Unresolved, Site: fn, Pos: fn.Pos(),
+		Unresolved: errset.FixpointLimit,
+		Detail:     fmt.Sprintf("values in %s that depend on themselves did not converge", fn),
+	})
 }
 
 // passes runs pass, which expands values of one function, until the
 // values of the call sites solved together stop changing (see evaluate).
-func (s *Solver) passes(pass func(*evalState)) {
+// It reports false if they still changed at the pass limit.
+func (s *Solver) passes(pass func(*evalState)) bool {
 	st := &evalState{
 		final:   make(map[callKey][]Fact),
 		prev:    make(map[callKey][]Fact),
 		onStack: make(map[callKey]bool),
+		vars:    make(map[ssa.Value]int),
 	}
 	// The values only grow from pass to pass and are bounded by the cap;
 	// the pass limit is a safeguard against a non-monotone pass.
@@ -53,8 +70,11 @@ func (s *Solver) passes(pass func(*evalState)) {
 		st.cur = make(map[callKey][]Fact)
 		st.changed = false
 		pass(st)
-		if !st.changed || n == limit {
-			return
+		if !st.changed {
+			return true
+		}
+		if n == limit {
+			return false
 		}
 		st.prev = st.cur
 	}
@@ -126,16 +146,38 @@ func (s *Solver) captured(creator *ssa.Function, facts []flow.Fact, site any, st
 // and captured variables whose bindings are not known.
 func (s *Solver) stored(fn *ssa.Function, store *ssa.Store, v errset.Value, site any, st *evalState) []subst {
 	w := store.Parent()
-	facts := s.memoized(callKey{store, 0}, st, func(fs *factSet) {
-		for _, af := range s.argFacts(w, store.Val, store) {
-			s.expand(w, af, fs, st)
+	key := callKey{store, 0}
+	root := s.rootVar(store.Addr)
+	var facts []Fact
+	if st.vars[root] > 0 {
+		// A load of the variable inside a value stored to it (err =
+		// wrap(err), through any of its stores): the value read went
+		// through a store before, perhaps many times. It stands for
+		// the leaves of the store's values so far, each under a
+		// Truncated marker, so that a store adds its Wraps once and
+		// the values stay linear in the stores.
+		st.taint()
+		known, ok := st.final[key]
+		if !ok {
+			if known, ok = st.cur[key]; !ok {
+				known = st.prev[key]
+			}
 		}
-	})
+		facts = s.flat(known)
+	} else {
+		st.vars[root]++
+		facts = s.memoized(key, st, func(fs *factSet) {
+			for _, af := range s.argFacts(w, store.Val, store) {
+				s.expand(w, af, fs, st)
+			}
+		})
+		st.vars[root]--
+	}
 	var out []subst
 	for _, f := range facts {
 		for _, sub := range s.mapTree(f.Value, func(id errset.ValueID, k int) []subst {
 			l := s.tbl.Get(id)
-			if l.Fn != fn.String() {
+			if !s.belongsTo(l, fn) {
 				what := ""
 				switch l.Kind {
 				case errset.Param:
@@ -161,6 +203,145 @@ func (s *Solver) stored(fn *ssa.Function, store *ssa.Store, v errset.Value, site
 	return out
 }
 
+// belongsTo reports whether the symbolic value l (a Param, FreeVar or
+// ErrorfLike) is one of fn's own.
+func (s *Solver) belongsTo(l errset.Value, fn *ssa.Function) bool {
+	switch site := l.Site.(type) {
+	case *ssa.Parameter:
+		return site.Parent() == fn
+	case ssa.Value:
+		if site.Parent() != nil {
+			return site.Parent() == fn
+		}
+	case ssa.Instruction:
+		return site.Parent() == fn
+	}
+	return l.Fn == fn.String()
+}
+
+// rootVar returns the local variable (an Alloc) that the address addr of
+// a closure's store stands for: addr itself, or what the closure's
+// captured variable was bound to, through nested closures.
+func (s *Solver) rootVar(addr ssa.Value) ssa.Value {
+	for range 64 {
+		fv, ok := addr.(*ssa.FreeVar)
+		if !ok {
+			return addr
+		}
+		fn := fv.Parent()
+		creator := fn.Parent()
+		index := slices.Index(fn.FreeVars, fv)
+		if creator == nil || index < 0 {
+			return addr
+		}
+		var bound ssa.Value
+		for _, b := range creator.Blocks {
+			for _, instr := range b.Instrs {
+				if mc, ok := instr.(*ssa.MakeClosure); ok && mc.Fn == fn && index < len(mc.Bindings) {
+					bound = mc.Bindings[index]
+				}
+			}
+		}
+		if bound == nil {
+			return addr
+		}
+		addr = bound
+	}
+	return addr
+}
+
+// flat returns facts with every Wrap Chain cut: each leaf of each value
+// under a Truncated marker (a value that is a leaf stays as it is), with
+// the leaf's sources. It stands for values that went around a cycle of
+// stores an unknown number of times: the Origins are those of facts, and
+// the marker says that more Wraps may lie between.
+func (s *Solver) flat(facts []Fact) []Fact {
+	var fs factSet
+	for _, f := range facts {
+		for _, c := range s.tbl.CapLeaves(f.Value, 0) {
+			leaves := make([][]Source, len(c.From))
+			for i, from := range c.From {
+				for _, k := range from {
+					for _, src := range f.Leaves[k] {
+						leaves[i] = addSource(leaves[i], src)
+					}
+				}
+			}
+			fs.add(c.Value, leaves, nil)
+		}
+	}
+	return fs.facts
+}
+
+// holey reports whether the value tree id has a leaf that is not an Error
+// Origin: an Unresolved value, or a symbolic value that may become one.
+// Such a value must survive every cut (see keepHoles).
+func (s *Solver) holey(id errset.ValueID) bool {
+	if h, ok := s.holes[id]; ok {
+		return h
+	}
+	v := s.tbl.Get(id)
+	h := false
+	if v.Kind.IsLeaf() {
+		h = !v.Kind.IsOrigin()
+	} else {
+		for _, in := range v.Inner {
+			h = h || s.holey(in)
+		}
+	}
+	s.holes[id] = h
+	return h
+}
+
+// holeLeaves returns the leaves of the value tree id that are not Error
+// Origins, each as a value of its own under a Truncated marker (its Wrap
+// Chain is dropped), with its sources from leaves.
+func (s *Solver) holeLeaves(id errset.ValueID, leaves [][]Source) []subst {
+	if !s.holey(id) {
+		return nil
+	}
+	var out []subst
+	for k, e := range errset.Flatten(s.tbl, id) {
+		l := s.tbl.Get(e.Leaf)
+		if l.Kind.IsOrigin() {
+			continue
+		}
+		v := e.Leaf
+		if len(e.Chain) > 0 || e.Truncated {
+			v = s.tbl.Intern(errset.Value{Kind: errset.Truncated, Site: l.Site, Pos: l.Pos, Inner: []errset.ValueID{e.Leaf}})
+		}
+		var srcs []Source
+		if k < len(leaves) {
+			srcs = leaves[k]
+		}
+		out = append(out, subst{value: v, leaves: [][]Source{srcs}})
+	}
+	return out
+}
+
+// cutFacts cuts facts down to its first n. No Unresolved value is lost
+// with what is dropped: the leaves of the dropped values that are not
+// Error Origins (Unresolved values, and symbolic values that may become
+// one) are kept as values of their own, under Truncated markers. There
+// are at most as many of those as the program has such places, so the
+// result stays bounded.
+func (s *Solver) cutFacts(facts []Fact, n int) []Fact {
+	if len(facts) <= n {
+		return facts
+	}
+	fs := factSet{facts: facts[:n:n]}
+	fs.index = make(map[errset.ValueID]int, n)
+	for i, f := range fs.facts {
+		fs.index[f.Value] = i
+	}
+	for _, f := range facts[n:] {
+		for _, h := range s.holeLeaves(f.Value, f.Leaves) {
+			fs.add(h.value, h.leaves, nil)
+		}
+	}
+	return fs.facts
+}
+
 // callKey is one error result of a call site, or, with index 0, the
 // value of a Store instruction (see stored).
 type callKey struct {
@@ -182,6 +363,9 @@ type evalState struct {
 	tainted []bool
 	// changed says whether a value of this pass differs from prev.
 	changed bool
+	// vars counts, per local variable, the stores to it that are being
+	// expanded (see stored).
+	vars map[ssa.Value]int
 }
 
 // taint marks the call site result being expanded as not final.
@@ -480,18 +664,44 @@ func (s *Solver) mapTreeRaw(id errset.ValueID, base int, leaf func(errset.ValueI
 		}
 		return out
 	}
+	var operands [][]subst
+	// limits are the fixpoint-limit values among the inner values' values.
+	// They say that a set was cut, which is true of the Wrap's values as
+	// well: they pass through as they are instead of being wrapped, which
+	// would make one of them per Wrap Chain.
+	var limits []subst
+	off := base
+	several := 0
+	for _, in := range v.Inner {
+		var subs []subst
+		for _, sub := range s.mapTreeRaw(in, off, leaf) {
+			if s.isLimit(sub.value) {
+				limits = append(limits, sub)
+			} else {
+				subs = append(subs, sub)
+			}
+		}
+		off += s.tbl.Leaves(in)
+		operands = append(operands, subs)
+		if len(subs) > 1 {
+			several++
+		}
+	}
+	limit := maxValues
+	if several > 1 {
+		limit = maxCombos
+	}
 	combos := []subst{{}}
 	var inner [][]errset.ValueID
 	inner = append(inner, nil)
-	off := base
-	for _, in := range v.Inner {
-		subs := s.mapTreeRaw(in, off, leaf)
-		off += s.tbl.Leaves(in)
+	cut := false
+	for _, subs := range operands {
 		var nextCombos []subst
 		var nextInner [][]errset.ValueID
 		for ci, c := range combos {
 			for _, sub := range subs {
-				if len(nextCombos) == maxValues {
+				if len(nextCombos) == limit {
+					cut = true
 					break
 				}
 				nextCombos = append(nextCombos, subst{
@@ -508,7 +718,50 @@ func (s *Solver) mapTreeRaw(id errset.ValueID, base int, leaf func(errset.ValueI
 		w.Inner = inner[i]
 		combos[i].value = s.tbl.Intern(w)
 	}
+	if cut && len(combos) > 0 {
+		marker := s.tbl.Intern(errset.Value{
+			Kind: errset.Unresolved, Site: v.Site, Pos: v.Pos,
+			Unresolved: errset.FixpointLimit,
+			Detail:     fmt.Sprintf("more than %d combinations of wrapped values", limit),
+		})
+		var srcs []Source
+		if len(combos[0].leaves) > 0 {
+			srcs = combos[0].leaves[0]
+		}
+		limits = append(limits, subst{value: marker, leaves: [][]Source{srcs}})
+		// No Unresolved value may be lost with the combinations that
+		// were dropped: those of the operands are kept as values of
+		// their own, without the Wrap.
+		seen := make(map[errset.ValueID]bool)
+		for _, subs := range operands {
+			for _, sub := range subs {
+				for _, h := range s.holeLeaves(sub.value, sub.leaves) {
+					if !seen[h.value] {
+						seen[h.value] = true
+						combos = append(combos, h)
+					}
+				}
+			}
+		}
+	}
+	seenLimit := make(map[errset.ValueID]bool)
+	for _, l := range limits {
+		if !seenLimit[l.value] {
+			seenLimit[l.value] = true
+			combos = append(combos, l)
+		}
+	}
 	return combos
+}
+
+// isLimit reports whether id is an Unresolved fixpoint-limit value (or
+// one under a Truncated marker): the mark of a set that was cut.
+func (s *Solver) isLimit(id errset.ValueID) bool {
+	v := s.tbl.Get(id)
+	if v.Kind == errset.Truncated {
+		v = s.tbl.Get(v.Inner[0])
+	}
+	return v.Kind == errset.Unresolved && v.Unresolved == errset.FixpointLimit
 }
 
 // applyGuards applies guards to the value of sub (see flow.ApplyGuard). It

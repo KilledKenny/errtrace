@@ -1,0 +1,36 @@
+QA C2. A recursive Target in a library: its only call site is its own, which
+does not make its callers seen. It is not reachable from main or init, so
+every field load keeps the Unresolved entry for code outside the reachable
+program.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:11:12-16: Error Set of example.com/x.Walk: 1 entries, 1 unresolved
+$WORK/a.go:17:9-14: unresolved(memory): field err of example.com/x.N may be written by code that is not reachable from the Query's roots [+1 more paths]
+	path (origin → target):
+		$WORK/a.go:17:9-14: in example.com/x.Walk
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package lib
+
+type N struct {
+	err   error
+	child *N
+}
+
+// SetErr is exported API; nothing in this module calls it.
+func (n *N) SetErr(e error) { n.err = e }
+
+func /*@q*/Walk(n *N) error {
+	if n.child != nil {
+		if err := Walk(n.child); err != nil {
+			return err
+		}
+	}
+	return n.err
+}

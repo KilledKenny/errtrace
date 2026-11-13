@@ -1,10 +1,12 @@
-A closure that wraps the variable it writes: the Wrap holds the variable's
-other values and, through the closure again, itself, up to the chain depth
-(2 here).
+A closure that wraps the variable it writes. The store is not unrolled to the
+chain depth: inside a value stored to the variable, a load of the variable
+stands for the leaves of its values with their Wrap Chains cut, so the Wrap is
+added once: over the variable's other values, and over "any value of the
+variable" (the entry marked chain truncated).
 -- args --
--chain-depth=2 a.go:@f
+a.go:@f
 -- stdout --
-$WORK/a.go:8:12-13: Error Set of example.com/fx.F: 4 entries
+$WORK/a.go:8:12-13: Error Set of example.com/fx.F: 3 entries
 $GOROOT/src/io/io.go:*: sentinel io.EOF
 	path (origin → target):
 		$WORK/a.go:9:9-15: in example.com/fx.F
@@ -13,30 +15,14 @@ $GOROOT/src/io/io.go:*: sentinel io.EOF
 		$WORK/a.go:11:9-37: fmt.Errorf "retry: %w"
 	path (origin → target):
 		$WORK/a.go:9:9-15: in example.com/fx.F
-		$WORK/a.go:11:33-36: in example.com/fx.F$1
-		$WORK/a.go:11:3-6: in example.com/fx.F$1
-		$WORK/a.go:16:9-12: in example.com/fx.F
-$GOROOT/src/io/io.go:*: sentinel io.EOF
-	wrap chain (origin → target):
-		$WORK/a.go:11:9-37: fmt.Errorf "retry: %w"
-		$WORK/a.go:11:9-37: fmt.Errorf "retry: %w"
-	path (origin → target):
-		$WORK/a.go:9:9-15: in example.com/fx.F
-		$WORK/a.go:11:33-36: in example.com/fx.F$1
-		$WORK/a.go:11:3-6: in example.com/fx.F$1
-		$WORK/a.go:9:2-5: in example.com/fx.F
 		$WORK/a.go:11:33-36: in example.com/fx.F$1
 		$WORK/a.go:11:3-6: in example.com/fx.F$1
 		$WORK/a.go:16:9-12: in example.com/fx.F
 $GOROOT/src/io/io.go:*: sentinel io.EOF [chain truncated]
 	wrap chain (origin → target):
 		$WORK/a.go:11:9-37: fmt.Errorf "retry: %w"
-		$WORK/a.go:11:9-37: fmt.Errorf "retry: %w"
 	path (origin → target):
 		$WORK/a.go:9:9-15: in example.com/fx.F
-		$WORK/a.go:11:33-36: in example.com/fx.F$1
-		$WORK/a.go:11:3-6: in example.com/fx.F$1
-		$WORK/a.go:9:2-5: in example.com/fx.F
 		$WORK/a.go:11:33-36: in example.com/fx.F$1
 		$WORK/a.go:11:3-6: in example.com/fx.F$1
 		$WORK/a.go:9:2-5: in example.com/fx.F

@@ -244,8 +244,29 @@ func (a *analyzer) wraps(base errset.Value, operands [][]wrapped) []Fact {
 	if dropped {
 		out = append(out, Fact{Value: a.unresolvedAt(base.Site, base.Pos, errset.FixpointLimit,
 			fmt.Sprintf("more than %d combinations of wrapped values", maxCombos)), Source: base.Site})
+		// No Unresolved or symbolic value may be lost with the
+		// combinations that were dropped: the operand values that hold
+		// one are kept as values of their own, without the Wrap.
+		for _, op := range operands {
+			for _, w := range op {
+				if a.holey(w.id) {
+					out = append(out, Fact{Value: w.id, Source: base.Site, Leaves: w.leaves})
+				}
+			}
+		}
 	}
 	return out
+}
+
+// holey reports whether the value tree id has a leaf that is not an Error
+// Origin.
+func (a *analyzer) holey(id errset.ValueID) bool {
+	for _, e := range errset.Flatten(a.tbl, id) {
+		if !a.tbl.Get(e.Leaf).Kind.IsOrigin() {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *analyzer) addFacts(facts []Fact) {

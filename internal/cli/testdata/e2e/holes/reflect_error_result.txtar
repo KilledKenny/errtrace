@@ -1,0 +1,41 @@
+QA C1. An error returned by a call is handed to a function that writes it by
+reflection. The trace of the sink's argument ends at a call result, whose
+dynamic type is not known: every type the program converts to error is
+exposed.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:17:12-13: Error Set of example.com/x.F: 1 entries, 1 unresolved
+$WORK/a.go:18:9-19: unresolved(memory): field Err of example.com/x.S may be written by reflection, unsafe code or a function that is not seen
+	path (origin → target):
+		$WORK/a.go:18:9-19: in example.com/x.F
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+	"reflect"
+)
+
+type S struct{ Err error }
+
+func (s *S) Error() string { return "s" }
+
+func mk() error { return &S{} }
+
+func poke(e error) { reflect.ValueOf(e).Elem().Field(0).Set(reflect.ValueOf(io.EOF)) }
+
+func /*@q*/F(e error) error {
+	return e.(*S).Err
+}
+
+func main() {
+	e := mk()
+	poke(e)
+	fmt.Println(F(e))
+}

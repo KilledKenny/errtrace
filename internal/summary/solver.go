@@ -16,8 +16,18 @@ import (
 const (
 	// maxRounds caps the fixpoint iterations inside one SCC.
 	maxRounds = 64
-	// maxValues caps the number of values one error result can carry.
-	maxValues = 1024
+	// maxValues caps the number of values one error result, or one field
+	// location, can carry. It was 1024 while a store that wraps what it
+	// loads was unrolled to the chain depth; such stores no longer
+	// multiply values (see Solver.flat), and the Error Set of a function
+	// that reaches much of the standard library has more than 1024
+	// values.
+	maxValues = 2048
+	// maxCombos caps the number of Wraps that substitution makes of one
+	// Wrap with several inner values from the combinations of their
+	// values. A Wrap of one inner value has as many as that value has,
+	// which maxValues bounds.
+	maxCombos = 1024
 )
 
 // Stats counts the work a Solver did.
@@ -57,6 +67,8 @@ type Solver struct {
 	fields *fieldIndex
 	// roots are the functions Solve and SolveSite were asked about.
 	roots []*ssa.Function
+	// holes caches holey.
+	holes map[errset.ValueID]bool
 
 	// transfer computes the result summaries of a function from the
 	// current summaries of its callees. It is evaluate, except in tests.
@@ -103,6 +115,7 @@ func NewSolver(tbl *errset.Table, res resolve.Resolver, opts flow.Options) *Solv
 		opts:     opts,
 		local:    make(map[*ssa.Function]*flow.LocalFacts),
 		demands:  make(map[*ssa.Function]*demand),
+		holes:    make(map[errset.ValueID]bool),
 		args:     make(map[argKey][]flow.Fact),
 		bindings: make(map[bindingKey]bindingFacts),
 		sums:     make(map[*ssa.Function]*Summary),
@@ -161,10 +174,13 @@ func (s *Solver) SolveSite(ctx context.Context, fn *ssa.Function, site ssa.CallI
 // site's dependencies must have been solved with SolveSite.
 func (s *Solver) SiteFacts(fn *ssa.Function, site ssa.CallInstruction, index int) []Fact {
 	var fs factSet
-	s.passes(func(st *evalState) {
+	converged := s.passes(func(st *evalState) {
 		fs = factSet{}
 		s.expandCall(fn, site, index, &fs, st)
 	})
+	if !converged {
+		return appendFact(fs.facts, s.notConverged(fn), Source{Kind: Local, Site: site})
+	}
 	return fs.facts
 }
 
@@ -442,9 +458,11 @@ func errorOperands(site ssa.CallInstruction) []ssa.Value {
 // one SCC, whose dependencies outside the SCC are solved already.
 func (s *Solver) solveSCC(scc []dnode) {
 	counted := false
+	var locs []*location
 	for _, n := range scc {
 		if n.loc != nil {
 			n.loc.sum = &locSummary{}
+			locs = append(locs, n.loc)
 			continue
 		}
 		fn := n.fn
@@ -468,6 +486,27 @@ func (s *Solver) solveSCC(scc []dnode) {
 		}
 		return
 	}
+	// While the SCC is solved, a load of one of its locations stands for
+	// the leaves of the location's values so far (see fieldValues): what
+	// is loaded went around the cycle an unknown number of times. Once
+	// the locations are known, the functions are evaluated once more
+	// with the locations' whole values.
+	for _, l := range locs {
+		l.open = true
+	}
+	defer func() {
+		for _, l := range locs {
+			l.open = false
+		}
+		if len(locs) == 0 {
+			return
+		}
+		for _, n := range scc {
+			if n.fn != nil {
+				s.sums[n.fn].Results = s.finalResults(n.fn, s.capSize(n.fn, s.transfer(n.fn)))
+			}
+		}
+	}()
 	var changed map[*ssa.Function][]bool
 	var changedLocs []*location
 	for range maxRounds {
@@ -529,6 +568,23 @@ func (s *Solver) selfEdge(n dnode) bool {
 	return false
 }
 
+// finalResults returns next, the results of fn evaluated once more after
+// its SCC was solved, with the fixpoint-limit values of the results that
+// did not converge carried over from fn's summary.
+func (s *Solver) finalResults(fn *ssa.Function, next []ResultSummary) []ResultSummary {
+	for i, r := range s.sums[fn].Results {
+		if i >= len(next) {
+			break
+		}
+		for _, f := range r.Facts {
+			if v := s.tbl.Get(f.Value); v.Kind == errset.Unresolved && v.Unresolved == errset.FixpointLimit && v.Site == any(fn) {
+				next[i].Facts = appendFact(next[i].Facts, f.Value, Source{Kind: Local, Site: fn})
+			}
+		}
+	}
+	return next
+}
+
 // capSize cuts every result with more than maxValues values down to
 // maxValues and adds an Unresolved fixpoint-limit value to it.
 func (s *Solver) capSize(fn *ssa.Function, results []ResultSummary) []ResultSummary {
@@ -537,7 +593,7 @@ func (s *Solver) capSize(fn *ssa.Function, results []ResultSummary) []ResultSumm
 		if len(r.Facts) <= maxValues {
 			continue
 		}
-		r.Facts = r.Facts[:maxValues:maxValues]
+		r.Facts = s.cutFacts(r.Facts, maxValues)
 		id := s.tbl.Intern(errset.Value{
 			Kind: errset.Unresolved, Site: fn, Pos: fn.Pos(),
 			Unresolved: errset.FixpointLimit,

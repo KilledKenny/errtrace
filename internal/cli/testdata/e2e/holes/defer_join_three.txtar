@@ -1,0 +1,247 @@
+QA M1. Three deferred closures join the named result with another error each.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:26:12-13: Error Set of example.com/x.C: 19 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:10:27-33: in example.com/x.src
+		$WORK/a.go:30:9-14: in example.com/x.C, call to example.com/x.src
+$GOROOT/src/io/io.go:*: sentinel io.EOF [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:27:23-45: errors.Join
+	path (origin → target):
+		$WORK/a.go:10:27-33: in example.com/x.src
+		$WORK/a.go:30:9-14: in example.com/x.C, call to example.com/x.src
+		$WORK/a.go:27:35-38: in example.com/x.C$1
+		$WORK/a.go:27:17-20: in example.com/x.C$1
+		$WORK/a.go:30:2-2: in example.com/x.C
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:27:23-45: errors.Join
+	path (origin → target):
+		$WORK/a.go:10:27-33: in example.com/x.src
+		$WORK/a.go:30:9-14: in example.com/x.C, call to example.com/x.src
+		$WORK/a.go:27:35-38: in example.com/x.C$1
+		$WORK/a.go:27:17-20: in example.com/x.C$1
+		$WORK/a.go:26:17-20: in example.com/x.C
+		$WORK/a.go:27:35-38: in example.com/x.C$1
+		$WORK/a.go:27:17-20: in example.com/x.C$1
+		$WORK/a.go:30:2-2: in example.com/x.C
+$GOROOT/src/io/io.go:*: sentinel io.EOF [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:28:23-45: errors.Join
+	path (origin → target):
+		$WORK/a.go:10:27-33: in example.com/x.src
+		$WORK/a.go:30:9-14: in example.com/x.C, call to example.com/x.src
+		$WORK/a.go:28:35-38: in example.com/x.C$2
+		$WORK/a.go:28:17-20: in example.com/x.C$2
+		$WORK/a.go:30:2-2: in example.com/x.C
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:28:23-45: errors.Join
+	path (origin → target):
+		$WORK/a.go:10:27-33: in example.com/x.src
+		$WORK/a.go:30:9-14: in example.com/x.C, call to example.com/x.src
+		$WORK/a.go:27:35-38: in example.com/x.C$1
+		$WORK/a.go:27:17-20: in example.com/x.C$1
+		$WORK/a.go:26:17-20: in example.com/x.C
+		$WORK/a.go:28:35-38: in example.com/x.C$2
+		$WORK/a.go:28:17-20: in example.com/x.C$2
+		$WORK/a.go:30:2-2: in example.com/x.C
+$GOROOT/src/io/io.go:*: sentinel io.EOF [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:29:23-45: errors.Join
+	path (origin → target):
+		$WORK/a.go:10:27-33: in example.com/x.src
+		$WORK/a.go:30:9-14: in example.com/x.C, call to example.com/x.src
+		$WORK/a.go:29:35-38: in example.com/x.C$3
+		$WORK/a.go:29:17-20: in example.com/x.C$3
+		$WORK/a.go:30:2-2: in example.com/x.C
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:29:23-45: errors.Join
+	path (origin → target):
+		$WORK/a.go:10:27-33: in example.com/x.src
+		$WORK/a.go:30:9-14: in example.com/x.C, call to example.com/x.src
+		$WORK/a.go:27:35-38: in example.com/x.C$1
+		$WORK/a.go:27:17-20: in example.com/x.C$1
+		$WORK/a.go:26:17-20: in example.com/x.C
+		$WORK/a.go:29:35-38: in example.com/x.C$3
+		$WORK/a.go:29:17-20: in example.com/x.C$3
+		$WORK/a.go:30:2-2: in example.com/x.C
+$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:27:23-45: errors.Join
+	path (origin → target):
+		$WORK/a.go:12:27-40: in example.com/x.c2
+		$WORK/a.go:28:40-44: in example.com/x.C$2, call to example.com/x.c2
+		$WORK/a.go:28:17-20: in example.com/x.C$2
+		$WORK/a.go:26:17-20: in example.com/x.C
+		$WORK/a.go:27:35-38: in example.com/x.C$1
+		$WORK/a.go:27:17-20: in example.com/x.C$1
+		$WORK/a.go:30:2-2: in example.com/x.C
+$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid [+5 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:28:23-45: errors.Join
+	path (origin → target):
+		$WORK/a.go:12:27-40: in example.com/x.c2
+		$WORK/a.go:28:40-44: in example.com/x.C$2, call to example.com/x.c2
+		$WORK/a.go:28:17-20: in example.com/x.C$2
+		$WORK/a.go:30:2-2: in example.com/x.C
+$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:28:23-45: errors.Join
+	path (origin → target):
+		$WORK/a.go:12:27-40: in example.com/x.c2
+		$WORK/a.go:28:40-44: in example.com/x.C$2, call to example.com/x.c2
+		$WORK/a.go:28:17-20: in example.com/x.C$2
+		$WORK/a.go:26:17-20: in example.com/x.C
+		$WORK/a.go:28:35-38: in example.com/x.C$2
+		$WORK/a.go:28:17-20: in example.com/x.C$2
+		$WORK/a.go:30:2-2: in example.com/x.C
+$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:29:23-45: errors.Join
+	path (origin → target):
+		$WORK/a.go:12:27-40: in example.com/x.c2
+		$WORK/a.go:28:40-44: in example.com/x.C$2, call to example.com/x.c2
+		$WORK/a.go:28:17-20: in example.com/x.C$2
+		$WORK/a.go:26:17-20: in example.com/x.C
+		$WORK/a.go:29:35-38: in example.com/x.C$3
+		$WORK/a.go:29:17-20: in example.com/x.C$3
+		$WORK/a.go:30:2-2: in example.com/x.C
+$GOROOT/src/os/error.go:*: sentinel os.ErrExist [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:27:23-45: errors.Join
+	path (origin → target):
+		$WORK/a.go:13:27-38: in example.com/x.c3
+		$WORK/a.go:29:40-44: in example.com/x.C$3, call to example.com/x.c3
+		$WORK/a.go:29:17-20: in example.com/x.C$3
+		$WORK/a.go:26:17-20: in example.com/x.C
+		$WORK/a.go:27:35-38: in example.com/x.C$1
+		$WORK/a.go:27:17-20: in example.com/x.C$1
+		$WORK/a.go:30:2-2: in example.com/x.C
+$GOROOT/src/os/error.go:*: sentinel os.ErrExist [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:28:23-45: errors.Join
+	path (origin → target):
+		$WORK/a.go:13:27-38: in example.com/x.c3
+		$WORK/a.go:29:40-44: in example.com/x.C$3, call to example.com/x.c3
+		$WORK/a.go:29:17-20: in example.com/x.C$3
+		$WORK/a.go:26:17-20: in example.com/x.C
+		$WORK/a.go:28:35-38: in example.com/x.C$2
+		$WORK/a.go:28:17-20: in example.com/x.C$2
+		$WORK/a.go:30:2-2: in example.com/x.C
+$GOROOT/src/os/error.go:*: sentinel os.ErrExist [+5 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:29:23-45: errors.Join
+	path (origin → target):
+		$WORK/a.go:13:27-38: in example.com/x.c3
+		$WORK/a.go:29:40-44: in example.com/x.C$3, call to example.com/x.c3
+		$WORK/a.go:29:17-20: in example.com/x.C$3
+		$WORK/a.go:30:2-2: in example.com/x.C
+$GOROOT/src/os/error.go:*: sentinel os.ErrExist [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:29:23-45: errors.Join
+	path (origin → target):
+		$WORK/a.go:13:27-38: in example.com/x.c3
+		$WORK/a.go:29:40-44: in example.com/x.C$3, call to example.com/x.c3
+		$WORK/a.go:29:17-20: in example.com/x.C$3
+		$WORK/a.go:26:17-20: in example.com/x.C
+		$WORK/a.go:29:35-38: in example.com/x.C$3
+		$WORK/a.go:29:17-20: in example.com/x.C$3
+		$WORK/a.go:30:2-2: in example.com/x.C
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [+5 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:27:23-45: errors.Join
+	path (origin → target):
+		$WORK/a.go:11:27-39: in example.com/x.c1
+		$WORK/a.go:27:40-44: in example.com/x.C$1, call to example.com/x.c1
+		$WORK/a.go:27:17-20: in example.com/x.C$1
+		$WORK/a.go:30:2-2: in example.com/x.C
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:27:23-45: errors.Join
+	path (origin → target):
+		$WORK/a.go:11:27-39: in example.com/x.c1
+		$WORK/a.go:27:40-44: in example.com/x.C$1, call to example.com/x.c1
+		$WORK/a.go:27:17-20: in example.com/x.C$1
+		$WORK/a.go:26:17-20: in example.com/x.C
+		$WORK/a.go:27:35-38: in example.com/x.C$1
+		$WORK/a.go:27:17-20: in example.com/x.C$1
+		$WORK/a.go:30:2-2: in example.com/x.C
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:28:23-45: errors.Join
+	path (origin → target):
+		$WORK/a.go:11:27-39: in example.com/x.c1
+		$WORK/a.go:27:40-44: in example.com/x.C$1, call to example.com/x.c1
+		$WORK/a.go:27:17-20: in example.com/x.C$1
+		$WORK/a.go:26:17-20: in example.com/x.C
+		$WORK/a.go:28:35-38: in example.com/x.C$2
+		$WORK/a.go:28:17-20: in example.com/x.C$2
+		$WORK/a.go:30:2-2: in example.com/x.C
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:29:23-45: errors.Join
+	path (origin → target):
+		$WORK/a.go:11:27-39: in example.com/x.c1
+		$WORK/a.go:27:40-44: in example.com/x.C$1, call to example.com/x.c1
+		$WORK/a.go:27:17-20: in example.com/x.C$1
+		$WORK/a.go:26:17-20: in example.com/x.C
+		$WORK/a.go:29:35-38: in example.com/x.C$3
+		$WORK/a.go:29:17-20: in example.com/x.C$3
+		$WORK/a.go:30:2-2: in example.com/x.C
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"os"
+)
+
+func src() error { return io.EOF }
+func c1() error  { return os.ErrClosed }
+func c2() error  { return os.ErrInvalid }
+func c3() error  { return os.ErrExist }
+
+func A() (err error) {
+	defer func() { err = errors.Join(err, c1()) }()
+	return src()
+}
+
+func B() (err error) {
+	defer func() { err = errors.Join(err, c1()) }()
+	defer func() { err = errors.Join(err, c2()) }()
+	return src()
+}
+
+func /*@q*/C() (err error) {
+	defer func() { err = errors.Join(err, c1()) }()
+	defer func() { err = errors.Join(err, c2()) }()
+	defer func() { err = errors.Join(err, c3()) }()
+	return src()
+}
+
+func D() (err error) {
+	defer func() {
+		if cerr := c1(); cerr != nil {
+			err = fmt.Errorf("%w (close: %w)", err, cerr)
+		}
+	}()
+	defer func() {
+		if cerr := c2(); cerr != nil {
+			err = fmt.Errorf("%w (close: %w)", err, cerr)
+		}
+	}()
+	return src()
+}
+
+func main() { fmt.Println(A(), B(), C(), D()) }
