@@ -1,0 +1,59 @@
+A constructor stores its parameter: the field location has no call context, so
+the parameter stands for the arguments of every call site of the constructor.
+The Propagation Path shows the caller's value, the call, the parameter, the
+store and the load.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:21:12-13: Error Set of example.com/fx.F: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF [+1 more paths]
+	path (origin → target):
+		$WORK/a.go:16:27-33: in example.com/fx.a
+		$WORK/a.go:16:22-34: in example.com/fx.a, call to example.com/fx.NewE
+		$WORK/a.go:12:42-45: in example.com/fx.NewE
+		$WORK/a.go:12:37-45: in example.com/fx.NewE
+		$WORK/a.go:19:33-38: in example.com/fx.inner
+		$WORK/a.go:23:10-20: in example.com/fx.F, call to example.com/fx.inner
+$WORK/a.go:14:5-13: sentinel example.com/fx.ErrOther [+1 more paths]
+	path (origin → target):
+		$WORK/a.go:17:27-35: in example.com/fx.b
+		$WORK/a.go:17:22-36: in example.com/fx.b, call to example.com/fx.NewE
+		$WORK/a.go:12:42-45: in example.com/fx.NewE
+		$WORK/a.go:12:37-45: in example.com/fx.NewE
+		$WORK/a.go:19:33-38: in example.com/fx.inner
+		$WORK/a.go:23:10-20: in example.com/fx.F, call to example.com/fx.inner
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"io"
+)
+
+type E struct{ Err error }
+
+func (e *E) Error() string { return "e" }
+
+func NewE(err error) *E { return &E{Err: err} }
+
+var ErrOther = errors.New("other")
+
+func a() *E { return NewE(io.EOF) }
+func b() *E { return NewE(ErrOther) }
+
+func inner(e *E) error { return e.Err }
+
+func /*@f*/F(n int) error {
+	if n > 0 {
+		return inner(a())
+	}
+	return inner(b())
+}
+
+func main() {
+	_ = F(0)
+}

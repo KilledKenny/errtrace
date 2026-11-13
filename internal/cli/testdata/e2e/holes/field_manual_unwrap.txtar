@@ -1,0 +1,45 @@
+A manual unwrap after a type assertion: the field is loaded from the asserted
+pointer, and holds what the program stores to it.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:19:12-13: Error Set of example.com/fx.F: 1 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:14:18-24: in example.com/fx.source
+		$WORK/a.go:14:13-24: in example.com/fx.source
+		$WORK/a.go:22:10-15: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"io"
+)
+
+type E struct{ Err error }
+
+func (e *E) Error() string { return "e" }
+
+func source(n int) error {
+	if n > 0 {
+		return &E{Err: io.EOF}
+	}
+	return errors.New("plain")
+}
+
+func /*@f*/F(n int) error {
+	err := source(n)
+	if e, ok := err.(*E); ok {
+		return e.Err
+	}
+	return nil
+}
+
+func main() {
+	_ = F(0)
+}

@@ -35,8 +35,9 @@ type Solver struct {
 	opts flow.Options
 
 	local map[*ssa.Function]*flow.LocalFacts
-	sites map[*ssa.Function][]ssa.CallInstruction
-	args  map[argKey][]flow.Fact
+	// demands caches what each function's error results depend on.
+	demands map[*ssa.Function]*demand
+	args    map[argKey][]flow.Fact
 	// bindings caches the binding facts of captured variables.
 	bindings map[bindingKey]bindingFacts
 	sums     map[*ssa.Function]*Summary
@@ -51,9 +52,21 @@ type Solver struct {
 	// computePaths).
 	memo map[srcsKey]memoBest
 
+	// fields indexes the field locations of the program and their
+	// writers; it is built when a field load is first met (see fields.go).
+	fields *fieldIndex
+	// roots are the functions Solve and SolveSite were asked about.
+	roots []*ssa.Function
+
 	// transfer computes the result summaries of a function from the
 	// current summaries of its callees. It is evaluate, except in tests.
 	transfer func(*ssa.Function) []ResultSummary
+}
+
+// dnode is a node of the demand graph: a function, or a field location.
+type dnode struct {
+	fn  *ssa.Function
+	loc *location
 }
 
 // bindingKey is one captured variable of a closure, read as one type.
@@ -89,7 +102,7 @@ func NewSolver(tbl *errset.Table, res resolve.Resolver, opts flow.Options) *Solv
 		res:      res,
 		opts:     opts,
 		local:    make(map[*ssa.Function]*flow.LocalFacts),
-		sites:    make(map[*ssa.Function][]ssa.CallInstruction),
+		demands:  make(map[*ssa.Function]*demand),
 		args:     make(map[argKey][]flow.Fact),
 		bindings: make(map[bindingKey]bindingFacts),
 		sums:     make(map[*ssa.Function]*Summary),
@@ -104,21 +117,26 @@ func (s *Solver) Stats() Stats { return s.stats }
 // Summary returns the summary of fn, or nil if fn has not been solved.
 func (s *Solver) Summary(fn *ssa.Function) *Summary { return s.sums[fn] }
 
-// Solve computes the summaries of fns and of every function their error
-// results depend on, bottom-up over the SCCs of the demand graph.
-// Functions solved by an earlier call are reused.
+// Solve computes the summaries of fns and of every function and field
+// location their error results depend on, bottom-up over the SCCs of the
+// demand graph. Functions solved by an earlier call are reused.
 func (s *Solver) Solve(ctx context.Context, fns []*ssa.Function) error {
-	var roots []*ssa.Function
+	s.roots = append(s.roots, fns...)
+	var roots []dnode
 	for _, fn := range fns {
 		if s.sums[fn] == nil {
-			roots = append(roots, fn)
+			roots = append(roots, dnode{fn: fn})
 		}
 	}
+	return s.solve(ctx, roots)
+}
+
+func (s *Solver) solve(ctx context.Context, roots []dnode) error {
 	if len(roots) == 0 {
 		return nil
 	}
 	s.paths = nil
-	return tarjan(roots, s.succ, func(scc []*ssa.Function) error {
+	return tarjan(roots, s.succ, func(scc []dnode) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -128,9 +146,14 @@ func (s *Solver) Solve(ctx context.Context, fns []*ssa.Function) error {
 }
 
 // SolveSite computes the summaries that the error results of the call site
-// in fn depend on: those of its callees and of the calls in its arguments.
+// in fn depend on: those of its callees and of the calls and field loads
+// in its arguments.
 func (s *Solver) SolveSite(ctx context.Context, fn *ssa.Function, site ssa.CallInstruction) error {
-	return s.Solve(ctx, s.callees(s.sitesFrom([]ssa.CallInstruction{site})))
+	s.roots = append(s.roots, fn)
+	c := s.newCollector()
+	c.site(site)
+	c.drain()
+	return s.solve(ctx, s.unsolved(c.nodes()))
 }
 
 // SiteFacts returns the values that error result index of the call site in
@@ -145,13 +168,27 @@ func (s *Solver) SiteFacts(fn *ssa.Function, site ssa.CallInstruction, index int
 	return fs.facts
 }
 
-// succ returns the unsolved functions of the demand graph that fn's error
-// results depend on.
-func (s *Solver) succ(fn *ssa.Function) []*ssa.Function {
-	var out []*ssa.Function
-	for _, g := range s.callees(s.demandSites(fn)) {
-		if s.sums[g] == nil {
-			out = append(out, g)
+// succ returns the unsolved nodes of the demand graph that n depends on.
+func (s *Solver) succ(n dnode) []dnode {
+	return s.unsolved(s.deps(n))
+}
+
+// deps returns the nodes of the demand graph that n depends on: for a
+// function, its callees with summaries and the field locations it loads
+// from; for a field location, what its writers' stored values depend on.
+func (s *Solver) deps(n dnode) []dnode {
+	if n.loc != nil {
+		return s.locationDemand(n.loc).nodes(s)
+	}
+	return s.demandOf(n.fn).nodes(s)
+}
+
+// unsolved returns the nodes of nodes that have no summary yet.
+func (s *Solver) unsolved(nodes []dnode) []dnode {
+	var out []dnode
+	for _, n := range nodes {
+		if (n.fn != nil && s.sums[n.fn] == nil) || (n.loc != nil && n.loc.sum == nil) {
+			out = append(out, n)
 		}
 	}
 	return out
@@ -211,52 +248,163 @@ func (s *Solver) binding(fn *ssa.Function, v errset.Value) (*ssa.Function, []flo
 	return b.creator, b.facts, b.ok
 }
 
-// demandSites returns the call sites whose results can reach fn's error
-// results: the calls its results come from, the calls in the error
-// arguments of those calls (which a callee may return as a parameter), and
-// the calls in the creating function whose results a closure's captured
-// variables are bound to. Sites may be in functions other than fn.
-func (s *Solver) demandSites(fn *ssa.Function) []ssa.CallInstruction {
-	sites, ok := s.sites[fn]
-	if ok {
-		return sites
-	}
-	var initial []ssa.CallInstruction
-	visited := make(map[*ssa.Store]bool)
-	for _, r := range s.localFacts(fn).Results {
-		for _, f := range r.Facts {
-			initial = s.appendCallRefSites(fn, initial, f.Value, visited)
-		}
-	}
-	sites = s.sitesFrom(initial)
-	s.sites[fn] = sites
-	return sites
+// demand is what a node of the demand graph depends on.
+type demand struct {
+	// sites are the call sites whose results can reach the node. They may
+	// be in other functions than the node's.
+	sites []ssa.CallInstruction
+	// locs are the field locations whose values can reach the node.
+	locs []*location
 }
 
-// sitesFrom returns initial and, transitively, the calls found in the
-// error-typed arguments (and closure bindings) of those calls, each in the
-// function that contains it, without duplicates.
-func (s *Solver) sitesFrom(initial []ssa.CallInstruction) []ssa.CallInstruction {
-	seen := make(map[ssa.CallInstruction]bool)
-	visited := make(map[*ssa.Store]bool)
-	var out []ssa.CallInstruction
-	work := append([]ssa.CallInstruction(nil), initial...)
-	for len(work) > 0 {
-		site := work[0]
-		work = work[1:]
-		if seen[site] {
-			continue
+// nodes returns the demand as nodes of the demand graph: the callees of
+// the sites that have summaries, then the locations.
+func (d *demand) nodes(s *Solver) []dnode {
+	var out []dnode
+	for _, g := range s.callees(d.sites) {
+		out = append(out, dnode{fn: g})
+	}
+	for _, l := range d.locs {
+		out = append(out, dnode{loc: l})
+	}
+	return out
+}
+
+// demandOf returns what fn's error results depend on: the calls its
+// results come from, the calls in the error arguments of those calls
+// (which a callee may return as a parameter), the calls in the creating
+// function whose results a closure's captured variables are bound to, the
+// calls in the values that closures store to its variables, and the field
+// locations that any of those values load from.
+func (s *Solver) demandOf(fn *ssa.Function) *demand {
+	d, ok := s.demands[fn]
+	if ok {
+		return d
+	}
+	c := s.newCollector()
+	for _, r := range s.localFacts(fn).Results {
+		for _, f := range r.Facts {
+			c.value(fn, f.Value)
 		}
-		seen[site] = true
-		out = append(out, site)
+	}
+	c.drain()
+	d = &demand{sites: c.sites, locs: c.locs}
+	s.demands[fn] = d
+	return d
+}
+
+// collector gathers what a set of local facts depends on.
+type collector struct {
+	s *Solver
+	// sites are the call sites found, without duplicates, in the order
+	// found; those before next have had their arguments followed.
+	sites    []ssa.CallInstruction
+	next     int
+	seenSite map[ssa.CallInstruction]bool
+	// locs are the field locations found.
+	locs    []*location
+	seenLoc map[*location]bool
+	// params are the parameters found, each with the number of calls
+	// between it and the facts the collector started from (see
+	// locationDemand).
+	params     []*ssa.Parameter
+	paramDepth map[*ssa.Parameter]int
+	depth      int
+	// errorfs are the ErrorfLike values found (formats forwarded from
+	// parameters), with their depths like params.
+	errorfs     []errset.ValueID
+	errorfDepth map[errset.ValueID]int
+	// stores are the closure stores already followed, which keeps a
+	// variable that is stored to itself (err = wrap(err) in a closure)
+	// finite.
+	stores map[*ssa.Store]bool
+}
+
+func (s *Solver) newCollector() *collector {
+	return &collector{
+		s:           s,
+		seenSite:    make(map[ssa.CallInstruction]bool),
+		seenLoc:     make(map[*location]bool),
+		paramDepth:  make(map[*ssa.Parameter]int),
+		errorfDepth: make(map[errset.ValueID]int),
+		stores:      make(map[*ssa.Store]bool),
+	}
+}
+
+// nodes returns what was collected as nodes of the demand graph.
+func (c *collector) nodes() []dnode {
+	return (&demand{sites: c.sites, locs: c.locs}).nodes(c.s)
+}
+
+// site adds a call site.
+func (c *collector) site(site ssa.CallInstruction) {
+	if !c.seenSite[site] {
+		c.seenSite[site] = true
+		c.sites = append(c.sites, site)
+	}
+}
+
+// drain follows the error-typed arguments (and closure bindings) of the
+// sites found, transitively, each in the function that contains it.
+func (c *collector) drain() {
+	for ; c.next < len(c.sites); c.next++ {
+		site := c.sites[c.next]
 		fn := site.Parent()
 		for _, v := range errorOperands(site) {
-			for _, f := range s.argFacts(fn, v, site) {
-				work = s.appendCallRefSites(fn, work, f.Value, visited)
+			for _, f := range c.s.argFacts(fn, v, site) {
+				c.value(fn, f.Value)
 			}
 		}
 	}
-	return out
+}
+
+// value adds what the value tree id of fn depends on: the sites of its
+// CallRef leaves, the locations of its FieldRef leaves, its Param leaves,
+// what the values bound to its FreeVar leaves depend on in the function
+// that created the closure fn, and what the values its StoreRef leaves'
+// stores write depend on in their closures.
+func (c *collector) value(fn *ssa.Function, id errset.ValueID) {
+	v := c.s.tbl.Get(id)
+	switch v.Kind {
+	case errset.CallRef:
+		if site, ok := v.Site.(ssa.CallInstruction); ok {
+			c.site(site)
+		}
+	case errset.FreeVar:
+		if creator, facts, ok := c.s.binding(fn, v); ok {
+			for _, f := range facts {
+				c.value(creator, f.Value)
+			}
+		}
+	case errset.StoreRef:
+		if st, ok := v.Site.(*ssa.Store); ok && !c.stores[st] {
+			c.stores[st] = true
+			for _, f := range c.s.argFacts(st.Parent(), st.Val, st) {
+				c.value(st.Parent(), f.Value)
+			}
+		}
+	case errset.FieldRef:
+		if l := c.s.location(fn, v); l != nil && !c.seenLoc[l] {
+			c.seenLoc[l] = true
+			c.locs = append(c.locs, l)
+		}
+	case errset.Param:
+		if p, ok := v.Site.(*ssa.Parameter); ok {
+			if _, seen := c.paramDepth[p]; !seen {
+				c.paramDepth[p] = c.depth
+				c.params = append(c.params, p)
+			}
+		}
+	case errset.ErrorfLike:
+		if _, seen := c.errorfDepth[id]; !seen {
+			c.errorfDepth[id] = c.depth
+			c.errorfs = append(c.errorfs, id)
+		}
+	case errset.Wrap, errset.Truncated, errset.Guarded:
+		for _, in := range v.Inner {
+			c.value(fn, in)
+		}
+	}
 }
 
 // errorOperands returns the operands of a call that a callee's Param or
@@ -290,45 +438,16 @@ func errorOperands(site ssa.CallInstruction) []ssa.Value {
 	return out
 }
 
-// appendCallRefSites appends the sites of the CallRef leaves of the value
-// tree id of fn, those of the values bound to its FreeVar leaves in the
-// function that created the closure fn, and those of the values its
-// StoreRef leaves' stores write in their closures. visited holds the
-// stores already followed, which keeps a variable that is stored to
-// itself (err = wrap(err) in a closure) finite.
-func (s *Solver) appendCallRefSites(fn *ssa.Function, sites []ssa.CallInstruction, id errset.ValueID, visited map[*ssa.Store]bool) []ssa.CallInstruction {
-	v := s.tbl.Get(id)
-	switch v.Kind {
-	case errset.CallRef:
-		if site, ok := v.Site.(ssa.CallInstruction); ok {
-			sites = append(sites, site)
+// solveSCC computes the summaries of the functions and field locations of
+// one SCC, whose dependencies outside the SCC are solved already.
+func (s *Solver) solveSCC(scc []dnode) {
+	counted := false
+	for _, n := range scc {
+		if n.loc != nil {
+			n.loc.sum = &locSummary{}
+			continue
 		}
-	case errset.FreeVar:
-		if creator, facts, ok := s.binding(fn, v); ok {
-			for _, f := range facts {
-				sites = s.appendCallRefSites(creator, sites, f.Value, visited)
-			}
-		}
-	case errset.StoreRef:
-		if st, ok := v.Site.(*ssa.Store); ok && !visited[st] {
-			visited[st] = true
-			for _, f := range s.argFacts(st.Parent(), st.Val, st) {
-				sites = s.appendCallRefSites(st.Parent(), sites, f.Value, visited)
-			}
-		}
-	case errset.Wrap, errset.Truncated, errset.Guarded:
-		for _, in := range v.Inner {
-			sites = s.appendCallRefSites(fn, sites, in, visited)
-		}
-	}
-	return sites
-}
-
-// solveSCC computes the summaries of the functions of one SCC, whose
-// callees outside the SCC are solved already.
-func (s *Solver) solveSCC(scc []*ssa.Function) {
-	s.stats.SCCs++
-	for _, fn := range scc {
+		fn := n.fn
 		sum := &Summary{Fn: fn}
 		for _, r := range s.localFacts(fn).Results {
 			sum.Results = append(sum.Results, ResultSummary{Index: r.Index})
@@ -336,15 +455,33 @@ func (s *Solver) solveSCC(scc []*ssa.Function) {
 		s.sums[fn] = sum
 		s.order = append(s.order, fn)
 		s.stats.Functions++
+		if !counted {
+			counted = true
+			s.stats.SCCs++
+		}
 	}
 	if len(scc) == 1 && !s.selfEdge(scc[0]) {
-		s.sums[scc[0]].Results = s.capSize(scc[0], s.transfer(scc[0]))
+		if n := scc[0]; n.loc != nil {
+			n.loc.sum = s.evalLocation(n.loc)
+		} else {
+			s.sums[n.fn].Results = s.capSize(n.fn, s.transfer(n.fn))
+		}
 		return
 	}
 	var changed map[*ssa.Function][]bool
+	var changedLocs []*location
 	for range maxRounds {
-		changed = nil
-		for _, fn := range scc {
+		changed, changedLocs = nil, nil
+		for _, n := range scc {
+			if n.loc != nil {
+				next := s.evalLocation(n.loc)
+				if !sameValues(n.loc.sum.facts, next.facts) {
+					changedLocs = append(changedLocs, n.loc)
+				}
+				n.loc.sum = next
+				continue
+			}
+			fn := n.fn
 			next := s.capSize(fn, s.transfer(fn))
 			if diff := changedResults(s.sums[fn].Results, next); diff != nil {
 				if changed == nil {
@@ -354,12 +491,17 @@ func (s *Solver) solveSCC(scc []*ssa.Function) {
 			}
 			s.sums[fn].Results = next
 		}
-		if changed == nil {
+		if changed == nil && changedLocs == nil {
 			return
 		}
 	}
-	// The SCC did not converge: mark the results still changing.
-	for _, fn := range scc {
+	// The SCC did not converge: mark the results and locations still
+	// changing.
+	for _, n := range scc {
+		fn := n.fn
+		if fn == nil {
+			continue
+		}
 		for i, ch := range changed[fn] {
 			if !ch {
 				continue
@@ -373,11 +515,14 @@ func (s *Solver) solveSCC(scc []*ssa.Function) {
 			r.Facts = appendFact(r.Facts, id, Source{Kind: Local, Site: fn})
 		}
 	}
+	for _, l := range changedLocs {
+		l.sum.holes = append(l.sum.holes, locHole{errset.FixpointLimit, fmt.Sprintf("did not converge within %d rounds", maxRounds)})
+	}
 }
 
-func (s *Solver) selfEdge(fn *ssa.Function) bool {
-	for _, g := range s.callees(s.demandSites(fn)) {
-		if g == fn {
+func (s *Solver) selfEdge(n dnode) bool {
+	for _, d := range s.deps(n) {
+		if d == n {
 			return true
 		}
 	}

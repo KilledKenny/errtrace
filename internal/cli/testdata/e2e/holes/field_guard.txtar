@@ -1,0 +1,42 @@
+A guard on a loaded field filters the values of its location: the loaded
+value is not io.EOF where F returns it.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:12:12-13: Error Set of example.com/fx.F: 1 entries
+$WORK/a.go:10:5-12: sentinel example.com/fx.ErrKeep
+	path (origin → target):
+		$WORK/a.go:23:11-18: in example.com/fx.main
+		$WORK/a.go:23:5-8: in example.com/fx.main
+		$WORK/a.go:13:9-14: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"io"
+)
+
+type S struct{ err error }
+
+var ErrKeep = errors.New("keep")
+
+func /*@f*/F(s *S) error {
+	err := s.err
+	if err == io.EOF {
+		return nil
+	}
+	return err
+}
+
+func main() {
+	s := &S{err: io.EOF}
+	if len(io.EOF.Error()) > 0 {
+		s.err = ErrKeep
+	}
+	_ = F(s)
+}

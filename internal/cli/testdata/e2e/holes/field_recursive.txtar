@@ -1,0 +1,75 @@
+A field that holds a value built from the same field: each push wraps what the
+field held. The location and the function that wraps it are solved together
+to a fixpoint, and the Wrap Chain is cut at the chain depth (2 here).
+-- args --
+-chain-depth=2 a.go:@f
+-- stdout --
+$WORK/a.go:14:12-13: Error Set of example.com/fx.F: 4 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:19:19-25: in example.com/fx.main
+		$WORK/a.go:19:14-25: in example.com/fx.main
+		$WORK/a.go:15:9-14: in example.com/fx.F
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	wrap chain (origin → target):
+		$WORK/a.go:11:10-42: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/a.go:19:19-25: in example.com/fx.main
+		$WORK/a.go:19:14-25: in example.com/fx.main
+		$WORK/a.go:11:36-41: in (*example.com/fx.stack).push
+		$WORK/a.go:11:4-7: in (*example.com/fx.stack).push
+		$WORK/a.go:15:9-14: in example.com/fx.F
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	wrap chain (origin → target):
+		$WORK/a.go:11:10-42: fmt.Errorf "%s: %w"
+		$WORK/a.go:11:10-42: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/a.go:19:19-25: in example.com/fx.main
+		$WORK/a.go:19:14-25: in example.com/fx.main
+		$WORK/a.go:11:36-41: in (*example.com/fx.stack).push
+		$WORK/a.go:11:4-7: in (*example.com/fx.stack).push
+		$WORK/a.go:11:36-41: in (*example.com/fx.stack).push
+		$WORK/a.go:11:4-7: in (*example.com/fx.stack).push
+		$WORK/a.go:15:9-14: in example.com/fx.F
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain truncated]
+	wrap chain (origin → target):
+		$WORK/a.go:11:10-42: fmt.Errorf "%s: %w"
+		$WORK/a.go:11:10-42: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/a.go:19:19-25: in example.com/fx.main
+		$WORK/a.go:19:14-25: in example.com/fx.main
+		$WORK/a.go:11:36-41: in (*example.com/fx.stack).push
+		$WORK/a.go:11:4-7: in (*example.com/fx.stack).push
+		$WORK/a.go:11:36-41: in (*example.com/fx.stack).push
+		$WORK/a.go:11:4-7: in (*example.com/fx.stack).push
+		$WORK/a.go:11:36-41: in (*example.com/fx.stack).push
+		$WORK/a.go:11:4-7: in (*example.com/fx.stack).push
+		$WORK/a.go:15:9-14: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+)
+
+type stack struct{ err error }
+
+func (s *stack) push(msg string) {
+	s.err = fmt.Errorf("%s: %w", msg, s.err)
+}
+
+func /*@f*/F(s *stack) error {
+	return s.err
+}
+
+func main() {
+	s := &stack{err: io.EOF}
+	s.push("a")
+	s.push("b")
+	_ = F(s)
+}

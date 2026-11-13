@@ -66,6 +66,13 @@ const (
 	// within Fn. The summaries replace it by the stored value's facts in
 	// Fn; it only exists inside summaries.
 	StoreRef
+	// FieldRef is symbolic: the value loaded at Site, in function Fn, from
+	// field Index (named Name) of the named struct type Type, through a
+	// pointer or value that was not built where it is loaded. The
+	// summaries replace it by what the program stores to that field
+	// anywhere (its field location); Detail describes the load, for when
+	// it stays Unresolved. It only exists inside summaries.
+	FieldRef
 )
 
 var kindNames = [...]string{
@@ -81,6 +88,7 @@ var kindNames = [...]string{
 	ErrorfLike: "errorf-like",
 	Guarded:    "guarded",
 	StoreRef:   "storeref",
+	FieldRef:   "fieldref",
 }
 
 // String returns the lower-case name of k.
@@ -168,8 +176,8 @@ type Value struct {
 	Fresh bool
 	// Type is the type of a Concrete Type Origin, the dynamic type of a
 	// Sentinel when errtrace knows it (its declared type, or that of its
-	// initializer), the wrapper type of a custom-Unwrap Wrap, and the type
-	// of a Param or FreeVar.
+	// initializer), the wrapper type of a custom-Unwrap Wrap, the type of
+	// a Param or FreeVar, and the struct type of a FieldRef.
 	Type types.Type
 	// TypedNil marks a Concrete Type Origin that is a nil pointer in a
 	// non-nil interface.
@@ -206,21 +214,24 @@ type Value struct {
 
 	// Unresolved is the kind of an Unresolved value.
 	Unresolved UnresolvedKind
-	// Detail describes an Unresolved value, or the callee of a CallRef.
+	// Detail describes an Unresolved value, the callee of a CallRef, or
+	// the load of a FieldRef.
 	Detail string
 
 	// Fn is the SSA name of the function a Param or FreeVar belongs to,
-	// or of the closure that makes the store of a StoreRef.
+	// of the closure that makes the store of a StoreRef, or of the
+	// function that makes the load of a FieldRef.
 	Fn string
 	// Index is the parameter index of a Param, the free variable index of
 	// a FreeVar, the result index of a CallRef, the format parameter
-	// index of an ErrorfLike, or the number of a StoreRef's store in Fn.
+	// index of an ErrorfLike, the number of a StoreRef's store in Fn, or
+	// the field index of a FieldRef.
 	Index int
 	// ArgIndex is the index of the variadic operands parameter of an
 	// ErrorfLike.
 	ArgIndex int
-	// Name is the source name of a Param or FreeVar, or of the variable a
-	// StoreRef's store writes.
+	// Name is the source name of a Param or FreeVar, of the variable a
+	// StoreRef's store writes, or of the field of a FieldRef.
 	Name string
 	// Guards are the pending guards of a Guarded value.
 	Guards []Guard
@@ -390,6 +401,8 @@ func (t *Table) String(id ValueID) string {
 		return fmt.Sprintf("errorf-like %s format#%d args#%d", v.Fn, v.Index, v.ArgIndex)
 	case StoreRef:
 		return fmt.Sprintf("storeref %s#%d %s", v.Fn, v.Index, v.Name)
+	case FieldRef:
+		return fmt.Sprintf("fieldref %s.%s", types.TypeString(v.Type, nil), v.Name)
 	case Guarded:
 		parts := make([]string, len(v.Guards))
 		for i, g := range v.Guards {

@@ -1,0 +1,67 @@
+A struct stored whole carries its fields with it: they are instances of the
+same field locations, so a copy (*dst = *src) or a struct returned by a
+function the analysis sees (make1) adds no value that the field's writers did
+not store. A struct that comes from a call with no Candidates is built by
+code the analysis does not see: the field keeps an Unresolved entry next to
+the values found.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:29:12-13: Error Set of example.com/fx.F: 3 entries, 1 unresolved
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:34:17-23: in example.com/fx.main
+		$WORK/a.go:34:12-23: in example.com/fx.main
+		$WORK/a.go:30:9-14: in example.com/fx.F
+$WORK/a.go:10:5-12: sentinel example.com/fx.ErrMade
+	path (origin → target):
+		$WORK/a.go:12:32-39: in example.com/fx.make1
+		$WORK/a.go:12:27-39: in example.com/fx.make1
+		$WORK/a.go:30:9-14: in example.com/fx.F
+$WORK/a.go:30:9-14: unresolved(memory): field err of example.com/fx.S may be written by reflection, unsafe code or a function that is not seen
+	path (origin → target):
+		$WORK/a.go:30:9-14: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"io"
+)
+
+type S struct{ err error }
+
+var ErrMade = errors.New("made")
+
+func make1() S { return S{err: ErrMade} }
+
+// hook is never assigned: the call through it has no Candidates.
+var hook func() S
+
+func fill(dst, src *S) {
+	*dst = *src
+}
+
+func refill(dst *S, n int) {
+	if n > 0 {
+		*dst = make1()
+		return
+	}
+	*dst = hook()
+}
+
+func /*@f*/F(s *S) error {
+	return s.err
+}
+
+func main() {
+	src := &S{err: io.EOF}
+	dst := new(S)
+	fill(dst, src)
+	refill(dst, len(io.EOF.Error()))
+	_ = F(dst)
+}

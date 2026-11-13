@@ -125,7 +125,8 @@ func (s *Solver) bestOf(fn *ssa.Function, srcs []Source) (best, bool) {
 // for a local source; for a captured variable, the path of the bound value
 // in the closure's creator, then the read in fn; for a stored value, its
 // path in the function that stores it, then the store, then the load in
-// fn; for a source through a
+// fn; for a value passed to a parameter, its path in the caller, the
+// call, then the parameter's path on from there; for a source through a
 // call, the path of the argument substituted into the callee (if any),
 // then the callee's path, then the call (with the method and Candidate
 // count of a dynamic call).
@@ -140,6 +141,17 @@ func (s *Solver) sourcePath(fn *ssa.Function, src Source) (best, bool) {
 		}
 		path := slices.Concat(arg.path, errset.Path{{Site: src.Site, Func: fn.String()}})
 		return best{path: path, dynamic: arg.dynamic}, true
+	case Passed:
+		arg, ok := s.bestOf(src.ArgFn, src.ArgSources)
+		if !ok {
+			return best{}, false
+		}
+		then, ok := s.bestOf(fn, src.Then)
+		if !ok {
+			return best{}, false
+		}
+		hop := errset.Hop{Site: src.Site, Func: src.ArgFn.String(), Callee: src.Callee.String()}
+		return best{path: slices.Concat(arg.path, errset.Path{hop}, then.path), dynamic: arg.dynamic + then.dynamic}, true
 	case Stored:
 		arg, ok := s.bestOf(src.ArgFn, src.ArgSources)
 		if !ok {

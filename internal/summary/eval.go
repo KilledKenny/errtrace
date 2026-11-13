@@ -75,6 +75,9 @@ func (s *Solver) expand(fn *ssa.Function, f flow.Fact, fs *factSet, st *evalStat
 		if store, ok := v.Site.(*ssa.Store); ok && v.Kind == errset.StoreRef {
 			return s.stored(fn, store, v, f.LeafSource(k), st)
 		}
+		if v.Kind == errset.FieldRef {
+			return s.fieldValues(fn, v, f.LeafSource(k))
+		}
 		site, ok := v.Site.(ssa.CallInstruction)
 		if v.Kind != errset.CallRef || !ok {
 			return []subst{{value: id, leaves: local(1, Source{Kind: Local, Site: f.LeafSource(k)})}}

@@ -1,0 +1,51 @@
+A writer stores what fmt.Errorf makes of a format and operands that are its
+own parameters: each caller's format and operands are evaluated at its call,
+like a parameter's arguments.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:14:12-13: Error Set of example.com/fx.F: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	wrap chain (origin → target):
+		$WORK/a.go:20:2-29: fmt.Errorf "read: %w"
+	path (origin → target):
+		$WORK/a.go:20:22-28: in example.com/fx.main
+		$WORK/a.go:20:2-29: in example.com/fx.main, call to (*example.com/fx.S).failf
+		$WORK/a.go:11:10-37: in (*example.com/fx.S).failf
+		$WORK/a.go:11:4-7: in (*example.com/fx.S).failf
+		$WORK/a.go:15:9-14: in example.com/fx.F
+$WORK/a.go:21:2-24: opaque fmt.Errorf "plain %d"
+	path (origin → target):
+		$WORK/a.go:21:2-24: in example.com/fx.main
+		$WORK/a.go:21:2-24: in example.com/fx.main, call to (*example.com/fx.S).failf
+		$WORK/a.go:11:10-37: in (*example.com/fx.S).failf
+		$WORK/a.go:11:4-7: in (*example.com/fx.S).failf
+		$WORK/a.go:15:9-14: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+)
+
+type S struct{ err error }
+
+func (s *S) failf(format string, args ...any) {
+	s.err = fmt.Errorf(format, args...)
+}
+
+func /*@f*/F(s *S) error {
+	return s.err
+}
+
+func main() {
+	s := new(S)
+	s.failf("read: %w", io.EOF)
+	s.failf("plain %d", 1)
+	_ = F(s)
+}

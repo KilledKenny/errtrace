@@ -1,0 +1,35 @@
+A closure writes the field with a variable it captured: the captured
+variable's values are those its creator bound.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:9:12-13: Error Set of example.com/fx.F: 1 entries
+$GOROOT/src/io/pipe.go:*: sentinel io.ErrClosedPipe
+	path (origin → target):
+		$WORK/a.go:15:7-23: in example.com/fx.main
+		$WORK/a.go:16:23-24: in example.com/fx.main$1
+		$WORK/a.go:16:17-20: in example.com/fx.main$1
+		$WORK/a.go:10:9-14: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import "io"
+
+type S struct{ err error }
+
+func run(f func()) { f() }
+
+func /*@f*/F(s *S) error {
+	return s.err
+}
+
+func main() {
+	s := new(S)
+	e := io.ErrClosedPipe
+	run(func() { s.err = e })
+	_ = F(s)
+}

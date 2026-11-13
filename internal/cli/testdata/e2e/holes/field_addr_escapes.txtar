@@ -1,0 +1,41 @@
+The address of the field is passed to a call, which writes through it: the
+field keeps an Unresolved entry next to the value its seen writer stores.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:14:12-13: Error Set of example.com/fx.F: 2 entries, 1 unresolved
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:19:15-21: in example.com/fx.main
+		$WORK/a.go:19:10-21: in example.com/fx.main
+		$WORK/a.go:15:9-14: in example.com/fx.F
+$WORK/a.go:15:9-14: unresolved(memory): field err of example.com/fx.S may be written through an escaped pointer
+	path (origin → target):
+		$WORK/a.go:15:9-14: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"io"
+)
+
+type S struct{ err error }
+
+var ErrP = errors.New("p")
+
+func setp(p *error) { *p = ErrP }
+
+func /*@f*/F(s *S) error {
+	return s.err
+}
+
+func main() {
+	s := &S{err: io.EOF}
+	setp(&s.err)
+	_ = F(s)
+}

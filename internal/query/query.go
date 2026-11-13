@@ -209,6 +209,12 @@ func (r *Result) leafTop(v errset.Value) errset.ValueID {
 			Unresolved: errset.Memory,
 			Detail:     fmt.Sprintf("variable %s written by %s", v.Name, v.Fn),
 		})
+	case errset.FieldRef:
+		return r.Table.Intern(errset.Value{
+			Kind: errset.Unresolved, Site: v.Site, Pos: v.Pos,
+			Unresolved: errset.Memory,
+			Detail:     v.Detail,
+		})
 	}
 	return r.Table.Intern(v)
 }

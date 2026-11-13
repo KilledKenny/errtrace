@@ -1,0 +1,43 @@
+The writer of the field is in another package than the load.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:5:12-13: Error Set of example.com/fx.F: 1 entries
+$WORK/sub/sub.go:10:5-11: sentinel example.com/fx/sub.ErrRun
+	path (origin → target):
+		$WORK/sub/sub.go:14:10-16: in example.com/fx/sub.Run
+		$WORK/sub/sub.go:14:4-7: in example.com/fx/sub.Run
+		$WORK/a.go:6:9-14: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import "example.com/fx/sub"
+
+func /*@f*/F(r *sub.Result) error {
+	return r.Err
+}
+
+func main() {
+	_ = F(sub.Run())
+}
+-- sub/sub.go --
+package sub
+
+import "errors"
+
+type Result struct {
+	N   int
+	Err error
+}
+
+var ErrRun = errors.New("run failed")
+
+func Run() *Result {
+	r := new(Result)
+	r.Err = ErrRun
+	return r
+}

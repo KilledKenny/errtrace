@@ -1,0 +1,41 @@
+A pointer to the struct is handed to a decoder as any: reflection may write
+the field, so it keeps an Unresolved entry next to the value its seen writer
+stores. Printing the struct with fmt does not expose it (see field_zero).
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:13:12-13: Error Set of example.com/fx.F: 2 entries, 1 unresolved
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:18:15-21: in example.com/fx.main
+		$WORK/a.go:18:10-21: in example.com/fx.main
+		$WORK/a.go:14:9-14: in example.com/fx.F
+$WORK/a.go:14:9-14: unresolved(memory): field Err of example.com/fx.S may be written by reflection, unsafe code or a function that is not seen
+	path (origin → target):
+		$WORK/a.go:14:9-14: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"encoding/json"
+	"io"
+)
+
+type S struct {
+	Name string
+	Err  error
+}
+
+func /*@f*/F(s *S) error {
+	return s.Err
+}
+
+func main() {
+	s := &S{Err: io.EOF}
+	_ = json.Unmarshal([]byte(`{"Name":"x"}`), s)
+	_ = F(s)
+}

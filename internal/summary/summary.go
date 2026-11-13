@@ -9,6 +9,12 @@
 // graph's strongly connected components with a capped fixpoint inside each
 // one. Call results are replaced by the callees' summaries, substituting
 // the call's arguments for the callees' parameters.
+//
+// A load of a struct field is replaced by the summary of the field's
+// location: the join of the values that the reachable program stores to
+// that field of that struct type anywhere (see fields.go). Locations are
+// nodes of the demand graph like functions: a function depends on the
+// locations it loads from, and a location on what its writers store.
 package summary
 
 import (
@@ -35,6 +41,12 @@ const (
 	// function writes: it is the value that function (ArgFn) stores with
 	// the instruction Store, where it has the sources ArgSources.
 	Stored
+	// Passed is a fact that a function with no call context (the writer
+	// of a field location) got through a parameter: it is the value that
+	// the caller ArgFn passes at the call Site to Callee, where it has the
+	// sources ArgSources; Then are the sources of the parameter itself, on
+	// from there.
+	Passed
 )
 
 // MaxSources is how many sources a fact keeps, ranked local first, then
@@ -76,6 +88,9 @@ type Source struct {
 	// Store is, for a Stored source, the instruction of ArgFn that stores
 	// the value.
 	Store ssa.Instruction
+	// Then are, for a Passed source, the sources of the parameter that
+	// received the value, in the function the source belongs to.
+	Then []Source
 }
 
 // rank orders sources: local first, then static calls, then dynamic calls.
@@ -83,7 +98,7 @@ func (s Source) rank() int {
 	switch {
 	case s.Kind == Local, s.Kind == Captured:
 		return 0
-	case s.Kind == Stored, !s.Dynamic:
+	case s.Kind == Stored, s.Kind == Passed, !s.Dynamic:
 		return 1
 	}
 	return 2
@@ -92,7 +107,8 @@ func (s Source) rank() int {
 func sourceEqual(a, b Source) bool {
 	return a.Kind == b.Kind && a.Site == b.Site && a.Callee == b.Callee &&
 		a.CalleeResult == b.CalleeResult && a.CalleeValue == b.CalleeValue && a.CalleeLeaf == b.CalleeLeaf &&
-		a.Dynamic == b.Dynamic && a.ArgFn == b.ArgFn && a.Store == b.Store && slices.EqualFunc(a.ArgSources, b.ArgSources, sourceEqual)
+		a.Dynamic == b.Dynamic && a.ArgFn == b.ArgFn && a.Store == b.Store &&
+		slices.EqualFunc(a.ArgSources, b.ArgSources, sourceEqual) && slices.EqualFunc(a.Then, b.Then, sourceEqual)
 }
 
 // addSource adds src to srcs unless it is there already, keeping srcs

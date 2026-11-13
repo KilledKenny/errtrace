@@ -421,7 +421,7 @@ func decideTop(tbl *errset.Table, id errset.ValueID, node func(errset.Value) (Ve
 		return Maybe, "unresolved value"
 	case errset.Truncated:
 		return Maybe, "Wrap Chain truncated"
-	case errset.Param, errset.FreeVar, errset.CallRef, errset.ErrorfLike, errset.Guarded, errset.StoreRef:
+	case errset.Param, errset.FreeVar, errset.CallRef, errset.ErrorfLike, errset.Guarded, errset.StoreRef, errset.FieldRef:
 		return Unknown, ""
 	}
 	return node(v)
@@ -444,7 +444,7 @@ func decideTree(tbl *errset.Table, id errset.ValueID, node func(errset.Value) (V
 			verdict, why = Maybe, "unresolved value"
 		case errset.Truncated:
 			verdict, why = Maybe, "Wrap Chain truncated"
-		case errset.Param, errset.FreeVar, errset.CallRef, errset.ErrorfLike, errset.Guarded, errset.StoreRef:
+		case errset.Param, errset.FreeVar, errset.CallRef, errset.ErrorfLike, errset.Guarded, errset.StoreRef, errset.FieldRef:
 			verdict = Unknown
 		default:
 			verdict, why = node(v)

@@ -296,7 +296,7 @@ func (a *analyzer) walk(v ssa.Value) {
 		a.freeVar(v, v)
 		return
 	case *ssa.Field:
-		a.memory(v, fmt.Sprintf("load of field %s of %s", fieldName(v.X.Type(), v.Field), typeString(v.X.Type())))
+		a.fieldLoad(v, v.X.Type(), v.Field)
 		return
 	case *ssa.Index:
 		a.memory(v, "load of array element")
@@ -421,7 +421,7 @@ func (a *analyzer) load(v *ssa.UnOp) bool {
 		}
 		a.add(a.sentinel(x, typ), v)
 	case *ssa.FieldAddr:
-		a.memory(v, fmt.Sprintf("load of field %s of %s", fieldName(x.X.Type(), x.Field), typeString(x.X.Type())))
+		a.fieldLoad(v, x.X.Type(), x.Field)
 	case *ssa.IndexAddr:
 		a.memory(v, "load of slice or array element")
 	case *ssa.FreeVar:
@@ -432,6 +432,56 @@ func (a *analyzer) load(v *ssa.UnOp) bool {
 		a.memory(v, "load through pointer")
 	}
 	return true
+}
+
+// fieldLoad records the load v of field number field of recv, a struct
+// or a pointer to one. A field of a named struct type becomes a FieldRef,
+// which the summaries resolve from every store to that field in the
+// program (the locally built composite literal of a custom-Unwrap type is
+// not loaded from: see constructed). A field of an unnamed struct type,
+// of a type parameter, or whose type depends on a type parameter of its
+// generic struct is Unresolved, as every field load was before.
+func (a *analyzer) fieldLoad(v ssa.Value, recv types.Type, field int) {
+	detail := fmt.Sprintf("load of field %s of %s", fieldName(recv, field), typeString(recv))
+	st := FieldStruct(recv, field)
+	if st == nil {
+		a.memory(v, detail)
+		return
+	}
+	a.add(a.tbl.Intern(errset.Value{
+		Kind:   errset.FieldRef,
+		Site:   v,
+		Pos:    a.posOf(v),
+		Type:   st,
+		Index:  field,
+		Name:   fieldName(recv, field),
+		Fn:     a.fn.String(),
+		Detail: detail,
+	}), v)
+}
+
+// FieldStruct returns the named struct type that recv (a struct or a
+// pointer to one) is, if a load of its field number field is modelled as
+// a FieldRef: the type is a named struct type, and the field's type does
+// not depend on a type parameter of the type. Otherwise it returns nil.
+func FieldStruct(recv types.Type, field int) types.Type {
+	t := types.Unalias(recv)
+	if p, ok := t.Underlying().(*types.Pointer); ok {
+		t = types.Unalias(p.Elem())
+	}
+	n, ok := t.(*types.Named)
+	if !ok {
+		return nil
+	}
+	st, ok := n.Underlying().(*types.Struct)
+	if !ok || field >= st.NumFields() {
+		return nil
+	}
+	orig, ok := n.Origin().Underlying().(*types.Struct)
+	if !ok || field >= orig.NumFields() || !types.Identical(orig.Field(field).Type(), st.Field(field).Type()) {
+		return nil
+	}
+	return n
 }
 
 // local follows a load of a local variable that was not lifted to a
