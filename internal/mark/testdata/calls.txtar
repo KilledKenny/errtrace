@@ -145,7 +145,20 @@ func BoundArgY() error {
 	return echoY(ErrY)
 }
 
+// note only counts its variadic arguments: passing it ErrY does not put
+// ErrY into the memory that Noted reads.
+func note(args ...any) int { return len(args) }
+
+func Noted(s []any) error {
+	note(ErrY)
+	if e, ok := s[0].(error); ok {
+		return e
+	}
+	return nil
+}
+
 func main() {
+	Noted([]any{1})
 	BoundArg()
 	BoundArgY()
 	CallerX()

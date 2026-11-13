@@ -1,10 +1,13 @@
 package mark
 
 import (
+	"go/token"
 	"go/types"
 	"sort"
 
 	"golang.org/x/tools/go/ssa"
+
+	"github.com/KilledKenny/errtrace/internal/flow"
 )
 
 // callees returns the functions that may run at site.
@@ -265,6 +268,143 @@ func (a *analysis) siteResultFromCallees(site ssa.CallInstruction, index int) bo
 			if arg := argAt(site, g, p); arg != nil && a.tagsOf(arg) != 0 {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+// sliceParam returns the locVarargs of v, if v is a parameter of slice
+// type: the elements of the slices passed to it that the pass can tell
+// apart from other memory.
+func sliceParam(v ssa.Value) (loc, bool) {
+	p, ok := v.(*ssa.Parameter)
+	if !ok || p.Parent() == nil {
+		return loc{}, false
+	}
+	if _, ok := p.Type().Underlying().(*types.Slice); !ok {
+		return loc{}, false
+	}
+	return loc{kind: locVarargs, v: p}, true
+}
+
+// indexSlices records, for the static call of a function the pass
+// scanned, how slices reach the callee's parameters: a fresh argument
+// array of a variadic call that only the call uses is the memory of the
+// callee's variadic parameter (locVarargs), and a slice parameter of the
+// caller passed on as an argument (f(args...), p.doPrintf(format, a))
+// forwards its memory to the callee's parameter.
+func (a *analysis) indexSlices(call *ssa.Call) {
+	g := call.Call.StaticCallee()
+	args := call.Call.Args
+	if g == nil || !a.known(g) || len(args) == 0 || len(args) != len(g.Params) {
+		return
+	}
+	for j, arg := range args {
+		from, ok := sliceParam(arg)
+		if !ok {
+			continue
+		}
+		if to, ok := sliceParam(g.Params[j]); ok {
+			a.forwards[from] = append(a.forwards[from], to)
+		}
+	}
+	if !g.Signature.Variadic() {
+		return
+	}
+	to, ok := sliceParam(g.Params[len(g.Params)-1])
+	if !ok {
+		return
+	}
+	sl, ok := args[len(args)-1].(*ssa.Slice)
+	if !ok {
+		return
+	}
+	if _, ok := flow.VarargsOperands(sl); !ok {
+		return
+	}
+	if alloc, ok := sl.X.(*ssa.Alloc); ok && onlyUsedBy(sl, call) {
+		a.varargsParam[alloc] = to
+	}
+}
+
+// vaEscapes reports whether the function of the slice parameter of l uses
+// the slice other than to read its elements, take its length, or pass it
+// on as an argument of a static call the pass follows or as the operands
+// of a modelled intrinsic. If it does, its elements are also memory of
+// their type.
+func (a *analysis) vaEscapes(l loc) bool {
+	if esc, ok := a.vaEsc[l]; ok {
+		return esc
+	}
+	esc := a.vaEscapesNow(l.v.(*ssa.Parameter))
+	a.vaEsc[l] = esc
+	return esc
+}
+
+func (a *analysis) vaEscapesNow(p *ssa.Parameter) bool {
+	refs := p.Referrers()
+	if refs == nil {
+		return true
+	}
+	for _, r := range *refs {
+		switch r := r.(type) {
+		case *ssa.DebugRef:
+		case *ssa.IndexAddr:
+			if r.X != ssa.Value(p) || r.Referrers() == nil {
+				return true
+			}
+			for _, rr := range *r.Referrers() {
+				switch rr := rr.(type) {
+				case *ssa.DebugRef:
+				case *ssa.UnOp:
+					if rr.Op != token.MUL {
+						return true
+					}
+				default:
+					return true
+				}
+			}
+		case *ssa.Call:
+			args := r.Call.Args
+			if b, ok := r.Call.Value.(*ssa.Builtin); ok {
+				if b.Name() != "len" && b.Name() != "cap" {
+					return true
+				}
+				continue
+			}
+			g := r.Call.StaticCallee()
+			if g == nil {
+				return true
+			}
+			if name, ok := a.intrinsic(g); ok {
+				// Only as the operands, which the model reads.
+				operands := -1
+				switch name {
+				case "fmt.Errorf":
+					operands = 1
+				case "errors.Join":
+					operands = 0
+				}
+				for j, arg := range args {
+					if arg == ssa.Value(p) && j != operands {
+						return true
+					}
+				}
+				continue
+			}
+			if !a.known(g) || len(args) != len(g.Params) {
+				return true
+			}
+			for j, arg := range args {
+				if arg != ssa.Value(p) {
+					continue
+				}
+				if _, ok := sliceParam(g.Params[j]); !ok {
+					return true
+				}
+			}
+		default:
+			return true
 		}
 	}
 	return false

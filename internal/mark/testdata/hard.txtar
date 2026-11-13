@@ -246,7 +246,48 @@ func Deferred() (err error) {
 	return nil
 }
 
+// Variadic arguments: read by index, in a loop, by a closure, passed on,
+// and kept.
+func first(args ...any) error { return args[0].(error) }
+
+func VarFirst() error { return first(1, ErrX) }
+
+func ranged(args ...any) error {
+	for _, a := range args {
+		if e, ok := a.(error); ok {
+			return e
+		}
+	}
+	return nil
+}
+
+func VarRange() error { return ranged(ErrX) }
+
+func later(args ...any) func() error {
+	return func() error { return args[0].(error) }
+}
+
+func VarClosure() error { return later(ErrX)() }
+
+func pass(args ...any) error { return first(args...) }
+
+func VarForward() error { return pass(ErrX) }
+
+var kept []any
+
+func keep(args ...any) { kept = args }
+
+func VarKept() error {
+	keep(ErrX)
+	return kept[0].(error)
+}
+
 func main() {
+	VarFirst()
+	VarRange()
+	VarClosure()
+	VarForward()
+	VarKept()
 	AtomicValue()
 	AtomicPointer()
 	FieldAddr()

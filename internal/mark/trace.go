@@ -228,6 +228,11 @@ func (a *analysis) locString(l loc) string {
 		return "a channel of " + ts
 	case locPanic:
 		return "the panic value"
+	case locVarargs:
+		if p, ok := l.v.(*ssa.Parameter); ok && p.Parent() != nil {
+			return "the variadic arguments of " + p.Parent().String()
+		}
+		return "variadic arguments"
 	case locReflect:
 		return "reflection (reflect.ValueOf)"
 	case locAtomic:

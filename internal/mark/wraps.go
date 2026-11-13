@@ -132,6 +132,7 @@ func (a *analysis) indexCall(site ssa.CallInstruction) {
 		case modelReflectInterface:
 			a.addReader(loc{kind: locReflect}, key{call, 0})
 		}
+		a.indexSlices(call)
 	}
 	a.indexCallees(site)
 }
@@ -179,6 +180,11 @@ func (a *analysis) indexIntrinsic(call *ssa.Call, name string) {
 	}
 	if st, ok := slice.Type().Underlying().(*types.Slice); ok {
 		a.addReader(a.typedLoc(st.Elem()), key{call, 0})
+	}
+	// The operands may be a slice parameter of the caller
+	// (fmt.Errorf(format, args...)).
+	if l, ok := sliceParam(slice); ok {
+		a.addReader(l, key{call, 0})
 	}
 }
 

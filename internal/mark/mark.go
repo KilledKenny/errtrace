@@ -20,7 +20,10 @@
 //     elements, program-wide (type-based aliasing), which also stands for
 //     every variable and field whose address is taken;
 //   - the keys and the values of a map type, the elements of channels of a
-//     type, the value of a panic, and the contents of sync/atomic values.
+//     type, the value of a panic, and the contents of sync/atomic values;
+//   - the argument array of a static variadic call, which is the memory
+//     of the callee's slice parameter alone (and of the parameters it is
+//     passed on to) as long as the callee only reads it.
 //
 // A type that implements error and whose Unwrap method can return a marked
 // value, or that has an Unwrap, Is or As method and holds a marked value in

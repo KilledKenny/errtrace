@@ -76,7 +76,7 @@ func TestCalls(t *testing.T) {
 			"Callback": "-", "CallbackY": "0",
 			"Method": "-", "Go": "-", "DeferClosure": "-",
 			"DynErrorf": "-", "Multi": "-", "SecondY": "0", "SecondX": "-", "bound": "-",
-			"second": "0", "BoundArg": "-", "BoundArgY": "0",
+			"second": "0", "BoundArg": "-", "BoundArgY": "0", "Noted": "-",
 		}},
 	})
 }
@@ -103,6 +103,7 @@ func TestHard(t *testing.T) {
 		"Boxed", "ResultField", "Generic", "GenericBox", "Promoted", "Registry", "MethodResult",
 		"Returned", "Once", "Goroutine", "AsHelper", "Forwarded", "JoinForwarded",
 		"ChanStruct", "MapKey", "SelectSend", "PtrConvert", "Cause", "Switch", "Deferred",
+		"VarFirst", "VarRange", "VarClosure", "VarForward", "VarKept",
 	}
 	want := make(map[string]string)
 	for _, n := range names {

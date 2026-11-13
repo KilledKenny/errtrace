@@ -61,6 +61,12 @@ const (
 	locAtomic
 	// locReflect is every value passed to reflect.ValueOf.
 	locReflect
+	// locVarargs is the elements of the slices passed to the slice
+	// parameter v of a function that are argument arrays of static
+	// variadic calls (directly, or passed on from parameter to
+	// parameter): memory only that function reads, unless it lets the
+	// slice escape.
+	locVarargs
 )
 
 // loc names a memory location.
@@ -193,12 +199,19 @@ type analysis struct {
 	cands    []*candidate
 	candByID map[int32]*candidate
 
-	typeSeeds  []ssa.Value
-	opaque     []opaqueSeed
-	varargs    map[*ssa.Alloc]*ssa.Call
-	asPointees []types.Type
-	asSeen     map[int32]bool
-	asUnknown  bool
+	typeSeeds []ssa.Value
+	opaque    []opaqueSeed
+	varargs   map[*ssa.Alloc]*ssa.Call
+	// varargsParam maps the argument array of a static call of a
+	// variadic function to the locVarargs of the callee's parameter;
+	// forwards are the locVarargs a function passes its own on to
+	// (f(args...)), and vaEsc caches vaEscapes.
+	varargsParam map[*ssa.Alloc]loc
+	forwards     map[loc][]loc
+	vaEsc        map[loc]bool
+	asPointees   []types.Type
+	asSeen       map[int32]bool
+	asUnknown    bool
 
 	siteOrd      map[ssa.CallInstruction]int64
 	calleesCache map[ssa.CallInstruction][]*ssa.Function
@@ -253,6 +266,9 @@ func newAnalysis(prog *ssa.Program, res Callees, subj Subject) *analysis {
 		rets:          make(map[*ssa.Function][]info),
 		candByID:      make(map[int32]*candidate),
 		varargs:       make(map[*ssa.Alloc]*ssa.Call),
+		varargsParam:  make(map[*ssa.Alloc]loc),
+		forwards:      make(map[loc][]loc),
+		vaEsc:         make(map[loc]bool),
 		asSeen:        make(map[int32]bool),
 		siteOrd:       make(map[ssa.CallInstruction]int64),
 		calleesCache:  make(map[ssa.CallInstruction][]*ssa.Function),
@@ -351,6 +367,10 @@ func (a *analysis) collect() {
 	}
 	var list []named
 	var rands []*ssa.Value
+	// helpers are the functions the bodies of the intrinsics refer to,
+	// and referenced the functions that scanned bodies refer to.
+	helpers := make(map[*ssa.Function]bool)
+	referenced := make(map[*ssa.Function]bool)
 	for len(work) > 0 {
 		fn := work[len(work)-1]
 		work = work[:len(work)-1]
@@ -362,6 +382,19 @@ func (a *analysis) collect() {
 			// operands through memory of type any, would mark that
 			// memory for every Subject. A dynamic call that may reach
 			// it is modelled too (see indexCallees).
+			for _, b := range fn.Blocks {
+				for _, instr := range b.Instrs {
+					rands = instr.Operands(rands[:0])
+					for _, r := range rands {
+						if r == nil || *r == nil {
+							continue
+						}
+						if f, ok := (*r).(*ssa.Function); ok {
+							helpers[f] = true
+						}
+					}
+				}
+			}
 			continue
 		}
 		list = append(list, named{fn, fn.String()})
@@ -376,6 +409,7 @@ func (a *analysis) collect() {
 						continue
 					}
 					if f, ok := (*r).(*ssa.Function); ok {
+						referenced[f] = true
 						add(f)
 					}
 				}
@@ -393,6 +427,17 @@ func (a *analysis) collect() {
 			}
 		}
 	}
+	// An unexported function that only the body of an intrinsic refers
+	// to (fmt.errorf, which does the work of fmt.Errorf) is part of that
+	// body: nothing the pass follows can call it.
+	kept := list[:0]
+	for _, n := range list {
+		if helpers[n.fn] && !referenced[n.fn] && n.fn.Signature.Recv() == nil && !token.IsExported(n.fn.Name()) {
+			continue
+		}
+		kept = append(kept, n)
+	}
+	list = kept
 	sort.Slice(list, func(i, j int) bool {
 		x, y := list[i], list[j]
 		if x.name != y.name {
@@ -727,6 +772,17 @@ func (a *analysis) markLoc(l loc, why reason) {
 		}
 		a.mark(k, free, why)
 	}
+	if l.kind == locVarargs {
+		from := ref{kind: refLoc, l: l, free: true}
+		for _, f := range a.forwards[l] {
+			a.markLoc(f, reason{kind: kFlow, from: from})
+		}
+		// A function that lets its slice parameter escape makes the
+		// elements memory of their type.
+		if st, ok := l.v.Type().Underlying().(*types.Slice); ok && a.vaEscapes(l) {
+			a.markLoc(a.typedLoc(st.Elem()), reason{kind: kFlow, from: from})
+		}
+	}
 }
 
 // Marks.
@@ -942,6 +998,11 @@ func (a *analysis) store(addr ssa.Value, from ref, site ssa.Instruction) {
 				a.evalIntrinsic(call)
 				return
 			}
+			if l, ok := a.varargsParam[alloc]; ok {
+				// The array is the variadic argument of one callee.
+				a.markLoc(l, reason{kind: kStore, from: from, site: site})
+				return
+			}
 		}
 	}
 	locs, n := a.addrLocs(addr)
@@ -966,6 +1027,11 @@ func (a *analysis) index() {
 							locs, n := a.addrLocs(x.X)
 							for _, l := range locs[:n] {
 								a.addReader(l, key{x, 0})
+							}
+							if ia, ok := x.X.(*ssa.IndexAddr); ok {
+								if l, ok := sliceParam(ia.X); ok {
+									a.addReader(l, key{x, 0})
+								}
 							}
 						}
 					case token.ARROW:
