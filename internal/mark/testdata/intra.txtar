@@ -1,0 +1,228 @@
+Marks inside functions: seeds, copies, memory locations and Wraps.
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrX = errors.New("x")
+var ErrY = errors.New("y")
+var ErrAlias = ErrX
+
+func Direct() error { return ErrX }
+func Other() error  { return ErrY }
+func Alias() error  { return ErrAlias }
+func New() error    { return errors.New("z") }
+
+func Compare(err error) bool { return err == ErrX }
+
+func Phi(b bool) error {
+	var e error
+	if b {
+		e = ErrX
+	} else {
+		e = ErrY
+	}
+	return e
+}
+
+func Two() (error, error) { return ErrY, ErrX }
+
+func WrapW() error           { return fmt.Errorf("a: %w", ErrX) }
+func WrapV() error           { return fmt.Errorf("a: %v", ErrX) }
+func WrapSecond() error      { return fmt.Errorf("%v: %w", ErrX, ErrY) }
+func WrapIndexed() error     { return fmt.Errorf("%[2]w: %[1]v", ErrY, ErrX) }
+func WrapDyn(f string) error { return fmt.Errorf(f, ErrX) }
+func Join() error            { return errors.Join(ErrY, ErrX) }
+func JoinOther() error       { return errors.Join(ErrY, ErrY) }
+func Unwrap() error          { return errors.Unwrap(fmt.Errorf("a: %w", ErrX)) }
+
+type holder struct {
+	err   error
+	other error
+}
+
+func FieldStore(h *holder)       { h.err = ErrX }
+func FieldLoad(h *holder) error  { return h.err }
+func FieldOther(h *holder) error { return h.other }
+func FieldValue(h holder) error  { return h.err }
+
+type renamed holder
+
+func FieldRenamed(h *holder) error { return (*renamed)(h).err }
+
+type tagged struct {
+	err   error `json:"e"`
+	other error
+}
+
+func FieldTagged(h holder) error { return tagged(h).err }
+
+var global error
+var unset error
+
+func GlobalStore()      { global = ErrX }
+func GlobalLoad() error { return global }
+func UnsetLoad() error  { return unset }
+
+func SliceStore(s []error)     { s[0] = ErrX }
+func SliceLoad(s []error) error { return s[1] }
+func ArrayLoad(a [2]error) error { return a[0] }
+func RangeLoad(s []error) error {
+	for _, e := range s {
+		return e
+	}
+	return nil
+}
+
+func MapStore(m map[string]error)       { m["a"] = ErrX }
+func MapLoad(m map[string]error) error  { return m["b"] }
+func MapOther(m map[int]error) error    { return m[1] }
+func MapRange(m map[string]error) error {
+	for _, e := range m {
+		return e
+	}
+	return nil
+}
+
+func ChanSend(c chan error)        { c <- ErrX }
+func ChanRecv(c <-chan error) error { return <-c }
+func ChanSelect(c chan error, d chan int) error {
+	select {
+	case e := <-c:
+		return e
+	case <-d:
+		return nil
+	}
+}
+
+func PtrStore(p *error)      { *p = ErrX }
+func PtrLoad(p *error) error { return *p }
+
+func Local() error {
+	var e error
+	p := &e
+	*p = ErrY
+	return e
+}
+
+func LocalEscaped() error {
+	var e error
+	PtrStore(&e)
+	return e
+}
+
+type wrapErr struct {
+	msg   string
+	inner error
+}
+
+func (w *wrapErr) Error() string { return w.msg }
+func (w *wrapErr) Unwrap() error { return w.inner }
+
+func MakeWrap() error      { return &wrapErr{"m", ErrX} }
+func MakeWrapOther() error { return &wrapErr{"m", ErrY} }
+func WrapTyped() *wrapErr  { return nil }
+
+type isErr struct{ cause error }
+
+func (e *isErr) Error() string        { return "is" }
+func (e *isErr) Is(target error) bool { return errors.Is(e.cause, target) }
+
+func MakeIs() error { return &isErr{ErrX} }
+
+type multi []error
+
+func (m multi) Error() string   { return "multi" }
+func (m multi) Unwrap() []error { return m }
+
+func MakeMulti() error { return multi{ErrX} }
+
+type plain struct{ msg string }
+
+func (p *plain) Error() string { return p.msg }
+
+func MakePlain() error  { return &plain{"m"} }
+func PlainTyped() *plain { return nil }
+
+type tempErr interface {
+	error
+	Temporary() bool
+}
+
+func As() error {
+	var te tempErr
+	if errors.As(fmt.Errorf("a: %w", ErrX), &te) {
+		return te
+	}
+	return nil
+}
+
+func AsOther() error {
+	var te tempErr
+	if errors.As(ErrY, &te) {
+		return te
+	}
+	return nil
+}
+
+func AsPlain() error {
+	var p *plain
+	if errors.As(ErrX, &p) {
+		return p
+	}
+	return nil
+}
+
+func Assert() error {
+	var e error = ErrX
+	a := any(e)
+	return a.(error)
+}
+
+func AssertPlain() error {
+	var e error = ErrX
+	if p, ok := e.(*plain); ok {
+		return p
+	}
+	return nil
+}
+
+func Panic() { panic(ErrX) }
+
+func Recover() (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = r.(error)
+		}
+	}()
+	return nil
+}
+
+func Closure() error {
+	var e error
+	f := func() { e = ErrX }
+	f()
+	return e
+}
+
+func ClosureOther() error {
+	var e error
+	f := func() { e = ErrY }
+	f()
+	return e
+}
+
+type valErr struct{ s string }
+
+func (valErr) Error() string { return "val" }
+
+var ErrVal error = valErr{"a"}
+
+func MakeVal() error { return valErr{"a"} }
