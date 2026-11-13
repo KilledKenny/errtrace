@@ -91,6 +91,21 @@ type Source struct {
 	// Then are, for a Passed source, the sources of the parameter that
 	// received the value, in the function the source belongs to.
 	Then []Source
+	// Field is, for a Stored source of a value loaded from a field
+	// location, the location's name ("field Err of io/fs.PathError"). It
+	// is empty for a variable that a closure stores to.
+	Field string
+	// viaField reports that every way the value comes through this source
+	// goes through a field location (see locOnly).
+	viaField bool
+}
+
+// locOnly reports whether every source of srcs goes through a field
+// location: the value they belong to is known only as "what the program
+// stores to that field". Lists are kept with the sources that do not
+// first (see addSource), so the first one decides.
+func locOnly(srcs []Source) bool {
+	return len(srcs) > 0 && srcs[0].viaField
 }
 
 // rank orders sources: local first, then static calls, then dynamic calls.
@@ -105,20 +120,41 @@ func (s Source) rank() int {
 }
 
 func sourceEqual(a, b Source) bool {
-	return a.Kind == b.Kind && a.Site == b.Site && a.Callee == b.Callee &&
+	return a.Kind == b.Kind && a.Site == b.Site && a.Callee == b.Callee && a.Field == b.Field && a.viaField == b.viaField &&
 		a.CalleeResult == b.CalleeResult && a.CalleeValue == b.CalleeValue && a.CalleeLeaf == b.CalleeLeaf &&
 		a.Dynamic == b.Dynamic && a.ArgFn == b.ArgFn && a.Store == b.Store &&
-		slices.EqualFunc(a.ArgSources, b.ArgSources, sourceEqual) && slices.EqualFunc(a.Then, b.Then, sourceEqual)
+		sourcesEqual(a.ArgSources, b.ArgSources) && sourcesEqual(a.Then, b.Then)
+}
+
+// sourcesEqual compares two source lists; lists that share their backing
+// array (as the argument sources of the sources made by one substitution
+// do) are equal without looking at them.
+func sourcesEqual(a, b []Source) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	if len(a) == 0 || &a[0] == &b[0] {
+		return true
+	}
+	return slices.EqualFunc(a, b, sourceEqual)
 }
 
 // addSource adds src to srcs unless it is there already, keeping srcs
-// ranked and at most MaxSources long.
+// ranked and at most MaxSources long. The sources that do not go through a
+// field location come before those that do, whatever their rank: a list
+// with one of them is never cut down to location sources only.
 func addSource(srcs []Source, src Source) []Source {
 	if slices.ContainsFunc(srcs, func(s Source) bool { return sourceEqual(s, src) }) {
 		return srcs
 	}
+	after := func(a, b Source) bool {
+		if a.viaField != b.viaField {
+			return a.viaField
+		}
+		return a.rank() > b.rank()
+	}
 	i := len(srcs)
-	for i > 0 && srcs[i-1].rank() > src.rank() {
+	for i > 0 && after(srcs[i-1], src) {
 		i--
 	}
 	if i >= MaxSources {

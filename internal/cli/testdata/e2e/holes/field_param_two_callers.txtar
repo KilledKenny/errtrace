@@ -6,22 +6,20 @@ store and the load.
 a.go:@f
 -- stdout --
 $WORK/a.go:21:12-13: Error Set of example.com/fx.F: 2 entries
-$GOROOT/src/io/io.go:*: sentinel io.EOF [+1 more paths]
+$GOROOT/src/io/io.go:*: sentinel io.EOF [via field Err of example.com/fx.E]
 	path (origin → target):
 		$WORK/a.go:16:27-33: in example.com/fx.a
 		$WORK/a.go:16:22-34: in example.com/fx.a, call to example.com/fx.NewE
 		$WORK/a.go:12:42-45: in example.com/fx.NewE
 		$WORK/a.go:12:37-45: in example.com/fx.NewE
-		$WORK/a.go:19:33-38: in example.com/fx.inner
-		$WORK/a.go:23:10-20: in example.com/fx.F, call to example.com/fx.inner
-$WORK/a.go:14:5-13: sentinel example.com/fx.ErrOther [+1 more paths]
+		$WORK/a.go:19:33-38: in example.com/fx.F
+$WORK/a.go:14:5-13: sentinel example.com/fx.ErrOther [via field Err of example.com/fx.E]
 	path (origin → target):
 		$WORK/a.go:17:27-35: in example.com/fx.b
 		$WORK/a.go:17:22-36: in example.com/fx.b, call to example.com/fx.NewE
 		$WORK/a.go:12:42-45: in example.com/fx.NewE
 		$WORK/a.go:12:37-45: in example.com/fx.NewE
-		$WORK/a.go:19:33-38: in example.com/fx.inner
-		$WORK/a.go:23:10-20: in example.com/fx.F, call to example.com/fx.inner
+		$WORK/a.go:19:33-38: in example.com/fx.F
 -- go.mod --
 module example.com/fx
 

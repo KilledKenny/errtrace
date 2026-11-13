@@ -57,20 +57,46 @@ func (s *Solver) notConverged(fn *ssa.Function) errset.ValueID {
 // values of the call sites solved together stop changing (see evaluate).
 // It reports false if they still changed at the pass limit.
 func (s *Solver) passes(pass func(*evalState)) bool {
-	st := &evalState{
-		final:   make(map[callKey][]Fact),
-		prev:    make(map[callKey][]Fact),
-		onStack: make(map[callKey]bool),
-		vars:    make(map[ssa.Value]int),
+	newState := func() *evalState {
+		return &evalState{
+			final:   make(map[callKey][]Fact),
+			prev:    make(map[callKey][]Fact),
+			onStack: make(map[callKey]bool),
+			vars:    make(map[ssa.Value]int),
+			cur:     make(map[callKey][]Fact),
+		}
 	}
-	// The values only grow from pass to pass and are bounded by the cap;
-	// the pass limit is a safeguard against a non-monotone pass.
+	outer, outerSaw := s.unsettledPass, s.sawNothing
+	defer func() { s.unsettledPass, s.sawNothing = outer, outerSaw }()
+	// Most evaluations have no value that depends on itself: one pass,
+	// in which an inner value of a Wrap that has no value is nil.
+	st := newState()
+	s.unsettledPass, s.sawNothing = false, false
+	pass(st)
+	if !st.cyclic {
+		return true
+	}
+	// Some value depends on itself. The values only grow from pass to
+	// pass and are bounded by the cap; the pass limit is a safeguard
+	// against a non-monotone pass. A Wrap whose inner values have no
+	// value yet is first left out, since the values may come in a later
+	// pass; once the passes have converged that way, the inner values
+	// that still have none are nil, and the passes go on with the Wraps
+	// of nothing until they converge again.
+	st = newState()
 	limit := 4 * (s.chainDepth() + 2)
+	s.unsettledPass = true
 	for n := 0; ; n++ {
 		st.cur = make(map[callKey][]Fact)
 		st.changed = false
 		pass(st)
 		if !st.changed {
+			if s.unsettledPass && s.sawNothing {
+				s.unsettledPass = false
+				st.final = make(map[callKey][]Fact)
+				st.prev = st.cur
+				continue
+			}
 			return true
 		}
 		if n == limit {
@@ -90,7 +116,16 @@ func (s *Solver) expand(fn *ssa.Function, f flow.Fact, fs *factSet, st *evalStat
 	for _, sub := range s.mapTree(f.Value, func(id errset.ValueID, k int) []subst {
 		v := s.tbl.Get(id)
 		if creator, facts, ok := s.binding(fn, v); ok {
-			return s.captured(creator, facts, f.LeafSource(k), st)
+			subs := s.captured(creator, facts, f.LeafSource(k), st)
+			if v.Index < len(fn.FreeVars) && st.vars[s.rootVar(fn.FreeVars[v.Index])] > 0 {
+				// The captured variable is read inside a value stored to
+				// it (err = wrap(err) in a closure): what it holds went
+				// through this store any number of times before. Its
+				// values stand for themselves with their chains cut, as
+				// for the stores of other closures (see stored).
+				subs = s.flatSubs(subs)
+			}
+			return subs
 		}
 		if store, ok := v.Site.(*ssa.Store); ok && v.Kind == errset.StoreRef {
 			return s.stored(fn, store, v, f.LeafSource(k), st)
@@ -126,7 +161,7 @@ func (s *Solver) captured(creator *ssa.Function, facts []flow.Fact, site any, st
 	for i, f := range fs.facts {
 		leaves := make([][]Source, len(f.Leaves))
 		for j, srcs := range f.Leaves {
-			leaves[j] = []Source{{Kind: Captured, Site: site, ArgFn: creator, ArgSources: srcs}}
+			leaves[j] = []Source{{Kind: Captured, Site: site, ArgFn: creator, ArgSources: srcs, viaField: locOnly(srcs)}}
 		}
 		out[i] = subst{value: f.Value, leaves: leaves, notes: f.Notes}
 	}
@@ -154,8 +189,8 @@ func (s *Solver) stored(fn *ssa.Function, store *ssa.Store, v errset.Value, site
 		// wrap(err), through any of its stores): the value read went
 		// through a store before, perhaps many times. It stands for
 		// the leaves of the store's values so far, each under a
-		// Truncated marker, so that a store adds its Wraps once and
-		// the values stay linear in the stores.
+		// Repeat marker, so that a store adds its Wraps once and the
+		// values stay linear in the stores.
 		st.taint()
 		known, ok := st.final[key]
 		if !ok {
@@ -166,11 +201,13 @@ func (s *Solver) stored(fn *ssa.Function, store *ssa.Store, v errset.Value, site
 		facts = s.flat(known)
 	} else {
 		st.vars[root]++
+		st.inStore++
 		facts = s.memoized(key, st, func(fs *factSet) {
 			for _, af := range s.argFacts(w, store.Val, store) {
 				s.expand(w, af, fs, st)
 			}
 		})
+		st.inStore--
 		st.vars[root]--
 	}
 	var out []subst
@@ -195,7 +232,7 @@ func (s *Solver) stored(fn *ssa.Function, store *ssa.Store, v errset.Value, site
 					})
 				}
 			}
-			return []subst{{value: id, leaves: [][]Source{{{Kind: Stored, Site: site, ArgFn: w, Store: store, ArgSources: f.Leaves[k]}}}}}
+			return []subst{{value: id, leaves: [][]Source{{{Kind: Stored, Site: site, ArgFn: w, Store: store, ArgSources: f.Leaves[k], viaField: locOnly(f.Leaves[k])}}}}}
 		}) {
 			out = append(out, subst{value: sub.value, leaves: sub.leaves, notes: errset.AddNotes(slices.Clone(f.Notes), sub.notes...)})
 		}
@@ -250,15 +287,16 @@ func (s *Solver) rootVar(addr ssa.Value) ssa.Value {
 	return addr
 }
 
-// flat returns facts with every Wrap Chain cut: each leaf of each value
-// under a Truncated marker (a value that is a leaf stays as it is), with
-// the leaf's sources. It stands for values that went around a cycle of
-// stores an unknown number of times: the Origins are those of facts, and
-// the marker says that more Wraps may lie between.
+// flat returns facts as they are read back inside a cycle of stores: each
+// leaf of each value under a Repeat marker (errset.Value.Repeat), without
+// its Wrap Chain, with the leaf's sources. The values went around the
+// cycle an unknown number of times: the Origins are those of facts, and
+// the marker says that any number of Wraps may lie between the leaf and
+// what the reader puts around it.
 func (s *Solver) flat(facts []Fact) []Fact {
 	var fs factSet
 	for _, f := range facts {
-		for _, c := range s.tbl.CapLeaves(f.Value, 0) {
+		for _, c := range s.tbl.RepeatCut(f.Value) {
 			leaves := make([][]Source, len(c.From))
 			for i, from := range c.From {
 				for _, k := range from {
@@ -271,6 +309,20 @@ func (s *Solver) flat(facts []Fact) []Fact {
 		}
 	}
 	return fs.facts
+}
+
+// flatSubs is flat for substitutions.
+func (s *Solver) flatSubs(subs []subst) []subst {
+	facts := make([]Fact, len(subs))
+	for i, sub := range subs {
+		facts[i] = Fact{Value: sub.value, Leaves: sub.leaves}
+	}
+	facts = s.flat(facts)
+	out := make([]subst, len(facts))
+	for i, f := range facts {
+		out[i] = subst{value: f.Value, leaves: f.Leaves}
+	}
+	return out
 }
 
 // holey reports whether the value tree id has a leaf that is not an Error
@@ -363,13 +415,18 @@ type evalState struct {
 	tainted []bool
 	// changed says whether a value of this pass differs from prev.
 	changed bool
+	// cyclic reports that some value was read that is not final: the
+	// evaluation has a value that depends on itself.
+	cyclic bool
 	// vars counts, per local variable, the stores to it that are being
-	// expanded (see stored).
-	vars map[ssa.Value]int
+	// expanded (see stored), and inStore all of them.
+	vars    map[ssa.Value]int
+	inStore int
 }
 
 // taint marks the call site result being expanded as not final.
 func (st *evalState) taint() {
+	st.cyclic = true
 	if n := len(st.tainted); n > 0 {
 		st.tainted[n-1] = true
 	}
@@ -464,7 +521,15 @@ func (s *Solver) expandCallOnce(fn *ssa.Function, site ssa.CallInstruction, inde
 			fs.add(s.unresolved(site, errset.Memory, fmt.Sprintf("result %d of %s is not tracked", index, g)), here, nil)
 			continue
 		}
-		for _, gf := range res.Facts {
+		facts := res.Facts
+		if st.inStore > 0 && s.solving[g] {
+			// Inside a value stored to a variable, the result of a
+			// function that is being solved with it (a closure that
+			// returns the variable) is the variable read back around
+			// the cycle: see stored.
+			facts = s.flat(facts)
+		}
+		for _, gf := range facts {
 			via := Source{
 				Kind:         Via,
 				Site:         site,
@@ -473,7 +538,7 @@ func (s *Solver) expandCallOnce(fn *ssa.Function, site ssa.CallInstruction, inde
 				CalleeValue:  gf.Value,
 				Dynamic:      dynamic,
 			}
-			for _, sub := range s.substitute(fn, site, g, gf.Value, via, st) {
+			for _, sub := range s.substitute(fn, site, g, gf, via, st) {
 				fs.add(sub.value, sub.leaves, errset.AddNotes(slices.Clone(gf.Notes), sub.notes...))
 			}
 		}
@@ -506,10 +571,13 @@ type subst struct {
 // site's format and operands, and Error Origins and Unresolved values stay
 // as they are. Each leaf gets the source via, naming the callee leaf it
 // comes from, with the leaf's sources in fn if it came from an argument.
-func (s *Solver) substitute(fn *ssa.Function, site ssa.CallInstruction, g *ssa.Function, id errset.ValueID, via Source, st *evalState) []subst {
-	return s.mapTree(id, func(id errset.ValueID, k int) []subst {
+func (s *Solver) substitute(fn *ssa.Function, site ssa.CallInstruction, g *ssa.Function, gf Fact, via Source, st *evalState) []subst {
+	return s.mapTree(gf.Value, func(id errset.ValueID, k int) []subst {
 		via := via
 		via.CalleeLeaf = k
+		if k < len(gf.Leaves) {
+			via.viaField = locOnly(gf.Leaves[k])
+		}
 		v := s.tbl.Get(id)
 		if v.Kind == errset.ErrorfLike && v.Fn == g.String() {
 			return s.forwardedErrorf(fn, site, g, v, via, st)
@@ -541,6 +609,7 @@ func (s *Solver) substitute(fn *ssa.Function, site ssa.CallInstruction, g *ssa.F
 			for j, srcs := range f.Leaves {
 				src := via
 				src.ArgSources = srcs
+				src.viaField = via.viaField || locOnly(srcs)
 				leaves[j] = []Source{src}
 			}
 			out[i] = subst{value: f.Value, leaves: leaves, notes: f.Notes}
@@ -585,6 +654,7 @@ func (s *Solver) forwardedErrorf(fn *ssa.Function, site ssa.CallInstruction, g *
 			if len(args) > 0 {
 				src := via
 				src.ArgSources = args
+				src.viaField = via.viaField || locOnly(args)
 				leaves[j] = addSource(leaves[j], src)
 			}
 		}
@@ -664,6 +734,9 @@ func (s *Solver) mapTreeRaw(id errset.ValueID, base int, leaf func(errset.ValueI
 		}
 		return out
 	}
+	if v.Kind == errset.FieldOf {
+		return s.fieldOf(v, s.mapTreeRaw(v.Inner[0], base, leaf))
+	}
 	var operands [][]subst
 	// limits are the fixpoint-limit values among the inner values' values.
 	// They say that a set was cut, which is true of the Wrap's values as
@@ -682,15 +755,31 @@ func (s *Solver) mapTreeRaw(id errset.ValueID, base int, leaf func(errset.ValueI
 			}
 		}
 		off += s.tbl.Leaves(in)
+		if len(subs) == 0 {
+			// The inner value has no value here: it is nil. A Wrap
+			// holds nothing for it (fmt.Errorf drops a nil %w operand,
+			// errors.Join a nil error, a nil field is a nil Unwrap).
+			continue
+		}
 		operands = append(operands, subs)
 		if len(subs) > 1 {
 			several++
 		}
 	}
-	limit := maxValues
-	if several > 1 {
-		limit = maxCombos
+	if len(operands) == 0 {
+		// Every inner value is nil, unless a fixpoint is still running
+		// and may give one of them a value.
+		var out []subst
+		if alone, ok := s.wrapOfNothing(v); ok {
+			if s.unsettledPass {
+				s.sawNothing = true
+			} else {
+				out = append(out, subst{value: alone, leaves: local(1, Source{Kind: Local, Site: v.Site})})
+			}
+		}
+		return append(out, limits...)
 	}
+	limit := maxValues
 	combos := []subst{{}}
 	var inner [][]errset.ValueID
 	inner = append(inner, nil)
@@ -752,6 +841,28 @@ func (s *Solver) mapTreeRaw(id errset.ValueID, base int, leaf func(errset.ValueI
 		}
 	}
 	return combos
+}
+
+// wrapOfNothing returns what the Wrap (or marker) v is when every one of
+// its inner values is nil. fmt.Errorf with %w still makes an error, which
+// wraps nothing: an Opaque Error. A composite literal of a type with a
+// custom Unwrap is a value of that type with a nil field: a Concrete
+// Type. errors.Join of nil errors and errtrace.Wrap(nil) are nil, and a
+// marker over nothing is nothing: there is no value.
+func (s *Solver) wrapOfNothing(v errset.Value) (errset.ValueID, bool) {
+	if v.Kind != errset.Wrap {
+		return 0, false
+	}
+	switch v.WrapKind {
+	case errset.WrapErrorf:
+		return s.tbl.Intern(errset.Value{
+			Kind: errset.Opaque, Site: v.Site, Pos: v.Pos,
+			Constructor: "fmt.Errorf", Message: v.Format, HasMessage: v.Format != "",
+		}), true
+	case errset.WrapUnwrapMethod:
+		return s.tbl.Intern(errset.Value{Kind: errset.Concrete, Site: v.Site, Pos: v.Pos, Type: v.Type, Allocated: true}), true
+	}
+	return 0, false
 }
 
 // isLimit reports whether id is an Unresolved fixpoint-limit value (or

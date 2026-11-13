@@ -741,6 +741,13 @@ func sliceElems(v ssa.Value) ([]ssa.Value, bool) {
 	return nil, false
 }
 
+// UnwrapField returns the field that the Unwrap() error method of typ
+// returns, if typ has one that does nothing else.
+func UnwrapField(prog *ssa.Program, typ types.Type) (int, bool) {
+	m := unwrapMethod(prog, typ)
+	return m.field, m.kind == unwrapField && !m.multi
+}
+
 type unwrapKind uint8
 
 const (

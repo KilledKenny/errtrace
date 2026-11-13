@@ -5,7 +5,7 @@ what its writers store, and the load is resolved.
 a.go:@f
 -- stdout --
 $WORK/a.go:16:12-13: Error Set of example.com/fx.F: 1 entries
-$GOROOT/src/io/io.go:*: sentinel io.EOF
+$GOROOT/src/io/io.go:*: sentinel io.EOF [via field err of example.com/fx.S]
 	path (origin → target):
 		$WORK/a.go:27:17-23: in example.com/fx.main
 		$WORK/a.go:27:12-23: in example.com/fx.main

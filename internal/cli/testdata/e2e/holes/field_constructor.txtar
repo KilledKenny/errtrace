@@ -7,7 +7,7 @@ has the writer's store, the load, and the calls up to the Target.
 a.go:@f
 -- stdout --
 $WORK/a.go:18:12-13: Error Set of example.com/fx.F: 1 entries
-$WORK/a.go:10:31-53: opaque errors.New "computed"
+$WORK/a.go:10:31-53: opaque errors.New "computed" [via field err of example.com/fx.S]
 	path (origin → target):
 		$WORK/a.go:10:31-53: in example.com/fx.compute
 		$WORK/a.go:13:28-37: in example.com/fx.NewS, call to example.com/fx.compute

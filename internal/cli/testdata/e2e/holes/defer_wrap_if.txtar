@@ -1,32 +1,20 @@
 QA M1. A deferred closure wraps the named result once. The entries are the
-returned value, the value under the closure's Wrap, and the same marked chain
-truncated (the closure's store reads the variable it writes).
+returned value and the value under the closure's Wrap, marked chain may
+repeat (the closure's store reads the variable it writes).
 -- args --
 a.go:@q
 -- stdout --
-$WORK/a.go:27:12-13: Error Set of example.com/x.C: 3 entries
+$WORK/a.go:27:12-13: Error Set of example.com/x.C: 2 entries
 $GOROOT/src/io/io.go:*: sentinel io.EOF
 	path (origin → target):
 		$WORK/a.go:9:27-33: in example.com/x.src
 		$WORK/a.go:33:9-14: in example.com/x.C, call to example.com/x.src
-$GOROOT/src/io/io.go:*: sentinel io.EOF [+1 more paths]
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat] [+1 more paths]
 	wrap chain (origin → target):
 		$WORK/a.go:30:10-36: fmt.Errorf "ctx: %w"
 	path (origin → target):
 		$WORK/a.go:9:27-33: in example.com/x.src
 		$WORK/a.go:33:9-14: in example.com/x.C, call to example.com/x.src
-		$WORK/a.go:30:32-35: in example.com/x.C$1
-		$WORK/a.go:30:4-7: in example.com/x.C$1
-		$WORK/a.go:33:2-2: in example.com/x.C
-$GOROOT/src/io/io.go:*: sentinel io.EOF [chain truncated] [+1 more paths]
-	wrap chain (origin → target):
-		$WORK/a.go:30:10-36: fmt.Errorf "ctx: %w"
-	path (origin → target):
-		$WORK/a.go:9:27-33: in example.com/x.src
-		$WORK/a.go:33:9-14: in example.com/x.C, call to example.com/x.src
-		$WORK/a.go:30:32-35: in example.com/x.C$1
-		$WORK/a.go:30:4-7: in example.com/x.C$1
-		$WORK/a.go:27:17-20: in example.com/x.C
 		$WORK/a.go:30:32-35: in example.com/x.C$1
 		$WORK/a.go:30:4-7: in example.com/x.C$1
 		$WORK/a.go:33:2-2: in example.com/x.C

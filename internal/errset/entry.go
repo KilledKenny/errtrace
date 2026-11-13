@@ -45,6 +45,18 @@ type Entry struct {
 	// Truncated reports whether the Wrap Chain was cut at the chain depth
 	// limit.
 	Truncated bool
+	// Repeats reports that the leaf went around a cycle of stores (a
+	// variable or field that is stored a Wrap of itself): between the
+	// leaf and the Wrap Chain shown there may be any number of further
+	// Wraps, those shown among them.
+	Repeats bool
+	// ViaLocation is set if every way the leaf reaches the Target goes
+	// through a field location: it was loaded from a struct field whose
+	// value errtrace knows only as "what the program stores to that field
+	// of that type, anywhere". It names the field ("field Err of
+	// io/fs.PathError"). Such an entry is an over-approximation: the
+	// struct that was loaded from may never hold this value.
+	ViaLocation string
 	// Path is the Propagation Path shown for the entry.
 	Path Path
 	// MorePaths is how many other distinct Propagation Paths were found.
@@ -60,28 +72,28 @@ type Entry struct {
 // there are t.Leaves(top) of them.
 func Flatten(t *Table, top ValueID) []Entry {
 	out := make([]Entry, 0, t.Leaves(top))
-	var walk func(id ValueID, outer []ValueID, truncated bool)
-	walk = func(id ValueID, outer []ValueID, truncated bool) {
+	var walk func(id ValueID, outer []ValueID, truncated, repeats bool)
+	walk = func(id ValueID, outer []ValueID, truncated, repeats bool) {
 		v := t.Get(id)
 		switch v.Kind {
 		case Wrap:
 			next := append(outer[:len(outer):len(outer)], id)
 			for _, in := range v.Inner {
-				walk(in, next, truncated)
+				walk(in, next, truncated, repeats)
 			}
 		case Truncated:
-			walk(v.Inner[0], outer, true)
-		case Guarded:
-			walk(v.Inner[0], outer, truncated)
+			walk(v.Inner[0], outer, truncated || !v.Repeat, repeats || v.Repeat)
+		case Guarded, FieldOf:
+			walk(v.Inner[0], outer, truncated, repeats)
 		default:
 			chain := make([]ValueID, len(outer))
 			for i, w := range outer {
 				chain[len(outer)-1-i] = w
 			}
-			out = append(out, Entry{Leaf: id, Chain: chain, Truncated: truncated})
+			out = append(out, Entry{Leaf: id, Chain: chain, Truncated: truncated, Repeats: repeats})
 		}
 	}
-	walk(top, nil, false)
+	walk(top, nil, false, false)
 	return out
 }
 
@@ -90,7 +102,8 @@ func Flatten(t *Table, top ValueID) []Entry {
 // format and type), not by its wrapped values: the same leaf under one
 // errors.Join is one entry whatever the Join's other operands are. The
 // first entry's Path and Chain are kept; every other distinct Path adds to
-// MorePaths. A merged entry is possibly handled only by the guards that
+// MorePaths. A merged entry is via a field location only if every one of
+// its entries is. A merged entry is possibly handled only by the guards that
 // every one of its entries is possibly handled by. The order of first
 // occurrences is kept.
 func Dedup(t *Table, entries []Entry) []Entry {
@@ -122,7 +135,7 @@ func Dedup(t *Table, entries []Entry) []Entry {
 	var b strings.Builder
 	for _, e := range entries {
 		b.Reset()
-		fmt.Fprintf(&b, "%d %t", e.Leaf, e.Truncated)
+		fmt.Fprintf(&b, "%d %t %t", e.Leaf, e.Truncated, e.Repeats)
 		for _, w := range e.Chain {
 			fmt.Fprintf(&b, " %d", shownOf(w))
 		}
@@ -135,6 +148,11 @@ func Dedup(t *Table, entries []Entry) []Entry {
 		}
 		g.entry.MorePaths += e.MorePaths
 		g.entry.PossiblyHandled = IntersectNotes(g.entry.PossiblyHandled, e.PossiblyHandled)
+		if e.ViaLocation == "" {
+			// One way that does not go through a field location: the
+			// entry is not location-derived.
+			g.entry.ViaLocation = ""
+		}
 		if !slices.ContainsFunc(g.paths, func(p Path) bool { return slices.Equal(p, e.Path) }) {
 			g.paths = append(g.paths, e.Path)
 			g.entry.MorePaths++
@@ -199,13 +217,30 @@ func Sort(t *Table, entries []Entry, pos PosFunc) {
 			return c
 		}
 		switch {
-		case a.Truncated == b.Truncated:
-			return 0
-		case !a.Truncated:
-			return -1
+		case a.Truncated != b.Truncated:
+			if !a.Truncated {
+				return -1
+			}
+			return 1
+		case a.Repeats != b.Repeats:
+			if !a.Repeats {
+				return -1
+			}
+			return 1
 		}
-		return 1
+		return 0
 	})
+}
+
+// CountViaLocation returns how many entries are via a field location.
+func CountViaLocation(entries []Entry) int {
+	n := 0
+	for _, e := range entries {
+		if e.ViaLocation != "" {
+			n++
+		}
+	}
+	return n
 }
 
 // CountUnresolved returns how many entries have an Unresolved leaf.

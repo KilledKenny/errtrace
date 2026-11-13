@@ -4,7 +4,7 @@ pointer, and holds what the program stores to it.
 a.go:@f
 -- stdout --
 $WORK/a.go:19:12-13: Error Set of example.com/fx.F: 1 entries
-$GOROOT/src/io/io.go:*: sentinel io.EOF
+$GOROOT/src/io/io.go:*: sentinel io.EOF [via field Err of example.com/fx.E]
 	path (origin → target):
 		$WORK/a.go:14:18-24: in example.com/fx.source
 		$WORK/a.go:14:13-24: in example.com/fx.source

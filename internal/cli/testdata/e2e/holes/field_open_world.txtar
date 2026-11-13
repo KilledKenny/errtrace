@@ -5,7 +5,7 @@ entry next to the values of the writers that are reachable from the Target.
 a.go:@f
 -- stdout --
 $WORK/a.go:9:12-13: Error Set of example.com/fx.F: 2 entries, 1 unresolved
-$GOROOT/src/io/io.go:*: sentinel io.EOF
+$GOROOT/src/io/io.go:*: sentinel io.EOF [via field err of example.com/fx.S]
 	path (origin → target):
 		$WORK/a.go:7:31-37: in (*example.com/fx.S).reset
 		$WORK/a.go:7:25-28: in (*example.com/fx.S).reset

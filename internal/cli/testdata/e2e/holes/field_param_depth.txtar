@@ -4,7 +4,7 @@ from the fourth level is Unresolved, and says which parameter was not followed.
 a.go:@f
 -- stdout --
 $WORK/a.go:14:12-13: Error Set of example.com/fx.F: 2 entries, 1 unresolved
-$GOROOT/src/io/io.go:*: sentinel io.EOF
+$GOROOT/src/io/io.go:*: sentinel io.EOF [via field err of example.com/fx.S]
 	path (origin → target):
 		$WORK/a.go:12:36-42: in example.com/fx.near
 		$WORK/a.go:12:30-43: in example.com/fx.near, call to example.com/fx.l2

@@ -62,11 +62,12 @@ import (
 //   - unsafe conversions and functions without a body (assembly,
 //     linknamed, cgo) do not go on through the interface values stored in
 //     what they are given, and reflection does not get past an unexported
-//     field (reach);
+//     field that is not embedded (reach), except in a function outside
+//     the standard library that itself calls reflect.NewAt or
+//     Value.UnsafeAddr, UnsafePointer or Pointer;
 //   - reflect.TypeOf of an interface value of unknown dynamic type
-//     exposes nothing: it gives a type, and a value that reflection then
-//     builds of a type it did not get from a traced conversion is not
-//     followed;
+//     exposes the types it may hold but not what the interfaces inside
+//     them hold: it gives a type, of which reflection builds new values;
 //   - the standard library does not write through an interface value
 //     that it neither received from its caller (which the trace follows)
 //     nor found inside such a value: a trace that ends inside a standard
@@ -144,9 +145,16 @@ type sinkArg struct {
 	v  ssa.Value
 	// mode says what the code may do with the value.
 	mode reachMode
-	// weak says that a trace of the value that ends at an interface of
-	// unknown dynamic type exposes nothing (reflect.TypeOf: see trace).
+	// weak says that the sink only reads (a sink in a trusted package):
+	// a trace of the value that ends at an interface of unknown dynamic
+	// type reaches nothing.
 	weak bool
+	// typeOnly says that the sink is reflect.TypeOf: it gets a type, of
+	// which reflection may build new values. A trace that ends at an
+	// interface of unknown dynamic type exposes the types it may hold,
+	// without going on through the interfaces inside them (a new value
+	// holds none).
+	typeOnly bool
 }
 
 // exposedType is a type handed to code that may write what it reaches.
@@ -217,6 +225,11 @@ type fieldIndex struct {
 	// traced are the values followed from a sink that may write, and
 	// tracedRead those followed from one that only reads.
 	traced, tracedRead map[ssa.Value]bool
+	// typeOnly is set while the argument of a reflect.TypeOf is traced.
+	typeOnly bool
+	// unsafeReflect are the functions outside the standard library that
+	// call reflect.NewAt or Value.UnsafeAddr, UnsafePointer or Pointer.
+	unsafeReflect map[*ssa.Function]bool
 	// stdRoot is the directory of the standard library's sources, and
 	// stdPkgs caches std by package path.
 	stdRoot string
@@ -239,11 +252,11 @@ type fieldIndex struct {
 	reflectCallable map[*ssa.Function]bool
 	// unseenCaller are the functions that a function outside the
 	// reachable program calls or refers to; unseenInvoke the names of the
-	// methods such a function calls through an interface; unseenDynCall
-	// reports that one calls a function value.
-	unseenCaller  map[*ssa.Function]bool
-	unseenInvoke  map[string]bool
-	unseenDynCall bool
+	// methods such a function calls through an interface; unseenDynCalls
+	// are the types of the function values one calls.
+	unseenCaller   map[*ssa.Function]bool
+	unseenInvoke   map[string]bool
+	unseenDynCalls []*types.Signature
 }
 
 // index returns the Solver's field index, building it from prog if it is
@@ -271,6 +284,7 @@ func (s *Solver) index(prog *ssa.Program) *fieldIndex {
 		invoked:         make(map[string]bool),
 		traced:          make(map[ssa.Value]bool),
 		tracedRead:      make(map[ssa.Value]bool),
+		unsafeReflect:   make(map[*ssa.Function]bool),
 		stdPkgs:         make(map[string]bool),
 		reached:         make(map[reachMode]map[types.Type]bool),
 		named:           make(map[*types.Named]int),
@@ -309,8 +323,19 @@ func (s *Solver) index(prog *ssa.Program) *fieldIndex {
 		ix.reach(e.t, e.mode)
 	}
 	for _, a := range ix.sinks {
-		ix.trace(a.fn, a.v, a.mode, a.weak)
+		m := a.mode
+		ix.typeOnly = a.typeOnly
+		ix.trace(a.fn, a.v, m, a.weak)
+		if ix.unsafeReflect[a.fn] && m.exported {
+			// With reflect's unsafe accessors, the function also gets
+			// at the unexported fields of what it is given (though, it
+			// is assumed, not at what the interfaces behind them
+			// hold). The trace is done again in that mode.
+			clear(ix.traced)
+			ix.trace(a.fn, a.v, reachMode{write: true}, true)
+		}
 	}
+	ix.typeOnly = false
 	ix.settle()
 	ix.scanUnreached()
 	ix.settle()
@@ -667,7 +692,9 @@ func (ix *fieldIndex) dynamicTypes(t types.Type) []types.Type {
 //
 // Reflection cannot set an unexported field, nor anything it reaches
 // through one (reflect panics), so in an exported mode such fields are
-// neither flagged nor followed; encoding/json also leaves the fields
+// neither flagged nor followed, except that an embedded unexported field
+// is followed to the exported fields of its type, which reflection can
+// set; encoding/json also leaves the fields
 // tagged `json:"-"` alone. deep is not set for what unsafe conversions and
 // functions without a body are given (a syscall's buffer), and for what
 // the trusted packages read: they are taken not to go through the
@@ -701,6 +728,11 @@ func (ix *fieldIndex) reach(t types.Type, m reachMode) {
 	case *types.Struct:
 		for i := range u.NumFields() {
 			if m.exported && !u.Field(i).Exported() {
+				// Reflection cannot set the field, but it gets through
+				// an embedded one to the exported fields below it.
+				if u.Field(i).Embedded() {
+					ix.reach(u.Field(i).Type(), m)
+				}
 				continue
 			}
 			if m.tag != "" {
@@ -850,7 +882,7 @@ func (ix *fieldIndex) trace(fn *ssa.Function, v ssa.Value, m reachMode, weak boo
 			if op := argument(site.Common(), fn, index); op != nil {
 				ix.trace(site.Parent(), op, m, weak)
 			} else if flood {
-				ix.reach(v.Type(), anything)
+				ix.flood(v.Type())
 			}
 		}
 		return
@@ -858,7 +890,7 @@ func (ix *fieldIndex) trace(fn *ssa.Function, v ssa.Value, m reachMode, weak boo
 	if isIface {
 		// The trace ends at an interface value of unknown dynamic type.
 		if flood {
-			ix.reach(v.Type(), anything)
+			ix.flood(v.Type())
 		}
 		return
 	}
@@ -866,6 +898,20 @@ func (ix *fieldIndex) trace(fn *ssa.Function, v ssa.Value, m reachMode, weak boo
 	// is reached without going through the interfaces inside it.
 	m.deep = m.deep && !ix.std(fn)
 	ix.reach(v.Type(), m)
+}
+
+// flood exposes every concrete type that the interface type t may hold:
+// the end of a trace at a value of unknown dynamic type. For the argument
+// of reflect.TypeOf only the types are exposed, not what the interfaces
+// inside them hold.
+func (ix *fieldIndex) flood(t types.Type) {
+	if !ix.typeOnly {
+		ix.reach(t, anything)
+		return
+	}
+	for _, x := range ix.dynamicTypes(t) {
+		ix.reach(x, reachMode{write: true})
+	}
 }
 
 // settle exposes the static types of the traced parameters of functions
@@ -959,6 +1005,12 @@ func (ix *fieldIndex) call(site ssa.CallInstruction, safe bool) {
 		}
 		bodiless = bodiless || g.Blocks == nil
 		sink = sink || sinkCallee(g)
+		if pkgPath(g) == "reflect" && !ix.std(fn) {
+			switch g.Name() {
+			case "NewAt", "UnsafeAddr", "UnsafePointer", "Pointer":
+				ix.unsafeReflect[fn] = true
+			}
+		}
 		if recv := g.Signature.Recv(); g.Blocks == nil && recv != nil && common.IsInvoke() && !safe {
 			// The receiver of a method without a body, called through
 			// an interface, has that method's receiver type.
@@ -983,18 +1035,15 @@ func (ix *fieldIndex) call(site ssa.CallInstruction, safe bool) {
 		// The reflect.Value or reflect.Type made here is only inspected.
 		safe = true
 	}
-	// reflect.TypeOf gives a type, not the value: it writes nothing. A
-	// value of that type that reflection goes on to build is seen where
-	// the type was a concrete one converted for the call.
-	weak := false
-	if callee := common.StaticCallee(); callee != nil && sink && !bodiless && callee.Name() == "TypeOf" && callee.Signature.Recv() == nil {
-		weak = true
+	typeOnly := false
+	if callee := common.StaticCallee(); callee != nil && sink && !bodiless && callee.Signature.Recv() == nil && callee.Name() == "TypeOf" {
+		typeOnly = true
 	}
 	for _, arg := range args {
 		if safe {
-			ix.readSinks = append(ix.readSinks, sinkArg{fn, arg, reachMode{}, true})
+			ix.readSinks = append(ix.readSinks, sinkArg{fn: fn, v: arg, weak: true})
 		} else {
-			ix.sinks = append(ix.sinks, sinkArg{fn, arg, m, weak})
+			ix.sinks = append(ix.sinks, sinkArg{fn: fn, v: arg, mode: m, typeOnly: typeOnly})
 		}
 	}
 	if bodiless && !safe {
@@ -1296,7 +1345,10 @@ func (ix *fieldIndex) scanUnreached() {
 							}
 						}
 					case common.StaticCallee() == nil && !builtin:
-						ix.unseenDynCall = true
+						if sig := common.Signature(); !ix.sigSeen[sig] {
+							ix.sigSeen[sig] = true
+							ix.unseenDynCalls = append(ix.unseenDynCalls, sig)
+						}
 					}
 				}
 				for _, op := range instr.Operands(buf[:0]) {
@@ -1373,12 +1425,17 @@ func (ix *fieldIndex) callersSeen(fn *ssa.Function) ([]ssa.CallInstruction, bool
 		return nil, false
 	}
 	if ix.addrTaken[fn] {
-		if !ix.dynCalled[fn] || ix.unseenDynCall {
+		if !ix.dynCalled[fn] {
 			return nil, false
 		}
-		for _, sig := range ix.boxedSigs {
-			if types.Identical(sig.Params(), fn.Signature.Params()) && types.Identical(sig.Results(), fn.Signature.Results()) {
-				return nil, false
+		// A function value of this type was handed to reflection or to
+		// code that is not seen, or is called by a function outside the
+		// reachable program: it may be this function.
+		for _, sigs := range [][]*types.Signature{ix.boxedSigs, ix.unseenDynCalls} {
+			for _, sig := range sigs {
+				if types.Identical(sig.Params(), fn.Signature.Params()) && types.Identical(sig.Results(), fn.Signature.Results()) {
+					return nil, false
+				}
 			}
 		}
 	}

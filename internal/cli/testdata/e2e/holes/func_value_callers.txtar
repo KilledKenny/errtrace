@@ -1,0 +1,69 @@
+QA minor (k2). A writer that stores its parameter and is only called through a
+function value sent on a channel: the call resolves to it and the function
+value reaches no reflection, so the argument of the call is the parameter.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:22:12-13: Error Set of example.com/x.B: 1 entries
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [via field b of example.com/x.S]
+	path (origin → target):
+		$WORK/a.go:35:12-24: in example.com/x.main
+		$WORK/a.go:35:2-25: in example.com/x.main, call to example.com/x.setB
+		$WORK/a.go:12:34-35: in example.com/x.setB
+		$WORK/a.go:12:30-31: in example.com/x.setB
+		$WORK/a.go:22:35-38: in example.com/x.B
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+	"os"
+)
+
+type S struct{ a, b, c, d, e error }
+
+func setA(s *S, e error) { s.a = e }
+func setB(s *S, e error) { s.b = e }
+func setC(s *S, e error) { s.c = e }
+func setD(s *S, e error) { s.d = e }
+func setE(s *S, e error) { s.e = e }
+
+type holder struct{ f func(*S, error) }
+
+var global func(*S, error)
+
+func A(s *S) error { return s.a }
+func /*@q*/B(s *S) error { return s.b }
+func C(s *S) error { return s.c }
+func D(s *S) error { return s.d }
+func E(s *S) error { return s.e }
+
+func main() {
+	s := &S{}
+	fns := []func(*S, error){setA}
+	for _, f := range fns {
+		f(s, io.EOF)
+	}
+	ch := make(chan func(*S, error), 1)
+	ch <- setB
+	(<-ch)(s, os.ErrClosed)
+	h := holder{f: setC}
+	func() { defer h.f(s, os.ErrExist) }()
+	global = setD
+	done := make(chan bool)
+	go func() { global(s, os.ErrInvalid); close(done) }()
+	<-done
+	var i interface{ Set(error) } = setter{s}
+	m := i.Set
+	m(os.ErrPermission)
+	fmt.Println(A(s), B(s), C(s), D(s), E(s))
+}
+
+type setter struct{ s *S }
+
+func (x setter) Set(e error) { setE(x.s, e) }

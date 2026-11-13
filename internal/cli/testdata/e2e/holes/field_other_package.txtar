@@ -3,7 +3,7 @@ The writer of the field is in another package than the load.
 a.go:@f
 -- stdout --
 $WORK/a.go:5:12-13: Error Set of example.com/fx.F: 1 entries
-$WORK/sub/sub.go:10:5-11: sentinel example.com/fx/sub.ErrRun
+$WORK/sub/sub.go:10:5-11: sentinel example.com/fx/sub.ErrRun [via field Err of example.com/fx/sub.Result]
 	path (origin → target):
 		$WORK/sub/sub.go:14:10-16: in example.com/fx/sub.Run
 		$WORK/sub/sub.go:14:4-7: in example.com/fx/sub.Run

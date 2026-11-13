@@ -1,0 +1,61 @@
+QA N1. A deferred closure joins a named result that is otherwise nil.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:21:12-13: Error Set of example.com/x.D: 2 entries
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:22:23-53: errors.Join
+	path (origin → target):
+		$WORK/a.go:22:40-52: in example.com/x.D$1
+		$WORK/a.go:22:17-20: in example.com/x.D$1
+		$WORK/a.go:23:2-2: in example.com/x.D
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [chain may repeat] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:22:23-53: errors.Join
+	path (origin → target):
+		$WORK/a.go:22:40-52: in example.com/x.D$1
+		$WORK/a.go:22:17-20: in example.com/x.D$1
+		$WORK/a.go:21:17-20: in example.com/x.D
+		$WORK/a.go:22:35-38: in example.com/x.D$1
+		$WORK/a.go:22:17-20: in example.com/x.D$1
+		$WORK/a.go:23:2-2: in example.com/x.D
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"os"
+)
+
+func none() error { return nil }
+
+func A() error { return errors.Join(none(), io.EOF) }
+
+func B() error { return fmt.Errorf("%w; %w", none(), io.EOF) }
+
+func C() error {
+	var e error
+	return errors.Join(e, io.EOF)
+}
+
+func /*@q*/D() (err error) {
+	defer func() { err = errors.Join(err, os.ErrClosed) }()
+	return nil
+}
+
+func E() error {
+	var errs error
+	for _, f := range []func() error{func() error { return io.EOF }} {
+		func() { errs = errors.Join(errs, f()) }()
+	}
+	return errs
+}
+
+func main() { fmt.Println(A(), B(), C(), D(), E()) }

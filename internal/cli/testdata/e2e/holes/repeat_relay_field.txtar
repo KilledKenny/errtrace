@@ -1,0 +1,115 @@
+QA M4.3 (e13). A field that is copied from another field, which is stored a
+Wrap of itself. The entries keep the Wrap Chain and are marked "chain may
+repeat", not "chain truncated".
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:23:12-14: Error Set of example.com/x.FT: 4 entries, 2 possibly handled
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat] [via field err of example.com/x.S]
+	possibly handled:
+		$WORK/a.go:15:5-16: comparison with io.EOF: Wrap Chain truncated
+	path (origin → target):
+		$WORK/a.go:39:18-24: in example.com/x.main
+		$WORK/a.go:39:13-24: in example.com/x.main
+		$WORK/a.go:11:50-55: in (*example.com/x.S).wrap
+		$WORK/a.go:11:24-27: in (*example.com/x.S).wrap
+		$WORK/a.go:14:7-12: in (*example.com/x.S).relay
+		$WORK/a.go:18:4-7: in (*example.com/x.S).relay
+		$WORK/a.go:21:34-39: in (*example.com/x.S).back
+		$WORK/a.go:21:28-31: in (*example.com/x.S).back
+		$WORK/a.go:14:7-12: in (*example.com/x.S).relay
+		$WORK/a.go:18:4-7: in (*example.com/x.S).relay
+		$WORK/a.go:23:36-41: in example.com/x.FT
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat] [via field err of example.com/x.S]
+	wrap chain (origin → target):
+		$WORK/a.go:11:30-56: fmt.Errorf "w: %w"
+	path (origin → target):
+		$WORK/a.go:39:18-24: in example.com/x.main
+		$WORK/a.go:39:13-24: in example.com/x.main
+		$WORK/a.go:11:50-55: in (*example.com/x.S).wrap
+		$WORK/a.go:11:24-27: in (*example.com/x.S).wrap
+		$WORK/a.go:14:7-12: in (*example.com/x.S).relay
+		$WORK/a.go:18:4-7: in (*example.com/x.S).relay
+		$WORK/a.go:23:36-41: in example.com/x.FT
+$WORK/a.go:11:30-56: opaque fmt.Errorf "w: %w" [chain may repeat] [via field err of example.com/x.S]
+	possibly handled:
+		$WORK/a.go:15:5-16: comparison with io.EOF: Wrap Chain truncated
+	path (origin → target):
+		$WORK/a.go:11:30-56: in (*example.com/x.S).wrap
+		$WORK/a.go:11:24-27: in (*example.com/x.S).wrap
+		$WORK/a.go:11:50-55: in (*example.com/x.S).wrap
+		$WORK/a.go:11:24-27: in (*example.com/x.S).wrap
+		$WORK/a.go:11:50-55: in (*example.com/x.S).wrap
+		$WORK/a.go:11:24-27: in (*example.com/x.S).wrap
+		$WORK/a.go:14:7-12: in (*example.com/x.S).relay
+		$WORK/a.go:18:4-7: in (*example.com/x.S).relay
+		$WORK/a.go:21:34-39: in (*example.com/x.S).back
+		$WORK/a.go:21:28-31: in (*example.com/x.S).back
+		$WORK/a.go:14:7-12: in (*example.com/x.S).relay
+		$WORK/a.go:18:4-7: in (*example.com/x.S).relay
+		$WORK/a.go:23:36-41: in example.com/x.FT
+$WORK/a.go:11:30-56: opaque fmt.Errorf "w: %w" [chain may repeat] [via field err of example.com/x.S]
+	wrap chain (origin → target):
+		$WORK/a.go:11:30-56: fmt.Errorf "w: %w"
+	path (origin → target):
+		$WORK/a.go:11:30-56: in (*example.com/x.S).wrap
+		$WORK/a.go:11:24-27: in (*example.com/x.S).wrap
+		$WORK/a.go:11:50-55: in (*example.com/x.S).wrap
+		$WORK/a.go:11:24-27: in (*example.com/x.S).wrap
+		$WORK/a.go:11:50-55: in (*example.com/x.S).wrap
+		$WORK/a.go:11:24-27: in (*example.com/x.S).wrap
+		$WORK/a.go:11:50-55: in (*example.com/x.S).wrap
+		$WORK/a.go:11:24-27: in (*example.com/x.S).wrap
+		$WORK/a.go:14:7-12: in (*example.com/x.S).relay
+		$WORK/a.go:18:4-7: in (*example.com/x.S).relay
+		$WORK/a.go:23:36-41: in example.com/x.FT
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+)
+
+type S struct{ err error }
+type T struct{ err error }
+
+func (s *S) wrap() { s.err = fmt.Errorf("w: %w", s.err) }
+
+func (s *S) relay(t *T) {
+	e := s.err
+	if e == io.EOF {
+		return
+	}
+	t.err = e
+}
+
+func (s *S) back(t *T) { s.err = t.err }
+
+func /*@q*/FT(t *T) error { return t.err }
+
+func F0() (err error) {
+	defer func() { err = fmt.Errorf("ctx: %w", err) }()
+	return io.EOF
+}
+
+func G() error {
+	err := F0()
+	if err == io.EOF {
+		return nil
+	}
+	return err
+}
+
+func main() {
+	s, t := &S{err: io.EOF}, &T{}
+	s.relay(t)
+	s.wrap()
+	s.relay(t)
+	s.back(t)
+	fmt.Println(FT(t), G())
+}

@@ -34,7 +34,9 @@ const (
 	// Wrap is a node of a Wrap Chain: an error that keeps its Inner errors
 	// reachable through errors.Is and errors.As.
 	Wrap
-	// Truncated marks a Wrap Chain that was cut at the chain depth limit.
+	// Truncated marks a Wrap Chain that was cut: at the chain depth limit,
+	// or, with Repeat set, where a value went around a cycle of stores
+	// (see Value.Repeat).
 	Truncated
 	// Unresolved is a place the analysis could not see through. It is
 	// never dropped from an Error Set.
@@ -73,6 +75,15 @@ const (
 	// anywhere (its field location); Detail describes the load, for when
 	// it stays Unresolved. It only exists inside summaries.
 	FieldRef
+	// FieldOf is symbolic: the value of field Index (named Name) of the
+	// value Inner[0], which is a pointer to (or a value of) the named
+	// struct type Type that implements error, loaded at Site in function
+	// Fn. Once Inner[0] is known, the summaries replace it: by the inner
+	// values of a Wrap that was built for that type with that field, by
+	// nothing for a value of another type, and otherwise by the field's
+	// location (as for a FieldRef). It has the leaves of its inner value
+	// and only exists inside summaries.
+	FieldOf
 )
 
 var kindNames = [...]string{
@@ -89,6 +100,7 @@ var kindNames = [...]string{
 	Guarded:    "guarded",
 	StoreRef:   "storeref",
 	FieldRef:   "fieldref",
+	FieldOf:    "fieldof",
 }
 
 // String returns the lower-case name of k.
@@ -105,7 +117,7 @@ func (k Kind) IsOrigin() bool { return k == Sentinel || k == Concrete || k == Op
 // IsLeaf reports whether a value of kind k is a leaf of a value tree: an
 // Error Origin, an Unresolved place, or (only inside summaries) a symbolic
 // value.
-func (k Kind) IsLeaf() bool { return k != Wrap && k != Truncated && k != Guarded }
+func (k Kind) IsLeaf() bool { return k != Wrap && k != Truncated && k != Guarded && k != FieldOf }
 
 // UnresolvedKind says why a value is Unresolved. The set is closed.
 type UnresolvedKind string
@@ -205,6 +217,12 @@ type Value struct {
 	// Inner are the wrapped values of a Wrap, or the single value under a
 	// Truncated marker.
 	Inner []ValueID
+	// Repeat marks a Truncated marker that stands for a value that went
+	// around a cycle of stores (s.err = wrap(s.err)): between the leaf and
+	// the Wraps above the marker there may be any number of further
+	// Wraps, those of the cycle among them. The chain was not cut at the
+	// chain depth limit.
+	Repeat bool
 	// MayHoldNil marks a Wrap that, on some path, holds nothing for one of
 	// its operands, which was nil there: a %w operand of fmt.Errorf, an
 	// operand of errors.Join or the field a custom Unwrap returns. Such a
@@ -253,6 +271,7 @@ type key struct {
 	format      string
 	inner       string
 	mayHoldNil  bool
+	repeat      bool
 	unresolved  UnresolvedKind
 	detail      string
 	fn          string
@@ -274,6 +293,7 @@ func keyOf(v Value) key {
 		hasMessage:  v.HasMessage,
 		wrapKind:    v.WrapKind,
 		mayHoldNil:  v.MayHoldNil,
+		repeat:      v.Repeat,
 		format:      v.Format,
 		unresolved:  v.Unresolved,
 		detail:      v.Detail,
@@ -388,7 +408,12 @@ func (t *Table) String(id ValueID) string {
 		}
 		return fmt.Sprintf("wrap(%s %s)[%s]", v.WrapKind, t.WrapDescription(id), strings.Join(parts, "; "))
 	case Truncated:
+		if v.Repeat {
+			return "repeat[" + t.String(v.Inner[0]) + "]"
+		}
 		return "truncated[" + t.String(v.Inner[0]) + "]"
+	case FieldOf:
+		return fmt.Sprintf("fieldof %s.%s[%s]", types.TypeString(v.Type, nil), v.Name, t.String(v.Inner[0]))
 	case Unresolved:
 		return fmt.Sprintf("unresolved(%s): %s", v.Unresolved, v.Detail)
 	case Param:
@@ -507,13 +532,26 @@ func (t *Table) capAt(id ValueID, level, limit, base int) []Capped {
 		}
 		return []Capped{{Value: t.Intern(v), From: from}}
 	case Truncated:
-		if t.Get(v.Inner[0]).Kind.IsLeaf() {
+		if in := t.Get(v.Inner[0]); in.Kind.IsLeaf() {
 			return []Capped{{Value: id, From: [][]int{{base}}}}
+		} else if in.Kind == FieldOf {
+			return []Capped{{Value: id, From: seq(base, t.leaves[id])}}
+		}
+		if v.Repeat {
+			// The marker of a cycle stays one: push it down to the
+			// leaves.
+			inner := t.capAt(v.Inner[0], level, limit, base)
+			var out []Capped
+			for _, c := range inner {
+				out = append(out, t.repeatLeaves(c)...)
+			}
+			return out
 		}
 		return t.truncateLeaves(v.Inner[0], base)
-	case Guarded:
+	case Guarded, FieldOf:
 		// Guards don't count as Wraps: cap the inner value and keep the
-		// guards over each capped value.
+		// guards over each capped value. So for the value a FieldOf
+		// loads a field of.
 		inner := t.capAt(v.Inner[0], level, limit, base)
 		if len(inner) == 1 && inner[0].Value == v.Inner[0] {
 			return []Capped{{Value: id, From: seq(base, t.leaves[id])}}
@@ -526,6 +564,33 @@ func (t *Table) capAt(id ValueID, level, limit, base int) []Capped {
 		return inner
 	}
 	return []Capped{{Value: id, From: [][]int{{base}}}}
+}
+
+// repeatLeaves returns the capped value c with a Repeat marker over each
+// of its leaves (those already under a Truncated marker keep theirs),
+// Wraps kept.
+func (t *Table) repeatLeaves(c Capped) []Capped {
+	return []Capped{{Value: t.RepeatLeaves(c.Value), From: c.From}}
+}
+
+// RepeatLeaves returns the value tree id with a Repeat marker directly
+// above each of its leaves (and above each FieldOf): the tree of a value
+// that went around a cycle of stores. A leaf already under a Truncated
+// marker keeps that marker. The tree keeps its shape and leaf order.
+func (t *Table) RepeatLeaves(id ValueID) ValueID {
+	v := t.Get(id)
+	switch {
+	case v.Kind == Truncated:
+		return id
+	case v.Kind.IsLeaf(), v.Kind == FieldOf:
+		return t.Intern(Value{Kind: Truncated, Repeat: true, Site: v.Site, Pos: v.Pos, Inner: []ValueID{id}})
+	}
+	inner := make([]ValueID, len(v.Inner))
+	for i, in := range v.Inner {
+		inner[i] = t.RepeatLeaves(in)
+	}
+	v.Inner = inner
+	return t.Intern(v)
 }
 
 // seq returns n consecutive indices from base, one per leaf.
@@ -542,19 +607,46 @@ func seq(base, n int) [][]int {
 // values in the cut part are dropped, which keeps more values, never
 // fewer.
 func (t *Table) truncateLeaves(id ValueID, base int) []Capped {
+	return t.cutLeaves(id, base, false)
+}
+
+// RepeatCut returns a Repeat marker over each distinct leaf of the tree
+// id (see Value.Repeat), with the indices of the leaves it stands for: the
+// tree as it is read back inside a cycle of stores, its Wrap Chains
+// dropped. A leaf that is the whole tree is marked too.
+func (t *Table) RepeatCut(id ValueID) []Capped {
+	return t.cutLeaves(id, 0, true)
+}
+
+func (t *Table) cutLeaves(id ValueID, base int, repeat bool) []Capped {
 	var out []Capped
 	seen := make(map[ValueID]int)
 	next := base
 	var walk func(ValueID)
 	walk = func(id ValueID) {
 		v := t.Get(id)
+		if v.Kind == FieldOf {
+			// A field of a value still to come: cut as one unit, with
+			// all its leaves.
+			n := t.leaves[id]
+			from := make([][]int, n)
+			for i := range from {
+				from[i] = []int{next + i}
+			}
+			out = append(out, Capped{
+				Value: t.Intern(Value{Kind: Truncated, Repeat: repeat, Site: v.Site, Pos: v.Pos, Inner: []ValueID{id}}),
+				From:  from,
+			})
+			next += n
+			return
+		}
 		if v.Kind.IsLeaf() {
 			if at, ok := seen[id]; ok {
 				out[at].From[0] = append(out[at].From[0], next)
 			} else {
 				seen[id] = len(out)
 				out = append(out, Capped{
-					Value: t.Intern(Value{Kind: Truncated, Site: v.Site, Pos: v.Pos, Inner: []ValueID{id}}),
+					Value: t.Intern(Value{Kind: Truncated, Repeat: repeat, Site: v.Site, Pos: v.Pos, Inner: []ValueID{id}}),
 					From:  [][]int{{next}},
 				})
 			}

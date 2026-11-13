@@ -42,12 +42,25 @@ import (
 // the arguments of every call site of the writer, up to maxCallerDepth
 // callers up; see paramResolver.
 //
+// A location is the fallback. A load whose base is itself an error value
+// (the receiver of an Unwrap method, a wrapper got from a type assertion)
+// is a FieldOf of that value, and is resolved from the value once it is
+// known (Solver.fieldOf): a Wrap that was built for the struct type gives
+// its own inner values, exactly those of that instance. Only a value of
+// the type whose literal the analysis did not follow is looked up in the
+// location. What comes out of a location is "what some value of this type
+// holds in this field", an over-approximation: the sources of such a value
+// are marked (Source.Field), and an entry whose every source is so marked
+// is reported as via the location (Solver.ViaLocation).
+//
 // A store that wraps what it loads from its own location (s.err =
 // fmt.Errorf("...: %w", s.err)) is not iterated to the chain depth: while
 // a location is being solved, a load of it stands for the leaves of its
-// values, each under a Truncated marker (Solver.flat), so the store adds
-// its Wrap once, over the location's other values and over "any of its
-// values, chain cut".
+// values, each under a Repeat marker (Solver.flat), so the store adds its
+// Wrap once, over "any value of the location, under any number of
+// Wraps". Within an SCC of several locations, a location reads the ones
+// found before it whole (see solveSCC), so that every cycle has such a
+// read but a plain copy of another field keeps its Wrap Chains.
 
 // maxCallerDepth is how many levels of callers a field location follows to
 // resolve a stored value that is a parameter.
@@ -115,8 +128,10 @@ type location struct {
 	demand *demand
 	// sum is the location's summary, or nil until it is solved.
 	sum *locSummary
-	// open is set while the location's SCC is being solved.
-	open bool
+	// open is set while the location's SCC is being solved, and order
+	// is then the location's place in it (see solveSCC).
+	open  bool
+	order int
 }
 
 // locSummary is the summary of a field location.
@@ -137,10 +152,14 @@ type locHole struct {
 // location returns the field location of the FieldRef v, loaded in fn.
 func (s *Solver) location(fn *ssa.Function, v errset.Value) *location {
 	k, ok := fieldKeyOf(v.Type, v.Index)
-	if !ok || fn.Prog == nil {
+	prog := s.prog
+	if prog == nil && fn != nil {
+		prog = fn.Prog
+	}
+	if !ok || prog == nil {
 		return nil
 	}
-	l := s.index(fn.Prog).at(k)
+	l := s.index(prog).at(k)
 	if l.name == "" {
 		l.name = fieldDescription(v.Type, v.Index)
 	}
@@ -249,6 +268,9 @@ func paramIndex(p *ssa.Parameter) int {
 // facts expanded in the writer, with the writer's symbolic values resolved
 // from its callers (see paramResolver).
 func (s *Solver) evalLocation(l *location) *locSummary {
+	outer := s.curLoc
+	s.curLoc = l
+	defer func() { s.curLoc = outer }()
 	var fs factSet
 	converged := s.passes(func(st *evalState) {
 		fs = factSet{}
@@ -263,7 +285,7 @@ func (s *Solver) evalLocation(l *location) *locSummary {
 				for _, sub := range r.resolve(w, f, 0) {
 					leaves := make([][]Source, len(sub.leaves))
 					for j, srcs := range sub.leaves {
-						leaves[j] = []Source{{Kind: Stored, ArgFn: w, Store: store, ArgSources: srcs}}
+						leaves[j] = []Source{{Kind: Stored, ArgFn: w, Store: store, ArgSources: srcs, Field: l.name, viaField: true}}
 					}
 					fs.add(sub.value, leaves, sub.notes)
 				}
@@ -366,6 +388,7 @@ func (r *paramResolver) resolve(fn *ssa.Function, f Fact, depth int) []subst {
 					leaves[j] = make([]Source, len(srcs))
 					for i, src := range srcs {
 						src.Then = f.Leaves[k]
+						src.viaField = src.viaField || locOnly(f.Leaves[k])
 						leaves[j][i] = src
 					}
 				}
@@ -452,7 +475,7 @@ func (r *paramResolver) fromCallers(callee *ssa.Function, depth int, passed func
 			for _, sub := range r.resolve(caller, af, depth+1) {
 				leaves := make([][]Source, len(sub.leaves))
 				for j, srcs := range sub.leaves {
-					leaves[j] = []Source{{Kind: Passed, Site: site, Callee: callee, ArgFn: caller, ArgSources: srcs}}
+					leaves[j] = []Source{{Kind: Passed, Site: site, Callee: callee, ArgFn: caller, ArgSources: srcs, viaField: locOnly(srcs)}}
 				}
 				fs.add(sub.value, leaves, sub.notes)
 			}
@@ -480,12 +503,12 @@ func (s *Solver) fieldValues(fn *ssa.Function, v errset.Value, site any) []subst
 		return []subst{hole(errset.Memory, v.Detail)}
 	}
 	facts := l.sum.facts
-	if l.open {
+	if l.open && (s.curLoc == nil || l.order >= s.curLoc.order) {
 		// The location's SCC is being solved: what is loaded here may
 		// have gone around the cycle (through a store that wraps what
 		// it loads) any number of times. It stands for the leaves of
-		// the values so far, each under a Truncated marker, so that
-		// the cycle adds its Wraps once.
+		// the values so far, each under a Repeat marker, so that the
+		// cycle adds its Wraps once.
 		facts = s.flat(facts)
 	}
 	out := make([]subst, 0, len(facts))
@@ -508,6 +531,81 @@ func (s *Solver) fieldValues(fn *ssa.Function, v errset.Value, site any) []subst
 		out = append(out, hole(errset.Memory, what+openWorldReason))
 	}
 	return out
+}
+
+// fieldOf resolves the FieldOf value v for the values bases of the value
+// it loads the field of. A Wrap built for v's struct type with a custom
+// Unwrap that returns that field gives its inner values: the field of
+// that very instance. A value that cannot be of the struct type gives
+// nothing (the load does not run on it). A value still to be substituted
+// keeps the FieldOf around it, unless the Query's top is reached. An
+// Unresolved value, or one whose Wrap Chain was cut, stays as it is: the
+// place the analysis could not see through stands for its fields too. Any
+// other value (of the type, but not built where errtrace could see its
+// fields) falls back to the field's location.
+func (s *Solver) fieldOf(v errset.Value, bases []subst) []subst {
+	var out []subst
+	fallback := false
+	for _, b := range bases {
+		bv := s.tbl.Get(b.value)
+		switch bv.Kind {
+		case errset.Guarded, errset.Param, errset.FreeVar, errset.CallRef, errset.ErrorfLike, errset.StoreRef, errset.FieldRef, errset.FieldOf:
+			if s.atTop {
+				fallback = true
+				continue
+			}
+			w := v
+			w.Inner = []errset.ValueID{b.value}
+			out = append(out, subst{value: s.tbl.Intern(w), leaves: b.leaves, notes: b.notes})
+		case errset.Wrap:
+			if bv.WrapKind != errset.WrapUnwrapMethod || !sameStruct(bv.Type, v.Type) {
+				continue
+			}
+			if f, ok := flow.UnwrapField(s.prog, bv.Type); !ok || f != v.Index {
+				fallback = true
+				continue
+			}
+			off := 0
+			for _, in := range bv.Inner {
+				n := s.tbl.Leaves(in)
+				out = append(out, subst{value: in, leaves: b.leaves[off : off+n : off+n], notes: b.notes})
+				off += n
+			}
+		case errset.Concrete:
+			if sameStruct(bv.Type, v.Type) && !bv.TypedNil {
+				fallback = true
+			}
+		case errset.Sentinel:
+			if bv.Type == nil || sameStruct(bv.Type, v.Type) {
+				fallback = true
+			}
+		case errset.Opaque:
+		default:
+			// An Unresolved value, or one whose Wrap Chain was cut:
+			// what its field holds is as unknown as the value itself,
+			// which stands for it.
+			out = append(out, b)
+		}
+	}
+	if fallback {
+		ref := v
+		ref.Kind, ref.Inner = errset.FieldRef, nil
+		out = append(out, s.fieldValues(nil, ref, v.Site)...)
+	}
+	return out
+}
+
+// sameStruct reports whether t, or the type t points to, is the struct
+// type st.
+func sameStruct(t, st types.Type) bool {
+	if t == nil || st == nil {
+		return false
+	}
+	t = types.Unalias(t)
+	if p, ok := t.Underlying().(*types.Pointer); ok {
+		t = types.Unalias(p.Elem())
+	}
+	return types.Identical(t, types.Unalias(st))
 }
 
 // openWorld reports whether a function the Query was asked about is not

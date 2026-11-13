@@ -54,6 +54,7 @@ func TestSelfFeedingStoresFinish(t *testing.T) {
 	for _, name := range []string{
 		"self_join_defer", "self_join_field", "self_cycle_two_fields",
 		"defer_join_three", "defer_errorf_two", "field_join_three", "var_closure_self_wrap", "field_recursive",
+		"getter_self_join", "getter_two_joins", "nil_inner_field_join", "nil_inner_defer_join", "repeat_relay_field",
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -74,7 +75,7 @@ func TestSelfFeedingStoresFinish(t *testing.T) {
 // entry, and both keep the entry for the escaped pointer.
 func TestCutKeepsUnresolved(t *testing.T) {
 	t.Parallel()
-	const n = 2200 // more than summary.maxValues
+	const n = 1100 // more than summary.maxValues
 	var b strings.Builder
 	b.WriteString("package main\n\nimport (\n\t\"errors\"\n\t\"fmt\"\n)\n\n")
 	for i := range n {

@@ -3,12 +3,12 @@ the entries grow with the number of stores, not with their combinations.
 -- args --
 a.go:@q
 -- stdout --
-$WORK/a.go:20:12-13: Error Set of example.com/x.B: 11 entries
+$WORK/a.go:20:12-13: Error Set of example.com/x.B: 9 entries
 $GOROOT/src/io/io.go:*: sentinel io.EOF
 	path (origin → target):
 		$WORK/a.go:10:27-33: in example.com/x.src
 		$WORK/a.go:23:9-14: in example.com/x.B, call to example.com/x.src
-$GOROOT/src/io/io.go:*: sentinel io.EOF [+1 more paths]
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat] [+1 more paths]
 	wrap chain (origin → target):
 		$WORK/a.go:21:23-45: errors.Join
 	path (origin → target):
@@ -17,19 +17,7 @@ $GOROOT/src/io/io.go:*: sentinel io.EOF [+1 more paths]
 		$WORK/a.go:21:35-38: in example.com/x.B$1
 		$WORK/a.go:21:17-20: in example.com/x.B$1
 		$WORK/a.go:23:2-2: in example.com/x.B
-$GOROOT/src/io/io.go:*: sentinel io.EOF [chain truncated] [+1 more paths]
-	wrap chain (origin → target):
-		$WORK/a.go:21:23-45: errors.Join
-	path (origin → target):
-		$WORK/a.go:10:27-33: in example.com/x.src
-		$WORK/a.go:23:9-14: in example.com/x.B, call to example.com/x.src
-		$WORK/a.go:21:35-38: in example.com/x.B$1
-		$WORK/a.go:21:17-20: in example.com/x.B$1
-		$WORK/a.go:20:17-20: in example.com/x.B
-		$WORK/a.go:21:35-38: in example.com/x.B$1
-		$WORK/a.go:21:17-20: in example.com/x.B$1
-		$WORK/a.go:23:2-2: in example.com/x.B
-$GOROOT/src/io/io.go:*: sentinel io.EOF [+1 more paths]
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat] [+1 more paths]
 	wrap chain (origin → target):
 		$WORK/a.go:22:23-45: errors.Join
 	path (origin → target):
@@ -38,19 +26,7 @@ $GOROOT/src/io/io.go:*: sentinel io.EOF [+1 more paths]
 		$WORK/a.go:22:35-38: in example.com/x.B$2
 		$WORK/a.go:22:17-20: in example.com/x.B$2
 		$WORK/a.go:23:2-2: in example.com/x.B
-$GOROOT/src/io/io.go:*: sentinel io.EOF [chain truncated] [+1 more paths]
-	wrap chain (origin → target):
-		$WORK/a.go:22:23-45: errors.Join
-	path (origin → target):
-		$WORK/a.go:10:27-33: in example.com/x.src
-		$WORK/a.go:23:9-14: in example.com/x.B, call to example.com/x.src
-		$WORK/a.go:21:35-38: in example.com/x.B$1
-		$WORK/a.go:21:17-20: in example.com/x.B$1
-		$WORK/a.go:20:17-20: in example.com/x.B
-		$WORK/a.go:22:35-38: in example.com/x.B$2
-		$WORK/a.go:22:17-20: in example.com/x.B$2
-		$WORK/a.go:23:2-2: in example.com/x.B
-$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid [chain truncated] [+1 more paths]
+$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid [chain may repeat] [+1 more paths]
 	wrap chain (origin → target):
 		$WORK/a.go:21:23-45: errors.Join
 	path (origin → target):
@@ -61,7 +37,7 @@ $GOROOT/src/os/error.go:*: sentinel os.ErrInvalid [chain truncated] [+1 more pat
 		$WORK/a.go:21:35-38: in example.com/x.B$1
 		$WORK/a.go:21:17-20: in example.com/x.B$1
 		$WORK/a.go:23:2-2: in example.com/x.B
-$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid [+4 more paths]
+$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid [+3 more paths]
 	wrap chain (origin → target):
 		$WORK/a.go:22:23-45: errors.Join
 	path (origin → target):
@@ -69,7 +45,7 @@ $GOROOT/src/os/error.go:*: sentinel os.ErrInvalid [+4 more paths]
 		$WORK/a.go:22:40-44: in example.com/x.B$2, call to example.com/x.c2
 		$WORK/a.go:22:17-20: in example.com/x.B$2
 		$WORK/a.go:23:2-2: in example.com/x.B
-$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid [chain truncated] [+1 more paths]
+$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid [chain may repeat] [+1 more paths]
 	wrap chain (origin → target):
 		$WORK/a.go:22:23-45: errors.Join
 	path (origin → target):
@@ -80,7 +56,7 @@ $GOROOT/src/os/error.go:*: sentinel os.ErrInvalid [chain truncated] [+1 more pat
 		$WORK/a.go:22:35-38: in example.com/x.B$2
 		$WORK/a.go:22:17-20: in example.com/x.B$2
 		$WORK/a.go:23:2-2: in example.com/x.B
-$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [+4 more paths]
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [+3 more paths]
 	wrap chain (origin → target):
 		$WORK/a.go:21:23-45: errors.Join
 	path (origin → target):
@@ -88,7 +64,7 @@ $GOROOT/src/os/error.go:*: sentinel os.ErrClosed [+4 more paths]
 		$WORK/a.go:21:40-44: in example.com/x.B$1, call to example.com/x.c1
 		$WORK/a.go:21:17-20: in example.com/x.B$1
 		$WORK/a.go:23:2-2: in example.com/x.B
-$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [chain truncated] [+1 more paths]
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [chain may repeat] [+1 more paths]
 	wrap chain (origin → target):
 		$WORK/a.go:21:23-45: errors.Join
 	path (origin → target):
@@ -99,7 +75,7 @@ $GOROOT/src/os/error.go:*: sentinel os.ErrClosed [chain truncated] [+1 more path
 		$WORK/a.go:21:35-38: in example.com/x.B$1
 		$WORK/a.go:21:17-20: in example.com/x.B$1
 		$WORK/a.go:23:2-2: in example.com/x.B
-$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [chain truncated] [+1 more paths]
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [chain may repeat] [+1 more paths]
 	wrap chain (origin → target):
 		$WORK/a.go:22:23-45: errors.Join
 	path (origin → target):

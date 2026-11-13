@@ -110,7 +110,7 @@ func Run(ctx context.Context, prog *load.Program, tgt *target.Target, opts Optio
 // a count of the leaf's other sources.
 func (r *Result) entries(solver *summary.Solver, fn *ssa.Function, facts []summary.Fact) []errset.Entry {
 	var out []errset.Entry
-	for _, f := range facts {
+	for _, f := range solver.ResolveTop(facts) {
 		top, notes, ok := r.top(f.Value)
 		if !ok {
 			continue
@@ -126,6 +126,9 @@ func (r *Result) entries(solver *summary.Solver, fn *ssa.Function, facts []summa
 			if k < len(f.Leaves) {
 				entries[k].Path, _ = solver.Path(fn, f.Leaves[k])
 				entries[k].MorePaths = len(f.Leaves[k]) - 1
+				if r.Table.Get(entries[k].Leaf).Kind.IsOrigin() {
+					entries[k].ViaLocation = solver.ViaLocation(f.Leaves[k])
+				}
 			}
 			entries[k].PossiblyHandled = notes
 		}

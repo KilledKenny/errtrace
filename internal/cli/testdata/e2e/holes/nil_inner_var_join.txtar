@@ -1,0 +1,49 @@
+QA N1. errors.Join of a nil variable and a Sentinel.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:16:12-13: Error Set of example.com/x.C: 1 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	wrap chain (origin → target):
+		$WORK/a.go:18:9-31: errors.Join
+	path (origin → target):
+		$WORK/a.go:18:24-30: in example.com/x.C
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"os"
+)
+
+func none() error { return nil }
+
+func A() error { return errors.Join(none(), io.EOF) }
+
+func B() error { return fmt.Errorf("%w; %w", none(), io.EOF) }
+
+func /*@q*/C() error {
+	var e error
+	return errors.Join(e, io.EOF)
+}
+
+func D() (err error) {
+	defer func() { err = errors.Join(err, os.ErrClosed) }()
+	return nil
+}
+
+func E() error {
+	var errs error
+	for _, f := range []func() error{func() error { return io.EOF }} {
+		func() { errs = errors.Join(errs, f()) }()
+	}
+	return errs
+}
+
+func main() { fmt.Println(A(), B(), C(), D(), E()) }

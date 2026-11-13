@@ -1,0 +1,32 @@
+QA N2. Reflection sets the exported field of an embedded unexported struct.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:13:12-13: Error Set of example.com/x.F: 1 entries, 1 unresolved
+$WORK/a.go:13:35-40: unresolved(memory): field Err of example.com/x.inner may be written by reflection, unsafe code or a function that is not seen
+	path (origin → target):
+		$WORK/a.go:13:35-40: in example.com/x.F
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+	"reflect"
+)
+
+type inner struct{ Err error }
+
+type S struct{ inner }
+
+func /*@q*/F(s *S) error { return s.Err }
+
+func main() {
+	s := &S{}
+	reflect.ValueOf(s).Elem().Field(0).Field(0).Set(reflect.ValueOf(&io.EOF).Elem())
+	fmt.Println(F(s))
+}

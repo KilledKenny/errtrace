@@ -296,7 +296,7 @@ func (a *analyzer) walk(v ssa.Value) {
 		a.freeVar(v, v)
 		return
 	case *ssa.Field:
-		a.fieldLoad(v, v.X.Type(), v.Field)
+		a.fieldLoad(v, v.X, v.Field)
 		return
 	case *ssa.Index:
 		a.memory(v, "load of array element")
@@ -387,6 +387,17 @@ func (a *analyzer) makeInterface(mi *ssa.MakeInterface) {
 			a.call(call, x.Index)
 			return
 		}
+		if ta, ok := x.Tuple.(*ssa.TypeAssert); ok && x.Index == 0 && types.IsInterface(ta.X.Type()) {
+			// e, ok := err.(*E); return e: the values of err that are
+			// of type *E, with what they wrap.
+			a.typeAssert(ta)
+			return
+		}
+	case *ssa.TypeAssert:
+		if !x.CommaOk && types.IsInterface(x.X.Type()) {
+			a.typeAssert(x)
+			return
+		}
 	}
 	a.add(a.concrete(mi.X.Type(), mi, false), mi)
 }
@@ -421,7 +432,7 @@ func (a *analyzer) load(v *ssa.UnOp) bool {
 		}
 		a.add(a.sentinel(x, typ), v)
 	case *ssa.FieldAddr:
-		a.fieldLoad(v, x.X.Type(), x.Field)
+		a.fieldLoad(v, x.X, x.Field)
 	case *ssa.IndexAddr:
 		a.memory(v, "load of slice or array element")
 	case *ssa.FreeVar:
@@ -434,21 +445,27 @@ func (a *analyzer) load(v *ssa.UnOp) bool {
 	return true
 }
 
-// fieldLoad records the load v of field number field of recv, a struct
-// or a pointer to one. A field of a named struct type becomes a FieldRef,
-// which the summaries resolve from every store to that field in the
-// program (the locally built composite literal of a custom-Unwrap type is
-// not loaded from: see constructed). A field of an unnamed struct type,
-// of a type parameter, or whose type depends on a type parameter of its
-// generic struct is Unresolved, as every field load was before.
-func (a *analyzer) fieldLoad(v ssa.Value, recv types.Type, field int) {
+// fieldLoad records the load v of field number field of base, a struct
+// or a pointer to one. A field of an unnamed struct type, of a type
+// parameter, or whose type depends on a type parameter of its generic
+// struct is Unresolved. Otherwise:
+//
+//   - if base is itself an error value (its type implements error: the
+//     receiver of an Unwrap method, a wrapper got from a type assertion),
+//     the load becomes a FieldOf of each value base can carry. The
+//     summaries resolve it once that value is known: to the inner values
+//     of the very Wrap it loads from, where there is one;
+//   - any other load becomes a FieldRef, which the summaries resolve from
+//     every store to that field in the program.
+func (a *analyzer) fieldLoad(v ssa.Value, base ssa.Value, field int) {
+	recv := base.Type()
 	detail := fmt.Sprintf("load of field %s of %s", fieldName(recv, field), typeString(recv))
 	st := FieldStruct(recv, field)
 	if st == nil {
 		a.memory(v, detail)
 		return
 	}
-	a.add(a.tbl.Intern(errset.Value{
+	val := errset.Value{
 		Kind:   errset.FieldRef,
 		Site:   v,
 		Pos:    a.posOf(v),
@@ -457,7 +474,35 @@ func (a *analyzer) fieldLoad(v ssa.Value, recv types.Type, field int) {
 		Name:   fieldName(recv, field),
 		Fn:     a.fn.String(),
 		Detail: detail,
-	}), v)
+	}
+	if a.flat || !IsErrorType(recv) {
+		a.add(a.tbl.Intern(val), v)
+		return
+	}
+	// Walk base as the value it is, where the load is made.
+	c := &analyzer{tbl: a.tbl, fn: a.fn, at: a.at, pt: a.pt, gd: a.gd, seen: make(map[seenKey]bool), opts: a.opts, depth: a.depth, captured: a.captured, active: a.active}
+	if instr, ok := v.(ssa.Instruction); ok && instr.Block() != nil {
+		c.pt = pointOf(instr)
+	}
+	c.walk(base)
+	for _, f := range c.facts {
+		if a.tbl.Get(f.Value).Kind == errset.Unresolved {
+			// The base is a place the analysis could not see through
+			// here (a variable that errors.As filled through its
+			// address): it is some value of the struct type, whose field
+			// is what the program stores to that field.
+			a.add(a.tbl.Intern(val), v)
+			continue
+		}
+		of := val
+		of.Kind = errset.FieldOf
+		of.Inner = []errset.ValueID{f.Value}
+		leaves := make([]any, a.tbl.Leaves(f.Value))
+		for k := range leaves {
+			leaves[k] = f.LeafSource(k)
+		}
+		a.addFact(Fact{Value: a.tbl.Intern(of), Source: v, Leaves: leaves})
+	}
 }
 
 // FieldStruct returns the named struct type that recv (a struct or a

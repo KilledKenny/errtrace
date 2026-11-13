@@ -3,6 +3,7 @@ package summary
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"go/types"
 
@@ -17,17 +18,10 @@ const (
 	// maxRounds caps the fixpoint iterations inside one SCC.
 	maxRounds = 64
 	// maxValues caps the number of values one error result, or one field
-	// location, can carry. It was 1024 while a store that wraps what it
-	// loads was unrolled to the chain depth; such stores no longer
-	// multiply values (see Solver.flat), and the Error Set of a function
-	// that reaches much of the standard library has more than 1024
+	// location, can carry, and the number of Wraps that substitution
+	// makes of one Wrap from the combinations of its inner values'
 	// values.
-	maxValues = 2048
-	// maxCombos caps the number of Wraps that substitution makes of one
-	// Wrap with several inner values from the combinations of their
-	// values. A Wrap of one inner value has as many as that value has,
-	// which maxValues bounds.
-	maxCombos = 1024
+	maxValues = 1024
 )
 
 // Stats counts the work a Solver did.
@@ -69,6 +63,27 @@ type Solver struct {
 	roots []*ssa.Function
 	// holes caches holey.
 	holes map[errset.ValueID]bool
+	// prog is the program of the functions being solved.
+	prog *ssa.Program
+	// solving are the functions of the SCC being solved, if it is a
+	// cycle.
+	solving map[*ssa.Function]bool
+	// curLoc is the field location being evaluated, if any.
+	curLoc *location
+	// atTop is set while the values at the top of a Query are resolved
+	// (see ResolveTop).
+	atTop bool
+	// unsettledPass is set while the passes of one evaluation have not
+	// yet converged: an inner value of a Wrap that has no value then may
+	// still get one, so it is not yet taken as nil (see wrapOfNothing).
+	// sawNothing records that a Wrap was left out for that reason. (The
+	// rounds of an SCC do not wait: a summary is computed anew in every
+	// round, so a Wrap of nothing made while a callee's summary was
+	// still empty goes away with the next round, unless the function
+	// wraps its own result: the Opaque Error then stays under that Wrap,
+	// as it always did.)
+	unsettledPass bool
+	sawNothing    bool
 
 	// transfer computes the result summaries of a function from the
 	// current summaries of its callees. It is evaluate, except in tests.
@@ -135,6 +150,9 @@ func (s *Solver) Summary(fn *ssa.Function) *Summary { return s.sums[fn] }
 // demand graph. Functions solved by an earlier call are reused.
 func (s *Solver) Solve(ctx context.Context, fns []*ssa.Function) error {
 	s.roots = append(s.roots, fns...)
+	if s.prog == nil && len(fns) > 0 {
+		s.prog = fns[0].Prog
+	}
 	var roots []dnode
 	for _, fn := range fns {
 		if s.sums[fn] == nil {
@@ -163,10 +181,79 @@ func (s *Solver) solve(ctx context.Context, roots []dnode) error {
 // in its arguments.
 func (s *Solver) SolveSite(ctx context.Context, fn *ssa.Function, site ssa.CallInstruction) error {
 	s.roots = append(s.roots, fn)
+	if s.prog == nil {
+		s.prog = fn.Prog
+	}
 	c := s.newCollector()
 	c.site(site)
 	c.drain()
 	return s.solve(ctx, s.unsolved(c.nodes()))
+}
+
+// ResolveTop returns facts, which reached the top of a Query, with the
+// field loads that still wait for the value they load from (FieldOf of a
+// parameter of the Target, say) resolved from their field locations:
+// nothing more will be substituted there.
+func (s *Solver) ResolveTop(facts []Fact) []Fact {
+	s.atTop = true
+	defer func() { s.atTop = false }()
+	var fs factSet
+	for _, f := range facts {
+		for _, sub := range s.mapTree(f.Value, func(id errset.ValueID, k int) []subst {
+			return []subst{{value: id, leaves: [][]Source{f.Leaves[k]}}}
+		}) {
+			fs.add(sub.value, sub.leaves, errset.AddNotes(slices.Clone(f.Notes), sub.notes...))
+		}
+	}
+	return fs.facts
+}
+
+// ViaLocation returns the name of a field location if every source of
+// srcs, the sources of a leaf, goes through one: the leaf is then known
+// only as a value that the program stores to that field somewhere. It
+// returns "" if some source does not.
+func (s *Solver) ViaLocation(srcs []Source) string {
+	if !locOnly(srcs) {
+		return ""
+	}
+	if n := s.fieldName(srcs, make(map[*Source]bool)); n != "" {
+		return n
+	}
+	return "a field"
+}
+
+// fieldName returns the name of a field location that the sources go
+// through, following them into the summaries of the callees, or "" if
+// there is none. Of several on one way it names the first the value went
+// through.
+func (s *Solver) fieldName(srcs []Source, seen map[*Source]bool) string {
+	if len(srcs) == 0 || seen[&srcs[0]] {
+		return ""
+	}
+	seen[&srcs[0]] = true
+	for _, src := range srcs {
+		if n := s.fieldName(src.ArgSources, seen); n != "" {
+			return n
+		}
+		if src.Kind == Via && s.sums[src.Callee] != nil {
+			if res := s.sums[src.Callee].Result(src.CalleeResult); res != nil {
+				for _, f := range res.Facts {
+					if f.Value == src.CalleeValue && src.CalleeLeaf < len(f.Leaves) {
+						if n := s.fieldName(f.Leaves[src.CalleeLeaf], seen); n != "" {
+							return n
+						}
+					}
+				}
+			}
+		}
+		if n := s.fieldName(src.Then, seen); n != "" {
+			return n
+		}
+		if src.Field != "" {
+			return src.Field
+		}
+	}
+	return ""
 }
 
 // SiteFacts returns the values that error result index of the call site in
@@ -416,6 +503,13 @@ func (c *collector) value(fn *ssa.Function, id errset.ValueID) {
 			c.errorfDepth[id] = c.depth
 			c.errorfs = append(c.errorfs, id)
 		}
+	case errset.FieldOf:
+		// The field's location is what the value falls back to.
+		if l := c.s.location(fn, v); l != nil && !c.seenLoc[l] {
+			c.seenLoc[l] = true
+			c.locs = append(c.locs, l)
+		}
+		c.value(fn, v.Inner[0])
 	case errset.Wrap, errset.Truncated, errset.Guarded:
 		for _, in := range v.Inner {
 			c.value(fn, in)
@@ -439,8 +533,11 @@ func errorOperands(site ssa.CallInstruction) []ssa.Value {
 		ops = append(ops, mc.Bindings...)
 	}
 	var out []ssa.Value
-	for _, v := range ops {
-		if flow.IsErrorType(v.Type()) {
+	for i, v := range ops {
+		// The receiver of an interface call is followed whatever its
+		// interface type is (interface{ Unwrap() error }): the method
+		// may return a field of it.
+		if flow.IsErrorType(v.Type()) || (i == 0 && c.IsInvoke()) {
 			out = append(out, v)
 			continue
 		}
@@ -491,10 +588,22 @@ func (s *Solver) solveSCC(scc []dnode) {
 	// is loaded went around the cycle an unknown number of times. Once
 	// the locations are known, the functions are evaluated once more
 	// with the locations' whole values.
-	for _, l := range locs {
+	// A location reads the locations found before it whole and the
+	// others (itself among them) flat, so that every cycle of locations
+	// has a flat read and the location the Query came to first sees the
+	// Wraps the others made.
+	for i, l := range locs {
 		l.open = true
+		l.order = len(locs) - i
+	}
+	s.solving = make(map[*ssa.Function]bool)
+	for _, n := range scc {
+		if n.fn != nil {
+			s.solving[n.fn] = true
+		}
 	}
 	defer func() {
+		s.solving = nil
 		for _, l := range locs {
 			l.open = false
 		}
@@ -509,13 +618,36 @@ func (s *Solver) solveSCC(scc []dnode) {
 	}()
 	var changed map[*ssa.Function][]bool
 	var changedLocs []*location
+	// A node is evaluated again only if something it depends on changed
+	// since it was last evaluated. A function may read a location it has
+	// no edge to (a field load it got from a callee's summary and whose
+	// value it supplies), so a change of any location makes every node
+	// due.
+	last := make(map[dnode]bool)
+	for _, n := range scc {
+		last[n] = true
+	}
+	lastLoc := true
 	for range maxRounds {
 		changed, changedLocs = nil, nil
+		now := make(map[dnode]bool)
+		nowLoc := false
 		for _, n := range scc {
+			due := lastLoc || nowLoc
+			for _, d := range s.deps(n) {
+				if due {
+					break
+				}
+				due = last[d] || now[d]
+			}
+			if !due {
+				continue
+			}
 			if n.loc != nil {
 				next := s.evalLocation(n.loc)
 				if !sameValues(n.loc.sum.facts, next.facts) {
 					changedLocs = append(changedLocs, n.loc)
+					now[n], nowLoc = true, true
 				}
 				n.loc.sum = next
 				continue
@@ -527,12 +659,14 @@ func (s *Solver) solveSCC(scc []dnode) {
 					changed = make(map[*ssa.Function][]bool)
 				}
 				changed[fn] = diff
+				now[n] = true
 			}
 			s.sums[fn].Results = next
 		}
 		if changed == nil && changedLocs == nil {
 			return
 		}
+		last, lastLoc = now, nowLoc
 	}
 	// The SCC did not converge: mark the results and locations still
 	// changing.

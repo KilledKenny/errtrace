@@ -510,7 +510,7 @@ func decideTop(tbl *errset.Table, id errset.ValueID, node func(errset.Value) (Ve
 		return Maybe, "unresolved value"
 	case errset.Truncated:
 		return Maybe, "Wrap Chain truncated"
-	case errset.Param, errset.FreeVar, errset.CallRef, errset.ErrorfLike, errset.Guarded, errset.StoreRef, errset.FieldRef:
+	case errset.Param, errset.FreeVar, errset.CallRef, errset.ErrorfLike, errset.Guarded, errset.StoreRef, errset.FieldRef, errset.FieldOf:
 		return Unknown, ""
 	}
 	return node(v)
@@ -533,7 +533,7 @@ func decideTree(tbl *errset.Table, id errset.ValueID, node func(errset.Value) (V
 			verdict, why = Maybe, "unresolved value"
 		case errset.Truncated:
 			verdict, why = Maybe, "Wrap Chain truncated"
-		case errset.Param, errset.FreeVar, errset.CallRef, errset.ErrorfLike, errset.Guarded, errset.StoreRef, errset.FieldRef:
+		case errset.Param, errset.FreeVar, errset.CallRef, errset.ErrorfLike, errset.Guarded, errset.StoreRef, errset.FieldRef, errset.FieldOf:
 			verdict = Unknown
 		default:
 			verdict, why = node(v)
@@ -550,6 +550,11 @@ func decideTree(tbl *errset.Table, id errset.ValueID, node func(errset.Value) (V
 			if maybe == "" {
 				maybe = why
 			}
+		}
+		if v.Kind == errset.FieldOf {
+			// The value is a field of its inner value, not the inner
+			// value: what is below says nothing yet.
+			return
 		}
 		below := mayBeMissing || (v.Kind == errset.Wrap && v.MayHoldNil)
 		for _, in := range v.Inner {

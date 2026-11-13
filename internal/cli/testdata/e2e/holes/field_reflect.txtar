@@ -5,7 +5,7 @@ stores. Printing the struct with fmt does not expose it (see field_zero).
 a.go:@f
 -- stdout --
 $WORK/a.go:13:12-13: Error Set of example.com/fx.F: 2 entries, 1 unresolved
-$GOROOT/src/io/io.go:*: sentinel io.EOF
+$GOROOT/src/io/io.go:*: sentinel io.EOF [via field Err of example.com/fx.S]
 	path (origin → target):
 		$WORK/a.go:18:15-21: in example.com/fx.main
 		$WORK/a.go:18:10-21: in example.com/fx.main

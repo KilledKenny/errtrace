@@ -1,0 +1,48 @@
+errors.Unwrap of a wrapper the analysis followed from its literal gives the
+inner value of that very wrapper: ErrA, not ErrB or io.EOF, which other
+values of the same type hold, and no "via field" tag.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:23:12-13: Error Set of example.com/x.F: 1 entries
+$WORK/a.go:14:2-6: sentinel example.com/x.ErrA
+	path (origin → target):
+		$WORK/a.go:18:35-39: in example.com/x.mkA
+		$WORK/a.go:23:45-50: in example.com/x.F, call to example.com/x.mkA
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap
+		$WORK/a.go:11:37-38: in (*example.com/x.E).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*example.com/x.E).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 1 of 1 candidates)
+		$WORK/a.go:23:31-51: in example.com/x.F, call to errors.Unwrap
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"io"
+)
+
+type E struct{ Err error }
+
+func (e *E) Error() string { return "e" }
+func (e *E) Unwrap() error { return e.Err }
+
+var (
+	ErrA = errors.New("a")
+	ErrB = errors.New("b")
+)
+
+func mkA() error { return &E{Err: ErrA} }
+func mkB() error { return &E{Err: ErrB} }
+
+var stored *E
+
+func /*@q*/F() error { return errors.Unwrap(mkA()) }
+
+func main() {
+	stored = &E{Err: io.EOF}
+	_, _ = mkB(), F()
+}
