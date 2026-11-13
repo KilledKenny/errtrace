@@ -7,8 +7,7 @@ $WORK/a.go:9:35-40: unresolved(memory): load of field err of *example.com/fx.S
 	path (origin → target):
 		$WORK/a.go:9:35-40: in example.com/fx.F
 	marked via (origin of *io/fs.PathError → here):
-		$WORK/a.go:7:35-38: value of Concrete Type *io/fs.PathError
-		$WORK/a.go:7:35-38: stored to field err of example.com/fx.S
+		-: a parameter of (*example.com/fx.S).Fail: a caller outside the loaded program may pass *io/fs.PathError
 		$WORK/a.go:9:35-40: loaded from field err of example.com/fx.S
 -- stderr --
 errtrace: warning: target not reachable from main/init; parameters may lack candidates

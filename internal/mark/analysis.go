@@ -11,22 +11,104 @@ import (
 	"github.com/KilledKenny/errtrace/internal/flow"
 )
 
-// tags are the contexts in which a Mark holds: free (any calling
-// context), or bit i+1 for "when parameter i of the enclosing function
-// holds the Subject". A set with free is just free.
+// tags are the contexts in which a Mark holds, in two planes that say how
+// the value came to hold the Subject.
+//
+// By value (the low half): the value is the Subject itself, or an
+// immutable construction over such values (fmt.Errorf, errors.Join): what
+// errors.Is says about it never changes. By type (the high half): the
+// value has a type that wraps the Subject, comes from memory or code the
+// pass does not see, or is derived from such a value: what errors.Is says
+// about it may change after a check. The errors.Is guard drops only the
+// by-value plane.
+//
+// In each plane, bit 0 is free (true in any calling context) and bit i+1
+// is "when parameter i of the enclosing function holds the Subject" (in
+// that plane). A plane with free is just free.
 type tags uint64
 
-const free tags = 1
+const (
+	// free is the by-value free tag, freeT the by-type one.
+	free  tags = 1
+	freeT tags = 1 << 32
+	// planeV and planeT are the bits of the two planes.
+	planeV tags = 1<<32 - 1
+	planeT tags = ^planeV
+	// anyFree is free in either plane.
+	anyFree = free | freeT
+)
 
 // maxParamTag is the number of parameters that have a tag of their own;
 // a Mark that depends on a later parameter is free.
-const maxParamTag = 63
+const maxParamTag = 31
 
+// paramTag returns the by-value tag of parameter i.
 func paramTag(i int) tags {
 	if i < 0 || i >= maxParamTag {
 		return free
 	}
 	return 1 << uint(i+1)
+}
+
+// paramBits returns the tags of parameter i in both planes.
+func paramBits(i int) tags {
+	t := paramTag(i)
+	return t | t<<32
+}
+
+// toT moves every tag of t to the by-type plane.
+func toT(t tags) tags { return (t&planeV)<<32 | t&planeT }
+
+// planesOf returns free in every plane in which t has a tag: what a
+// location gets when a value with the tags t is stored to it.
+func planesOf(t tags) tags {
+	var p tags
+	if t&planeV != 0 {
+		p |= free
+	}
+	if t&planeT != 0 {
+		p |= freeT
+	}
+	return p
+}
+
+// paramSeed returns the tags that parameter p of a callee gets from an
+// argument with the tags t: its Param tag in each plane t has a tag in.
+func paramSeed(p int, t tags) tags {
+	var out tags
+	if t&planeV != 0 {
+		out |= paramTag(p)
+	}
+	if t&planeT != 0 {
+		out |= paramTag(p) << 32
+	}
+	return out
+}
+
+// throughParam returns the tags a call gets from a callee result with the
+// Param(p) bits ret (see paramBits) when the argument has the tags arg:
+// the argument's tags, in the planes the result depends on the parameter
+// in.
+func throughParam(ret, arg tags) tags {
+	var out tags
+	if ret&planeV != 0 {
+		out |= arg & planeV
+	}
+	if ret&planeT != 0 {
+		out |= arg & planeT
+	}
+	return out
+}
+
+// normTags makes a plane that has free just free.
+func normTags(t tags) tags {
+	if t&free != 0 {
+		t = t&planeT | free
+	}
+	if t&freeT != 0 {
+		t = t&planeV | freeT
+	}
+	return t
 }
 
 // key names a markable value: an SSA value, or component idx of a
@@ -120,6 +202,9 @@ const (
 	kAs
 	kSeedCaller
 	kSeedOpen
+	kReflectArg
+	kReflectRet
+	kOutside
 )
 
 // reason is the first way a Mark was found.
@@ -144,7 +229,8 @@ type info struct {
 
 // locInfo is the state of a memory location.
 type locInfo struct {
-	marked  bool
+	// marked is free in the planes in which the location is marked.
+	marked  tags
 	why     reason
 	readers []key
 }
@@ -208,6 +294,7 @@ type analysis struct {
 	// (f(args...)), and vaEsc caches vaEscapes.
 	varargsParam map[*ssa.Alloc]loc
 	forwards     map[loc][]loc
+	backwards    map[loc][]loc
 	vaEsc        map[loc]bool
 	// taken are the functions used as values, not only called: the
 	// only functions a call of a function value can run.
@@ -218,7 +305,7 @@ type analysis struct {
 	closedMemo  map[loc]int8
 	asPointees  []types.Type
 	asSeen      map[int32]bool
-	asUnknown   bool
+	asUnknown   tags
 
 	siteOrd      map[ssa.CallInstruction]int64
 	calleesCache map[ssa.CallInstruction][]*ssa.Function
@@ -247,6 +334,28 @@ type analysis struct {
 	openLoads []key
 	// recovers are the calls of recover, by function.
 	recovers []recoverCall
+	// locOrder are the locations in the order they were first named.
+	locOrder []loc
+	// allMarked are the planes in which markAll ran.
+	allMarked tags
+	// reflects says that the program calls functions through reflection
+	// (see reflectCall); reflectCallers are the functions that do,
+	// reflectValues the memory of type reflect.Value, and reflectSeeded
+	// the planes in which reflectArgsMarked ran.
+	reflects bool
+	// reflectRoots are the static types of the values that the called
+	// reflect.Values were made from (reflect.ValueOf(f).Call), and
+	// reflectAny says that one of them is not known: then any exported
+	// method and any function whose value is taken may be called.
+	reflectRoots   []types.Type
+	reflectAny     bool
+	reflectTargets map[*ssa.Function]bool
+	// boxed are the concrete types converted to interfaces anywhere.
+	boxed          []types.Type
+	boxedSeen      map[int32]bool
+	reflectCallers []*ssa.Function
+	reflectValues  loc
+	reflectSeeded  tags
 	// reflectArgs are the types of the composite values passed to
 	// reflect.ValueOf.
 	reflectArgs []reflectArg
@@ -283,40 +392,43 @@ type recoverCall struct {
 
 func newAnalysis(prog *ssa.Program, res Callees, subj Subject) *analysis {
 	return &analysis{
-		prog:          prog,
-		res:           res,
-		subj:          subj,
-		fnIndex:       make(map[*ssa.Function]int32),
-		ty:            newTypeIDs(),
-		cellParent:    make(map[ssa.Value]ssa.Value),
-		cellEsc:       make(map[ssa.Value]bool),
-		globalEsc:     make(map[*ssa.Global]bool),
-		globalStore:   make(map[*ssa.Global][]*ssa.Store),
-		fieldEsc:      make(map[fieldKey]bool),
-		fieldOwner:    make(map[fieldKey]types.Type),
-		locs:          make(map[loc]*locInfo),
-		locTypes:      make(map[loc]types.Type),
-		marks:         make(map[key]*info),
-		rets:          make(map[*ssa.Function][]info),
-		candByID:      make(map[int32]*candidate),
-		varargs:       make(map[*ssa.Alloc]*ssa.Call),
-		varargsParam:  make(map[*ssa.Alloc]loc),
-		forwards:      make(map[loc][]loc),
-		vaEsc:         make(map[loc]bool),
-		taken:         make(map[*ssa.Function]bool),
-		staticSites:   make(map[*ssa.Function][]ssa.CallInstruction),
-		closedMemo:    make(map[loc]int8),
-		asSeen:        make(map[int32]bool),
-		siteOrd:       make(map[ssa.CallInstruction]int64),
-		calleesCache:  make(map[ssa.CallInstruction][]*ssa.Function),
-		callersCache:  make(map[*ssa.Function][]ssa.CallInstruction),
-		models:        make(map[*ssa.Function]model),
-		guards:        make(map[ssa.Value][]*ssa.BasicBlock),
-		targets:       make(map[*ssa.Function]*targetInfo),
-		markableCache: make(map[types.Type]bool),
-		wrapperCache:  make(map[types.Type]bool),
-		typeSeedCache: make(map[types.Type]bool),
-		assertCache:   make(map[types.Type]bool),
+		prog:           prog,
+		res:            res,
+		subj:           subj,
+		fnIndex:        make(map[*ssa.Function]int32),
+		ty:             newTypeIDs(),
+		cellParent:     make(map[ssa.Value]ssa.Value),
+		cellEsc:        make(map[ssa.Value]bool),
+		globalEsc:      make(map[*ssa.Global]bool),
+		globalStore:    make(map[*ssa.Global][]*ssa.Store),
+		fieldEsc:       make(map[fieldKey]bool),
+		fieldOwner:     make(map[fieldKey]types.Type),
+		locs:           make(map[loc]*locInfo),
+		locTypes:       make(map[loc]types.Type),
+		marks:          make(map[key]*info),
+		rets:           make(map[*ssa.Function][]info),
+		candByID:       make(map[int32]*candidate),
+		varargs:        make(map[*ssa.Alloc]*ssa.Call),
+		varargsParam:   make(map[*ssa.Alloc]loc),
+		forwards:       make(map[loc][]loc),
+		backwards:      make(map[loc][]loc),
+		vaEsc:          make(map[loc]bool),
+		taken:          make(map[*ssa.Function]bool),
+		staticSites:    make(map[*ssa.Function][]ssa.CallInstruction),
+		closedMemo:     make(map[loc]int8),
+		asSeen:         make(map[int32]bool),
+		siteOrd:        make(map[ssa.CallInstruction]int64),
+		calleesCache:   make(map[ssa.CallInstruction][]*ssa.Function),
+		callersCache:   make(map[*ssa.Function][]ssa.CallInstruction),
+		models:         make(map[*ssa.Function]model),
+		reflectTargets: make(map[*ssa.Function]bool),
+		boxedSeen:      make(map[int32]bool),
+		guards:         make(map[ssa.Value][]*ssa.BasicBlock),
+		targets:        make(map[*ssa.Function]*targetInfo),
+		markableCache:  make(map[types.Type]bool),
+		wrapperCache:   make(map[types.Type]bool),
+		typeSeedCache:  make(map[types.Type]bool),
+		assertCache:    make(map[types.Type]bool),
 	}
 }
 
@@ -348,7 +460,7 @@ func (a *analysis) run(ctx context.Context) error {
 			c.wrapper = true
 			changed = true
 			for _, s := range c.seeds {
-				a.mark(key{s, 0}, free, reason{kind: kSeedWrapper, from: a.heldBy, site: s.(ssa.Instruction), typ: c.typ})
+				a.mark(key{s, 0}, freeT, reason{kind: kSeedWrapper, from: a.heldBy, site: s.(ssa.Instruction), typ: c.typ})
 			}
 		}
 		// A composite value that holds a marked value and is passed to
@@ -360,7 +472,7 @@ func (a *analysis) run(ctx context.Context) error {
 				rest = append(rest, ra)
 				continue
 			}
-			a.reflectResults(ra.call, free, reason{kind: kThrough, from: a.heldBy, site: ra.call, fn: ra.call.Call.StaticCallee()})
+			a.reflectResults(ra.call, freeT, reason{kind: kThrough, from: a.heldBy, site: ra.call, fn: ra.call.Call.StaticCallee()})
 			changed = true
 		}
 		a.reflectArgs = rest
@@ -887,13 +999,14 @@ func (a *analysis) locInfo(l loc) *locInfo {
 	if li == nil {
 		li = new(locInfo)
 		a.locs[l] = li
+		a.locOrder = append(a.locOrder, l)
 	}
 	return li
 }
 
 func (a *analysis) locMarked(l loc) bool {
 	li := a.locs[l]
-	return li != nil && li.marked
+	return li != nil && li.marked != 0
 }
 
 func (a *analysis) addReader(l loc, k key) {
@@ -901,34 +1014,47 @@ func (a *analysis) addReader(l loc, k key) {
 	li.readers = append(li.readers, k)
 }
 
-// markLoc marks the location l: every value loaded from it is marked, in
-// any calling context.
-func (a *analysis) markLoc(l loc, why reason) {
+// markLoc marks the location l in the given planes (see planesOf): every
+// value loaded from it is marked, in any calling context.
+func (a *analysis) markLoc(l loc, planes tags, why reason) {
 	li := a.locInfo(l)
-	if li.marked {
+	fresh := planes & anyFree &^ li.marked
+	if fresh == 0 {
 		return
 	}
-	li.marked = true
-	li.why = why
+	if li.marked == 0 {
+		li.why = why
+	}
+	li.marked |= fresh
 	for _, k := range li.readers {
 		why := reason{kind: kLoad, from: ref{kind: refLoc, l: l, free: true}}
 		if instr, ok := k.v.(ssa.Instruction); ok {
 			why.site = instr
 		}
-		a.mark(k, free, why)
+		a.mark(k, fresh, why)
 	}
-	if l.kind == locPanic {
-		a.wakeRecovers(l)
-	}
-	if l.kind == locVarargs {
-		from := ref{kind: refLoc, l: l, free: true}
+	a.locMarkedHook(l, fresh)
+}
+
+// locMarkedHook does what follows from the new marks fresh of l beyond
+// its readers.
+func (a *analysis) locMarkedHook(l loc, fresh tags) {
+	from := ref{kind: refLoc, l: l, free: true}
+	switch l.kind {
+	case locPanic:
+		a.wakeRecovers(l, fresh)
+	case locVarargs:
 		for _, f := range a.forwards[l] {
-			a.markLoc(f, reason{kind: kFlow, from: from})
+			a.markLoc(f, fresh, reason{kind: kFlow, from: from})
 		}
 		// A function that lets its slice parameter escape makes the
 		// elements memory of their type.
 		if st, ok := l.v.Type().Underlying().(*types.Slice); ok && a.vaEscapes(l) {
-			a.markLoc(a.typedLoc(st.Elem()), reason{kind: kFlow, from: from})
+			a.markLoc(a.typedLoc(st.Elem()), fresh, reason{kind: kFlow, from: from})
+		}
+	case locTyped:
+		if a.reflects && l == a.reflectValues {
+			a.reflectArgsMarked(fresh, from)
 		}
 	}
 }
@@ -946,7 +1072,8 @@ func (a *analysis) tagsOf(v ssa.Value) tags {
 		return in.t
 	}
 	if a.implicit(v.Type()) {
-		return free
+		// By type: what errors.Is says about it may change.
+		return freeT
 	}
 	return 0
 }
@@ -965,7 +1092,7 @@ func (a *analysis) canMark(k key) bool {
 }
 
 func valueRef(k key, t tags) ref {
-	return ref{kind: refValue, k: k, free: t&free != 0}
+	return ref{kind: refValue, k: k, free: t&anyFree != 0}
 }
 
 func (a *analysis) mark(k key, t tags, why reason) {
@@ -997,24 +1124,22 @@ func (a *analysis) markRet(fn *ssa.Function, idx int, t tags, why reason) {
 }
 
 func (a *analysis) add(in *info, t tags, why reason, it item) {
+	nt := normTags(in.t | t)
+	// A plane that is free already takes nothing more.
 	if in.t&free != 0 {
-		return
+		nt = nt&planeT | free
 	}
-	nt := in.t | t
-	if nt&free != 0 {
-		nt = free
+	if in.t&freeT != 0 {
+		nt = nt&planeV | freeT
 	}
 	if nt == in.t {
 		return
 	}
 	delta := nt &^ in.t
-	if nt == free {
-		delta = free
-	}
 	if in.t == 0 {
 		in.first = why
-		in.firstFree = nt == free
-	} else if nt == free {
+		in.firstFree = nt&anyFree != 0
+	} else if delta&anyFree != 0 && in.freeR == nil && !in.firstFree {
 		w := why
 		in.freeR = &w
 	}
@@ -1068,10 +1193,24 @@ func (a *analysis) propagate(k key, delta tags) {
 			continue
 		}
 		prev = r
-		if len(dead) > 0 && guarded(dead, v, r) {
-			// errors.Is(v, X) was false on every path to this use.
-			continue
+		a.use(k, delta, dead, r)
+	}
+}
+
+// use pushes the new tags delta of the Mark of k to its user r.
+func (a *analysis) use(k key, delta tags, dead []*ssa.BasicBlock, r ssa.Instruction) {
+	v := k.v
+	if len(dead) > 0 && guarded(dead, v, r) {
+		// errors.Is(v, X) was false on every path to this use: v is not
+		// X by value there. What it holds by type may have changed.
+		delta &= planeT
+		if delta == 0 {
+			return
 		}
+	}
+	from := valueRef(k, delta)
+	planes := planesOf(delta)
+	{
 		switch x := r.(type) {
 		case *ssa.Phi:
 			a.mark(key{x, 0}, delta, reason{kind: kFlow, from: from, site: x})
@@ -1090,28 +1229,36 @@ func (a *analysis) propagate(k key, delta tags) {
 				a.mark(key{x, 0}, delta, reason{kind: kFlow, from: from, site: x})
 			}
 		case *ssa.TypeAssert:
-			if x.X == v && a.assertable(x.AssertedType) {
+			if x.X != v {
+				break
+			}
+			if a.assertable(x.AssertedType) {
 				a.mark(key{x, 0}, delta, reason{kind: kAssert, from: from, site: x, typ: x.AssertedType})
+			} else if !a.markable(x.AssertedType) {
+				// The interface held a composite (it came out of
+				// reflection, or from outside): what was marked is
+				// inside it.
+				a.markHeld(x.AssertedType, toT(planes), reason{kind: kAssert, from: from, site: x, typ: x.AssertedType})
 			}
 		case *ssa.Store:
 			if x.Val == v {
-				a.store(x.Addr, from, x)
+				a.store(x.Addr, from, planes, x)
 			}
 		case *ssa.MapUpdate:
 			if x.Key == v {
-				a.markLoc(a.mapLoc(locMapKey, x.Map.Type()), reason{kind: kStore, from: from, site: x})
+				a.markLoc(a.mapLoc(locMapKey, x.Map.Type()), planes, reason{kind: kStore, from: from, site: x})
 			}
 			if x.Value == v {
-				a.markLoc(a.mapLoc(locMapVal, x.Map.Type()), reason{kind: kStore, from: from, site: x})
+				a.markLoc(a.mapLoc(locMapVal, x.Map.Type()), planes, reason{kind: kStore, from: from, site: x})
 			}
 		case *ssa.Send:
 			if et := chanElem(x.Chan.Type()); x.X == v && et != nil {
-				a.markLoc(a.chanLoc(et), reason{kind: kStore, from: from, site: x})
+				a.markLoc(a.chanLoc(et), planes, reason{kind: kStore, from: from, site: x})
 			}
 		case *ssa.Select:
 			for _, st := range x.States {
 				if et := chanElem(st.Chan.Type()); st.Send == v && et != nil {
-					a.markLoc(a.chanLoc(et), reason{kind: kStore, from: from, site: x})
+					a.markLoc(a.chanLoc(et), planes, reason{kind: kStore, from: from, site: x})
 				}
 			}
 		case *ssa.MakeClosure:
@@ -1122,7 +1269,7 @@ func (a *analysis) propagate(k key, delta tags) {
 			for i, bind := range x.Bindings {
 				if bind == v && i < len(cl.FreeVars) {
 					// A captured value is memory: free.
-					a.mark(key{cl.FreeVars[i], 0}, free, reason{kind: kCapture, from: from, site: x, fn: cl})
+					a.mark(key{cl.FreeVars[i], 0}, planes, reason{kind: kCapture, from: from, site: x, fn: cl})
 				}
 			}
 		case *ssa.Return:
@@ -1133,7 +1280,7 @@ func (a *analysis) propagate(k key, delta tags) {
 			}
 		case *ssa.Panic:
 			if x.X == v {
-				a.markLoc(a.panicLoc(x.Parent()), reason{kind: kStore, from: from, site: x})
+				a.markLoc(a.panicLoc(x.Parent()), planes, reason{kind: kStore, from: from, site: x})
 			}
 		case ssa.CallInstruction:
 			a.callUse(k, delta, x)
@@ -1144,7 +1291,7 @@ func (a *analysis) propagate(k key, delta tags) {
 // store marks the locations a store of the marked value from through addr
 // writes. A store into the argument array of a modelled intrinsic call is
 // an operand of that call instead.
-func (a *analysis) store(addr ssa.Value, from ref, site ssa.Instruction) {
+func (a *analysis) store(addr ssa.Value, from ref, planes tags, site ssa.Instruction) {
 	if ia, ok := addr.(*ssa.IndexAddr); ok {
 		if alloc, ok := ia.X.(*ssa.Alloc); ok {
 			if call := a.varargs[alloc]; call != nil {
@@ -1153,14 +1300,24 @@ func (a *analysis) store(addr ssa.Value, from ref, site ssa.Instruction) {
 			}
 			if l, ok := a.varargsParam[alloc]; ok {
 				// The array is the variadic argument of one callee.
-				a.markLoc(l, reason{kind: kStore, from: from, site: site})
+				a.markLoc(l, planes, reason{kind: kStore, from: from, site: site})
+				return
+			}
+		}
+	}
+	if ia, ok := addr.(*ssa.IndexAddr); ok {
+		if l, ok := sliceParam(ia.X); ok {
+			// A store into an element of a slice parameter.
+			a.storeSliceParam(l, planes, reason{kind: kStore, from: from, site: site})
+			if a.closed(l) {
+				// Its elements are in no other memory.
 				return
 			}
 		}
 	}
 	locs, n := a.addrLocs(addr)
 	for _, l := range locs[:n] {
-		a.markLoc(l, reason{kind: kStore, from: from, site: site})
+		a.markLoc(l, planes, reason{kind: kStore, from: from, site: site})
 	}
 }
 
@@ -1247,6 +1404,10 @@ func (a *analysis) index() {
 					ot := x.X.Type()
 					if isInterface(ot) {
 						break
+					}
+					if id := a.ty.id(ot); !a.boxedSeen[id] {
+						a.boxedSeen[id] = true
+						a.boxed = append(a.boxed, ot)
 					}
 					if a.typeSeed(ot) {
 						a.typeSeeds = append(a.typeSeeds, x)
@@ -1370,15 +1531,20 @@ func (a *analysis) initOnly(g *ssa.Global) bool {
 
 // openAddr reports whether code outside the program may have written the
 // memory at addr (see Options.Open): an exported variable of an open
-// package that the program does not only initialize, or an exported field
-// of a struct type of an open package.
+// package (unless it is a Sentinel by its name that the program only
+// initializes), or an exported field of a struct type of an open package.
 func (a *analysis) openAddr(addr ssa.Value) bool {
 	if a.open == nil {
 		return false
 	}
 	switch x := addr.(type) {
 	case *ssa.Global:
-		return x.Pkg != nil && a.open[x.Pkg] && x.Object() != nil && x.Object().Exported() && !a.initOnly(x)
+		if x.Pkg == nil || !a.open[x.Pkg] || x.Object() == nil || !x.Object().Exported() {
+			return false
+		}
+		// A Sentinel by its name that the program only initializes is
+		// taken not to be reassigned from outside (see sentinelName).
+		return !(a.initOnly(x) && sentinelName(x.Name()))
 	case *ssa.FieldAddr:
 		if st := structOf(x.X.Type()); st != nil && x.Field < st.NumFields() {
 			return a.openField(x.X.Type(), st, x.Field)
@@ -1571,7 +1737,8 @@ func (a *analysis) seed() {
 		why := reason{kind: kSeedSentinel, text: Subject{Sentinel: g}.String()}
 		locs, n := a.addrLocs(g)
 		for _, l := range locs[:n] {
-			a.markLoc(l, why)
+			// The value of the Sentinel: by value.
+			a.markLoc(l, free, why)
 		}
 		// A value the program stores into the variable is its value
 		// from then on.
@@ -1579,31 +1746,14 @@ func (a *analysis) seed() {
 			a.mark(key{st.Val, 0}, free, reason{kind: kSeedStored, site: st, text: why.text})
 		}
 	}
-	if a.open != nil {
-		for _, fn := range a.fns {
-			obj := fn.Object()
-			if fn.Pkg == nil || !a.open[fn.Pkg] || fn.Parent() != nil || obj == nil || !obj.Exported() {
-				continue
-			}
-			for i, p := range fn.Params {
-				a.mark(key{p, 0}, paramTag(i), reason{kind: kSeedCaller, fn: fn})
-			}
-		}
-		for _, k := range a.openLoads {
-			why := reason{kind: kSeedOpen}
-			if instr, ok := k.v.(ssa.Instruction); ok {
-				why.site = instr
-			}
-			a.mark(k, free, why)
-		}
-	}
+	a.seedOpen()
 	for _, v := range a.typeSeeds {
-		a.mark(key{v, 0}, free, reason{kind: kSeedType, site: v.(ssa.Instruction), typ: seedOperandType(v)})
+		a.mark(key{v, 0}, freeT, reason{kind: kSeedType, site: v.(ssa.Instruction), typ: seedOperandType(v)})
 	}
 	for _, o := range a.opaque {
 		res := o.call.Call.Signature().Results()
 		for i := range res.Len() {
-			a.markResult(o.call, i, free, reason{kind: kSeedOpaque, site: o.call, text: o.text})
+			a.markResult(o.call, i, freeT, reason{kind: kSeedOpaque, site: o.call, text: o.text})
 		}
 	}
 }

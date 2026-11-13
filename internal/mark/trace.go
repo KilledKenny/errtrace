@@ -16,6 +16,11 @@ type Step struct {
 	Site any
 	// Desc says what happens to the Mark there.
 	Desc string
+	// Wide reports a step that is not about one value: from here on the
+	// Mark is on every value of a type, on a memory location that many
+	// places share, or on whatever comes from outside. Traces that pass
+	// the same wide step share what comes before it.
+	Wide bool
 }
 
 // maxTrace bounds the length of a trace.
@@ -97,13 +102,14 @@ func (a *analysis) trace(cur ref) []Step {
 			why = pick(&rs[cur.idx], cur.free)
 		case refLoc:
 			li := a.locs[cur.l]
-			if li == nil || !li.marked {
+			if li == nil || li.marked == 0 {
 				cur = ref{}
 				continue
 			}
 			why = li.why
 		}
 		if s, ok := a.describe(why, cur); ok {
+			s.Wide = wideStep(why)
 			rev = append(rev, s)
 		}
 		cur = why.from
@@ -113,6 +119,21 @@ func (a *analysis) trace(cur ref) []Step {
 		out[len(rev)-1-i] = s
 	}
 	return out
+}
+
+// wideStep reports whether the reason why makes a wide step (see
+// Step.Wide).
+func wideStep(why reason) bool {
+	switch why.kind {
+	case kSeedType, kSeedWrapper, kSeedOpaque, kSeedCaller, kSeedOpen, kReflectArg, kReflectRet, kOutside:
+		return true
+	case kLoad:
+		switch why.from.l.kind {
+		case locField, locTyped, locMapKey, locMapVal, locChan, locAtomic:
+			return true
+		}
+	}
+	return false
 }
 
 // pick returns the reason of a Mark: the one that made it free if the
@@ -164,6 +185,12 @@ func (a *analysis) describe(why reason, at ref) (Step, bool) {
 		return Step{Site: where, Desc: fmt.Sprintf("%s of %s: a caller outside the loaded program may pass %s", name, why.fn, a.subj)}, true
 	case kSeedOpen:
 		return Step{Site: site(why.site), Desc: fmt.Sprintf("exported variable or field: code outside the loaded program may set it to %s", a.subj)}, true
+	case kReflectArg:
+		return Step{Desc: fmt.Sprintf("passed to %s by a call through reflection (reflect.Value.Call)", why.fn)}, true
+	case kReflectRet:
+		return Step{Desc: fmt.Sprintf("returned by %s to a call through reflection (reflect.Value.Call)", why.fn)}, true
+	case kOutside:
+		return Step{Site: site(why.site), Desc: "result of a dynamic call on it: the code called may be outside the loaded program"}, true
 	case kSeedOpaque:
 		return Step{Site: site(why.site), Desc: why.text + ": it may hold anything"}, true
 	case kAssert:

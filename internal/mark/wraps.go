@@ -304,6 +304,11 @@ func (a *analysis) callUse(k key, delta tags, site ssa.CallInstruction) {
 	common := site.Common()
 	call, _ := site.(*ssa.Call)
 	from := valueRef(k, delta)
+	if a.open != nil && call != nil && common.StaticCallee() == nil && common.Value == v {
+		// The function value or receiver of a dynamic call is marked:
+		// it may come from outside the program.
+		a.outsideResults(call, delta, from)
+	}
 	if sc := common.StaticCallee(); sc != nil {
 		if _, ok := a.intrinsic(sc); ok {
 			if call != nil {
@@ -318,11 +323,14 @@ func (a *analysis) callUse(k key, delta tags, site ssa.CallInstruction) {
 			}
 		case modelErrorsAs:
 			if len(common.Args) == 2 && common.Args[0] == v {
-				a.asTarget(common.Args[1], from, site)
+				a.asTarget(common.Args[1], from, planesOf(delta), site)
 			}
 		case modelReflect:
 			// What goes into reflection may come out of the call: a
 			// reflect.Value that holds it, or the value itself.
+			if reflectStore(sc) && len(common.Args) > 1 && common.Args[0] != v {
+				a.reflectStored(site, common.Args[0], planesOf(delta), reason{kind: kStore, from: from, site: site, text: "reflection"})
+			}
 			if call != nil {
 				a.reflectResults(call, delta, reason{kind: kThrough, from: from, site: site, fn: sc})
 			}
@@ -331,7 +339,7 @@ func (a *analysis) callUse(k key, delta tags, site ssa.CallInstruction) {
 		case modelAtomicStore, modelAtomicSwap:
 			for _, arg := range common.Args[1:] {
 				if arg == v {
-					a.markLoc(a.atomicLoc(v.Type()), reason{kind: kStore, from: from, site: site})
+					a.markLoc(a.atomicLoc(v.Type()), planesOf(delta), reason{kind: kStore, from: from, site: site})
 				}
 			}
 		}
@@ -367,7 +375,7 @@ func unwrapReceiver(common *ssa.CallCommon) ssa.Value {
 // operand is marked: the variable the target points to, if the target is
 // a pointer converted at the call; else every memory a pointer converted
 // to an interface anywhere in the program points to.
-func (a *analysis) asTarget(target ssa.Value, from ref, site ssa.Instruction) {
+func (a *analysis) asTarget(target ssa.Value, from ref, planes tags, site ssa.Instruction) {
 	why := reason{kind: kAs, from: from, site: site}
 	if mi, ok := target.(*ssa.MakeInterface); ok {
 		pe := pointerElem(mi.X.Type())
@@ -376,16 +384,16 @@ func (a *analysis) asTarget(target ssa.Value, from ref, site ssa.Instruction) {
 		}
 		locs, n := a.addrLocs(mi.X)
 		for _, l := range locs[:n] {
-			a.markLoc(l, why)
+			a.markLoc(l, planes, why)
 		}
 		return
 	}
-	if a.asUnknown {
+	if a.asUnknown&planes == planes {
 		return
 	}
-	a.asUnknown = true
+	a.asUnknown |= planes
 	for _, t := range a.asPointees {
-		a.markLoc(a.typedLoc(t), why)
+		a.markLoc(a.typedLoc(t), planes, why)
 	}
 }
 
@@ -431,7 +439,7 @@ func (a *analysis) reflectResults(call *ssa.Call, t tags, why reason) {
 			continue
 		}
 		if st, ok := rt.Underlying().(*types.Slice); ok && reflectCarrier(st.Elem()) {
-			a.markLoc(a.typedLoc(st.Elem()), why)
+			a.markLoc(a.typedLoc(st.Elem()), planesOf(t), why)
 		}
 	}
 }

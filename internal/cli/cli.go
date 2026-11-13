@@ -14,7 +14,6 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/ssa"
-	"golang.org/x/tools/go/ssa/ssautil"
 
 	"github.com/KilledKenny/errtrace/internal/load"
 	"github.com/KilledKenny/errtrace/internal/mark"
@@ -91,7 +90,9 @@ type config struct {
 	// is and as are the Subject of a Membership Query: a Sentinel
 	// (<pkgpath>.<Name>) or a Concrete Type; at most one is set.
 	is, as string
-	debug  map[string]bool
+	// full prints every Carrier of a Membership Query in full.
+	full  bool
+	debug map[string]bool
 }
 
 // usageError is an error caused by how the command was invoked; the usage
@@ -229,8 +230,9 @@ func runQuery(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) 
 // loaded program. A generic Target is narrowed to its reachable instances.
 // Target functions that are not reachable from the roots are added as
 // roots, with a warning: their parameters have no callers to take
-// Candidates from. If the loaded packages have no main package, the
-// program is open: the Resolver is told so, and the packages are returned.
+// Candidates from. The loaded packages that are not main packages, and the
+// package of a Target the roots do not reach, are open (code that is not
+// loaded calls them): the Resolver is told so, and they are returned.
 func newResolver(ctx context.Context, prog *load.Program, tgt *target.Target, stderr io.Writer, timing bool) (*resolve.VTA, []*ssa.Package, error) {
 	var initial []*ssa.Package
 	for _, p := range prog.Initial {
@@ -242,17 +244,38 @@ func newResolver(ctx context.Context, prog *load.Program, tgt *target.Target, st
 	if err != nil {
 		return nil, nil, err
 	}
+	// A loaded package that is not a main package is open: code that is
+	// not loaded may call it. An internal package is not: only the code
+	// around its internal directory can import it, and that code is
+	// taken to be loaded with it (load the whole module).
 	var open []*ssa.Package
-	if len(ssautil.MainPackages(initial)) == 0 {
-		v.SetOpen()
-		open = initial
+	isOpen := make(map[*ssa.Package]bool)
+	for _, p := range initial {
+		if p.Pkg.Name() != "main" && !internalPackage(p.Pkg.Path()) && !isOpen[p] {
+			isOpen[p] = true
+			open = append(open, p)
+		}
 	}
-	tgt.KeepReachable(v.Reachable)
 	var unreachable []*ssa.Function
 	for _, fn := range tgt.Funcs {
 		if !v.Reachable(fn) {
 			unreachable = append(unreachable, fn)
 		}
+	}
+	// So is the package of a Target that the roots do not reach: what
+	// calls it is not loaded.
+	for _, fn := range unreachable {
+		pkg := fn.Pkg
+		for f := fn; pkg == nil && f != nil; f = f.Parent() {
+			pkg = f.Pkg
+		}
+		if pkg != nil && !isOpen[pkg] {
+			isOpen[pkg] = true
+			open = append(open, pkg)
+		}
+	}
+	if len(open) > 0 {
+		v.SetOpen()
 	}
 	if len(unreachable) > 0 {
 		fmt.Fprintf(stderr, "%s: warning: target not reachable from main/init; parameters may lack candidates\n", BinaryName)
@@ -264,6 +287,13 @@ func newResolver(ctx context.Context, prog *load.Program, tgt *target.Target, st
 		fmt.Fprintf(stderr, "timing: cha=%s vta1=%s vta2=%s\n", v.Timing.CHA, v.Timing.VTA1, v.Timing.VTA2)
 	}
 	return v, open, nil
+}
+
+// internalPackage reports whether path is the import path of an internal
+// package: it has an element "internal".
+func internalPackage(path string) bool {
+	return path == "internal" || strings.HasPrefix(path, "internal/") ||
+		strings.HasSuffix(path, "/internal") || strings.Contains(path, "/internal/")
 }
 
 // splitList splits a comma-separated flag value, dropping empty elements.
@@ -287,6 +317,7 @@ func newFlagSet() (*flag.FlagSet, *config) {
 	fs.IntVar(&cfg.fanout, "fanout", DefaultFanout, "group entries under dynamic call sites with at least `N` Candidates (0 = never group)")
 	fs.StringVar(&cfg.is, "is", "", "Membership Query: is the Sentinel `pkgpath.Name` (such as io.EOF) in the Error Set?")
 	fs.StringVar(&cfg.as, "as", "", "Membership Query: is the Concrete Type `type` (such as '*io/fs.PathError') in the Error Set?")
+	fs.BoolVar(&cfg.full, "full", false, "Membership Query: print every entry that could carry the error in full, instead of grouping those whose traces share a pivot")
 	fs.String("debug", "", "comma-separated `list` of "+strings.Join(debugModes, ",")+" (stderr only)")
 	return fs, cfg
 }

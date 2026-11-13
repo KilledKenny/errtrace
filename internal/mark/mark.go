@@ -67,13 +67,20 @@
 // A recover sees a panic only if the function that defers the recovering
 // function reaches the function that panics over those call edges.
 //
-// # Guards
+// # Guards and provenance
 //
 // One guard is applied, because it is the common proof that X does not
 // come back: a Mark does not pass a use of v that is dominated by the
 // false edge of errors.Is(v, X), for a Sentinel X whose variable is never
-// reassigned. A comparison (v != X) excludes nothing: v may wrap X. Every
-// other guard is the downward pass's business.
+// reassigned. A comparison (v != X) excludes nothing: v may wrap X.
+//
+// The guard proves that v did not hold X when it was checked. That stays
+// true only for a Mark v holds by value: v is X itself, or an immutable
+// construction over such values (fmt.Errorf, errors.Join). A Mark held by
+// type (v has a type that wraps or reports X, or comes from memory or code
+// the pass does not see) may become true after the check, when the
+// wrapper's content changes. Every Mark is in one or both of these two
+// planes, and the guard drops the by-value plane only.
 //
 // # Which functions are scanned
 //
@@ -95,25 +102,51 @@
 // run, and a parameter holds X only if some call in the program passes it.
 // A dynamic call that no function of the program matches calls nil.
 //
-// With Options.Open (a program without a main package), code outside the
-// program may call the exported functions and methods of the open
-// packages and set their exported variables and fields; those are seeded.
+// With Options.Open, code outside the program may call the functions of
+// the open packages and set their exported variables and fields. Then:
+//
+//   - the parameters of every function of an open package that is
+//     exported, is a method or has its value taken are seeded: a parameter
+//     that can be an error (or a function, or any interface) is marked, and
+//     the memory that a composite parameter can hold marked values in is
+//     marked (markHeld);
+//   - function values are marked too, and a dynamic call whose function
+//     value or receiver is marked may run code that is not loaded: its
+//     results are marked;
+//   - the loads of exported fields, and of exported variables, of the open
+//     packages are marked. An exported variable named like a Sentinel
+//     (Err..., EOF) that the program only initializes is the one exception:
+//     it is taken not to be reassigned from outside, or every Sentinel of a
+//     library could be every other.
+//
+// # Reflection
+//
+// Package reflect is modelled, coarsely: a reflect.Value carries the Mark
+// of what it holds, a call of package reflect gives back what it is
+// passed, a composite passed to it counts if it holds a marked value, a
+// store through it (Set, SetMapIndex, Send, Append, Copy) marks the memory
+// of the composite the destination was made from (or, if the pass cannot
+// tell, all memory that values converted to interfaces can hold), and if
+// the program calls through reflect.Value (Call, CallSlice, Method,
+// MethodByName) the results, parameters and panics of the exported methods
+// and of the functions whose value is taken (of the types the called
+// Values were made from, when the pass can tell) are connected to those
+// calls.
 //
 // # Known limits
 //
-//   - Reflection, unsafe, cgo and assembly can move X where the pass cannot
-//     see. Modelled are only: errors.As (its target is marked), the
-//     contents of sync/atomic.Value and atomic.Pointer, values passed
-//     through package reflect and returned by it (not: stored through it
-//     with Value.Set, or returned by a function it calls), and a function
-//     without a body (its results are marked when an argument is; what it
-//     reads from memory, as the target of a //go:linkname does, is not
-//     seen). An address converted to unsafe.Pointer is not followed.
+//   - unsafe, cgo, assembly and //go:linkname can move X where the pass
+//     cannot see. Modelled are only errors.As (its target is marked), the
+//     contents of sync/atomic.Value and atomic.Pointer, and a function
+//     without a body (its results are marked when an argument is). An
+//     address converted to unsafe.Pointer is not followed.
 //   - An Is or As method that decides from something other than its target
 //     and the values it compares it with (a global flag, the error text)
 //     is taken at its word only where the target is compared or passed on.
-//   - The errors.Is guard assumes that the error tree of v does not change
-//     between the check and the use.
+//   - An Is method that does not look at its target at all, compares it
+//     with a constant, or can return true where no branch on the target
+//     led, reports every error; so does one that hands the target to code
+//     the pass cannot see.
 //   - Type-keyed locations and whole-type wrappers are coarse: expect a
 //     false "maybe", never a false "no".
 //   - A value stored into the Sentinel's variable by the program is followed
@@ -121,9 +154,8 @@
 //   - A value converted to another named type and back is followed only as
 //     far as its Mark goes: a type assertion to a type that is neither the
 //     Subject's nor a possible wrapper drops it.
-//   - In an open world, a value from outside that is not an error itself
-//     (an io.Reader, a callback) is not followed: a dynamic call on it is
-//     answered from the callees the loaded program has.
+//   - An internal package is not open (the CLI decides): the code that may
+//     import it is taken to be loaded.
 //   - The bodies of generic functions are not scanned, only their
 //     instances.
 package mark
@@ -398,7 +430,7 @@ func (r *Result) TraceType(t types.Type) []Step {
 	if t == nil || !a.implicitQuery(t) {
 		return nil
 	}
-	last := Step{Desc: fmt.Sprintf("a value of type %s is or may wrap %s", typeString(t), a.subj)}
+	last := Step{Desc: fmt.Sprintf("a value of type %s is or may wrap %s", typeString(t), a.subj), Wide: true}
 	if a.typeSeed(t) || !a.potentialWrapper(t) {
 		return []Step{last}
 	}
@@ -425,7 +457,7 @@ func (r *Result) Stats() Stats {
 	}
 	st.MarkedFunctions = len(fns)
 	for _, li := range a.locs {
-		if li.marked {
+		if li.marked != 0 {
 			st.Locations++
 		}
 	}

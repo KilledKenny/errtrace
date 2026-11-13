@@ -188,15 +188,13 @@ func (a *analysis) linkArgs(k key, delta tags, site ssa.CallInstruction) {
 				continue
 			}
 			if p < len(g.Params) {
-				a.mark(key{g.Params[p], 0}, paramTag(p), reason{kind: kParam, from: from, site: site, fn: g})
+				a.mark(key{g.Params[p], 0}, paramSeed(p, delta), reason{kind: kParam, from: from, site: site, fn: g})
 			}
-			pt := paramTag(p)
-			if call == nil || pt == free {
+			if call == nil || p >= maxParamTag {
 				continue
 			}
 			for r := range a.rets[g] {
-				if a.rets[g][r].t&pt != 0 {
-					t := a.tagsOf(v)
+				if t := throughParam(a.rets[g][r].t&paramBits(p), a.tagsOf(v)); t != 0 {
 					a.markResult(call, r, t, reason{kind: kThrough, from: valueRef(k, t), site: site, fn: g})
 				}
 			}
@@ -208,6 +206,7 @@ func (a *analysis) linkArgs(k key, delta tags, site ssa.CallInstruction) {
 // g: a free result marks every call, a Param(i) result the calls whose
 // operand i is marked, with that operand's tags.
 func (a *analysis) retChanged(g *ssa.Function, r int, delta tags) {
+	a.reflectReturned(g, r, planesOf(delta&anyFree))
 	for _, site := range a.callers(g) {
 		call, ok := site.(*ssa.Call)
 		if !ok {
@@ -219,36 +218,34 @@ func (a *analysis) retChanged(g *ssa.Function, r int, delta tags) {
 				continue
 			}
 		}
-		if delta&free != 0 {
+		if fr := delta & anyFree; fr != 0 {
 			if a.unwrapMethod(g) {
 				// An Unwrap method that can return the Subject makes
 				// its receiver type a wrapper, and every wrapper is
 				// marked: the result is marked where the receiver is.
-				recv := argAt(site, g, 0)
-				if recv == nil {
-					continue
+				if recv := argAt(site, g, 0); recv != nil {
+					t := a.tagsOf(recv)
+					if !isInterface(recv.Type()) {
+						t = freeT
+					}
+					if t != 0 {
+						a.markResult(call, r, t, reason{kind: kUnwrap, from: valueRef(key{recv, 0}, t), site: site})
+					}
 				}
-				t := a.tagsOf(recv)
-				if !isInterface(recv.Type()) {
-					t = free
-				}
-				if t != 0 {
-					a.markResult(call, r, t, reason{kind: kUnwrap, from: valueRef(key{recv, 0}, t), site: site})
-				}
-				continue
+			} else {
+				a.markResult(call, r, fr, reason{kind: kReturn, from: ref{kind: refRet, fn: g, idx: int32(r), free: true}, site: site, fn: g})
 			}
-			a.markResult(call, r, free, reason{kind: kReturn, from: ref{kind: refRet, fn: g, idx: int32(r), free: true}, site: site, fn: g})
-			continue
 		}
 		for p := 0; p < maxParamTag && p < len(g.Params); p++ {
-			if delta&paramTag(p) == 0 {
+			bits := delta & paramBits(p)
+			if bits == 0 {
 				continue
 			}
 			arg := argAt(site, g, p)
 			if arg == nil {
 				continue
 			}
-			if t := a.tagsOf(arg); t != 0 {
+			if t := throughParam(bits, a.tagsOf(arg)); t != 0 {
 				a.markResult(call, r, t, reason{kind: kThrough, from: valueRef(key{arg, 0}, t), site: site, fn: g})
 			}
 		}
@@ -292,11 +289,11 @@ func (a *analysis) siteResultFromCallees(site ssa.CallInstruction, index int) bo
 			continue
 		}
 		t := rs[index].t
-		if t&free != 0 {
+		if t&anyFree != 0 {
 			return true
 		}
 		for p := 0; p < maxParamTag && p < len(g.Params); p++ {
-			if t&paramTag(p) == 0 {
+			if t&paramBits(p) == 0 {
 				continue
 			}
 			if arg := argAt(site, g, p); arg != nil && a.tagsOf(arg) != 0 {
@@ -361,12 +358,28 @@ func (a *analysis) soleCallee(site ssa.CallInstruction) *ssa.Function {
 // function, and how slices reach their parameters (see indexSlices),
 // before the loads are indexed.
 func (a *analysis) indexStatic() {
+	if rp := a.prog.ImportedPackage("reflect"); rp != nil {
+		if t := rp.Type("Value"); t != nil {
+			a.reflectValues = a.typedLoc(t.Type())
+		}
+	}
 	for _, fn := range a.fns {
 		for _, b := range fn.Blocks {
 			for _, instr := range b.Instrs {
 				site, ok := instr.(ssa.CallInstruction)
 				if !ok {
 					continue
+				}
+				if sc := site.Common().StaticCallee(); sc != nil && reflectCall(sc) {
+					a.reflects = true
+					if root := a.reflectRoot(site.Common().Args[0]); root != nil {
+						a.reflectRoots = append(a.reflectRoots, root)
+					} else if _, isCall := site.Common().Args[0].(*ssa.Call); !isCall || a.reflectRoot(site.Common().Args[0]) == nil {
+						a.reflectAny = a.reflectAny || !a.rootedInReflectCall(site.Common().Args[0])
+					}
+					if n := len(a.reflectCallers); n == 0 || a.reflectCallers[n-1] != fn {
+						a.reflectCallers = append(a.reflectCallers, fn)
+					}
 				}
 				g := a.soleCallee(site)
 				if g == nil {
@@ -478,6 +491,7 @@ func (a *analysis) indexSlices(call *ssa.Call, g *ssa.Function) {
 		}
 		if to, ok := sliceParam(g.Params[j]); ok {
 			a.forwards[from] = append(a.forwards[from], to)
+			a.backwards[to] = append(a.backwards[to], from)
 		}
 	}
 	if !g.Signature.Variadic() {
@@ -540,6 +554,12 @@ func (a *analysis) sliceEscapes(v ssa.Value, depth int) bool {
 				case *ssa.DebugRef:
 				case *ssa.UnOp:
 					if rr.Op != token.MUL {
+						return true
+					}
+				case *ssa.Store:
+					// A store into an element (args[i] = x) stays in
+					// the slice: see store.
+					if rr.Val == ssa.Value(r) {
 						return true
 					}
 				default:
@@ -608,7 +628,7 @@ func (a *analysis) panicLoc(fn *ssa.Function) loc {
 // the function of the panic location l: a recover in F sees the panics of
 // the functions that the functions deferring F call, directly or not (not
 // through a go statement).
-func (a *analysis) wakeRecovers(l loc) {
+func (a *analysis) wakeRecovers(l loc, planes tags) {
 	if len(a.recovers) == 0 || int(l.id) >= len(a.fns) {
 		return
 	}
@@ -618,6 +638,16 @@ func (a *analysis) wakeRecovers(l loc) {
 	for len(work) > 0 {
 		g := work[len(work)-1]
 		work = work[:len(work)-1]
+		if a.reflectTarget(g) {
+			// It may be called through reflection: the panic surfaces
+			// where the program does that.
+			for _, c := range a.reflectCallers {
+				if !reach[c] {
+					reach[c] = true
+					work = append(work, c)
+				}
+			}
+		}
 		for _, site := range a.callers(g) {
 			if _, isGo := site.(*ssa.Go); isGo {
 				continue
@@ -637,7 +667,26 @@ func (a *analysis) wakeRecovers(l loc) {
 			}
 		}
 		if sees {
-			a.mark(rc.k, free, reason{kind: kLoad, from: ref{kind: refLoc, l: l, free: true}, site: rc.k.v.(ssa.Instruction)})
+			a.mark(rc.k, planes, reason{kind: kLoad, from: ref{kind: refLoc, l: l, free: true}, site: rc.k.v.(ssa.Instruction)})
+		}
+	}
+}
+
+// storeSliceParam marks the memory of the slice parameter of l, into an
+// element of which its function stores a marked value, and of the slice
+// parameters whose slices are passed on to it: they share the elements.
+func (a *analysis) storeSliceParam(l loc, planes tags, why reason) {
+	seen := map[loc]bool{l: true}
+	work := []loc{l}
+	for len(work) > 0 {
+		cur := work[len(work)-1]
+		work = work[:len(work)-1]
+		a.markLoc(cur, planes, why)
+		for _, from := range a.backwards[cur] {
+			if !seen[from] {
+				seen[from] = true
+				work = append(work, from)
+			}
 		}
 	}
 }

@@ -90,8 +90,9 @@ type MembershipResult struct {
 	// the Target first. They are set when there are no Matches.
 	Carriers []Carrier
 	// Reached reports that the upward pass marked the Target's error
-	// result.
-	Reached bool
+	// result, and TargetTrace how the Mark got there (it may be empty).
+	Reached     bool
+	TargetTrace []mark.Step
 	// MarkRan reports whether the upward pass ran; MarkTime is how long
 	// it took and MarkStats what it did.
 	MarkRan   bool
@@ -143,7 +144,7 @@ func Membership(ctx context.Context, prog *load.Program, tgt *target.Target, opt
 		return nil, err
 	}
 	m.MarkRan, m.MarkTime, m.MarkStats = true, time.Since(start), marks.Stats()
-	m.Reached = targetMarked(marks, tgt)
+	m.Reached, m.TargetTrace = targetMarked(marks, tgt)
 	c := carriers{marks: marks, tbl: res.Table, prog: prog.SSA, open: len(opts.Open) > 0, reached: m.Reached}
 	for _, e := range res.Entries {
 		if ok, trace := c.carrier(e); ok {
@@ -208,17 +209,21 @@ func matcher(subj mark.Subject) func(*errset.Table, errset.Entry) bool {
 
 // targetMarked reports whether the upward pass marked an error result of
 // the Target: of its functions, or of its call site.
-func targetMarked(marks *mark.Result, tgt *target.Target) bool {
+func targetMarked(marks *mark.Result, tgt *target.Target) (bool, []mark.Step) {
 	if len(tgt.Funcs) == 0 {
 		// Nothing to look at (a generic Target without instances).
-		return true
+		return true, nil
 	}
 	for _, fn := range tgt.Funcs {
 		switch tgt.Kind {
 		case target.Declaration:
 			for _, idx := range flow.ErrorResults(fn.Signature) {
 				if marks.ResultMarked(fn, idx) {
-					return true
+					trace := marks.TraceResult(fn, idx)
+					if len(trace) == 0 {
+						trace = marks.TraceType(fn.Signature.Results().At(idx).Type())
+					}
+					return true, trace
 				}
 			}
 		case target.CallSite:
@@ -228,14 +233,18 @@ func targetMarked(marks *mark.Result, tgt *target.Target) bool {
 			}
 			for _, idx := range flow.ErrorResults(site.Common().Signature()) {
 				if marks.SiteResultMarked(site, idx) {
-					return true
+					var trace []mark.Step
+					if v := site.Value(); v != nil {
+						trace = marks.Trace(v)
+					}
+					return true, trace
 				}
 			}
 		default:
-			return true
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 // carriers decides which entries of an Error Set are Carriers.

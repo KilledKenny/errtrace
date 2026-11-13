@@ -431,9 +431,14 @@ errtrace -as '<type>' <target>             # is the Concrete Type?              
   place is marked and the resolved entries whose leaf may hold X. There may be
   none: the Error Set alone never proves a no. The one guard the upward pass
   applies itself is `errors.Is(err, X)`.
-- A program loaded without a main package is open: callers outside it may pass
-  X, so its exported functions' parameters, exported variables and fields are
-  seeded, and an entry that depends on the caller is always a Carrier.
+- A loaded package that is not a main package (and not an internal package),
+  and the package of a Target that main and init do not reach, is open: code
+  that is not loaded may call it. Its functions' parameters, exported
+  variables and exported fields are seeded, a dynamic call on a value that may
+  come from outside returns marked results, and an entry that depends on the
+  caller is always a Carrier.
+- Carriers whose traces share a pivot (a type-wide or location-wide step) are
+  printed as one group; `-full` prints every Carrier in full.
 - Output (`render.Membership`): `<target-span>: <X> in Error Set of <target>:
   yes | no | maybe: <K> entries could carry it (<U> unresolved) | maybe:
   possibly handled`, then the matching entries or the Carriers, each Carrier

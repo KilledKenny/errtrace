@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/ssa"
-	"golang.org/x/tools/go/ssa/ssautil"
 
 	"github.com/KilledKenny/errtrace/internal/errset"
 	"github.com/KilledKenny/errtrace/internal/fixture"
@@ -34,9 +33,14 @@ func loadProgram(t *testing.T, file string) *program {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ssautil.MainPackages(initial)) == 0 {
+	// A package that is not a main package is open, as in the CLI.
+	for _, pkg := range initial {
+		if pkg.Pkg.Name() != "main" {
+			p.open = append(p.open, pkg)
+		}
+	}
+	if len(p.open) > 0 {
 		v.SetOpen()
-		p.open = initial
 	}
 	p.base = v
 	return p
@@ -84,22 +88,34 @@ func (p *program) subject(t *testing.T, s string) mark.Subject {
 func (p *program) membership(t *testing.T, fn string, subj mark.Subject) *query.MembershipResult {
 	t.Helper()
 	f := p.pkg.Func(fn)
+	if typ, name, ok := strings.Cut(fn, "."); ok {
+		// A method of a pointer receiver: Type.Method.
+		f = nil
+		if tn := p.pkg.Type(typ); tn != nil {
+			f = p.l.SSA.LookupMethod(types.NewPointer(tn.Type()), p.pkg.Pkg, name)
+		}
+	}
 	if f == nil {
 		t.Fatalf("no function %s", fn)
 	}
 	tgt := &target.Target{Kind: target.Declaration, Name: f.String(), Funcs: []*ssa.Function{f}}
 	v := p.base
+	open := p.open
 	if !v.Reachable(f) {
+		// The package of a Target that nothing reaches is open too.
 		var err error
 		if v, err = p.base.WithRoots(t.Context(), tgt.Funcs); err != nil {
 			t.Fatal(err)
+		}
+		if len(open) == 0 {
+			open = []*ssa.Package{p.pkg}
 		}
 	}
 	m, err := query.Membership(t.Context(), p.l.Program, tgt, query.MembershipOptions{
 		Options: query.Options{Resolver: v},
 		Subject: subj,
 		Upper:   v.Upper(),
-		Open:    p.open,
+		Open:    open,
 	})
 	if err != nil {
 		t.Fatal(err)

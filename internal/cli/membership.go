@@ -50,16 +50,14 @@ func runMembership(ctx context.Context, opts Options, cfg *config, prog *load.Pr
 			Table:      res.Table,
 			Locator:    res,
 		},
-		Subject: subj.String(),
-		Verdict: res.Verdict.String(),
-		Matches: res.Matches,
+		Subject:     subj.String(),
+		Verdict:     res.Verdict.String(),
+		Matches:     res.Matches,
+		TargetTrace: steps(res.TargetTrace),
+		Full:        cfg.full,
 	}
 	for _, c := range res.Carriers {
-		ce := render.CarrierEntry{Entry: c.Entry, Unresolved: c.Unresolved}
-		for _, s := range c.Trace {
-			ce.Trace = append(ce.Trace, render.TraceStep{Site: s.Site, Desc: s.Desc})
-		}
-		in.Carriers = append(in.Carriers, ce)
+		in.Carriers = append(in.Carriers, render.CarrierEntry{Entry: c.Entry, Unresolved: c.Unresolved, Trace: steps(c.Trace)})
 	}
 	if err := render.Membership(opts.Stdout, in); err != nil {
 		return 0, err
@@ -71,6 +69,15 @@ func runMembership(ctx context.Context, opts Options, cfg *config, prog *load.Pr
 		return ExitMaybe, nil
 	}
 	return ExitNo, nil
+}
+
+// steps converts the steps of a trace for the renderer.
+func steps(trace []mark.Step) []render.TraceStep {
+	out := make([]render.TraceStep, len(trace))
+	for i, s := range trace {
+		out[i] = render.TraceStep{Site: s.Site, Desc: s.Desc, Wide: s.Wide}
+	}
+	return out
 }
 
 // resolveSubject finds the Subject of a Membership Query in the loaded

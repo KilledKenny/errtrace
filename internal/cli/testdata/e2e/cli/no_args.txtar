@@ -17,6 +17,8 @@ flags:
     	max Wrap Chain depth N before truncation (default 8)
   -fanout N
     	group entries under dynamic call sites with at least N Candidates (0 = never group) (default 8)
+  -full 
+    	Membership Query: print every entry that could carry the error in full, instead of grouping those whose traces share a pivot (default false)
   -is pkgpath.Name
     	Membership Query: is the Sentinel pkgpath.Name (such as io.EOF) in the Error Set?
   -p patterns

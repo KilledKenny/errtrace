@@ -132,7 +132,12 @@ func (a *analysis) markable(t types.Type) bool {
 		switch t.Underlying().(type) {
 		case *types.Interface:
 			b = true
-		case *types.Signature, *types.Slice, *types.Map, *types.Chan, *types.Array:
+		case *types.Signature:
+			// In an open world a function value is marked when it may
+			// come from outside: calling it may run code that is not
+			// loaded.
+			b = a.open != nil || types.Implements(t, errorIface)
+		case *types.Slice, *types.Map, *types.Chan, *types.Array:
 			// Only a named one can implement error.
 			b = types.Implements(t, errorIface)
 		default:
@@ -295,8 +300,9 @@ func (a *analysis) assertable(t types.Type) bool {
 		return b
 	}
 	b := false
+	_, isFunc := t.Underlying().(*types.Signature)
 	switch {
-	case a.typeSeed(t), a.potentialWrapper(t):
+	case a.typeSeed(t), a.potentialWrapper(t), isFunc && a.open != nil:
 		b = true
 	case a.subj.Sentinel != nil && flow.IsErrorType(t):
 		b = a.dynUnknown
@@ -330,7 +336,7 @@ func (a *analysis) isWrapper(t types.Type) bool {
 		}
 		res := fn.Signature.Results()
 		for r := range res.Len() {
-			if rs := a.rets[fn]; r < len(rs) && rs[r].t&free != 0 {
+			if rs := a.rets[fn]; r < len(rs) && rs[r].t&anyFree != 0 {
 				a.heldBy = ref{kind: refRet, fn: fn, idx: int32(r), free: true}
 				return true
 			}

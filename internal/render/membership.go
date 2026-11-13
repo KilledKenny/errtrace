@@ -3,6 +3,7 @@ package render
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	"github.com/KilledKenny/errtrace/internal/errset"
@@ -16,6 +17,9 @@ type TraceStep struct {
 	Site any
 	// Desc says what happens to the Mark there.
 	Desc string
+	// Wide reports a step from which the Mark is on every value of a
+	// type or on shared memory: the pivot that Carriers are grouped by.
+	Wide bool
 }
 
 // CarrierEntry is a Carrier: an entry the Subject of a Membership Query
@@ -44,6 +48,12 @@ type MembershipInput struct {
 	Matches []errset.Entry
 	// Carriers are the Carriers of a maybe Verdict without Matches.
 	Carriers []CarrierEntry
+	// TargetTrace is how the Mark reached the Target's error result; it
+	// is printed when there is no Carrier.
+	TargetTrace []TraceStep
+	// Full prints every Carrier with its whole trace instead of grouping
+	// the Carriers that share a pivot.
+	Full bool
 }
 
 // Membership writes the Verdict of a Membership Query as text. The first
@@ -65,11 +75,25 @@ type MembershipInput struct {
 //		marked via (origin of <X> → here):
 //			<span>: <step description>
 //
+// Carriers whose traces pass the same pivot (the first step from which the
+// Mark is on a whole type or on shared memory, such as "value of type T,
+// which may wrap X" or "loaded from field f of T") are printed together,
+// after the others, smallest group first, unless Full is set: the trace up
+// to the pivot once, then one line per entry.
+//
+//	<pivot-span>: group of <M> entries via: <pivot step description>
+//		marked via (origin of <X> → here):
+//			<span>: <step description>
+//		<entry-span>: <label>
+//		...
+//
 // A maybe with 0 Carriers means that X can reach the Target (the upward
 // pass, an upper bound, says so) while no entry of the Error Set shows
 // how; it is followed by
 //
 //	<TAB><X> may reach the target, but no entry of the Error Set shows how
+//	<TAB>marked via (origin of <X> → target):
+//	<TAB><TAB><span>: <step description>
 //
 // A no is the header alone: X cannot reach the Target, whatever
 // Unresolved entries its Error Set has.
@@ -92,15 +116,32 @@ func Membership(w io.Writer, in MembershipInput) error {
 		fmt.Fprintf(&b, ": %d entries could carry it (%d unresolved)\n", len(in.Carriers), unresolved)
 		if len(in.Carriers) == 0 {
 			fmt.Fprintf(&b, "\t%s may reach the target, but no entry of the Error Set shows how\n", in.Subject)
+			if len(in.TargetTrace) > 0 {
+				fmt.Fprintf(&b, "\tmarked via (origin of %s → target):\n", in.Subject)
+				in.steps(&b, in.TargetTrace)
+			}
 		}
-		for _, c := range in.Carriers {
+		groups, grouped := in.pivotGroups()
+		for i, c := range in.Carriers {
+			if grouped[i] {
+				continue
+			}
 			in.entry(&b, c.Entry)
 			if len(c.Trace) == 0 {
 				continue
 			}
 			fmt.Fprintf(&b, "\tmarked via (origin of %s → here):\n", in.Subject)
-			for _, s := range c.Trace {
-				fmt.Fprintf(&b, "\t\t%s: %s\n", in.locate(s.Site), s.Desc)
+			in.steps(&b, c.Trace)
+		}
+		for _, g := range groups {
+			first := in.Carriers[g.members[0]]
+			pivot := first.Trace[g.pivot]
+			fmt.Fprintf(&b, "%s: group of %d entries via: %s\n", in.locate(pivot.Site), len(g.members), pivot.Desc)
+			fmt.Fprintf(&b, "\tmarked via (origin of %s → here):\n", in.Subject)
+			in.steps(&b, first.Trace[:g.pivot+1])
+			for _, i := range g.members {
+				e := in.Carriers[i].Entry
+				fmt.Fprintf(&b, "\t%s: %s\n", in.locate(in.Table.Get(e.Leaf).Site), Label(in.Table, e.Leaf))
 			}
 		}
 	default:
@@ -111,4 +152,60 @@ func Membership(w io.Writer, in MembershipInput) error {
 	}
 	_, err := io.WriteString(w, b.String())
 	return err
+}
+
+// steps writes the steps of a trace, two tabs deep.
+func (in MembershipInput) steps(b *strings.Builder, trace []TraceStep) {
+	for _, s := range trace {
+		fmt.Fprintf(b, "\t\t%s: %s\n", in.locate(s.Site), s.Desc)
+	}
+}
+
+// pivotGroup is the Carriers whose traces pass the same pivot.
+type pivotGroup struct {
+	// members are the indices of the Carriers, in order; pivot is the
+	// index of the pivot step in the first member's trace.
+	members []int
+	pivot   int
+}
+
+// pivotGroups groups the Carriers by the pivot of their trace: its first
+// wide step. It returns the groups of two or more, smallest first (then in
+// the order of their first Carriers), and which Carriers are grouped.
+// With Full nothing is grouped.
+func (in MembershipInput) pivotGroups() ([]pivotGroup, []bool) {
+	grouped := make([]bool, len(in.Carriers))
+	if in.Full {
+		return nil, grouped
+	}
+	var all []*pivotGroup
+	byKey := make(map[string]*pivotGroup)
+	for i, c := range in.Carriers {
+		for j, s := range c.Trace {
+			if !s.Wide {
+				continue
+			}
+			key := in.locate(s.Site) + ": " + s.Desc
+			g := byKey[key]
+			if g == nil {
+				g = &pivotGroup{pivot: j}
+				byKey[key] = g
+				all = append(all, g)
+			}
+			g.members = append(g.members, i)
+			break
+		}
+	}
+	var out []pivotGroup
+	for _, g := range all {
+		if len(g.members) < 2 {
+			continue
+		}
+		for _, i := range g.members {
+			grouped[i] = true
+		}
+		out = append(out, *g)
+	}
+	sort.SliceStable(out, func(i, j int) bool { return len(out[i].members) < len(out[j].members) })
+	return out, grouped
 }

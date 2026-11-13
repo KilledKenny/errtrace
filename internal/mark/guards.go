@@ -1,6 +1,7 @@
 package mark
 
 import (
+	"go/constant"
 	"go/token"
 	"go/types"
 
@@ -120,6 +121,9 @@ type targetInfo struct {
 	vals []ssa.Value
 	// asserted are the concrete types the target is asserted to.
 	asserted []types.Type
+	// conds are the boolean values that depend on the target: its
+	// comparisons, and the calls it is passed to.
+	conds map[ssa.Value]bool
 }
 
 // maxTargetDepth bounds how many static calls the target of an Is or As
@@ -130,14 +134,94 @@ func (a *analysis) targetInfo(fn *ssa.Function) *targetInfo {
 	if ti, ok := a.targets[fn]; ok {
 		return ti
 	}
-	ti := new(targetInfo)
+	ti := &targetInfo{conds: make(map[ssa.Value]bool)}
 	a.targets[fn] = ti
 	if len(fn.Params) != 2 {
 		ti.opaque = true
 		return ti
 	}
 	a.followTarget(fn, fn.Params[1], 0, ti, make(map[ssa.Value]bool))
+	if !ti.opaque && !answersFromTarget(fn, ti) {
+		// It can report true without having looked at its target (func
+		// (E) Is(error) bool { return true }): it reports every error.
+		ti.opaque = true
+	}
 	return ti
+}
+
+// answersFromTarget reports whether the method fn returns true only where
+// that follows from a look at its target: every value it returns is false,
+// one of ti.conds (or its negation), or is returned on a path that a
+// branch on one of them leads to.
+func answersFromTarget(fn *ssa.Function, ti *targetInfo) bool {
+	cond := func(v ssa.Value) bool {
+		if u, ok := v.(*ssa.UnOp); ok && u.Op == token.NOT {
+			v = u.X
+		}
+		return ti.conds[v]
+	}
+	// The blocks entered only through a branch on the target.
+	var branches []*ssa.BasicBlock
+	for _, b := range fn.Blocks {
+		if len(b.Instrs) == 0 {
+			continue
+		}
+		if br, ok := b.Instrs[len(b.Instrs)-1].(*ssa.If); ok && cond(br.Cond) {
+			for _, succ := range b.Succs {
+				if len(succ.Preds) == 1 {
+					branches = append(branches, succ)
+				}
+			}
+		}
+	}
+	after := func(b *ssa.BasicBlock) bool {
+		for _, d := range branches {
+			if d.Dominates(b) {
+				return true
+			}
+		}
+		return false
+	}
+	seen := make(map[ssa.Value]bool)
+	var ok func(v ssa.Value, at *ssa.BasicBlock) bool
+	ok = func(v ssa.Value, at *ssa.BasicBlock) bool {
+		if cond(v) {
+			return true
+		}
+		switch x := v.(type) {
+		case *ssa.Const:
+			if x.Value != nil && x.Value.Kind() == constant.Bool && !constant.BoolVal(x.Value) {
+				return true
+			}
+		case *ssa.Phi:
+			if seen[x] {
+				return true
+			}
+			seen[x] = true
+			for i, e := range x.Edges {
+				if !ok(e, x.Block().Preds[i]) {
+					return false
+				}
+			}
+			return true
+		}
+		// Anything else (true, e == EACCES) only where a branch on the
+		// target led.
+		return after(at)
+	}
+	for _, b := range fn.Blocks {
+		if len(b.Instrs) == 0 {
+			continue
+		}
+		ret, isRet := b.Instrs[len(b.Instrs)-1].(*ssa.Return)
+		if !isRet {
+			continue
+		}
+		if len(ret.Results) != 1 || !ok(ret.Results[0], b) {
+			return false
+		}
+	}
+	return true
 }
 
 // followTarget collects into ti what fn does with its parameter p, the
@@ -160,6 +244,19 @@ func (a *analysis) followTarget(fn *ssa.Function, p ssa.Value, depth int, ti *ta
 			ti.opaque = true
 			return
 		}
+		if v == p {
+			used := false
+			for _, r := range *refs {
+				if _, dbg := r.(*ssa.DebugRef); !dbg {
+					used = true
+				}
+			}
+			if !used {
+				// It decides without its target.
+				ti.opaque = true
+				return
+			}
+		}
 		for _, r := range *refs {
 			switch x := r.(type) {
 			case *ssa.DebugRef, *ssa.If, *ssa.Return, *ssa.FieldAddr, *ssa.IndexAddr:
@@ -172,6 +269,11 @@ func (a *analysis) followTarget(fn *ssa.Function, p ssa.Value, depth int, ti *ta
 			case *ssa.ChangeType:
 				work = append(work, x)
 			case *ssa.Extract:
+				if _, isAssert := x.Tuple.(*ssa.TypeAssert); isAssert && x.Index == 1 {
+					// The ok of a type assertion of the target.
+					ti.conds[x] = true
+					continue
+				}
 				work = append(work, x)
 			case *ssa.TypeAssert:
 				if isInterface(x.AssertedType) {
@@ -188,11 +290,17 @@ func (a *analysis) followTarget(fn *ssa.Function, p ssa.Value, depth int, ti *ta
 				if x.Op != token.EQL && x.Op != token.NEQ {
 					continue
 				}
-				if x.X == v && x.Y != v {
-					ti.vals = append(ti.vals, x.Y)
-				} else if x.Y == v && x.X != v {
-					ti.vals = append(ti.vals, x.X)
+				other := x.Y
+				if x.Y == v {
+					other = x.X
 				}
+				if _, isConst := other.(*ssa.Const); isConst || other == v {
+					// t != nil, t == t: true of every Subject.
+					ti.opaque = true
+					continue
+				}
+				ti.vals = append(ti.vals, other)
+				ti.conds[x] = true
 			case *ssa.UnOp:
 				// A load through the asserted pointer.
 			case *ssa.Store:
@@ -209,6 +317,7 @@ func (a *analysis) followTarget(fn *ssa.Function, p ssa.Value, depth int, ti *ta
 				case modelErrorsIs, modelErrorsAs:
 					if len(common.Args) == 2 && common.Args[1] == v && common.Args[0] != v {
 						ti.vals = append(ti.vals, common.Args[0])
+						ti.conds[x] = true
 						continue
 					}
 				}
@@ -221,6 +330,7 @@ func (a *analysis) followTarget(fn *ssa.Function, p ssa.Value, depth int, ti *ta
 						a.followTarget(sc, sc.Params[j], depth+1, ti, seen)
 					}
 				}
+				ti.conds[x] = true
 			default:
 				ti.opaque = true
 			}

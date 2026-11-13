@@ -7,9 +7,7 @@ $WORK/a.go:12:31-41: concrete example.com/fx.errs
 	path (origin → target):
 		$WORK/a.go:12:31-41: in example.com/fx.F
 	marked via (origin of example.com/fx.ErrX → here):
-		$WORK/a.go:5:5-9: Sentinel example.com/fx.ErrX
-		$WORK/a.go:12:36-40: loaded from variable example.com/fx.ErrX
-		$WORK/a.go:12:36-40: stored to memory of type error
+		-: a parameter of (example.com/fx.errs).Error: a caller outside the loaded program may pass example.com/fx.ErrX
 		-: a value of type example.com/fx.errs is or may wrap example.com/fx.ErrX
 -- stderr --
 errtrace: warning: target not reachable from main/init; parameters may lack candidates

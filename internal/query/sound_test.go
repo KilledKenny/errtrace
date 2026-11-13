@@ -18,13 +18,19 @@ type soundCase struct {
 	// where wantNo is set (the cases the upward pass is precise about).
 	truth  bool
 	wantNo bool
+	// method is the type of fn's pointer receiver, if fn is a method.
+	method string
 }
 
 func runSound(t *testing.T, file string, cases []soundCase) {
 	t.Helper()
 	p := loadProgram(t, file)
 	for _, c := range cases {
-		m := p.membership(t, c.fn, p.subject(t, c.subject))
+		fn := c.fn
+		if c.method != "" {
+			fn = c.method + "." + c.fn
+		}
+		m := p.membership(t, fn, p.subject(t, c.subject))
 		switch {
 		case c.truth && m.Verdict == query.No:
 			t.Errorf("%s, %s: Verdict is no, but the function can return it", c.fn, c.subject)
@@ -64,9 +70,7 @@ func TestVerdictSound(t *testing.T) {
 		{fn: "TypedNil", subject: "as *E", truth: true},
 		{fn: "TypedNil", subject: "is ErrP", truth: true},
 		{fn: "A", subject: "is ErrZ", wantNo: true},
-		// (C is marked for ErrZ too: IsOpaque, whose Is method cannot be
-		// seen, wraps every error, and a dead method reaches it by CHA.)
-		{fn: "C", subject: "is ErrZ"},
+		{fn: "C", subject: "is ErrZ", wantNo: true},
 		// Intrinsics called through function values.
 		{fn: "DynErrorf", subject: "is ErrX", truth: true},
 		{fn: "DynJoin", subject: "is ErrX", truth: true},
@@ -77,10 +81,8 @@ func TestVerdictSound(t *testing.T) {
 		{fn: "CustomIs", subject: "is ErrZ", wantNo: true},
 		{fn: "Open", subject: "is io/fs.ErrNotExist", truth: true},
 		{fn: "DelegIs", subject: "is ErrX", truth: true},
-		{fn: "OpaqueIs", subject: "is ErrX", truth: true},
 		{fn: "CustomAs", subject: "as *E", truth: true},
 		{fn: "Deep", subject: "is ErrX", truth: true},
-		{fn: "Reflect", subject: "is ErrX", truth: true},
 		// Guards: only errors.Is excludes the Sentinel.
 		{fn: "GuardIs", subject: "is ErrX", wantNo: true},
 		{fn: "GuardNeq", subject: "is ErrX", truth: true},
@@ -92,6 +94,13 @@ func TestVerdictSound(t *testing.T) {
 		{fn: "RecoveredOther", subject: "is ErrX", wantNo: true},
 		{fn: "Clean", subject: "is ErrX", wantNo: true},
 		{fn: "Clean", subject: "as *W", wantNo: true},
+		// A wrapper may come to wrap the Sentinel after errors.Is said
+		// no; the Sentinel itself may not.
+		{fn: "Mutated", subject: "is ErrX", truth: true},
+		{fn: "ViaCallee", subject: "is ErrX", truth: true},
+		{fn: "Stateful", subject: "is ErrX", truth: true},
+		{fn: "MutatedPtr", subject: "is ErrX", truth: true},
+		{fn: "CheckedValue", subject: "is ErrX", wantNo: true},
 	})
 }
 
@@ -110,5 +119,43 @@ func TestVerdictSoundLibrary(t *testing.T) {
 		{fn: "unexported", subject: "is ErrX", truth: true},
 		{fn: "Clean", subject: "is ErrX", wantNo: true},
 		{fn: "Clean", subject: "is io.EOF", wantNo: true},
+		{fn: "Lookup", subject: "is ErrX", truth: true},
+		{fn: "ReadAll", subject: "is ErrX", truth: true},
+		{fn: "RunHook", subject: "is ErrX", truth: true, method: "Client"},
+		{fn: "RunOnErr", subject: "is ErrX", truth: true, method: "Client"},
+		{fn: "Last", subject: "is ErrX", truth: true, method: "Client"},
+		{fn: "First", subject: "is ErrX", truth: true},
+		{fn: "FromMap", subject: "is ErrX", truth: true},
+		{fn: "FromChan", subject: "is ErrX", truth: true},
+		{fn: "FromReq", subject: "is ErrX", truth: true},
+		{fn: "FromPtr", subject: "is ErrX", truth: true},
+		{fn: "FromAny", subject: "is ErrX", truth: true},
+		{fn: "Each", subject: "is ErrX", truth: true},
+		{fn: "GetDefault", subject: "is ErrX", truth: true},
+		{fn: "New", subject: "is ErrX", truth: true},
+		{fn: "Walk", subject: "is ErrX", truth: true},
+		// A Sentinel by its name is not taken to be reassigned.
+		{fn: "Other", subject: "is ErrX", wantNo: true},
+	})
+}
+
+// TestVerdictSoundWild does the same for a program with Is methods that do
+// not look at their target and with calls and stores through reflection.
+func TestVerdictSoundWild(t *testing.T) {
+	t.Parallel()
+	runSound(t, "sound_wild.txtar", []soundCase{
+		{fn: "OpaqueIs", subject: "is ErrX", truth: true},
+		{fn: "Reflect", subject: "is ErrX", truth: true},
+		{fn: "IsAny", subject: "is ErrX", truth: true},
+		{fn: "IsNonNil", subject: "is ErrX", truth: true},
+		{fn: "IsAny", subject: "is ErrZ", truth: true},
+		{fn: "ReflectCall", subject: "is ErrX", truth: true},
+		{fn: "ReflectAppend", subject: "is ErrX", truth: true},
+		{fn: "ReflectMethod", subject: "is ErrX", truth: true},
+		{fn: "ReflectSet", subject: "is ErrX", truth: true},
+		{fn: "ReflectSend", subject: "is ErrX", truth: true},
+		{fn: "TemplateMethod", subject: "is ErrX", truth: true},
+		{fn: "TemplateFuncMap", subject: "is ErrX", truth: true},
+		{fn: "TemplatePanics", subject: "is ErrX", truth: true},
 	})
 }

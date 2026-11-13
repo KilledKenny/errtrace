@@ -1,0 +1,112 @@
+A whole program with what makes the upward pass coarse: Is methods that
+do not look at their target, and calls and stores through reflection (also
+inside text/template). Every case here must not be answered "no"; what is
+precise stays in sound_main.txtar, which has none of this.
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- main.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"reflect"
+	"text/template"
+)
+
+var ErrX = errors.New("x")
+var ErrZ = errors.New("z")
+
+type IsOpaque struct{ f func(error) bool }
+
+func (o IsOpaque) Error() string   { return "o" }
+func (o IsOpaque) Is(t error) bool { return o.f(t) }
+
+func OpaqueIs() error { return IsOpaque{func(t error) bool { return t == ErrX }} }
+
+// Reflection on a struct that holds the Sentinel.
+
+type H struct{ E error }
+
+func Reflect() error { return reflect.ValueOf(H{ErrX}).Field(0).Interface().(error) }
+
+// Is methods that do not look at their target.
+
+type AnyIs struct{}
+
+func (AnyIs) Error() string { return "any" }
+func (AnyIs) Is(error) bool { return true }
+
+type NonNilIs struct{}
+
+func (NonNilIs) Error() string   { return "nn" }
+func (NonNilIs) Is(t error) bool { return t != nil }
+
+func IsAny() error    { return AnyIs{} }
+func IsNonNil() error { return NonNilIs{} }
+
+// Calls and stores through reflection.
+
+func give() error { return ErrX }
+
+func ReflectCall() error { return reflect.ValueOf(give).Call(nil)[0].Interface().(error) }
+
+func ReflectAppend() error {
+	var s []error
+	return reflect.Append(reflect.ValueOf(s), reflect.ValueOf(ErrX)).Interface().([]error)[0]
+}
+
+type svc struct{}
+
+func (svc) Do() error { return ErrX }
+
+func ReflectMethod() error {
+	return reflect.ValueOf(svc{}).MethodByName("Do").Call(nil)[0].Interface().(error)
+}
+
+func ReflectSet() error {
+	h := &H{}
+	reflect.ValueOf(h).Elem().Field(0).Set(reflect.ValueOf(ErrX))
+	return h.E
+}
+
+func ReflectSend() error {
+	c := make(chan error, 1)
+	reflect.ValueOf(c).Send(reflect.ValueOf(ErrX))
+	return <-c
+}
+
+type TD struct{}
+
+func (TD) Fail() (string, error) { return "", ErrX }
+func (TD) Boom() string          { panic(ErrX) }
+
+func TemplateMethod() error {
+	t := template.Must(template.New("t").Parse("{{.Fail}}"))
+	return t.Execute(io.Discard, TD{})
+}
+
+func TemplateFuncMap() error {
+	fm := template.FuncMap{"fail": func() (string, error) { return "", ErrX }}
+	t := template.Must(template.New("t").Funcs(fm).Parse("{{fail}}"))
+	return t.Execute(io.Discard, nil)
+}
+
+func TemplatePanics() (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err, _ = r.(error)
+		}
+	}()
+	t := template.Must(template.New("t").Parse("{{.Boom}}"))
+	return t.Execute(io.Discard, TD{})
+}
+
+func main() {
+	fmt.Println(OpaqueIs(), Reflect(), IsAny(), IsNonNil(),
+		ReflectCall(), ReflectAppend(), ReflectMethod(), ReflectSet(), ReflectSend(),
+		TemplateMethod(), TemplateFuncMap(), TemplatePanics(), ErrZ)
+}

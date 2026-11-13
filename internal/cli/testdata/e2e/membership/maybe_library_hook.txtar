@@ -4,6 +4,10 @@ In a library every function may run: SetHook installs a function that returns th
 -- stdout --
 $WORK/a.go:11:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: 0 entries could carry it (0 unresolved)
 	example.com/fx.ErrX may reach the target, but no entry of the Error Set shows how
+	marked via (origin of example.com/fx.ErrX → target):
+		$WORK/a.go:5:5-9: Sentinel example.com/fx.ErrX
+		$WORK/a.go:9:47-51: loaded from variable example.com/fx.ErrX
+		$WORK/a.go:11:31-37: returned by example.com/fx.SetHook$1
 -- exit --
 3
 -- go.mod --
