@@ -30,12 +30,10 @@ const (
 	modelAtomicLoad
 	// modelAtomicSwap is Swap: it stores and loads.
 	modelAtomicSwap
-	// modelReflectValueOf is reflect.ValueOf: its argument goes into
-	// reflection.
-	modelReflectValueOf
-	// modelReflectInterface is reflect.Value.Interface: its result comes
-	// out of reflection.
-	modelReflectInterface
+	// modelReflect is a function or method of package reflect: what it
+	// is passed may come back in what it returns (reflect.ValueOf(x),
+	// v.Elem(), v.Interface()).
+	modelReflect
 )
 
 func (a *analysis) model(fn *ssa.Function) model {
@@ -46,6 +44,9 @@ func (a *analysis) model(fn *ssa.Function) model {
 		return m
 	}
 	m := modelOf(fn)
+	if m == modelReflect && !a.modelReflect {
+		m = modelNone
+	}
 	a.models[fn] = m
 	return m
 }
@@ -94,12 +95,7 @@ func modelOf(fn *ssa.Function) model {
 			}
 		}
 	case "reflect":
-		if recv == "Value" && o.Name() == "Interface" {
-			return modelReflectInterface
-		}
-		if recv == "" && o.Name() == "ValueOf" {
-			return modelReflectValueOf
-		}
+		return modelReflect
 	}
 	return modelNone
 }
@@ -133,18 +129,32 @@ func (a *analysis) indexCall(site ssa.CallInstruction) {
 			if res := common.Signature().Results(); res.Len() == 1 && a.markable(res.At(0).Type()) {
 				a.addReader(a.atomicLoc(res.At(0).Type()), key{call, 0})
 			}
-		case modelReflectInterface:
-			a.addReader(loc{kind: locReflect}, key{call, 0})
-		case modelReflectValueOf:
-			// A composite argument is not marked itself: what it holds
-			// is looked at when the pass settles (see run).
-			if len(common.Args) == 1 {
-				if mi, ok := common.Args[0].(*ssa.MakeInterface); ok && !a.markable(mi.X.Type()) {
-					a.reflectArgs = append(a.reflectArgs, mi.X.Type())
+		case modelReflect:
+			res := common.Signature().Results()
+			for _, arg := range common.Args {
+				// A composite argument is not marked itself: what it
+				// holds is looked at when the pass settles (see run).
+				if mi, ok := arg.(*ssa.MakeInterface); ok && !isInterface(mi.X.Type()) && !a.markable(mi.X.Type()) {
+					a.reflectArgs = append(a.reflectArgs, reflectArg{call, mi.X.Type()})
+				}
+				// The reflect.Values of a slice argument are memory.
+				if st, ok := arg.Type().Underlying().(*types.Slice); ok && reflectCarrier(st.Elem()) {
+					for r := range res.Len() {
+						if rt := res.At(r).Type(); !reflectCarrier(rt) {
+							continue
+						}
+						k := key{call, 0}
+						if res.Len() > 1 {
+							k.idx = int32(r)
+						}
+						a.addReader(a.typedLoc(st.Elem()), k)
+						if l, ok := a.varargsParam[sliceAlloc(arg)]; ok {
+							a.addReader(l, k)
+						}
+					}
 				}
 			}
 		}
-		a.indexSlices(call)
 	}
 	a.indexCallees(site)
 }
@@ -190,13 +200,17 @@ func (a *analysis) indexIntrinsic(call *ssa.Call, name string) {
 	if !wraps {
 		return
 	}
-	if st, ok := slice.Type().Underlying().(*types.Slice); ok {
-		a.addReader(a.typedLoc(st.Elem()), key{call, 0})
-	}
 	// The operands may be a slice parameter of the caller
-	// (fmt.Errorf(format, args...)).
+	// (fmt.Errorf(format, args...)), whose elements may be in no other
+	// memory.
 	if l, ok := sliceParam(slice); ok {
 		a.addReader(l, key{call, 0})
+		if a.closed(l) {
+			return
+		}
+	}
+	if st, ok := slice.Type().Underlying().(*types.Slice); ok {
+		a.addReader(a.typedLoc(st.Elem()), key{call, 0})
 	}
 }
 
@@ -306,10 +320,14 @@ func (a *analysis) callUse(k key, delta tags, site ssa.CallInstruction) {
 			if len(common.Args) == 2 && common.Args[0] == v {
 				a.asTarget(common.Args[1], from, site)
 			}
-		case modelReflectValueOf:
-			if len(common.Args) == 1 && common.Args[0] == v {
-				a.markLoc(loc{kind: locReflect}, reason{kind: kStore, from: from, site: site})
+		case modelReflect:
+			// What goes into reflection may come out of the call: a
+			// reflect.Value that holds it, or the value itself.
+			if call != nil {
+				a.reflectResults(call, delta, reason{kind: kThrough, from: from, site: site, fn: sc})
 			}
+			// Its body is not followed.
+			return
 		case modelAtomicStore, modelAtomicSwap:
 			for _, arg := range common.Args[1:] {
 				if arg == v {
@@ -368,5 +386,52 @@ func (a *analysis) asTarget(target ssa.Value, from ref, site ssa.Instruction) {
 	a.asUnknown = true
 	for _, t := range a.asPointees {
 		a.markLoc(a.typedLoc(t), why)
+	}
+}
+
+// reflectArg is a composite value passed to a function of package reflect.
+type reflectArg struct {
+	call *ssa.Call
+	typ  types.Type
+}
+
+// sliceAlloc returns the argument array that the slice v is made from, or
+// nil.
+func sliceAlloc(v ssa.Value) *ssa.Alloc {
+	if sl, ok := v.(*ssa.Slice); ok {
+		alloc, _ := sl.X.(*ssa.Alloc)
+		return alloc
+	}
+	return nil
+}
+
+// reflectCarrier reports whether a result of a function of package
+// reflect can give back what the function was passed: a reflect.Value, or
+// an empty interface (Value.Interface). A reflect.Type or a bool cannot.
+func reflectCarrier(t types.Type) bool {
+	if isReflectValue(t) {
+		return true
+	}
+	if _, isParam := t.(*types.TypeParam); isParam {
+		return true
+	}
+	i, ok := t.Underlying().(*types.Interface)
+	return ok && i.NumMethods() == 0
+}
+
+// reflectResults marks what the call of a function of package reflect
+// returns: its results that can give back what it was passed, and the
+// memory of the elements of a slice of them.
+func (a *analysis) reflectResults(call *ssa.Call, t tags, why reason) {
+	res := call.Call.Signature().Results()
+	for r := range res.Len() {
+		rt := res.At(r).Type()
+		if reflectCarrier(rt) {
+			a.markResult(call, r, t, why)
+			continue
+		}
+		if st, ok := rt.Underlying().(*types.Slice); ok && reflectCarrier(st.Elem()) {
+			a.markLoc(a.typedLoc(st.Elem()), why)
+		}
 	}
 }

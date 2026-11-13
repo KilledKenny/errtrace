@@ -69,8 +69,9 @@ type MembershipOptions struct {
 	Upper mark.Callees
 	// Open are the loaded packages of a program without a main package
 	// (see mark.Options.Open): code outside the program calls them. An
-	// entry that depends on the caller is then always a Carrier. Nil
-	// means the program is whole.
+	// entry that depends on the caller, and a dynamic call without
+	// Candidates, is then always a Carrier. Nil means the program is
+	// whole.
 	Open []*ssa.Package
 }
 
@@ -250,15 +251,26 @@ type carriers struct {
 
 // carrier reports whether the entry e is a Carrier, with the trace of the
 // Mark that makes it one. If the upward pass did not reach the Target,
-// only an entry that depends on the caller of an open program is one.
+// only an entry of an open program that depends on the caller, or is a
+// dynamic call without Candidates of a value that may come from outside,
+// is one.
 func (c carriers) carrier(e errset.Entry) (bool, []mark.Step) {
 	v := c.tbl.Get(e.Leaf)
-	if c.open && v.Kind == errset.Unresolved && v.Unresolved == errset.DependsOnCaller {
-		// A caller outside the program may pass the Subject.
-		if site, ok := v.Site.(ssa.Value); ok {
-			return true, c.marks.Trace(site)
+	if c.open && v.Kind == errset.Unresolved {
+		switch v.Unresolved {
+		case errset.DependsOnCaller:
+			// A caller outside the program may pass the Subject.
+			if site, ok := v.Site.(ssa.Value); ok {
+				return true, c.marks.Trace(site)
+			}
+			return true, nil
+		case errset.NoCandidates:
+			// The function or implementation called may come from
+			// outside the program, and return the Subject.
+			if site, ok := v.Site.(ssa.CallInstruction); !ok || c.marks.FromOutside(site.Common().Value) {
+				return true, nil
+			}
 		}
-		return true, nil
 	}
 	if !c.reached {
 		return false, nil

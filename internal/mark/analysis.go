@@ -59,8 +59,6 @@ const (
 	locPanic
 	// locAtomic is the contents of the sync/atomic values of type id.
 	locAtomic
-	// locReflect is every value passed to reflect.ValueOf.
-	locReflect
 	// locVarargs is the elements of the slices passed to the slice
 	// parameter v of a function that are argument arrays of static
 	// variadic calls (directly, or passed on from parameter to
@@ -211,9 +209,16 @@ type analysis struct {
 	varargsParam map[*ssa.Alloc]loc
 	forwards     map[loc][]loc
 	vaEsc        map[loc]bool
-	asPointees   []types.Type
-	asSeen       map[int32]bool
-	asUnknown    bool
+	// taken are the functions used as values, not only called: the
+	// only functions a call of a function value can run.
+	taken map[*ssa.Function]bool
+	// staticSites are the calls that can only run the function (see
+	// soleCallee); closedMemo caches closed.
+	staticSites map[*ssa.Function][]ssa.CallInstruction
+	closedMemo  map[loc]int8
+	asPointees  []types.Type
+	asSeen      map[int32]bool
+	asUnknown   bool
 
 	siteOrd      map[ssa.CallInstruction]int64
 	calleesCache map[ssa.CallInstruction][]*ssa.Function
@@ -229,6 +234,9 @@ type analysis struct {
 	// modelIntrinsics says that static calls of the intrinsics are
 	// modelled instead of following their bodies.
 	modelIntrinsics bool
+	// modelReflect says that the calls of package reflect are modelled
+	// instead of following their bodies.
+	modelReflect bool
 
 	// heldBy is set by isWrapper and holds (see isWrapper).
 	heldBy ref
@@ -241,7 +249,7 @@ type analysis struct {
 	recovers []recoverCall
 	// reflectArgs are the types of the composite values passed to
 	// reflect.ValueOf.
-	reflectArgs []types.Type
+	reflectArgs []reflectArg
 	// guards caches deadBlocks; guardOK says that the Sentinel keeps the
 	// value of its initialization, so that a failed errors.Is excludes it.
 	guards  map[ssa.Value][]*ssa.BasicBlock
@@ -295,6 +303,9 @@ func newAnalysis(prog *ssa.Program, res Callees, subj Subject) *analysis {
 		varargsParam:  make(map[*ssa.Alloc]loc),
 		forwards:      make(map[loc][]loc),
 		vaEsc:         make(map[loc]bool),
+		taken:         make(map[*ssa.Function]bool),
+		staticSites:   make(map[*ssa.Function][]ssa.CallInstruction),
+		closedMemo:    make(map[loc]int8),
 		asSeen:        make(map[int32]bool),
 		siteOrd:       make(map[ssa.CallInstruction]int64),
 		calleesCache:  make(map[ssa.CallInstruction][]*ssa.Function),
@@ -317,6 +328,7 @@ func (a *analysis) run(ctx context.Context) error {
 		return err
 	}
 	a.setupSubject()
+	a.indexStatic()
 	a.index()
 	if err := ctx.Err(); err != nil {
 		return err
@@ -340,21 +352,36 @@ func (a *analysis) run(ctx context.Context) error {
 			}
 		}
 		// A composite value that holds a marked value and is passed to
-		// reflect.ValueOf puts it into reflection.
-		if l := (loc{kind: locReflect}); !a.locMarked(l) {
-			for _, t := range a.reflectArgs {
-				a.heldBy = ref{}
-				if a.holdsAny(t) {
-					a.markLoc(l, reason{kind: kFlow, from: a.heldBy})
-					changed = true
-					break
-				}
+		// package reflect (reflect.ValueOf(s)) may come out of the call.
+		rest := a.reflectArgs[:0]
+		for _, ra := range a.reflectArgs {
+			a.heldBy = ref{}
+			if !a.holds(ra.typ, 0) {
+				rest = append(rest, ra)
+				continue
 			}
+			a.reflectResults(ra.call, free, reason{kind: kThrough, from: a.heldBy, site: ra.call, fn: ra.call.Call.StaticCallee()})
+			changed = true
 		}
+		a.reflectArgs = rest
 		if !changed {
 			return nil
 		}
 	}
+}
+
+// reflectCall reports whether fn calls a function or method chosen at run
+// time through reflection: reflect.Value.Call, CallSlice, Method or
+// MethodByName.
+func reflectCall(fn *ssa.Function) bool {
+	if fn.Pkg == nil || fn.Pkg.Pkg.Path() != "reflect" || fn.Signature.Recv() == nil {
+		return false
+	}
+	switch fn.Name() {
+	case "Call", "CallSlice", "Method", "MethodByName":
+		return true
+	}
+	return false
 }
 
 // isTemplate reports whether fn is the body of a generic function (or a
@@ -411,9 +438,8 @@ func (a *analysis) collect() {
 	// and referenced the functions that scanned bodies refer to.
 	helpers := make(map[*ssa.Function]bool)
 	referenced := make(map[*ssa.Function]bool)
-	// taken are the functions used as values (not only called), and
-	// refs the functions each function refers to.
-	taken := make(map[*ssa.Function]bool)
+	// refs are the functions each function refers to: its static
+	// callees, closures and function values.
 	refs := make(map[*ssa.Function][]*ssa.Function)
 	for len(work) > 0 {
 		fn := work[len(work)-1]
@@ -441,6 +467,12 @@ func (a *analysis) collect() {
 			}
 			continue
 		}
+		if a.reflectBody(fn) {
+			// Package reflect is modelled at its calls (see
+			// modelReflect): its bodies move values through unsafe
+			// memory, where the pass loses or floods them.
+			continue
+		}
 		list = append(list, named{fn, fn.String()})
 		for _, anon := range fn.AnonFuncs {
 			add(anon)
@@ -456,7 +488,7 @@ func (a *analysis) collect() {
 						referenced[f] = true
 						refs[fn] = append(refs[fn], f)
 						if site, isCall := instr.(ssa.CallInstruction); !isCall || r != &site.Common().Value {
-							taken[f] = true
+							a.taken[f] = true
 						}
 						add(f)
 					}
@@ -469,11 +501,7 @@ func (a *analysis) collect() {
 				for i := range ms.Len() {
 					sel := ms.At(i)
 					if sel.Obj().(*types.Func).Signature().TypeParams() == nil {
-						m := a.prog.MethodValue(sel)
-						if m != nil {
-							refs[fn] = append(refs[fn], m)
-						}
-						add(m)
+						add(a.prog.MethodValue(sel))
 					}
 				}
 			}
@@ -490,27 +518,60 @@ func (a *analysis) collect() {
 		kept = append(kept, n)
 	}
 	list = kept
-	// Dead code: in a whole program, a function that the roots do not
-	// reach, that is not a method (reflection, encoding and templates
-	// call methods) and whose value is never taken cannot run, nor can
-	// what only such functions refer to.
+	// Dead code: in a whole program, only what the roots reach can run.
+	// What they reach is taken with the call edges of the pass itself:
+	// from the functions the Callees report reachable, every function a
+	// live function refers to (a static callee, a closure, a function
+	// value) and every callee of its dynamic calls (the CHA callees
+	// where VTA has none, as for a method that only reflection puts
+	// behind an interface). If live code calls through reflect.Value,
+	// every exported method may run.
 	if reach, ok := a.res.(interface{ Reachable(*ssa.Function) bool }); ok {
+		inList := make(map[*ssa.Function]bool, len(list))
+		for _, n := range list {
+			inList[n.fn] = true
+		}
 		live := make(map[*ssa.Function]bool)
 		var stack []*ssa.Function
-		for _, n := range list {
-			fn := n.fn
-			if reach.Reachable(fn) || fn.Signature.Recv() != nil || taken[fn] || (fn.Synthetic != "" && fn.Parent() == nil) {
+		push := func(fn *ssa.Function) {
+			if fn != nil && inList[fn] && !live[fn] {
 				live[fn] = true
 				stack = append(stack, fn)
 			}
 		}
+		for _, n := range list {
+			if reach.Reachable(n.fn) {
+				push(n.fn)
+			}
+		}
+		reflects := false
 		for len(stack) > 0 {
 			fn := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
 			for _, g := range refs[fn] {
-				if !live[g] {
-					live[g] = true
-					stack = append(stack, g)
+				push(g)
+			}
+			for _, b := range fn.Blocks {
+				for _, instr := range b.Instrs {
+					site, ok := instr.(ssa.CallInstruction)
+					if !ok {
+						continue
+					}
+					sc := site.Common().StaticCallee()
+					if sc == nil {
+						for _, g := range a.callees(site) {
+							push(g)
+						}
+						continue
+					}
+					if !reflects && reflectCall(sc) {
+						reflects = true
+						for _, n := range list {
+							if obj := n.fn.Object(); n.fn.Signature.Recv() != nil && obj != nil && obj.Exported() {
+								push(n.fn)
+							}
+						}
+					}
 				}
 			}
 		}
@@ -1116,17 +1177,22 @@ func (a *analysis) index() {
 					switch x.Op {
 					case token.MUL:
 						if a.markable(x.Type()) {
+							if ia, ok := x.X.(*ssa.IndexAddr); ok {
+								if l, ok := sliceParam(ia.X); ok {
+									a.addReader(l, key{x, 0})
+									if a.closed(l) {
+										// Its elements are in no other
+										// memory.
+										break
+									}
+								}
+							}
 							locs, n := a.addrLocs(x.X)
 							for _, l := range locs[:n] {
 								a.addReader(l, key{x, 0})
 							}
 							if a.openAddr(x.X) {
 								a.openLoads = append(a.openLoads, key{x, 0})
-							}
-							if ia, ok := x.X.(*ssa.IndexAddr); ok {
-								if l, ok := sliceParam(ia.X); ok {
-									a.addReader(l, key{x, 0})
-								}
 							}
 						}
 					case token.ARROW:
@@ -1222,12 +1288,15 @@ func (a *analysis) index() {
 // modelled.
 func (a *analysis) setupIntrinsics() {
 	a.modelIntrinsics = true
+	a.modelReflect = true
 	if t := a.subj.Type; t != nil {
 		if p := pointerElem(t); p != nil {
 			t = p
 		}
 		if n, ok := types.Unalias(t).(*types.Named); ok && n.Obj().Pkg() != nil {
 			switch n.Obj().Pkg().Path() {
+			case "reflect":
+				a.modelReflect = false
 			case "errors", "fmt", "braces.dev/errtrace":
 				// The Subject is a type the intrinsics make: follow
 				// their bodies.
@@ -1235,6 +1304,18 @@ func (a *analysis) setupIntrinsics() {
 			}
 		}
 	}
+}
+
+// reflectBody reports whether fn is a function of package reflect whose
+// body is not scanned because its calls are modelled. (They are scanned
+// when the Subject is a type of package reflect itself.)
+func (a *analysis) reflectBody(fn *ssa.Function) bool {
+	for f := fn; f != nil; f = f.Parent() {
+		if f.Pkg != nil {
+			return a.modelReflect && f.Pkg.Pkg.Path() == "reflect"
+		}
+	}
+	return false
 }
 
 // setupSubject finds, for a Sentinel Subject, the variables that hold its

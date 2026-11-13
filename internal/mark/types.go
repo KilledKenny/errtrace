@@ -124,6 +124,11 @@ func (a *analysis) markable(t types.Type) bool {
 	switch t.(type) {
 	case *types.Tuple, *types.Basic:
 	default:
+		if isReflectValue(t) {
+			// A reflect.Value carries the Mark of what it holds.
+			a.markableCache[t] = true
+			return true
+		}
 		switch t.Underlying().(type) {
 		case *types.Interface:
 			b = true
@@ -136,6 +141,12 @@ func (a *analysis) markable(t types.Type) bool {
 	}
 	a.markableCache[t] = b
 	return b
+}
+
+// isReflectValue reports whether t is reflect.Value.
+func isReflectValue(t types.Type) bool {
+	n, ok := types.Unalias(t).(*types.Named)
+	return ok && n.Obj().Name() == "Value" && n.Obj().Pkg() != nil && n.Obj().Pkg().Path() == "reflect"
 }
 
 var errorIface = types.Universe.Lookup("error").Type().Underlying().(*types.Interface)

@@ -18,6 +18,17 @@ func (a *analysis) callees(site ssa.CallInstruction) []*ssa.Function {
 	fns, ok := a.calleesCache[site]
 	if !ok {
 		fns = a.res.Callees(site)
+		if !site.Common().IsInvoke() {
+			// A call of a function value runs a function whose value
+			// is taken somewhere (CHA assumes every function's is).
+			var kept []*ssa.Function
+			for _, g := range fns {
+				if a.taken[g] {
+					kept = append(kept, g)
+				}
+			}
+			fns = kept
+		}
 		a.calleesCache[site] = fns
 	}
 	return fns
@@ -31,9 +42,14 @@ func (a *analysis) callers(fn *ssa.Function) []ssa.CallInstruction {
 		return sites
 	}
 	for _, s := range a.res.Callers(fn) {
-		if _, scanned := a.siteOrd[s]; scanned {
-			sites = append(sites, s)
+		if _, scanned := a.siteOrd[s]; !scanned {
+			continue
 		}
+		if c := s.Common(); c.StaticCallee() == nil && !c.IsInvoke() && !a.taken[fn] {
+			// Not a callee of a call of a function value (see callees).
+			continue
+		}
+		sites = append(sites, s)
 	}
 	sort.Slice(sites, func(i, j int) bool { return a.siteOrd[sites[i]] < a.siteOrd[sites[j]] })
 	a.callersCache[fn] = sites
@@ -51,11 +67,12 @@ func (a *analysis) known(g *ssa.Function) bool {
 
 // opaqueCallee reports whether the callee g, which the pass did not scan,
 // may return what it is passed: it has no body (assembly, linkname, cgo),
-// or it is an intrinsic called dynamically. Any other callee the pass did
+// or it is an intrinsic or a function of package reflect called
+// dynamically. Any other callee the pass did
 // not scan is a method that only reflection can reach (see collect), and
 // is not a callee at all.
 func (a *analysis) opaqueCallee(g *ssa.Function) bool {
-	if g.Blocks == nil {
+	if g.Blocks == nil || a.reflectBody(g) {
 		return true
 	}
 	_, ok := a.intrinsic(g)
@@ -290,28 +307,166 @@ func (a *analysis) siteResultFromCallees(site ssa.CallInstruction, index int) bo
 	return false
 }
 
-// sliceParam returns the locVarargs of v, if v is a parameter of slice
-// type: the elements of the slices passed to it that the pass can tell
-// apart from other memory.
-func sliceParam(v ssa.Value) (loc, bool) {
-	p, ok := v.(*ssa.Parameter)
-	if !ok || p.Parent() == nil {
-		return loc{}, false
+// sliceRoot returns the parameter of slice type that v is, or is a
+// reslicing of (args[1:] shares the elements of args).
+func sliceRoot(v ssa.Value) (*ssa.Parameter, bool) {
+	for range 8 {
+		switch x := v.(type) {
+		case *ssa.Parameter:
+			_, ok := x.Type().Underlying().(*types.Slice)
+			return x, ok && x.Parent() != nil
+		case *ssa.Slice:
+			if _, ok := x.X.Type().Underlying().(*types.Slice); !ok {
+				return nil, false
+			}
+			v = x.X
+		default:
+			return nil, false
+		}
 	}
-	if _, ok := p.Type().Underlying().(*types.Slice); !ok {
+	return nil, false
+}
+
+// sliceParam returns the locVarargs of v, if v is (a reslicing of) a
+// parameter of slice type: the elements of the slices passed to it that
+// the pass can tell apart from other memory.
+func sliceParam(v ssa.Value) (loc, bool) {
+	p, ok := sliceRoot(v)
+	if !ok {
 		return loc{}, false
 	}
 	return loc{kind: locVarargs, v: p}, true
 }
 
-// indexSlices records, for the static call of a function the pass
-// scanned, how slices reach the callee's parameters: a fresh argument
+// soleCallee returns the one function that can run at site: its static
+// callee, or the only callee of a call of a function value.
+func (a *analysis) soleCallee(site ssa.CallInstruction) *ssa.Function {
+	common := site.Common()
+	if sc := common.StaticCallee(); sc != nil {
+		return sc
+	}
+	if common.IsInvoke() {
+		return nil
+	}
+	if _, ok := common.Value.(*ssa.Builtin); ok {
+		return nil
+	}
+	if cs := a.callees(site); len(cs) == 1 {
+		return cs[0]
+	}
+	return nil
+}
+
+// indexStatic records the calls that can only run one function, by that
+// function, and how slices reach their parameters (see indexSlices),
+// before the loads are indexed.
+func (a *analysis) indexStatic() {
+	for _, fn := range a.fns {
+		for _, b := range fn.Blocks {
+			for _, instr := range b.Instrs {
+				site, ok := instr.(ssa.CallInstruction)
+				if !ok {
+					continue
+				}
+				g := a.soleCallee(site)
+				if g == nil {
+					continue
+				}
+				a.staticSites[g] = append(a.staticSites[g], site)
+				if call, ok := site.(*ssa.Call); ok {
+					if _, intrinsic := a.intrinsic(g); !intrinsic {
+						a.indexSlices(call, g)
+					}
+				}
+			}
+		}
+	}
+}
+
+// closed reports whether the elements of the slices passed to the slice
+// parameter of l are in no other memory than l: the function only reads
+// the slice (see vaEscapes), every call that may run it can run nothing
+// else, and every such call passes a fresh argument array, nil, or a slice
+// parameter that is closed itself. Loads from such a parameter need not look at the type-keyed
+// memory of the element type.
+func (a *analysis) closed(l loc) bool {
+	switch a.closedMemo[l] {
+	case 1, 3:
+		// 3: being decided; a cycle of forwarding is closed if the
+		// rest is.
+		return true
+	case 2:
+		return false
+	}
+	a.closedMemo[l] = 3
+	ok := a.closedNow(l)
+	a.closedMemo[l] = 2
+	if ok {
+		a.closedMemo[l] = 1
+	}
+	return ok
+}
+
+func (a *analysis) closedNow(l loc) bool {
+	p := l.v.(*ssa.Parameter)
+	g := p.Parent()
+	if a.open != nil || a.vaEscapes(l) {
+		return false
+	}
+	idx := -1
+	for i, q := range g.Params {
+		if q == p {
+			idx = i
+		}
+	}
+	if idx < 0 {
+		return false
+	}
+	// (Not a.callers: the scan that orders the call sites is running.)
+	for _, site := range a.res.Callers(g) {
+		if _, scanned := a.fnIndex[site.Parent()]; !scanned {
+			continue
+		}
+		if c := site.Common(); c.StaticCallee() == nil && !c.IsInvoke() && !a.taken[g] {
+			continue
+		}
+		if a.soleCallee(site) != g {
+			return false
+		}
+	}
+	if len(a.staticSites[g]) == 0 {
+		// Nothing the pass sees calls it: do not conclude from that.
+		return false
+	}
+	for _, site := range a.staticSites[g] {
+		args := site.Common().Args
+		if _, isCall := site.(*ssa.Call); !isCall || len(args) != len(g.Params) {
+			return false
+		}
+		arg := args[idx]
+		if c, ok := arg.(*ssa.Const); ok && c.IsNil() {
+			continue
+		}
+		if sl, ok := arg.(*ssa.Slice); ok {
+			if alloc, ok := sl.X.(*ssa.Alloc); ok && a.varargsParam[alloc] == l {
+				continue
+			}
+		}
+		if from, ok := sliceParam(arg); ok && a.closed(from) {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+// indexSlices records, for a call that can only run the function g, which
+// the pass scanned, how slices reach the callee's parameters: a fresh argument
 // array of a variadic call that only the call uses is the memory of the
 // callee's variadic parameter (locVarargs), and a slice parameter of the
 // caller passed on as an argument (f(args...), p.doPrintf(format, a))
 // forwards its memory to the callee's parameter.
-func (a *analysis) indexSlices(call *ssa.Call) {
-	g := call.Call.StaticCallee()
+func (a *analysis) indexSlices(call *ssa.Call, g *ssa.Function) {
 	args := call.Call.Args
 	if g == nil || !a.known(g) || len(args) == 0 || len(args) != len(g.Params) {
 		return
@@ -359,15 +514,25 @@ func (a *analysis) vaEscapes(l loc) bool {
 }
 
 func (a *analysis) vaEscapesNow(p *ssa.Parameter) bool {
-	refs := p.Referrers()
-	if refs == nil {
+	return a.sliceEscapes(p, 0)
+}
+
+// sliceEscapes is vaEscapesNow for v, the slice parameter or a reslicing
+// of it.
+func (a *analysis) sliceEscapes(v ssa.Value, depth int) bool {
+	refs := v.Referrers()
+	if refs == nil || depth > 8 {
 		return true
 	}
 	for _, r := range *refs {
 		switch r := r.(type) {
 		case *ssa.DebugRef:
+		case *ssa.Slice:
+			if _, ok := r.Type().Underlying().(*types.Slice); r.X != v || !ok || a.sliceEscapes(r, depth+1) {
+				return true
+			}
 		case *ssa.IndexAddr:
-			if r.X != ssa.Value(p) || r.Referrers() == nil {
+			if r.X != v || r.Referrers() == nil {
 				return true
 			}
 			for _, rr := range *r.Referrers() {
@@ -403,7 +568,7 @@ func (a *analysis) vaEscapesNow(p *ssa.Parameter) bool {
 					operands = 0
 				}
 				for j, arg := range args {
-					if arg == ssa.Value(p) && j != operands {
+					if arg == v && j != operands {
 						return true
 					}
 				}
@@ -413,7 +578,7 @@ func (a *analysis) vaEscapesNow(p *ssa.Parameter) bool {
 				return true
 			}
 			for j, arg := range args {
-				if arg != ssa.Value(p) {
+				if arg != v {
 					continue
 				}
 				if _, ok := sliceParam(g.Params[j]); !ok {

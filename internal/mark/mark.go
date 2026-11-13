@@ -7,10 +7,12 @@
 //
 // # What a Mark means
 //
-// A marked value may be X itself, or a Wrap whose Wrap Chain reaches X.
-// Only values that can be errors are marked: interface values and values of
-// concrete types that implement error. What a struct, slice, map, channel
-// or pointer holds is not a Mark on that value but on a memory location:
+// A marked value may be X itself, or an error that errors.Is (for a
+// Sentinel) or errors.As (for a Concrete Type) finds X in. Only values that
+// can be errors are marked: interface values, values of concrete types that
+// implement error, and reflect.Values (which carry what they hold). What a
+// struct, slice, map, channel or pointer holds is not a Mark on that value
+// but on a memory location:
 //
 //   - a local variable (an Alloc) and the closures that capture it;
 //   - a package-level variable;
@@ -20,15 +22,33 @@
 //     elements, program-wide (type-based aliasing), which also stands for
 //     every variable and field whose address is taken;
 //   - the keys and the values of a map type, the elements of channels of a
-//     type, the value of a panic, and the contents of sync/atomic values;
-//   - the argument array of a static variadic call, which is the memory
-//     of the callee's slice parameter alone (and of the parameters it is
-//     passed on to) as long as the callee only reads it.
+//     type, the value of the panics raised in a function, and the contents
+//     of sync/atomic values;
+//   - the argument array of a variadic call that can run one function
+//     only, which is the memory of that function's slice parameter alone
+//     (and of the parameters it is passed on to) as long as the function
+//     only reads it.
 //
-// A type that implements error and whose Unwrap method can return a marked
-// value, or that has an Unwrap, Is or As method and holds a marked value in
-// a field, is a wrapper of X: every value of that type is marked, as every
-// value of a Concrete Type Subject is.
+// # Seeds
+//
+// For a Sentinel: every load of its variable, of the variable it is an
+// alias of, and of the variables it is stored to; every value stored into
+// it; and every value of a type that may be equal to its value without
+// being it (a comparable non-pointer type, a nil pointer). For a Concrete
+// Type: every value of that type.
+//
+// A type that can be an error is a wrapper of X, and every value of it is
+// marked, when
+//
+//   - its Unwrap method can return a marked value;
+//   - its Is method (for a Sentinel) or As method (for a Concrete Type)
+//     may report X: it compares its target with a marked value, asks
+//     errors.Is or errors.As about one, asserts the target to X's type, or
+//     passes the target where the pass cannot see what is done with it
+//     (then the type wraps every X);
+//   - it has an Unwrap, Is or As method and holds a marked value in a
+//     field (through structs nested by value) or in a slice, array, map,
+//     channel or pointer field.
 //
 // # Calls
 //
@@ -38,46 +58,74 @@
 // the callee's parameter with Param(i); a result marked Param(i) marks the
 // call only where argument i is marked, and a result marked Free marks
 // every call. Memory is context-insensitive: a Mark stored to a location is
-// Free. The callees of a call come from the Callees given to Run.
+// Free. The result of an Unwrap method is marked where its receiver is (a
+// receiver that wraps X is always marked).
 //
-// The world is closed: only the functions of the loaded program run, and a
-// parameter holds X only if some call in the program passes it. A dynamic
-// call that no function of the program matches calls nil and has no
-// result.
+// The callees of a call come from the Callees given to Run, less the
+// functions whose value is never taken at a call of a function value.
 //
-// # Intrinsics
+// A recover sees a panic only if the function that defers the recovering
+// function reaches the function that panics over those call edges.
+//
+// # Guards
+//
+// One guard is applied, because it is the common proof that X does not
+// come back: a Mark does not pass a use of v that is dominated by the
+// false edge of errors.Is(v, X), for a Sentinel X whose variable is never
+// reassigned. A comparison (v != X) excludes nothing: v may wrap X. Every
+// other guard is the downward pass's business.
+//
+// # Which functions are scanned
+//
+// With Callees that say which functions the roots reach (a whole
+// program), only what can run is scanned: those functions, the functions
+// they refer to, and the callees of their calls (and every exported method
+// if they call through reflect.Value). Otherwise every function is.
 //
 // Static calls of fmt.Errorf, errors.Join, errors.New and errtrace.Wrap are
 // modelled (flow.Intrinsic) and their bodies are not scanned, so that
-// fmt.Errorf("%v", err) does not mark anything. A dynamic call that may
-// reach fmt.Errorf or errors.Join is marked when the memory of its operand
-// type is. When the Subject is a type of package errors, fmt or errtrace,
-// nothing is modelled and the bodies are followed.
+// fmt.Errorf("%v", err) does not mark anything; nor are the bodies of
+// package reflect: a call of it gives back what it is passed, in the
+// reflect.Values and empty interfaces it returns. (When the Subject is a
+// type of one of those packages, the bodies are followed instead.)
+//
+// # Closed and open worlds
+//
+// By default the world is closed: only the functions of the loaded program
+// run, and a parameter holds X only if some call in the program passes it.
+// A dynamic call that no function of the program matches calls nil.
+//
+// With Options.Open (a program without a main package), code outside the
+// program may call the exported functions and methods of the open
+// packages and set their exported variables and fields; those are seeded.
 //
 // # Known limits
 //
 //   - Reflection, unsafe, cgo and assembly can move X where the pass cannot
 //     see. Modelled are only: errors.As (its target is marked), the
-//     contents of sync/atomic.Value and atomic.Pointer, a value passed to
-//     reflect.ValueOf (it marks every result of reflect.Value.Interface),
-//     and a function without a body (its results are marked when an
-//     argument is; what it reads from memory, as the target of a
-//     //go:linkname does, is not seen). An address converted to
-//     unsafe.Pointer is not followed.
-//   - A type with a custom Is or As method can match X without holding it.
-//     Such a type counts as a wrapper only if it holds a marked value in a
-//     field, or in a slice, array, map, channel or pointer field.
-//   - Guards are ignored upward by design; the downward pass decides them.
-//   - Type-keyed locations are coarse: expect a false "maybe", never a
-//     false "no".
+//     contents of sync/atomic.Value and atomic.Pointer, values passed
+//     through package reflect and returned by it (not: stored through it
+//     with Value.Set, or returned by a function it calls), and a function
+//     without a body (its results are marked when an argument is; what it
+//     reads from memory, as the target of a //go:linkname does, is not
+//     seen). An address converted to unsafe.Pointer is not followed.
+//   - An Is or As method that decides from something other than its target
+//     and the values it compares it with (a global flag, the error text)
+//     is taken at its word only where the target is compared or passed on.
+//   - The errors.Is guard assumes that the error tree of v does not change
+//     between the check and the use.
+//   - Type-keyed locations and whole-type wrappers are coarse: expect a
+//     false "maybe", never a false "no".
 //   - A value stored into the Sentinel's variable by the program is followed
 //     forward from the store only, not back to its other copies.
 //   - A value converted to another named type and back is followed only as
 //     far as its Mark goes: a type assertion to a type that is neither the
 //     Subject's nor a possible wrapper drops it.
+//   - In an open world, a value from outside that is not an error itself
+//     (an io.Reader, a callback) is not followed: a dynamic call on it is
+//     answered from the callees the loaded program has.
 //   - The bodies of generic functions are not scanned, only their
 //     instances.
-//   - Callers outside the loaded program are not considered.
 package mark
 
 import (
@@ -160,9 +208,10 @@ func Run(ctx context.Context, prog *ssa.Program, res Callees, subj Subject) (*Re
 
 // RunWith runs the upward pass for subj over the functions of prog,
 // following the call edges of res. If res has a method
-// Reachable(*ssa.Function) bool, a function that it reports unreachable,
-// that is not a method and whose value is never taken is not scanned
-// (nothing can run it, not even reflection).
+// Reachable(*ssa.Function) bool, only the functions that can run are
+// scanned: those it reports reachable and what they reach over the call
+// edges of res and through function values (and, if they call through
+// reflect.Value, every exported method).
 func RunWith(ctx context.Context, prog *ssa.Program, res Callees, subj Subject, opts Options) (*Result, error) {
 	a := newAnalysis(prog, res, subj)
 	if len(opts.Open) > 0 {
@@ -264,6 +313,35 @@ func (r *Result) SiteResultMarked(site ssa.CallInstruction, index int) bool {
 		return a.explicit(k)
 	}
 	return a.siteResultFromCallees(site, index)
+}
+
+// FromOutside reports whether v, the function value or receiver of a
+// dynamic call, may come from code outside an open program (see
+// Options.Open): it is a parameter or captured variable, an exported
+// variable the program does not only initialize, an exported field, or
+// something the pass does not place. It is false in a closed world, and
+// for the unexported variables and fields that only loaded code sets.
+func (r *Result) FromOutside(v ssa.Value) bool {
+	a := r.a
+	if a.open == nil {
+		return false
+	}
+	switch x := v.(type) {
+	case *ssa.UnOp:
+		switch addr := x.X.(type) {
+		case *ssa.Global:
+			return a.openAddr(addr)
+		case *ssa.FieldAddr:
+			return a.openAddr(addr)
+		}
+	case *ssa.Field:
+		if st := structOf(x.X.Type()); st != nil && x.Field < st.NumFields() {
+			return a.openField(x.X.Type(), st, x.Field)
+		}
+	case *ssa.MakeClosure, *ssa.Function:
+		return false
+	}
+	return true
 }
 
 // GlobalMarked reports whether the package-level variable g may hold the

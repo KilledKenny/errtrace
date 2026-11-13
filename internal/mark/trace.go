@@ -245,8 +245,6 @@ func (a *analysis) locString(l loc) string {
 			return "the variadic arguments of " + p.Parent().String()
 		}
 		return "variadic arguments"
-	case locReflect:
-		return "reflection (reflect.ValueOf)"
 	case locAtomic:
 		return "an atomic value of type " + ts
 	}

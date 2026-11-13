@@ -10,7 +10,9 @@ $WORK/a.go:12:31-84: unresolved(memory): value of TypeAssert not modelled
 		$WORK/a.go:8:5-9: Sentinel example.com/fx.ErrX
 		$WORK/a.go:12:49-53: loaded from variable example.com/fx.ErrX
 		$WORK/a.go:12:49-53: stored to field E of example.com/fx.H
-		$WORK/a.go:12:31-76: loaded from reflection (reflect.ValueOf)
+		$WORK/a.go:12:31-55: passed to reflect.ValueOf, which returns it
+		$WORK/a.go:12:31-64: passed to (reflect.Value).Field, which returns it
+		$WORK/a.go:12:31-76: passed to (reflect.Value).Interface, which returns it
 		$WORK/a.go:12:31-84: type assertion to error
 -- stderr --
 errtrace: warning: target not reachable from main/init; parameters may lack candidates
