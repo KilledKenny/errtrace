@@ -78,10 +78,28 @@ func (a *analysis) indexCallees(site ssa.CallInstruction) {
 	}
 }
 
-// argAt returns the operand of the call at site that parameter p of a
-// callee receives, or nil.
-func argAt(site ssa.CallInstruction, p int) ssa.Value {
+// paramShift returns how many leading parameters of the callee g the call at
+// site has no operand for: 0, except for a call of a bound method value
+// whose wrapper VTA spliced out, where the callee's receiver comes from the
+// closure (the wrapper's own call passes it) and operand j is parameter
+// j+1.
+func paramShift(site ssa.CallInstruction, g *ssa.Function) int {
 	common := site.Common()
+	n := len(common.Args)
+	if common.IsInvoke() {
+		n++
+	}
+	return len(g.Params) - n
+}
+
+// argAt returns the operand of the call at site that parameter p of the
+// callee g receives, or nil.
+func argAt(site ssa.CallInstruction, g *ssa.Function, p int) ssa.Value {
+	common := site.Common()
+	p -= paramShift(site, g)
+	if p < 0 {
+		return nil
+	}
 	if common.IsInvoke() {
 		if p == 0 {
 			return common.Value
@@ -132,7 +150,12 @@ func (a *analysis) linkArgs(k key, delta tags, site ssa.CallInstruction) {
 			}
 			continue
 		}
+		sh := paramShift(site, g)
 		for _, p := range params {
+			p += sh
+			if p < 0 {
+				continue
+			}
 			if p < len(g.Params) {
 				a.mark(key{g.Params[p], 0}, paramTag(p), reason{kind: kParam, from: from, site: site, fn: g})
 			}
@@ -173,7 +196,7 @@ func (a *analysis) retChanged(g *ssa.Function, r int, delta tags) {
 			if delta&paramTag(p) == 0 {
 				continue
 			}
-			arg := argAt(site, p)
+			arg := argAt(site, g, p)
 			if arg == nil {
 				continue
 			}
@@ -202,8 +225,12 @@ func (a *analysis) siteResultFromCallees(site ssa.CallInstruction, index int) bo
 			if _, ok := a.intrinsic(g); ok {
 				return true
 			}
-			for p := range g.Signature.Params().Len() + 1 {
-				if arg := argAt(site, p); arg != nil && a.tagsOf(arg) != 0 {
+			common := site.Common()
+			if common.IsInvoke() && a.tagsOf(common.Value) != 0 {
+				return true
+			}
+			for _, arg := range common.Args {
+				if a.tagsOf(arg) != 0 {
 					return true
 				}
 			}
@@ -221,7 +248,7 @@ func (a *analysis) siteResultFromCallees(site ssa.CallInstruction, index int) bo
 			if t&paramTag(p) == 0 {
 				continue
 			}
-			if arg := argAt(site, p); arg != nil && a.tagsOf(arg) != 0 {
+			if arg := argAt(site, g, p); arg != nil && a.tagsOf(arg) != 0 {
 				return true
 			}
 		}

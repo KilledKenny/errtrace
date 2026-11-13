@@ -129,7 +129,25 @@ func bound() error {
 	return f()
 }
 
+type bx struct{}
+
+func (bx) Echo(e error) error { return e }
+
+var echo, echoY func(error) error
+
+func BoundArg() error {
+	echo = bx{}.Echo
+	return echo(ErrX)
+}
+
+func BoundArgY() error {
+	echoY = bx{}.Echo
+	return echoY(ErrY)
+}
+
 func main() {
+	BoundArg()
+	BoundArgY()
 	CallerX()
 	CallerY()
 	Chain()

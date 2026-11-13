@@ -64,6 +64,9 @@ func TestCalls(t *testing.T) {
 			"Method": "0", "Go": "0", "Defer": "0", "DeferClosure": "0",
 			"DynErrorf": "0", "Multi": "1", "SecondY": "-", "SecondX": "0", "bound": "0",
 			"wrap": "0", "id": "0", "second": "0",
+			// A bound method value: the operand is the method's second
+			// parameter.
+			"BoundArg": "0", "BoundArgY": "-",
 		}},
 		{"is ErrY", map[string]string{
 			"CallerX": "-", "CallerY": "0", "Chain": "-", "ChainY": "0",
@@ -73,7 +76,7 @@ func TestCalls(t *testing.T) {
 			"Callback": "-", "CallbackY": "0",
 			"Method": "-", "Go": "-", "DeferClosure": "-",
 			"DynErrorf": "-", "Multi": "-", "SecondY": "0", "SecondX": "-", "bound": "-",
-			"second": "0",
+			"second": "0", "BoundArg": "-", "BoundArgY": "0",
 		}},
 	})
 }
@@ -88,4 +91,27 @@ func TestCallsCHA(t *testing.T) {
 			"Iface": "0", "IfaceY": "0", "Unreached": "0", "CallbackY": "0",
 		}},
 	})
+}
+
+// TestHard checks the flows that are easy to lose: every function of the
+// fixture can return the Sentinel, in a whole program and in one that is
+// not.
+func TestHard(t *testing.T) {
+	t.Parallel()
+	names := []string{
+		"AtomicValue", "AtomicPointer", "FieldAddr", "FieldArray", "FieldMap", "FieldFunc",
+		"Boxed", "ResultField", "Generic", "GenericBox", "Promoted", "Registry", "MethodResult",
+		"Returned", "Once", "Goroutine", "AsHelper", "Forwarded", "JoinForwarded",
+		"ChanStruct", "MapKey", "SelectSend", "PtrConvert", "Cause", "Switch", "Deferred",
+	}
+	want := make(map[string]string)
+	for _, n := range names {
+		want[n] = "0"
+	}
+	for _, callees := range []func(*fixture.Loaded) mark.Callees{upper(t), upper(t, "main")} {
+		runMarkTests(t, "hard.txtar", callees, []markTest{
+			{"is ErrX", want},
+			{"is ErrLate", map[string]string{"setLate": "0"}},
+		})
+	}
 }
