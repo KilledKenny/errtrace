@@ -147,7 +147,7 @@ func (a *analysis) describe(why reason, at ref) (Step, bool) {
 		return Step{Site: site(why.site), Desc: "value stored into Sentinel " + why.text}, true
 	case kSeedType:
 		if a.subj.Type != nil {
-			return Step{Site: site(why.site), Desc: "value of Concrete Type " + typeString(why.typ)}, true
+			return Step{Site: site(why.site), Desc: "value of Concrete Type " + a.subj.String()}, true
 		}
 		return Step{Site: site(why.site), Desc: fmt.Sprintf("value of type %s, which may equal %s", typeString(why.typ), a.subj)}, true
 	case kSeedWrapper:

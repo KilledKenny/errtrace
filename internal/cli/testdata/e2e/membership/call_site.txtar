@@ -1,0 +1,31 @@
+A call-site Target: the Verdict is about what that call can return, with the arguments of the site.
+-- args --
+-is example.com/fx.ErrX a.go:@call
+-- stdout --
+$WORK/a.go:15:16-26: example.com/fx.ErrX in Error Set of call to wrap in example.com/fx.F: no
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- exit --
+1
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrX = errors.New("x")
+var ErrY = errors.New("y")
+
+func wrap(err error) error { return fmt.Errorf("w: %w", err) }
+
+func F() (error, error) {
+	a := wrap(ErrX)
+	b := /*@call*/wrap(ErrY)
+	return a, b
+}

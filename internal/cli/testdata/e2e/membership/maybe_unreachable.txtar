@@ -1,0 +1,36 @@
+The same guard in a library: the Target is not reachable from main or init, so the Candidates of its dynamic calls may be incomplete, and reaching the Target without a Carrier is not a proof: maybe, with 0 Carriers.
+-- args --
+-is example.com/fx.ErrX a.go:@g
+-- stdout --
+$WORK/a.go:15:12-13: example.com/fx.ErrX in Error Set of example.com/fx.G: maybe: 0 of 0 unresolved could carry it
+	example.com/fx.ErrX reaches the target, which is not reachable from main/init: the Candidates of its dynamic calls may be incomplete
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- exit --
+3
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var ErrX = errors.New("x")
+var ErrY = errors.New("y")
+
+func source(n int) error {
+	if n == 0 {
+		return ErrX
+	}
+	return ErrY
+}
+
+func /*@g*/G(n int) error {
+	err := source(n)
+	if errors.Is(err, ErrX) {
+		return nil
+	}
+	return err
+}

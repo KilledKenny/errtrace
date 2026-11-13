@@ -1,0 +1,36 @@
+A guard removes the Sentinel on its way to the Target: the upward pass, which ignores guards, reaches the Target, but no Unresolved entry is a Carrier. In a whole program (the Target is reachable from main) that is a no, with the second line.
+-- args --
+-is example.com/fx.ErrX a.go:@g
+-- stdout --
+$WORK/a.go:15:12-13: example.com/fx.ErrX in Error Set of example.com/fx.G: no
+	example.com/fx.ErrX reaches the target only through values the Error Set resolved without it
+-- exit --
+1
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import "errors"
+
+var ErrX = errors.New("x")
+var ErrY = errors.New("y")
+
+func source(n int) error {
+	if n == 0 {
+		return ErrX
+	}
+	return ErrY
+}
+
+func /*@g*/G(n int) error {
+	err := source(n)
+	if errors.Is(err, ErrX) {
+		return nil
+	}
+	return err
+}
+
+func main() { G(1) }

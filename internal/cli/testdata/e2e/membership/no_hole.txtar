@@ -1,0 +1,33 @@
+The key case: the Error Set has an Unresolved entry (a call with no Candidates), but nothing that could run there returns the Sentinel, so the hole cannot carry it: no. The one function that matches the call, other, returns something else; elsewhere returns the Sentinel, but nothing leads from it to the Target.
+-- args --
+-is example.com/fx.ErrX a.go:@f
+-- stdout --
+$WORK/a.go:14:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: no
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- exit --
+1
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var ErrX = errors.New("x")
+var ErrY = errors.New("y")
+
+var hook func(int, int) error
+
+func other(int, int) error { return ErrY }
+
+func elsewhere() error { return ErrX }
+
+func /*@f*/F() error {
+	if err := hook(1, 2); err != nil {
+		return err
+	}
+	return nil
+}

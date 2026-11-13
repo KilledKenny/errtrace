@@ -1,0 +1,30 @@
+-as with a Concrete Type the Target cannot return: the value type OtherErr is not *OtherErr.
+-- args --
+-as *example.com/fx.OtherErr a.go:@f
+-- stdout --
+$WORK/a.go:11:12-13: *example.com/fx.OtherErr in Error Set of example.com/fx.F: no
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- exit --
+1
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+type MyErr struct{ code int }
+
+func (e *MyErr) Error() string { return "my" }
+
+type OtherErr struct{}
+
+func (OtherErr) Error() string  { return "other" }
+
+func /*@f*/F(n int) error {
+	if n == 0 {
+		return &MyErr{n}
+	}
+	return OtherErr{}
+}

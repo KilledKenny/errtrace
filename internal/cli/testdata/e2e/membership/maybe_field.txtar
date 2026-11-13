@@ -1,0 +1,41 @@
+The Sentinel is stored in a struct field in one function and the field is loaded in the Target: the load is Unresolved, and a Carrier. The trace shows the store. The other Unresolved entry (a field nothing stores the Sentinel to) is not a Carrier.
+-- args --
+-is example.com/fx.ErrX a.go:@f
+-- stdout --
+$WORK/a.go:14:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: 1 of 2 unresolved could carry it
+$WORK/a.go:18:9-14: unresolved(memory): load of field err of *example.com/fx.S
+	path (origin → target):
+		$WORK/a.go:18:9-14: in example.com/fx.F
+	marked via (origin of example.com/fx.ErrX → here):
+		$WORK/a.go:5:5-9: Sentinel example.com/fx.ErrX
+		$WORK/a.go:12:30-34: loaded from variable example.com/fx.ErrX
+		$WORK/a.go:12:24-27: stored to field err of example.com/fx.S
+		$WORK/a.go:18:9-14: loaded from field err of example.com/fx.S
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- exit --
+3
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var ErrX = errors.New("x")
+
+type S struct {
+	err  error
+	last error
+}
+
+func (s *S) Fail() { s.err = ErrX }
+
+func /*@f*/F(s *S) error {
+	if s.last != nil {
+		return s.last
+	}
+	return s.err
+}

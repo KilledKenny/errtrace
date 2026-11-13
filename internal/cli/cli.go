@@ -15,6 +15,7 @@ import (
 	"golang.org/x/tools/go/ssa"
 
 	"github.com/KilledKenny/errtrace/internal/load"
+	"github.com/KilledKenny/errtrace/internal/mark"
 	"github.com/KilledKenny/errtrace/internal/query"
 	"github.com/KilledKenny/errtrace/internal/render"
 	"github.com/KilledKenny/errtrace/internal/resolve"
@@ -30,6 +31,11 @@ const (
 	// ExitError is returned for usage errors, Targets that can't be resolved,
 	// package load or type errors, and internal failures.
 	ExitError = 2
+	// ExitNo is returned by a Membership Query (-is, -as) whose Verdict is
+	// no; a yes Verdict returns ExitOK.
+	ExitNo = 1
+	// ExitMaybe is returned by a Membership Query whose Verdict is maybe.
+	ExitMaybe = 3
 )
 
 // Options is everything one Query run depends on, so that tests can run the
@@ -71,13 +77,21 @@ var debugModes = []string{"target", "timing", "summary"}
 // hiddenFlags are registered but left out of the usage text.
 var hiddenFlags = map[string]bool{"debug": true}
 
+// membershipFlags select a Membership Query. The usage text shows them,
+// and the exit codes of a Membership Query, only when one of them is on
+// the command line: without them the command prints what it always did.
+var membershipFlags = map[string]bool{"is": true, "as": true}
+
 // config holds the parsed flags.
 type config struct {
 	tags       string
 	patterns   string
 	chainDepth int
 	fanout     int
-	debug      map[string]bool
+	// is and as are the Subject of a Membership Query: a Sentinel
+	// (<pkgpath>.<Name>) or a Concrete Type; at most one is set.
+	is, as string
+	debug  map[string]bool
 }
 
 // usageError is an error caused by how the command was invoked; the usage
@@ -90,10 +104,10 @@ func (e usageError) Unwrap() error { return e.err }
 // Run executes one Query described by opts and returns the exit code.
 func Run(ctx context.Context, opts Options) int {
 	fs, cfg := newFlagSet()
-	err := run(ctx, opts, fs, cfg)
+	code, err := run(ctx, opts, fs, cfg)
 	switch {
 	case err == nil:
-		return ExitOK
+		return code
 	case errors.Is(err, flag.ErrHelp):
 		printUsage(opts.Stdout, fs)
 		return ExitOK
@@ -106,30 +120,42 @@ func Run(ctx context.Context, opts Options) int {
 	return ExitError
 }
 
-func run(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) error {
+// run executes the Query and returns its exit code, or an error.
+func run(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) (int, error) {
+	code, err := runQuery(ctx, opts, fs, cfg)
+	if err != nil {
+		return ExitError, err
+	}
+	return code, nil
+}
+
+func runQuery(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) (int, error) {
 	if err := fs.Parse(opts.Args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
-			return err
+			return 0, err
 		}
-		return usageError{err}
+		return 0, usageError{err}
+	}
+	if cfg.is != "" && cfg.as != "" {
+		return 0, usageError{errors.New("-is and -as are mutually exclusive")}
 	}
 	debug, err := parseDebug(fs.Lookup("debug").Value.String())
 	if err != nil {
-		return usageError{err}
+		return 0, usageError{err}
 	}
 	cfg.debug = debug
 	if cfg.chainDepth < 1 {
-		return usageError{fmt.Errorf("invalid -chain-depth %d (want at least 1)", cfg.chainDepth)}
+		return 0, usageError{fmt.Errorf("invalid -chain-depth %d (want at least 1)", cfg.chainDepth)}
 	}
 	if cfg.fanout < 0 {
-		return usageError{fmt.Errorf("invalid -fanout %d (want 0 or more)", cfg.fanout)}
+		return 0, usageError{fmt.Errorf("invalid -fanout %d (want 0 or more)", cfg.fanout)}
 	}
 	if fs.NArg() != 1 {
-		return usageError{fmt.Errorf("expected exactly one Target argument, got %d", fs.NArg())}
+		return 0, usageError{fmt.Errorf("expected exactly one Target argument, got %d", fs.NArg())}
 	}
 	pos, err := span.Parse(fs.Arg(0), opts.Dir)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	prog, err := load.Load(ctx, load.Config{
 		Dir:        opts.Dir,
@@ -139,18 +165,25 @@ func run(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) error
 		TargetFile: pos.File,
 	})
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if cfg.debug["timing"] {
 		fmt.Fprintf(opts.Stderr, "timing: load=%s ssa=%s\n", prog.Timing.Load, prog.Timing.SSA)
 	}
 	tgt, err := target.Resolve(prog, pos)
 	if err != nil {
-		return err
+		return 0, err
+	}
+	membership := cfg.is != "" || cfg.as != ""
+	var subj mark.Subject
+	if membership {
+		if subj, err = resolveSubject(prog, cfg.is, cfg.as); err != nil {
+			return 0, usageError{err}
+		}
 	}
 	resolver, err := newResolver(ctx, prog, tgt, opts.Stderr, cfg.debug["timing"])
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if cfg.debug["target"] {
 		names := make([]string, len(tgt.Funcs))
@@ -160,14 +193,17 @@ func run(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) error
 		fmt.Fprintf(opts.Stderr, "target: %s %s funcs=[%s] span=%s\n",
 			tgt.Kind, tgt.Name, strings.Join(names, " "), tgt.Span)
 	}
+	if membership {
+		return runMembership(ctx, opts, cfg, prog, tgt, resolver, subj)
+	}
 	res, err := query.Run(ctx, prog, tgt, query.Options{ChainDepth: cfg.chainDepth, Resolver: resolver})
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if cfg.debug["summary"] {
 		fmt.Fprintf(opts.Stderr, "summary: functions=%d sccs=%d\n", res.Stats.Functions, res.Stats.SCCs)
 	}
-	return render.Text(opts.Stdout, render.Input{
+	return ExitOK, render.Text(opts.Stdout, render.Input{
 		TargetSpan: tgt.Span,
 		TargetName: tgt.Name,
 		Table:      res.Table,
@@ -231,6 +267,8 @@ func newFlagSet() (*flag.FlagSet, *config) {
 	fs.StringVar(&cfg.patterns, "p", "./...", "comma-separated package `patterns` to load")
 	fs.IntVar(&cfg.chainDepth, "chain-depth", query.DefaultChainDepth, "max Wrap Chain depth `N` before truncation")
 	fs.IntVar(&cfg.fanout, "fanout", DefaultFanout, "group entries under dynamic call sites with at least `N` Candidates (0 = never group)")
+	fs.StringVar(&cfg.is, "is", "", "Membership Query: is the Sentinel `pkgpath.Name` (such as io.EOF) in the Error Set?")
+	fs.StringVar(&cfg.as, "as", "", "Membership Query: is the Concrete Type `type` (such as '*io/fs.PathError') in the Error Set?")
 	fs.String("debug", "", "comma-separated `list` of "+strings.Join(debugModes, ",")+" (stderr only)")
 	return fs, cfg
 }
@@ -254,6 +292,17 @@ func parseDebug(value string) (map[string]bool, error) {
 }
 
 func printUsage(w io.Writer, fs *flag.FlagSet) {
+	membership := false
+	fs.Visit(func(f *flag.Flag) { membership = membership || membershipFlags[f.Name] })
+	defer func() {
+		if membership {
+			fmt.Fprintf(w, `
+With -is or -as, %[1]s answers a Membership Query: whether that error is in
+the Target's Error Set. The exit status is the Verdict:
+  0 yes | 1 no | 3 maybe | 2 error
+`, BinaryName)
+		}
+	}()
 	fmt.Fprintf(w, `usage: %[1]s [flags] <target>
 
 %[1]s reports the Error Set of a Target: every Error Origin that can reach
@@ -265,7 +314,7 @@ the Target's error result, with its Propagation Path.
 flags:
 `, BinaryName)
 	fs.VisitAll(func(f *flag.Flag) {
-		if hiddenFlags[f.Name] {
+		if hiddenFlags[f.Name] || (membershipFlags[f.Name] && !membership) {
 			return
 		}
 		name, usage := flag.UnquoteUsage(f)

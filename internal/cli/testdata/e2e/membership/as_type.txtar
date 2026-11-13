@@ -1,0 +1,31 @@
+A Concrete Type with -as, written with its full package path: yes.
+-- args --
+-as *example.com/fx.MyErr a.go:@f
+-- stdout --
+$WORK/a.go:11:12-13: *example.com/fx.MyErr in Error Set of example.com/fx.F: yes
+$WORK/a.go:13:10-19: concrete *example.com/fx.MyErr
+	path (origin → target):
+		$WORK/a.go:13:10-19: in example.com/fx.F
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+type MyErr struct{ code int }
+
+func (e *MyErr) Error() string { return "my" }
+
+type OtherErr struct{}
+
+func (OtherErr) Error() string { return "other" }
+
+func /*@f*/F(n int) error {
+	if n == 0 {
+		return &MyErr{n}
+	}
+	return OtherErr{}
+}

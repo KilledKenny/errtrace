@@ -1,0 +1,23 @@
+A Sentinel that is an alias of another (var ErrAlias = ErrX) is the same error: asking for the alias finds the entry of ErrX.
+-- args --
+-is example.com/fx.ErrAlias a.go:@f
+-- stdout --
+$WORK/a.go:8:12-13: example.com/fx.ErrAlias in Error Set of example.com/fx.F: yes
+$WORK/a.go:5:5-9: sentinel example.com/fx.ErrX
+	path (origin → target):
+		$WORK/a.go:8:31-35: in example.com/fx.F
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var ErrX = errors.New("x")
+var ErrAlias = ErrX
+
+func /*@f*/F() error { return ErrX }
