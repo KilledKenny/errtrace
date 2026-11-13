@@ -56,11 +56,14 @@ type funcGuards struct {
 	// nonNil are, per point asked for, the values that a check that
 	// holds there proves non-nil (see provesNonNil).
 	nonNil map[point][]ssa.Value
+	// asserts numbers the type assertions whose value was walked (see
+	// analyzer.typeAssert), each with the id of its guard.
+	asserts map[*ssa.TypeAssert]int
 }
 
 // newFuncGuards recognises the guards of fn's Ifs.
 func newFuncGuards(fn *ssa.Function, sents *Sentinels) *funcGuards {
-	gd := &funcGuards{conds: make(map[*ssa.BasicBlock][]condGuard), at: make(map[point][]guardUse), nonNil: make(map[point][]ssa.Value)}
+	gd := &funcGuards{conds: make(map[*ssa.BasicBlock][]condGuard), at: make(map[point][]guardUse), nonNil: make(map[point][]ssa.Value), asserts: make(map[*ssa.TypeAssert]int)}
 	n := 0
 	for _, b := range fn.Blocks {
 		if len(b.Instrs) == 0 {

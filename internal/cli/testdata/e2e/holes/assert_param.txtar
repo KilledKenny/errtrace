@@ -1,0 +1,67 @@
+A type assertion on a parameter stays pending in the summary and filters
+the argument of each caller: G passes io.EOF, an *E and a *T, and only the *T
+has a Timeout method.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:38:12-13: Error Set of example.com/fx.G: 1 entries
+$WORK/a.go:45:11-15: concrete *example.com/fx.T
+	path (origin → target):
+		$WORK/a.go:45:11-15: in example.com/fx.G
+		$WORK/a.go:35:9-12: in example.com/fx.f
+		$WORK/a.go:45:9-16: in example.com/fx.G, call to example.com/fx.f
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"io"
+)
+
+type E struct{}
+
+func (*E) Error() string { return "e" }
+
+type T struct{}
+
+func (*T) Error() string { return "t" }
+func (*T) Timeout() bool { return true }
+
+type timeout interface {
+	error
+	Timeout() bool
+}
+
+func source(n int) error {
+	switch n {
+	case 0:
+		return io.EOF
+	case 1:
+		return &E{}
+	case 2:
+		return &T{}
+	}
+	return errors.New("x")
+}
+
+func f(err error) error {
+	return err.(timeout)
+}
+
+func /*@g*/G(n int) error {
+	switch n {
+	case 0:
+		return f(io.EOF)
+	case 1:
+		return f(&E{})
+	}
+	return f(&T{})
+}
+
+func main() {
+	_ = G(0)
+}

@@ -277,8 +277,18 @@ func (a *analyzer) walk(v ssa.Value) {
 			a.call(call, v.Index)
 			return
 		}
+		if ta, ok := v.Tuple.(*ssa.TypeAssert); ok && v.Index == 0 {
+			// v, ok := x.(T): x where the assertion holds, else nil.
+			a.typeAssert(ta)
+			return
+		}
 		a.memory(v, extractDetail(v))
 		return
+	case *ssa.TypeAssert:
+		if !v.CommaOk {
+			a.typeAssert(v)
+			return
+		}
 	case *ssa.Parameter:
 		a.param(v)
 		return
@@ -296,6 +306,44 @@ func (a *analyzer) walk(v ssa.Value) {
 		return
 	}
 	a.memory(v, fmt.Sprintf("value of %s not modelled", ssaOp(v)))
+}
+
+// typeAssert follows the value of the type assertion ta, x.(T), to its
+// operand: the result is x where x's dynamic type is (or implements) T,
+// and otherwise nil (comma-ok) or a panic. The operand's values are walked
+// under a guard saying the assertion holds, which removes the Sentinels,
+// Concrete Types, Opaque Errors and Wraps whose dynamic type cannot be T
+// (see typeVerdict), keeps Unresolved values and those errtrace cannot
+// decide, and stays pending on symbolic values (Param, FreeVar, CallRef)
+// until a caller or a callee's summary gives their values. A case of a
+// type switch is such a comma-ok assertion; where its own If guard
+// already holds for the operand (see guardsAt) no second guard is added.
+func (a *analyzer) typeAssert(ta *ssa.TypeAssert) {
+	saved := a.guards
+	defer func() { a.guards = saved }()
+	held := false
+	if a.fn != nil && a.fn.Blocks != nil {
+		for _, u := range a.funcGuards().guardsAt(a.pt) {
+			held = held || (u.g.Kind == errset.GuardAssert && u.g.Site == any(ta) && u.g.Holds && u.raw == ta.X)
+		}
+	}
+	if !held && a.fn != nil && a.fn.Blocks != nil {
+		gd := a.funcGuards()
+		id, ok := gd.asserts[ta]
+		if !ok {
+			// Negative ids keep these guards apart from those of Ifs.
+			id = -1 - len(gd.asserts)
+			gd.asserts[ta] = id
+		}
+		u := guardUse{raw: ta.X, operand: stripConv(ta.X), id: id, g: errset.Guard{
+			Kind: errset.GuardAssert, Site: ta, Pos: ta.Pos(), Type: unalias(ta.AssertedType), Holds: true,
+		}}
+		i, found := slices.BinarySearchFunc(a.guards, u.id, func(x guardUse, id int) int { return x.id - id })
+		if !found {
+			a.guards = slices.Insert(slices.Clip(a.guards), i, u)
+		}
+	}
+	a.walk(ta.X)
 }
 
 // makeInterface classifies a conversion of a concrete value to an

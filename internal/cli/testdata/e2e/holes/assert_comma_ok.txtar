@@ -1,0 +1,63 @@
+The value of a comma-ok type assertion to an interface is its operand where
+the assertion holds: *E and io.EOF have no Timeout method and are removed; an
+Opaque Error, whose type errtrace does not model, is kept.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:34:12-13: Error Set of example.com/fx.F: 2 entries
+$WORK/a.go:29:10-14: concrete *example.com/fx.T
+	path (origin → target):
+		$WORK/a.go:29:10-14: in example.com/fx.source
+		$WORK/a.go:35:14-23: in example.com/fx.F, call to example.com/fx.source
+$WORK/a.go:31:9-24: opaque errors.New "x"
+	path (origin → target):
+		$WORK/a.go:31:9-24: in example.com/fx.source
+		$WORK/a.go:35:14-23: in example.com/fx.F, call to example.com/fx.source
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"io"
+)
+
+type E struct{}
+
+func (*E) Error() string { return "e" }
+
+type T struct{}
+
+func (*T) Error() string { return "t" }
+func (*T) Timeout() bool { return true }
+
+type timeout interface {
+	error
+	Timeout() bool
+}
+
+func source(n int) error {
+	switch n {
+	case 0:
+		return io.EOF
+	case 1:
+		return &E{}
+	case 2:
+		return &T{}
+	}
+	return errors.New("x")
+}
+
+func /*@f*/F(n int) error {
+	if t, ok := source(n).(timeout); ok {
+		return t
+	}
+	return nil
+}
+
+func main() {
+	_ = F(0)
+}
