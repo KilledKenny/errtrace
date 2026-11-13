@@ -1,0 +1,156 @@
+Marks across calls: tagged Marks, Candidates, closures, go and defer.
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrX = errors.New("x")
+var ErrY = errors.New("y")
+
+func wrap(err error) error { return fmt.Errorf("w: %w", err) }
+func id(err error) error   { return err }
+
+func CallerX() error { return wrap(ErrX) }
+func CallerY() error { return wrap(ErrY) }
+func Chain() error   { return id(id(wrap(ErrX))) }
+func ChainY() error  { return id(id(wrap(ErrY))) }
+
+func rec(n int, err error) error {
+	if n == 0 {
+		return err
+	}
+	return rec(n-1, err)
+}
+
+func RecX() error { return rec(3, ErrX) }
+func RecY() error { return rec(3, ErrY) }
+
+func even(n int, err error) error {
+	if n == 0 {
+		return err
+	}
+	return odd(n-1, err)
+}
+
+func odd(n int, err error) error {
+	if n == 0 {
+		return nil
+	}
+	return even(n-1, err)
+}
+
+func MutualX() error { return even(4, ErrX) }
+func MutualY() error { return even(4, ErrY) }
+
+func source() error { return ErrX }
+func Free() error   { return source() }
+
+func recSource(n int) error {
+	if n > 0 {
+		return recSource(n - 1)
+	}
+	return ErrX
+}
+
+func RecFree() error { return recSource(2) }
+
+type thrower interface{ Throw() error }
+
+type tx struct{}
+
+func (tx) Throw() error { return ErrX }
+
+type ty struct{}
+
+func (ty) Throw() error { return ErrY }
+
+func Iface(t thrower) error     { return t.Throw() }
+func IfaceY(t thrower) error    { return t.Throw() }
+func Unreached(t thrower) error { return t.Throw() }
+
+func apply(f func() error) error  { return f() }
+func apply2(f func() error) error { return f() }
+
+func Callback() error  { return apply(func() error { return ErrX }) }
+func CallbackY() error { return apply2(func() error { return ErrY }) }
+
+type me struct{ inner error }
+
+func (m *me) Get() error { return m.inner }
+
+func Method() error {
+	m := &me{ErrX}
+	return m.Get()
+}
+
+func Go() error {
+	c := make(chan error, 1)
+	go func(e error) { c <- e }(ErrX)
+	return <-c
+}
+
+func setErr(p *error, e error) { *p = e }
+
+func Defer() (err error) {
+	defer setErr(&err, ErrX)
+	return nil
+}
+
+func DeferClosure() (err error) {
+	defer func() { err = wrap(ErrX) }()
+	return nil
+}
+
+var errorf = fmt.Errorf
+
+func DynErrorf() error { return errorf("a: %w", ErrX) }
+
+func multi() (int, error) { return 0, ErrX }
+
+func Multi() (string, error) {
+	_, err := multi()
+	return "", err
+}
+
+func second(a, b error) error { return b }
+
+func SecondY() error { return second(ErrX, ErrY) }
+func SecondX() error { return second(ErrY, ErrX) }
+
+func bound() error {
+	f := tx{}.Throw
+	return f()
+}
+
+func main() {
+	CallerX()
+	CallerY()
+	Chain()
+	ChainY()
+	RecX()
+	RecY()
+	MutualX()
+	MutualY()
+	Free()
+	RecFree()
+	Iface(tx{})
+	IfaceY(ty{})
+	Callback()
+	CallbackY()
+	Method()
+	Go()
+	Defer()
+	DeferClosure()
+	DynErrorf()
+	Multi()
+	SecondY()
+	SecondX()
+	bound()
+}

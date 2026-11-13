@@ -34,6 +34,8 @@ type VTA struct {
 	roots     []*ssa.Function
 	reachable map[*ssa.Function]bool
 	callees   map[ssa.CallInstruction][]*ssa.Function
+	// extended reports that WithRoots added roots (see WholeProgram).
+	extended bool
 	// Timing is how long building the Resolver took, by phase.
 	Timing VTATiming
 }
@@ -57,7 +59,7 @@ func NewVTA(ctx context.Context, prog *ssa.Program, roots []*ssa.Function) (*VTA
 // WithRoots returns the VTA Resolver of the same program from v's roots
 // plus extra, reusing v's CHA call graph.
 func (v *VTA) WithRoots(ctx context.Context, extra []*ssa.Function) (*VTA, error) {
-	w := &VTA{prog: v.prog, cha: v.cha, Timing: VTATiming{CHA: v.Timing.CHA}}
+	w := &VTA{prog: v.prog, cha: v.cha, extended: v.extended || len(extra) > 0, Timing: VTATiming{CHA: v.Timing.CHA}}
 	roots := append(v.roots[:len(v.roots):len(v.roots)], extra...)
 	if err := w.build(ctx, roots); err != nil {
 		return nil, err
