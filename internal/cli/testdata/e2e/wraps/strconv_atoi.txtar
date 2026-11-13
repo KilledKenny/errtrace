@@ -2,39 +2,148 @@ Stdlib oracle (go-errorlint's table lists strconv.ErrSyntax and strconv.ErrRange
 -- args --
 a.go:@f
 -- stdout --
-$WORK/a.go:5:12-13: Error Set of example.com/fx.F: 4 entries
-$GOROOT/src/strconv/atoi.go:*: sentinel strconv.ErrRange
+$WORK/a.go:5:12-13: Error Set of example.com/fx.F: 17 entries
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrRange
 	wrap chain (origin → target):
-		$GOROOT/src/strconv/atoi.go:*: *strconv.NumError.Unwrap
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
 	path (origin → target):
-		$GOROOT/src/strconv/atoi.go:*: in strconv.rangeError
-		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseInt, call to strconv.rangeError
-		$GOROOT/src/strconv/atoi.go:*: in strconv.Atoi, call to strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.rangeError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.rangeError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
 		$WORK/a.go:5:46-61: in example.com/fx.F, call to strconv.Atoi
-$GOROOT/src/strconv/atoi.go:*: sentinel strconv.ErrSyntax
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrSyntax
 	wrap chain (origin → target):
-		$GOROOT/src/strconv/atoi.go:*: *strconv.NumError.Unwrap
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
 	path (origin → target):
-		$GOROOT/src/strconv/atoi.go:*: in strconv.syntaxError
-		$GOROOT/src/strconv/atoi.go:*: in strconv.Atoi, call to strconv.syntaxError
+		$GOROOT/src/strconv/number.go:*: in strconv.syntaxError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.syntaxError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
 		$WORK/a.go:5:46-61: in example.com/fx.F, call to strconv.Atoi
-$GOROOT/src/strconv/atoi.go:*: opaque errors.New
-	wrap chain (origin → target):
-		$GOROOT/src/strconv/atoi.go:*: *strconv.NumError.Unwrap
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
 	path (origin → target):
-		$GOROOT/src/strconv/atoi.go:*: in strconv.baseError
-		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseUint, call to strconv.baseError
-		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseInt, call to strconv.ParseUint
-		$GOROOT/src/strconv/atoi.go:*: in strconv.Atoi, call to strconv.ParseInt
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
 		$WORK/a.go:5:46-61: in example.com/fx.F, call to strconv.Atoi
-$GOROOT/src/strconv/atoi.go:*: opaque errors.New
-	wrap chain (origin → target):
-		$GOROOT/src/strconv/atoi.go:*: *strconv.NumError.Unwrap
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
 	path (origin → target):
-		$GOROOT/src/strconv/atoi.go:*: in strconv.bitSizeError
-		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseUint, call to strconv.bitSizeError
-		$GOROOT/src/strconv/atoi.go:*: in strconv.ParseInt, call to strconv.ParseUint
-		$GOROOT/src/strconv/atoi.go:*: in strconv.Atoi, call to strconv.ParseInt
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/a.go:5:46-61: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/a.go:5:46-61: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/a.go:5:46-61: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/a.go:5:46-61: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/a.go:5:46-61: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/a.go:5:46-61: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/a.go:5:46-61: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/a.go:5:46-61: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/a.go:5:46-61: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/a.go:5:46-61: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/a.go:5:46-61: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/a.go:5:46-61: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/strconv/number.go:*: opaque errors.New
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.baseError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.baseError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/a.go:5:46-61: in example.com/fx.F, call to strconv.Atoi
+$GOROOT/src/strconv/number.go:*: opaque errors.New
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.bitSizeError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.bitSizeError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
 		$WORK/a.go:5:46-61: in example.com/fx.F, call to strconv.Atoi
 -- stderr --
 errtrace: warning: target not reachable from main/init; parameters may lack candidates
