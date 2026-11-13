@@ -1,6 +1,8 @@
 // Package render prints an Error Set: the text form (gopls-style span lines,
 // each followed by an indented tree with the Wrap Chain and the Propagation
-// Path).
+// Path). It also prints the Verdict of a Membership Query, with the entries
+// that are the error asked about or the Carriers it could come through (see
+// Membership).
 package render
 
 import (

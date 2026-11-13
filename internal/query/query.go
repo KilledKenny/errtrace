@@ -5,6 +5,12 @@
 // The Target functions' summaries follow static calls across functions,
 // packages and the stdlib. A call-site Target's set is what the call's
 // callees can return, with the site's arguments substituted.
+//
+// Membership answers a Membership Query: whether one Sentinel or Concrete
+// Type is in the Target's Error Set. It combines the Error Set (a lower
+// bound: what it holds has a Propagation Path as witness) with the upward
+// pass of package mark (an upper bound: what it does not mark cannot hold
+// the error) into a Verdict.
 package query
 
 import (

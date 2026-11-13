@@ -1,5 +1,6 @@
 // Package cli is the command-line front end: it parses flags and the Target
-// argument, applies the exit-code conventions and runs a Query.
+// argument, applies the exit-code conventions and runs a Query. With -is or
+// -as it runs a Membership Query instead, and the exit code is its Verdict.
 package cli
 
 import (

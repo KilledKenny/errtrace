@@ -407,6 +407,39 @@ flags:
   errors also print the usage text. `-h` prints usage to stdout and exits 0.
   stdout carries only the result.
 
+### Membership Queries (upward pass)
+
+Added by [plan-upward-pass.md](./plan-upward-pass.md).
+
+```
+errtrace -is <pkgpath>.<Name> <target>     # is the Sentinel in the Error Set?   -is io.EOF
+errtrace -as '<type>' <target>             # is the Concrete Type?               -as '*io/fs.PathError'
+```
+
+- `-is` and `-as` are mutually exclusive. Without either, behaviour and output
+  are unchanged, the usage text included: it lists the two flags and the exit
+  codes below only when one of them is on the command line.
+- The type of `-as` is written with the full package path; an alias names the
+  type it stands for (`*os.PathError` is `*io/fs.PathError`). It must be a
+  Concrete Type: not an interface, not generic, and implementing `error`.
+- X not found in the loaded program: a usage error, exit `2`.
+- Exit codes: `0` yes, `1` no, `3` maybe, `2` errors.
+- The Verdict combines the downward Query (`query.Run`, a lower bound) with the
+  upward pass (`internal/mark`, an upper bound): an entry that is X gives yes
+  (maybe, if every such entry is possibly handled); else, if the upward pass
+  does not mark the Target's error result, no; else maybe with the Unresolved
+  entries that are Carriers, or no if none is. For a Target that is not
+  reachable from main/init that last no is a maybe with 0 Carriers, because
+  the Candidates of the downward Query may be incomplete there.
+- Output (`render.Membership`): `<target-span>: <X> in Error Set of <target>:
+  yes | no | maybe: <K> of <N> unresolved could carry it | maybe: possibly
+  handled`, then the matching entries or the Carriers, each Carrier with a
+  `marked via (origin of <X> → here):` section. `-fanout` does not apply.
+- `-debug=timing` adds `timing: mark=<d>`; `-debug=summary` adds the counts of
+  the upward pass.
+
+---
+
 ## Output contract
 
 ### Text

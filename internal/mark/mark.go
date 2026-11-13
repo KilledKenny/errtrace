@@ -38,7 +38,18 @@
 // Free. The callees of a call come from the Callees given to Run.
 //
 // The world is closed: only the functions of the loaded program run, and a
-// parameter holds X only if some call in the program passes it.
+// parameter holds X only if some call in the program passes it. A dynamic
+// call that no function of the program matches calls nil and has no
+// result.
+//
+// # Intrinsics
+//
+// Static calls of fmt.Errorf, errors.Join, errors.New and errtrace.Wrap are
+// modelled (flow.Intrinsic) and their bodies are not scanned, so that
+// fmt.Errorf("%v", err) does not mark anything. A dynamic call that may
+// reach fmt.Errorf or errors.Join is marked when the memory of its operand
+// type is. When the Subject is a type of package errors, fmt or errtrace,
+// nothing is modelled and the bodies are followed.
 //
 // # Known limits
 //
@@ -47,15 +58,23 @@
 //     contents of sync/atomic.Value and atomic.Pointer, a value passed to
 //     reflect.ValueOf (it marks every result of reflect.Value.Interface),
 //     and a function without a body (its results are marked when an
-//     argument is).
+//     argument is; what it reads from memory, as the target of a
+//     //go:linkname does, is not seen). An address converted to
+//     unsafe.Pointer is not followed.
 //   - A type with a custom Is or As method can match X without holding it.
+//     Such a type counts as a wrapper only if it holds a marked value in a
+//     field, or in a slice, array, map, channel or pointer field.
 //   - Guards are ignored upward by design; the downward pass decides them.
 //   - Type-keyed locations are coarse: expect a false "maybe", never a
 //     false "no".
 //   - A value stored into the Sentinel's variable by the program is followed
 //     forward from the store only, not back to its other copies.
+//   - A value converted to another named type and back is followed only as
+//     far as its Mark goes: a type assertion to a type that is neither the
+//     Subject's nor a possible wrapper drops it.
 //   - The bodies of generic functions are not scanned, only their
 //     instances.
+//   - Callers outside the loaded program are not considered.
 package mark
 
 import (
