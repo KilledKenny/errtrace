@@ -78,8 +78,9 @@ type MembershipInput struct {
 // Carriers whose traces pass the same pivot (the first step from which the
 // Mark is on a whole type or on shared memory, such as "value of type T,
 // which may wrap X" or "loaded from field f of T") are printed together,
-// after the others, smallest group first, unless Full is set: the trace up
-// to the pivot once, then one line per entry.
+// after the others, smallest group first, unless Full is set: the steps
+// that all their traces start with once (at least those up to the pivot),
+// then one line per entry.
 //
 //	<pivot-span>: group of <M> entries via: <pivot step description>
 //		marked via (origin of <X> → here):
@@ -138,7 +139,7 @@ func Membership(w io.Writer, in MembershipInput) error {
 			pivot := first.Trace[g.pivot]
 			fmt.Fprintf(&b, "%s: group of %d entries via: %s\n", in.locate(pivot.Site), len(g.members), pivot.Desc)
 			fmt.Fprintf(&b, "\tmarked via (origin of %s → here):\n", in.Subject)
-			in.steps(&b, first.Trace[:g.pivot+1])
+			in.steps(&b, first.Trace[:in.shared(g)])
 			for _, i := range g.members {
 				e := in.Carriers[i].Entry
 				fmt.Fprintf(&b, "\t%s: %s\n", in.locate(in.Table.Get(e.Leaf).Site), Label(in.Table, e.Leaf))
@@ -159,6 +160,22 @@ func (in MembershipInput) steps(b *strings.Builder, trace []TraceStep) {
 	for _, s := range trace {
 		fmt.Fprintf(b, "\t\t%s: %s\n", in.locate(s.Site), s.Desc)
 	}
+}
+
+// shared returns the number of steps that the traces of all the Carriers
+// of g start with: at least those up to the pivot.
+func (in MembershipInput) shared(g pivotGroup) int {
+	first := in.Carriers[g.members[0]].Trace
+	n := len(first)
+	for _, i := range g.members[1:] {
+		t := in.Carriers[i].Trace
+		k := 0
+		for k < n && k < len(t) && t[k].Desc == first[k].Desc && in.locate(t[k].Site) == in.locate(first[k].Site) {
+			k++
+		}
+		n = k
+	}
+	return max(n, g.pivot+1)
 }
 
 // pivotGroup is the Carriers whose traces pass the same pivot.
