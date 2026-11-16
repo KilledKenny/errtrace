@@ -1,0 +1,9 @@
+Negative: the position is on the explicit type argument of validate.Check[validate.Name](n), inside the callee expression
+but neither on the callee name nor on "(". Expect exit 2, no function declaration or call at position.
+-- args --
+validation.go:@typearg
+-- stdout --
+-- stderr --
+errtrace: $WORK/validation.go:12:49: no function declaration or call at position
+-- exit --
+2

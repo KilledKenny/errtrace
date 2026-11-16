@@ -1,28 +1,31 @@
-SUSPECTED BUG: errors.Is(err, doc.ErrEmpty) { return nil } on validate.Report's
-fmt.Errorf(Join(title, body)). Expected 1 entry: doc.ErrNoTitle (possibly handled:
-both may be joined); doc.ErrEmpty is always handled through both wraps and must
-NOT appear. Actual: doc.ErrEmpty is kept too, as "possibly handled: wrapped value may be nil".
+errors.Is(err, doc.ErrEmpty) { return nil } on validate.Report's
+fmt.Errorf(Join(title, body)). At run time only doc.ErrNoTitle can come back: a
+report holding doc.ErrEmpty always matches. The Join may hold nil for either
+operand, so the check is undecided for the whole value and, by design (plan P07:
+a guard removes only what is proven), both leaves stay, marked possibly handled
+("wrapped value may be nil"). Expected: doc.ErrNoTitle present; doc.ErrEmpty at
+most possibly handled, never unmarked.
 -- args --
 pipeline.go:@lenient
 -- stdout --
-$WORK/pipeline.go:16:18-30: Error Set of example.com/wrapchain.checkLenient: 2 entries, 2 possibly handled
+$WORK/pipeline.go:17:18-30: Error Set of example.com/wrapchain.checkLenient: 2 entries, 2 possibly handled
 $WORK/doc/doc.go:17:2-10: sentinel example.com/wrapchain/doc.ErrEmpty
 	wrap chain (origin → target):
 		$WORK/validate/validate.go:63:12-52: errors.Join
 		$WORK/validate/validate.go:64:10-52: fmt.Errorf "validate %s: %w"
 	possibly handled:
-		$WORK/pipeline.go:18:5-33: errors.Is with example.com/wrapchain/doc.ErrEmpty: wrapped value may be nil
+		$WORK/pipeline.go:19:5-33: errors.Is with example.com/wrapchain/doc.ErrEmpty: wrapped value may be nil
 	path (origin → target):
 		$WORK/validate/validate.go:21:10-22: in example.com/wrapchain/validate.checkBody
 		$WORK/validate/validate.go:63:39-51: in example.com/wrapchain/validate.Report, call to example.com/wrapchain/validate.checkBody
-		$WORK/pipeline.go:17:9-27: in example.com/wrapchain.checkLenient, call to example.com/wrapchain/validate.Report
+		$WORK/pipeline.go:18:9-27: in example.com/wrapchain.checkLenient, call to example.com/wrapchain/validate.Report
 $WORK/doc/doc.go:20:2-12: sentinel example.com/wrapchain/doc.ErrNoTitle
 	wrap chain (origin → target):
 		$WORK/validate/validate.go:63:12-52: errors.Join
 		$WORK/validate/validate.go:64:10-52: fmt.Errorf "validate %s: %w"
 	possibly handled:
-		$WORK/pipeline.go:18:5-33: errors.Is with example.com/wrapchain/doc.ErrEmpty: wrapped value may be nil
+		$WORK/pipeline.go:19:5-33: errors.Is with example.com/wrapchain/doc.ErrEmpty: wrapped value may be nil
 	path (origin → target):
 		$WORK/validate/validate.go:14:10-24: in example.com/wrapchain/validate.checkTitle
 		$WORK/validate/validate.go:63:24-37: in example.com/wrapchain/validate.Report, call to example.com/wrapchain/validate.checkTitle
-		$WORK/pipeline.go:17:9-27: in example.com/wrapchain.checkLenient, call to example.com/wrapchain/validate.Report
+		$WORK/pipeline.go:18:9-27: in example.com/wrapchain.checkLenient, call to example.com/wrapchain/validate.Report

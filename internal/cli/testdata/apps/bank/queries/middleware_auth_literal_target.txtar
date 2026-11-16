@@ -1,6 +1,7 @@
 Target on a function literal (the handler returned by Auth), not a declaration or call.
-Expect either the closure's Error Set (ErrUnauthorized + next's) or a clean exit-2 "no function declaration or call
-at position" message; never a crash.
+Expect the closure's Error Set (sentinel ErrUnauthorized + whatever next can return) or a clean exit-2 message;
+never a crash. next is a free variable bound from a parameter of a dynamically called closure, so its Candidates
+are all Handler values and the set is the over-approximated, fixpoint-limited one of api_serve_decl.
 -- args --
 -fanout=2 middleware/middleware.go:@auth_fn
 -- stdout --
@@ -177,8 +178,8 @@ $WORK/middleware/middleware.go:41:11-25: group of 207 entries via dynamic call t
 	$WORK/repo/filerepo/filerepo.go:46:15-78: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate (*example.com/bank/api.Server).handleBalance)
 	$WORK/repo/filerepo/filerepo.go:46:15-78: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate (*example.com/bank/api.Server).handleBalance)
 	$WORK/repo/filerepo/filerepo.go:46:15-78: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate (*example.com/bank/api.Server).handleTransfer)
-	$WORK/repo/memory/memory.go:76:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate (*example.com/bank/api.Server).handleBalance)
-	$WORK/repo/memory/memory.go:76:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate (*example.com/bank/api.Server).handleBalance)
+	$WORK/repo/memory/memory.go:88:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate (*example.com/bank/api.Server).handleBalance)
+	$WORK/repo/memory/memory.go:88:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate (*example.com/bank/api.Server).handleBalance)
 	$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type" (candidate (*example.com/bank/api.Server).handleTransfer)
 	$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type" (candidate (*example.com/bank/api.Server).handleBalance)
 	$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type" (candidate (*example.com/bank/api.Server).handleBalance)
@@ -210,12 +211,12 @@ $WORK/middleware/middleware.go:41:11-25: group of 207 entries via dynamic call t
 	$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e (candidate (*example.com/bank/api.Server).handleBalance)
 	$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e (candidate (*example.com/bank/api.Server).handleBalance)
 	$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e (candidate (*example.com/bank/api.Server).handleTransfer)
-	$WORK/tx/tx.go:24:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/api.Server).handleBalance)
-	$WORK/tx/tx.go:24:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/api.Server).handleBalance)
-	$WORK/tx/tx.go:24:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/api.Server).handleTransfer)
-	$WORK/tx/tx.go:38:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/api.Server).handleBalance)
-	$WORK/tx/tx.go:38:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/api.Server).handleBalance)
-	$WORK/tx/tx.go:38:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/api.Server).handleTransfer)
-	$WORK/tx/tx.go:40:2-2: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/api.Server).handleBalance)
-	$WORK/tx/tx.go:40:2-2: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/api.Server).handleBalance)
-	$WORK/tx/tx.go:40:2-2: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/api.Server).handleTransfer)
+	$WORK/tx/tx.go:25:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/api.Server).handleBalance)
+	$WORK/tx/tx.go:25:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/api.Server).handleBalance)
+	$WORK/tx/tx.go:25:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/api.Server).handleTransfer)
+	$WORK/tx/tx.go:39:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/api.Server).handleBalance)
+	$WORK/tx/tx.go:39:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/api.Server).handleBalance)
+	$WORK/tx/tx.go:39:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/api.Server).handleTransfer)
+	$WORK/tx/tx.go:41:2-2: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/api.Server).handleBalance)
+	$WORK/tx/tx.go:41:2-2: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/api.Server).handleBalance)
+	$WORK/tx/tx.go:41:2-2: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/api.Server).handleTransfer)

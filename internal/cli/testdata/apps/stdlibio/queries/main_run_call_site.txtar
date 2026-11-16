@@ -2813,7 +2813,7 @@ $WORK/records/records.go:24:44-49: unresolved(memory): load of field Err of *exa
 		$WORK/main.go:54:14-31: in example.com/stdlibio.settings, call to example.com/stdlibio/config.Load
 		$WORK/main.go:34:31-48: in example.com/stdlibio.run, call to example.com/stdlibio.settings
 		$WORK/main.go:24:24-40: in example.com/stdlibio.main, call to example.com/stdlibio.run
-$WORK/main.go:188:27-34: group of 13 entries via dynamic call to function value of type func() error (12 candidates) in example.com/stdlibio.diagnostics
+$WORK/main.go:191:27-34: group of 13 entries via dynamic call to function value of type func() error (12 candidates) in example.com/stdlibio.diagnostics
 	$WORK/murky/murky.go:27:5-12: sentinel example.com/stdlibio/murky.lastErr (candidate example.com/stdlibio/murky.Last)
 	-: unresolved(memory): load of escaping variable err (candidate example.com/stdlibio.diagnostics$3)
 	$WORK/murky/murky.go:41:9-15: unresolved(memory): channel receive (candidate example.com/stdlibio/murky.FromChannel)

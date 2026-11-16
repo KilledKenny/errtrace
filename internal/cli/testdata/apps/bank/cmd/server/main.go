@@ -102,6 +102,18 @@ func /*@serve*/serve(ctx context.Context, srv *api.Server, in io.Reader, out io.
 			}
 			continue
 		}
+		if path == "validate" {
+			if err := /*@respond_validate_call*/respond(out, srv.Validate([]byte(rest))); err != nil {
+				return err
+			}
+			continue
+		}
+		if path == "import" {
+			if err := /*@respond_import_call*/respond(out, srv.Import(ctx, []byte(rest))); err != nil {
+				return err
+			}
+			continue
+		}
 		req := middleware.Request{Path: path, Token: token, Body: []byte(body)}
 		if err := /*@respond_call*/respond(out, srv./*@srv_serve_call*/Serve(ctx, req)); err != nil {
 			return err

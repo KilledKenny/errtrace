@@ -25,7 +25,7 @@ import (
 )
 
 var (
-	errUsage  = errors.New("usage: cli transfer|preview|explain FROM TO AMOUNT [TIME] | batch FROM:TO:AMOUNT... | balance ID | owner ID | settled N | freeze ID | check FROM AMOUNT")
+	errUsage  = errors.New("usage: cli transfer|preview|explain FROM TO AMOUNT [TIME] | batch FROM:TO:AMOUNT... | balance ID | owner ID | settled N | freeze ID | check FROM AMOUNT | ping STORE")
 	errDryRun = errors.New("cli: dry run, nothing was moved")
 )
 
@@ -49,6 +49,7 @@ func main() {
 }
 
 type app struct {
+	store *memory.Store
 	svc   *service.Service
 	bus   *events.Bus
 	trail *bytes.Buffer
@@ -74,7 +75,7 @@ func newApp(dry bool) *app {
 		return nil
 	})
 	trail := new(bytes.Buffer)
-	return &app{svc: service.New(store, eng, bus, audit.New(&audit.Quota{W: trail, Left: 1 << 16}), 3), bus: bus, trail: trail}
+	return &app{store: store, svc: service.New(store, eng, bus, audit.New(&audit.Quota{W: trail, Left: 1 << 16}), 3), bus: bus, trail: trail}
 }
 
 func /*@run*/run(ctx context.Context, args []string, out io.Writer) error {
@@ -83,6 +84,7 @@ func /*@run*/run(ctx context.Context, args []string, out io.Writer) error {
 	}
 	a := newApp(os.Getenv("BANK_DRY_RUN") != "")
 	defer io.Copy(out, a.trail)
+	defer a.store.Close()
 	switch cmd, rest := args[0], args[1:]; cmd {
 	case "transfer":
 		t, err := parse./*@line_call*/Line(1, rest)
@@ -118,6 +120,8 @@ func /*@run*/run(ctx context.Context, args []string, out io.Writer) error {
 		return a.svc./*@setstatus_call*/SetStatus(ctx, domain.AccountID(rest[0]), domain.Frozen)
 	case "check":
 		return /*@check_call*/check(ctx, a.svc, rest)
+	case "ping":
+		return a.svc./*@ready_call*/Ready()
 	case "replay":
 		return a.bus./*@first_call*/PublishFirst(events.Event{Kind: "transfer.done"})
 	}

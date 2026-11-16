@@ -1,7 +1,8 @@
-Two calls of deliver in one function, with an Email value and a *SMS of
-concrete type. Expected under Go semantics: ErrEmail and ErrSMS only.
-Actual today: also ErrPager and ErrQueue, because the Candidates of
-deliver's parameter are not narrowed per caller (see ops_call).
+SUSPECTED BUG (precision; plan step S09 not built yet, see ops_call): two
+calls of deliver in one function, with an Email value and a *SMS of
+concrete type, so both arguments have a complete local type set. Expected:
+ErrEmail and ErrSMS only. Actual: also ErrPager and ErrQueue, the
+Candidates other callers give deliver's parameter ("4 of 4 candidates").
 -- args --
 dispatch/dispatch.go:@alertuser
 -- stdout --

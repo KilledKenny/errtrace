@@ -1,7 +1,7 @@
 Translation function queried alone: every branch builds a fresh *api.Error or returns the sentinel
-ErrUnavailable; only the ErrDuplicate branch keeps err as Cause (custom Unwrap on a field).
+ErrUnavailable; only the ErrDuplicate branch keeps err as Cause (custom Unwrap over a field).
 Expect concrete *api.Error for 400/404/402/500, sentinel api.ErrUnavailable, and one
-unresolved(depends-on-caller) for parameter err behind (*api.Error).Unwrap.
+unresolved(depends-on-caller) for parameter err behind (*api.Error).Unwrap; nothing else.
 -- args --
 api/api.go:@translate
 -- stdout --

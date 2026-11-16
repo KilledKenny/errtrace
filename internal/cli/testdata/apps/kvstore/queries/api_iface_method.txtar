@@ -1,0 +1,9 @@
+Negative: the Target is a method declared in an interface type (no body, not a call).
+Expect: exit 2 with a diagnostic that points the user to a call site; never '0 entries'.
+-- args --
+api/api.go:@iface_get
+-- stdout --
+-- stderr --
+errtrace: $WORK/api/api.go:15:16: interface method has no body; query a call site
+-- exit --
+2

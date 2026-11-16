@@ -1,4 +1,4 @@
-Errors dropped in a loop: both time.Parse errors are discarded (err == nil check only).
+Errors dropped in a loop: both time.Parse errors are discarded (err == nil check only), then a fresh error.
 Expect exactly 1 entry: concrete *domain.ValidationError; nothing from package time.
 -- args --
 parse/parse.go:@date

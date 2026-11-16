@@ -3,6 +3,7 @@ package memory
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -11,6 +12,9 @@ import (
 	"example.com/bank/retry"
 )
 
+// ErrClosed is returned by Begin after Close.
+var ErrClosed = errors.New("memory: store closed")
+
 // Store keeps everything in maps.
 type Store struct {
 	mu       sync.Mutex
@@ -18,6 +22,14 @@ type Store struct {
 	seen     map[domain.TransferID]bool
 	// Contention makes the next Begin calls time out, to exercise retries.
 	Contention int
+	closed     bool
+}
+
+// Close makes every later Begin fail with ErrClosed.
+func (s *Store) Close() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.closed = true
 }
 
 // New returns a store holding the given accounts.
@@ -81,6 +93,9 @@ func /*@lookup*/lookup[K comparable, V any](m map[K]V, kind string, id K) (V, er
 func (s *Store) /*@begin*/Begin() (repo.Tx, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.closed {
+		return nil, ErrClosed
+	}
 	if s.Contention > 0 {
 		s.Contention--
 		return nil, &retry.TimeoutError{Op: "memory: begin"}

@@ -1,0 +1,9 @@
+Literal position 49:16 in store.go: "be" in s.be.Read(key), i.e. the Sel of the inner selector s.be, which is the X of the called selector.
+Negative: "be" is a field, not the callee name: exit 2, no target (the enclosing s.be.Read call must not be picked). Contrast call_interface_method (position on Read).
+-- args --
+internal/store/store.go:49:16
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/store/store.go:49:16: no function declaration or call at position
+-- exit --
+2

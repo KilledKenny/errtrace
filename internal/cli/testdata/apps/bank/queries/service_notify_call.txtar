@@ -1,0 +1,7 @@
+Negative at a call site: s.bus.Notify(...) at the end of Service.Transfer. Notify logs the joined handler errors
+(3 dynamic Candidates) and returns nil.
+Expect 0 entries.
+-- args --
+service/service.go:@notify_call
+-- stdout --
+$WORK/service/service.go:52:9-87: Error Set of call to s.bus.Notify in (*example.com/bank/service.Service).Transfer: 0 entries

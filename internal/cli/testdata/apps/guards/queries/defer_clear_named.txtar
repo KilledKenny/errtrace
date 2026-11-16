@@ -1,8 +1,10 @@
-SUSPECTED BUG: deferred guards on a named result are not modelled (plan S08) and the direct origins are lost.
+SUSPECTED BUG: a deferred closure guarding a named result gives only unresolved entries, one without a position.
 defer func() { if errors.Is(err, ErrDeclined) { err = nil } }(); return gateway.Charge(n).
-Expected 4 entries: ErrTimeout, *CodeError, ValidationError, opaque; ErrDeclined removed.
+Expected (plan S08): 4 entries: ErrTimeout, *CodeError, ValidationError, opaque; ErrDeclined removed.
 Actual: only 2 unresolved(memory) "load of escaping variable err" entries, none of gateway.Charge's origins,
 and one of the entries has no position at all ("-:" as entry span and hop span), the other a zero-width span.
+The unresolved entries are sound (S08, deferred changes to named results, is not implemented yet: the tool
+stops at S07); the entry without a position is a defect in any case.
 -- args --
 processor/flow.go:@deferClear
 -- stdout --

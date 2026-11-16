@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"example.com/guards/payerr"
 	"example.com/guards/processor"
 	"example.com/guards/runner"
 )
@@ -88,6 +89,16 @@ func main() {
 		r.RunUntilSettled(),
 		r.RunLast(),
 		r.RunTimeoutsOnly("job-2"),
+
+		processor.ChargeAsWrongTarget(n),
+		processor.LookupIsTarget(n, payerr.ErrRateLimited),
+		processor.LookupIsFlag(n),
+		processor.LookupIsAlias(n),
+		processor.PrecheckOnlyTypedNil(n),
+		processor.PrecheckInlineOnlyTypedNil(n),
+		processor.VoidDescribe(n),
+		processor.ChargeClosureGuard(n),
+		processor.ChargeIfVoidDeclined(n),
 	}
 	failed := 0
 	for i, err := range steps {

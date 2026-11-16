@@ -1,0 +1,9 @@
+File name followed by a bare colon, no line at all.
+Negative: exit 2, invalid position "missing start position" (not silently read as the file-only form of pos_file_only); no usage text.
+-- args --
+internal/platform/platform.go:
+-- stdout --
+-- stderr --
+errtrace: invalid position "internal/platform/platform.go:": missing start position
+-- exit --
+2

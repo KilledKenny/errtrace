@@ -4,4 +4,4 @@ Expected 0 entries (doc.ErrSyntax must go too: it shares the wrap with the NumEr
 -- args --
 pipeline.go:@fieldzero
 -- stdout --
-$WORK/pipeline.go:63:20-31: Error Set of example.com/wrapchain.fieldOrZero: 0 entries
+$WORK/pipeline.go:64:20-31: Error Set of example.com/wrapchain.fieldOrZero: 0 entries

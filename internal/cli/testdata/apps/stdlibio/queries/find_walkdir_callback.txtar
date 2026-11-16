@@ -1,7 +1,9 @@
 Find returns filepath.WalkDir's result; the callback returns its err argument,
-fs.SkipDir or walk.ErrTooMany. Expected: sentinel walk.ErrTooMany through the dynamic
-call of the callback inside filepath, plus WalkDir's own os.Lstat/ReadDir errors
-(some marked possibly handled by WalkDir's SkipDir/SkipAll comparisons).
+fs.SkipDir or walk.ErrTooMany. WalkDir itself only returns what the callback returns:
+it hands the os.Lstat / os.ReadDir failures to the callback, which passes them on.
+Expected: sentinel walk.ErrTooMany through the dynamic call of the callback inside
+filepath, plus the Lstat/ReadDir origins through the callback's "return err" (the
+Unresolved ones marked possibly handled by WalkDir's SkipDir/SkipAll comparisons).
 fs.SkipDir and fs.SkipAll must NOT appear: WalkDir turns them into nil.
 -- args --
 walk/walk.go:@find

@@ -1,0 +1,10 @@
+Declaration Target on the `func` keyword of a function literal (the callback passed to Engine.Scan).
+Expect: the closure's own Error Set, 1 entry sentinel repo.ErrTooMany without a wrap chain (the "scan %q: %w" wrap is added by the caller of the closure);
+the Target is named (*repo.Repo).Keys$1.
+-- args --
+repo/repo.go:@closure
+-- stdout --
+$WORK/repo/repo.go:119:69-73: Error Set of (*example.com/kvstore/repo.Repo).Keys$1: 1 entries
+$WORK/repo/repo.go:16:5-15: sentinel example.com/kvstore/repo.ErrTooMany
+	path (origin → target):
+		$WORK/repo/repo.go:121:11-21: in (*example.com/kvstore/repo.Repo).Keys$1

@@ -1,13 +1,14 @@
-Declaration of respond: its err parameter is unknown.
-Expect 1 entry: unresolved(depends-on-caller) parameter err behind "server: unhandled: %w".
+Declaration of respond: its err parameter is unknown; errors.As(err, &*api.Error) guards the wrap.
+Expect 1 entry: unresolved(depends-on-caller) parameter err behind "server: unhandled: %w", possibly handled by
+the errors.As guard.
 -- args --
 cmd/server/main.go:@respond
 -- stdout --
-$WORK/cmd/server/main.go:115:18-25: Error Set of example.com/bank/cmd/server.respond: 1 entries, 1 unresolved, 1 possibly handled
-$WORK/cmd/server/main.go:118:7-10: unresolved(depends-on-caller): parameter err (error)
+$WORK/cmd/server/main.go:127:18-25: Error Set of example.com/bank/cmd/server.respond: 1 entries, 1 unresolved, 1 possibly handled
+$WORK/cmd/server/main.go:130:7-10: unresolved(depends-on-caller): parameter err (error)
 	wrap chain (origin → target):
-		$WORK/cmd/server/main.go:123:10-50: fmt.Errorf "server: unhandled: %w"
+		$WORK/cmd/server/main.go:135:10-50: fmt.Errorf "server: unhandled: %w"
 	possibly handled:
-		$WORK/cmd/server/main.go:120:7-26: errors.As to *example.com/bank/api.Error: unresolved value
+		$WORK/cmd/server/main.go:132:7-26: errors.As to *example.com/bank/api.Error: unresolved value
 	path (origin → target):
-		$WORK/cmd/server/main.go:118:7-10: in example.com/bank/cmd/server.respond
+		$WORK/cmd/server/main.go:130:7-10: in example.com/bank/cmd/server.respond

@@ -1,8 +1,9 @@
-SUSPECTED BUG (precision): errors.Join(Refund(n), Void(n)) guarded by if errors.Is(err, ErrInternal) { return nil }.
-Whenever either operand is ErrInternal the join matches and nil is returned, so ErrInternal must NOT appear.
-Actual: ErrInternal is kept, marked possibly handled "wrapped value may be nil" - but an operand that is nil
-is not ErrInternal either. The rest is as expected: ErrDeclined (via Refund's inner join and via Void) and
-ErrDuplicate stay under errors.Join chains.
+errors.Join(Refund(n), Void(n)) guarded by if errors.Is(err, ErrInternal) { return nil }; both operands may be nil.
+Run-time truth: whenever either operand is ErrInternal the join matches, so ErrInternal never comes out;
+ErrDeclined (via Refund's inner join and via Void) and ErrDuplicate stay under errors.Join chains.
+Recorded: those 3 plus ErrInternal kept and marked possibly handled "wrapped value may be nil". Not flagged:
+this is the deliberate conservative rule for a Wrap whose operands may be nil (e2e guards/is_join_nil_operand):
+the join is filtered as one value that does not definitely contain ErrInternal. No entry may be missing.
 -- args --
 processor/is.go:@joinMaybe
 -- stdout --

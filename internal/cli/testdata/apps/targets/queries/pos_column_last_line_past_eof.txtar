@@ -1,0 +1,10 @@
+SUSPECTED BUG (same cause as pos_column_out_of_range, wording only): column 4 on the last line "}" of a newline-terminated file.
+Expected: exit 2, "column 4 is out of range (line 8 has 1 bytes)": line 8 holds one byte, as line 5 is said to have 20 bytes without its newline (pos_column_two_past_end).
+Actual: rejected, but the message says "line 8 has 2 bytes": the final newline is counted as content of the last line only.
+-- args --
+internal/platform/platform.go:8:4
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/platform/platform.go: column 4 is out of range (line 8 has 2 bytes)
+-- exit --
+2

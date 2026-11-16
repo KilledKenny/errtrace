@@ -2,12 +2,15 @@ diagnostics calls 12 function values from a slice in a loop. With the default
 -fanout 8 all entries must be printed as one "group of N entries via dynamic call"
 block naming the Candidate of each entry: every out-of-scope construct of package
 murky contributes its Unresolved entry (channel, field, map, slice, recover,
-reflection, errgroup, atomic, unsafe, any), and murky.Last its global.
+reflection, errgroup, atomic, unsafe, any), and murky.Last its global. Two known
+defects of single entries are flagged in their own queries and show up here too: the
+"-" span of Guarded's recover exit (murky_recover_to_error) and murky.lastErr as a
+plain sentinel (murky_runtime_global).
 -- args --
 main.go:@diagnostics
 -- stdout --
-$WORK/main.go:169:22-33: Error Set of example.com/stdlibio.diagnostics: 13 entries, 12 unresolved
-$WORK/main.go:188:27-34: group of 13 entries via dynamic call to function value of type func() error (12 candidates) in example.com/stdlibio.diagnostics
+$WORK/main.go:172:22-33: Error Set of example.com/stdlibio.diagnostics: 13 entries, 12 unresolved
+$WORK/main.go:191:27-34: group of 13 entries via dynamic call to function value of type func() error (12 candidates) in example.com/stdlibio.diagnostics
 	$WORK/murky/murky.go:27:5-12: sentinel example.com/stdlibio/murky.lastErr (candidate example.com/stdlibio/murky.Last)
 	-: unresolved(memory): load of escaping variable err (candidate example.com/stdlibio.diagnostics$3)
 	$WORK/murky/murky.go:41:9-15: unresolved(memory): channel receive (candidate example.com/stdlibio/murky.FromChannel)

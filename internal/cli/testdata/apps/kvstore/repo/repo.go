@@ -116,7 +116,7 @@ func (r *Repo) /*@check*/Check(key string) error {
 // Keys lists at most max keys with the given prefix.
 func (r *Repo) /*@keys*/Keys(prefix string, max int) ([]string, error) {
 	var out []string
-	err := r.eng./*@scan_call*/Scan(r.path(prefix), false, func(k string) error {
+	err := r.eng./*@scan_call*/Scan(r.path(prefix), false, /*@closure*/func(k string) error {
 		if len(out) >= max {
 			return ErrTooMany
 		}

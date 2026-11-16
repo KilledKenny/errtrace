@@ -1,9 +1,12 @@
-SUSPECTED BUG: Guarded converts a panic into its named result inside a
-deferred closure: err = r.(error) or err = fmt.Errorf("murky: panic: %v", r). Expected
-(plan S08/S10): opaque fmt.Errorf "murky: panic: %v" plus Unresolved(recover) at the type
-assertion; the panicking ErrStage itself is out of scope. Actual: neither; two
-Unresolved(memory) "load of escaping variable err" entries, one of which has the
-placeholder span "-" (and "-" as its path hop) instead of a source position.
+SUSPECTED BUG: (placeholder span "-") Guarded converts a panic into its named result inside a
+deferred closure: err = r.(error) or err = fmt.Errorf("murky: panic: %v", r). The final
+expectation (plan S08 recover_exit / S10) is opaque fmt.Errorf "murky: panic: %v" plus
+Unresolved(recover) at the type assertion; the panicking ErrStage is out of scope.
+Neither step is implemented yet: today the captured result variable is reported as
+Unresolved(memory) "load of escaping variable err", once for "return nil" and once for
+the recover exit, which is not a silent drop. What is wrong today is the recover-exit
+entry: span and path hop are the placeholder "-" instead of a source position (the
+same entry shows up in diagnostics_fanout_group and main_run_call_site).
 -- args --
 murky/murky.go:@guarded
 -- stdout --

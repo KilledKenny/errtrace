@@ -1,11 +1,15 @@
-SUSPECTED BUG: expected core.ErrDropped (from flush) and
-dispatch.ErrSpoolBusy (assigned by the deferred closure from the dynamic
-d.closer.Close()). Actual: no Origin at all, only two unresolved(memory)
-"load of escaping variable err", one of them with the position-less span
-"-" (also in its path hop). Deferred changes are plan step S08 (not built
-yet), but ErrDropped is lost and "-" is not a usable span.
+SUSPECTED BUG: one of the two Unresolved entries has the position-less
+span "-" (also as its only path hop). Every entry should carry a usable
+span; the second entry, for the same variable, is at the return statement.
 Deferred closure making a dynamic call (io.Closer field, one local
-implementation) and assigning the named result.
+implementation, *spool) and assigning the named result. Under Go semantics
+the set is core.ErrDropped (from flush) and dispatch.ErrSpoolBusy (assigned
+by the deferred closure when flush succeeded). Deferred changes to named
+results are plan step S08, not built yet (e2e origins/named_result_defer
+says so), and a captured variable that a closure writes is
+unresolved(memory) by design (e2e dynamic/freevar_other_closure_store), so
+today's accepted result is "no Origin, unresolved(memory): load of escaping
+variable err": both Origins are missing but the set says it is incomplete.
 -- args --
 dispatch/dispatch.go:@close
 -- stdout --

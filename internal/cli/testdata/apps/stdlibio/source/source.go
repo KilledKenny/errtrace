@@ -107,7 +107,7 @@ func /*@slurp*/Slurp(path string) (data []byte, err error) {
 			err = fmt.Errorf("source: close: %w", cerr)
 		}
 	}()
-	data, err = io.ReadAll(f)
+	data, err = io./*@readall*/ReadAll(f)
 	if err != nil {
 		return nil, fmt.Errorf("source: read: %w", err)
 	}
@@ -175,4 +175,21 @@ func /*@countlines*/CountLines(doc string) (int, error) {
 		n++
 	}
 	return n, nil
+}
+
+// Finish reopens the output file written by Save and seals it.
+func /*@finish*/Finish(path string) error {
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND, 0)
+	if err != nil {
+		return fmt.Errorf("source: reopen: %w", err)
+	}
+	return Seal(f, []byte("\n"))
+}
+
+// Seal appends the trailer to f, checks that the file is still there and
+// closes it. Write, stat and close failures are joined.
+func /*@seal*/Seal(f *os.File, trailer []byte) error {
+	_, werr := f./*@sealwrite*/Write(trailer)
+	_, serr := f.Stat()
+	return errors.Join(werr, serr, f.Close())
 }

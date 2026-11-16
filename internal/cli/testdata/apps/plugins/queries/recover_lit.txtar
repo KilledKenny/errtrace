@@ -1,8 +1,11 @@
-SUSPECTED BUG (same as close_decl): expected opaque fmt.Errorf "panic: %v"
-plus what next.Handle returns (ErrPager, core.ErrDropped, ErrGaveUp, ...).
-Actual: no Origin, two unresolved(memory) entries, one with span "-".
+SUSPECTED BUG (same as close_decl): one of the two Unresolved entries has
+the position-less span "-".
 Closure with a deferred recover() that overwrites the named result, plus a
-dynamic call on a captured interface.
+dynamic call on a captured interface. Under Go semantics the set is opaque
+fmt.Errorf "panic: %v" plus what next.Handle returns (here Retry's
+"%w: %w" of ErrGaveUp and ErrPager). Plan step S08 is not built yet, so
+today's accepted result is no Origin and unresolved(memory) "load of
+escaping variable err" (see close_decl).
 -- args --
 -chain-depth=1 middleware/middleware.go:@recover_lit
 -- stdout --

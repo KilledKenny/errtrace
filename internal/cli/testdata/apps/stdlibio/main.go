@@ -161,6 +161,9 @@ func /*@importfile*/importFile(ctx context.Context, path string) error {
 	if err := source.Save(path+".json", out); err != nil {
 		return err
 	}
+	if err := source.Finish(path + ".json"); err != nil {
+		return err
+	}
 	fmt.Fprintln(os.Stderr, source.Durability(os.Stdout))
 	return source.Cleanup(path + ".lock")
 }

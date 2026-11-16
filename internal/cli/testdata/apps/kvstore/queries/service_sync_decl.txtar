@@ -1,0 +1,22 @@
+Named result in a function whose only defer (`defer end()`) cannot touch the result.
+Expect the same set as without the defer: sentinel kverr.ErrReadOnly, sentinel engine.errTorn, sentinel engine.ErrClosed. 3 entries, 0 unresolved
+(contrast with service_put_decl / service_close_decl, where a deferred closure captures err).
+-- args --
+service/service.go:@sync
+-- stdout --
+$WORK/service/service.go:231:28-32: Error Set of (*example.com/kvstore/service.Service).Sync: 3 entries
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	path (origin → target):
+		$WORK/engine/engine.go:170:10-19: in (*example.com/kvstore/engine.Engine).compactOnce
+		$WORK/engine/engine.go:183:8-26: in (*example.com/kvstore/engine.Engine).Compact, call to (*example.com/kvstore/engine.Engine).compactOnce
+		$WORK/repo/repo.go:149:39-54: in (*example.com/kvstore/repo.Repo).Flush, call to (*example.com/kvstore/engine.Engine).Compact
+		$WORK/service/service.go:237:8-22: in (*example.com/kvstore/service.Service).Sync, call to (*example.com/kvstore/repo.Repo).Flush
+$WORK/engine/engine.go:24:2-9: sentinel example.com/kvstore/engine.errTorn
+	path (origin → target):
+		$WORK/engine/engine.go:173:10-17: in (*example.com/kvstore/engine.Engine).compactOnce
+		$WORK/engine/engine.go:183:8-26: in (*example.com/kvstore/engine.Engine).Compact, call to (*example.com/kvstore/engine.Engine).compactOnce
+		$WORK/repo/repo.go:149:39-54: in (*example.com/kvstore/repo.Repo).Flush, call to (*example.com/kvstore/engine.Engine).Compact
+		$WORK/service/service.go:237:8-22: in (*example.com/kvstore/service.Service).Sync, call to (*example.com/kvstore/repo.Repo).Flush
+$WORK/kverr/kverr.go:16:2-13: sentinel example.com/kvstore/kverr.ErrReadOnly
+	path (origin → target):
+		$WORK/service/service.go:235:10-27: in (*example.com/kvstore/service.Service).Sync

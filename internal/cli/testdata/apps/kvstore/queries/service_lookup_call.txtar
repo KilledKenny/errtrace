@@ -1,6 +1,5 @@
 Call-site Target whose callee returns the error first: `err, v := s.repo.Lookup(key)`.
-Expect: the not-found sentinel (repo.ErrNotFound) and engine.ErrClosed.
-(ErrClosed carries the same questionable 'possibly handled' note as in repo_lookup_decl.)
+Expect: sentinel repo.ErrNotFound and sentinel engine.ErrClosed (with the conservative 'possibly handled' note of repo_lookup_decl, which comes from the guard inside the callee).
 -- args --
 service/service.go:@lookup_call
 -- stdout --

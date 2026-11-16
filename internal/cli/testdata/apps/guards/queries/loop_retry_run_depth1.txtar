@@ -1,7 +1,7 @@
-SUSPECTED BUG: same spurious entries as loop_retry_run (|| on a continue edge), here with -chain-depth 1.
-Expected the 4 origins of loop_retry_run with chains cut to one element and [chain truncated] where longer;
-guards must still filter through the truncated chain (ErrTimeout inside *OpError never gets "job %s: %w").
-Actual: additionally ErrNotFound and *NetError under "retries exhausted".
+SUSPECTED BUG: as loop_retry_run (no entry for the wrap of a nil error when Max == 0), here with -chain-depth 1.
+Expect the entries of loop_retry_run with chains cut to their outermost element and [chain truncated] where
+longer; guards must still filter through the truncated chain (ErrTimeout inside *OpError never gets
+"job %s: %w"). ErrNotFound / *NetError under "retries exhausted" are the documented || over-approximation.
 -- args --
 -chain-depth 1 runner/runner.go:@run
 -- stdout --

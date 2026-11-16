@@ -1,5 +1,5 @@
 Call-site target in the CRLF file: Trim(raw), a call through a package-level function variable.
-Expected: 1 entry codec.ErrEmpty from the literal assigned to Trim (or an Unresolved if the var cannot be resolved).
+Expected: 1 entry codec.ErrEmpty from the literal assigned to Trim (init$1), reached as a dynamic function value with 1 of 1 candidates; columns on line 5 are unaffected by the \r bytes of the lines above.
 -- args --
 internal/codec/crlf.go:@trim_call
 -- stdout --

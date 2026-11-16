@@ -1,0 +1,10 @@
+Caller that converts the *TypedErr[int] result of the generic constructor NewErr[int] to error.
+Expect one concrete *TypedErr[int] created at the literal inside NewErr, with a hop through NewErr[int]; never [typed nil].
+-- args --
+handling.go:@rejected
+-- stdout --
+$WORK/handling.go:39:19-27: Error Set of example.com/generics.rejected: 1 entries
+$WORK/errs/errs.go:98:9-37: concrete *example.com/generics/errs.TypedErr[int]
+	path (origin → target):
+		$WORK/errs/errs.go:98:9-37: in example.com/generics/errs.NewErr[int]
+		$WORK/handling.go:41:10-36: in example.com/generics.rejected, call to example.com/generics/errs.NewErr[int]

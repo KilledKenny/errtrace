@@ -1,9 +1,9 @@
-SUSPECTED BUG (low confidence): the wrap of a nil error is not an entry.
+SUSPECTED BUG: the wrap of a nil error has no entry.
 Retry loop with a single retryable kind: Is(ErrTimeout) -> continue, else fail fast with "job %s: %w".
 As expected ErrTimeout appears ONLY with the "retries exhausted" chain and ErrNotFound, ErrRateLimited and
 *NetError ONLY with "job %s: %w". But when the loop body never runs (Max == 0) the function returns
 fmt.Errorf("...: %w", nil), a non-nil error with no wrapped origin; expected an extra opaque fmt.Errorf
-entry for it, actual: none.
+entry for it (the tool prints one when the %w operand is a constant nil), actual: none.
 -- args --
 runner/runner.go:@runSingle
 -- stdout --

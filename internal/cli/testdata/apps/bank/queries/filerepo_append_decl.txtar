@@ -1,7 +1,7 @@
-Named result + errors.Join(werr, f.Close()): OpenFile errors wrapped "filerepo: ledger: %w";
+Named result without defer + errors.Join(werr, f.Close()): OpenFile errors wrapped "filerepo: ledger: %w";
 Fprintf's write error and Close's error joined.
-Expect OpenFile errors behind "filerepo: ledger: %w" and (*os.File).Write / Close errors (e.g. os.ErrClosed behind
-*fs.PathError) behind errors.Join.
+Expect OpenFile errors behind "filerepo: ledger: %w" (never joined) and (*os.File).Write / Close errors (e.g.
+os.ErrClosed behind *fs.PathError, io.ErrShortWrite) behind errors.Join (never behind the ledger wrap).
 -- args --
 repo/filerepo/filerepo.go:@append
 -- stdout --

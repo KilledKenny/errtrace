@@ -1,5 +1,5 @@
 Negative target: Chain returns a Handler, not an error.
-Expect exit 2 with a message that the function has no error result.
+Expect exit 2 with a message that the function has no error result, nothing on stdout.
 -- args --
 middleware/middleware.go:@chain
 -- stdout --

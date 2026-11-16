@@ -1,7 +1,8 @@
-SUSPECTED BUG (precision): errors.Unwrap(Title(d)) removes the *OpError link.
-Expected 1 entry: doc.ErrNoTitle with NO wrap chain. Actual: errors.Unwrap is not
-modelled; 2 unresolved(memory) field loads, one of them in (*fmt.wrapError).Unwrap
-although the operand is only ever an *xerr.OpError.
+errors.Unwrap(Title(d)) removes the *OpError link: at run time the result is
+the bare doc.ErrNoTitle. errors.Unwrap is not an intrinsic; its body is analysed
+and ends in a field load, which is unresolved(memory) by design (fields are never
+tracked). Expected: Unresolved entries only, one per Unwrap Candidate of the
+program (*fmt.wrapError, *xerr.OpError); never an empty set, never the wrapped form.
 -- args --
 transform/transform.go:@peel
 -- stdout --

@@ -1,0 +1,9 @@
+CRLF file, line 1 is "package codec\r\n": column 16 is one past the accepted end-of-line column 15 (see crlf_line_end).
+Negative: exit 2, "column 16 is out of range (line 1 has 14 bytes)": the \r counts as a byte of the line, the \n does not.
+-- args --
+internal/codec/crlf.go:1:16
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/codec/crlf.go: column 16 is out of range (line 1 has 14 bytes)
+-- exit --
+2

@@ -1,0 +1,11 @@
+Negative: call-site Target on a dynamic call with NO Candidates
+(d.auditor.Audit; core.Auditor has no implementation). Expected: one
+unresolved(no-candidates) entry at the Target site itself, no Origin, exit 0
+and no warning (the enclosing function is reachable).
+-- args --
+dispatch/dispatch.go:@audit_call
+-- stdout --
+$WORK/dispatch/dispatch.go:124:9-42: Error Set of call to d.auditor.Audit in (*example.com/plugins/dispatch.Dispatcher).Audit: 1 entries, 1 unresolved
+$WORK/dispatch/dispatch.go:124:9-42: unresolved(no-candidates): dynamic call to (example.com/plugins/core.Auditor).Audit
+	path (origin → target):
+		$WORK/dispatch/dispatch.go:124:9-42: in (*example.com/plugins/dispatch.Dispatcher).Audit

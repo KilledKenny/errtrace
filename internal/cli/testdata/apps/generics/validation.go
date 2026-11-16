@@ -9,7 +9,7 @@ func checkInferred(id validate.UserID) error {
 
 // checkExplicit instantiates Check[Name] explicitly.
 func checkExplicit(n validate.Name) error {
-	return validate./*@explicit*/Check[validate.Name](n)
+	return validate./*@explicit*/Check[/*@typearg*/validate.Name](n)
 }
 
 // checkEmail instantiates Check[*Email].

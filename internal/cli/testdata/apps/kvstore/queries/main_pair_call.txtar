@@ -24,8 +24,8 @@ $WORK/validate/validate.go:22:3-3: concrete example.com/kvstore/kverr.Code
 		$WORK/validate/validate.go:22:3-3: in example.com/kvstore/validate.Key
 		$WORK/validate/validate.go:37:11-17: in example.com/kvstore/validate.Pair, call to example.com/kvstore/validate.Key
 		$WORK/cmd/kvstore/main.go:34:17-70: in example.com/kvstore/cmd/kvstore.run, call to example.com/kvstore/validate.Pair
-$WORK/validate/validate.go:30:10-28: concrete example.com/kvstore/kverr.Code
+$WORK/validate/validate.go:30:10-37: concrete example.com/kvstore/kverr.Code
 	path (origin → target):
-		$WORK/validate/validate.go:30:10-28: in example.com/kvstore/validate.Value
+		$WORK/validate/validate.go:30:10-37: in example.com/kvstore/validate.Value
 		$WORK/validate/validate.go:38:14-22: in example.com/kvstore/validate.Pair, call to example.com/kvstore/validate.Value
 		$WORK/cmd/kvstore/main.go:34:17-70: in example.com/kvstore/cmd/kvstore.run, call to example.com/kvstore/validate.Pair

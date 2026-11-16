@@ -1,0 +1,6 @@
+Negative: errors.As with a *Wrapped[string] target over lazy, whose only error is the loader failure wrapped by
+Wrap[string]. The wrapper itself matches the target type: expect 0 entries.
+-- args --
+handling.go:@lazyquiet
+-- stdout --
+$WORK/handling.go:57:20-29: Error Set of example.com/generics.lazyQuiet: 0 entries

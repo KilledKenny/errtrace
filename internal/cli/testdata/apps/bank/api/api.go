@@ -113,3 +113,20 @@ func (s *Server) /*@transfer*/Transfer(ctx context.Context, body []byte) error {
 func (s *Server) /*@balance*/Balance(ctx context.Context, id string) error {
 	return Translate(s.handleBalance(ctx, middleware.Request{Path: "/balance", Body: []byte(id)}))
 }
+
+// Validate checks a transfer request without executing it.
+func (s *Server) /*@validate*/Validate(body []byte) error {
+	_, err := parse.Request(body)
+	return Translate(err)
+}
+
+// Import is the in-process form of POST /import: it records a transfer that
+// was executed elsewhere. Importing the same transfer twice is a 409 that
+// keeps its cause.
+func (s *Server) /*@import*/Import(ctx context.Context, body []byte) error {
+	t, err := parse.Request(body)
+	if err != nil {
+		return Translate(err)
+	}
+	return /*@import_translate_call*/Translate(s.svc.Import(ctx, t))
+}

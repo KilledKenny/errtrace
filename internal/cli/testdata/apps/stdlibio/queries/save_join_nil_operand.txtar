@@ -1,10 +1,12 @@
-SUSPECTED BUG: Save returns errors.Join(werr, flush(f), f.Close()). In
-the default build flush always returns nil, but Join drops nil operands and still returns
-the others. Expected: os.Create origins under "source: create: %w" AND, under an
-errors.Join wrap, the (*os.File).Write and (*os.File).Close origins (os.ErrInvalid,
-os.ErrClosed, errno values ...). Actual: only the os.Create entry; the whole Join
-disappears as soon as one operand is a call that can only return nil (compare
-save_join_durable, where flush can fail and the Write/Close origins are listed).
+SUSPECTED BUG: Save returns errors.Join(werr, flush(f), f.Close()). In the default
+build flush always returns nil, but Join drops nil operands and still returns the
+others. Expected: the os.Create origin under "source: create: %w" AND, under an
+errors.Join link, the (*os.File).Write origins (seal_write_call_site) and the
+(*os.File).Close origins (close_in_deferred_closure). Actual: only the os.Create entry;
+the whole Join disappears as soon as one operand is a call that can only return nil
+(a literal nil operand is handled correctly). Cause: when a callee summary is
+substituted, the operand sets are multiplied and an empty set gives an empty product
+(internal/summary/eval.go, mapTreeRaw). Compare save_join_durable, where flush can fail.
 -- args --
 source/source.go:@save
 -- stdout --

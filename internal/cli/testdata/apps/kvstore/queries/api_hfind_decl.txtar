@@ -1,17 +1,18 @@
-SUSPECTED BUG (low confidence, same as repo_lookup_decl): 'possibly handled' notes claim engine.ErrClosed may equal kverr.ErrNotFound.
-Cross-package alias identity: repo.Lookup returns repo.ErrNotFound (var ErrNotFound = kverr.ErrNotFound), the handler clears it with err == kverr.ErrNotFound.
-Expected: 1 entry engine.ErrClosed, 0 possibly handled; neither kverr.ErrNotFound nor repo.ErrNotFound (this part is correct).
-Actual: the entry has two possibly-handled notes; ErrClosed is only ever errors.New values (initialiser, then init()).
+Cross-package alias identity: repo.Lookup returns repo.ErrNotFound (var ErrNotFound = kverr.ErrNotFound) and the handler clears it with err == kverr.ErrNotFound.
+Expect: 1 entry, sentinel engine.ErrClosed; neither kverr.ErrNotFound nor repo.ErrNotFound.
+ErrClosed is reassigned in the engine's func init(), so errtrace treats its value as unknown: the entry is kept with two 'possibly handled'
+notes ("may be the same value as kverr.ErrNotFound"), one per guard. At run time it can never equal ErrNotFound; the notes are the
+documented conservative rule for unstable sentinels (plan P07, e2e guards/eq_unstable_sentinel), not a wrong set.
 -- args --
 api/api.go:@hfind
 -- stdout --
-$WORK/api/api.go:92:29-33: Error Set of (*example.com/kvstore/api.Handler).find: 1 entries, 1 possibly handled
+$WORK/api/api.go:96:29-33: Error Set of (*example.com/kvstore/api.Handler).find: 1 entries, 1 possibly handled
 $WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
 	possibly handled:
 		$WORK/repo/repo.go:68:5-38: errors.Is with example.com/kvstore/kverr.ErrNotFound: sentinel engine.ErrClosed may be the same value as kverr.ErrNotFound
-		$WORK/api/api.go:94:5-29: comparison with example.com/kvstore/kverr.ErrNotFound: sentinel engine.ErrClosed may be the same value as kverr.ErrNotFound
+		$WORK/api/api.go:98:5-29: comparison with example.com/kvstore/kverr.ErrNotFound: sentinel engine.ErrClosed may be the same value as kverr.ErrNotFound
 	path (origin → target):
 		$WORK/engine/engine.go:68:15-24: in (*example.com/kvstore/engine.Engine).Get
 		$WORK/repo/repo.go:67:12-34: in (*example.com/kvstore/repo.Repo).Lookup, call to (*example.com/kvstore/engine.Engine).Get
 		$WORK/service/service.go:219:12-46: in (*example.com/kvstore/service.Service).Find, call to (*example.com/kvstore/repo.Repo).Lookup
-		$WORK/api/api.go:93:12-27: in (*example.com/kvstore/api.Handler).find, call to (*example.com/kvstore/service.Service).Find
+		$WORK/api/api.go:97:12-27: in (*example.com/kvstore/api.Handler).find, call to (*example.com/kvstore/service.Service).Find

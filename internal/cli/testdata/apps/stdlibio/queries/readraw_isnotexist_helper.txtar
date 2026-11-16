@@ -1,8 +1,11 @@
 ReadRaw swallows the os.ReadFile error when the helper guard os.IsNotExist(err) holds
-and returns it unwrapped otherwise. Expected: the os/poll/syscall origins of ReadFile
-(Open, Stat, Read, Close; mostly under *fs.PathError.Unwrap), each kept and marked
-"possibly handled: guarded by call to os.IsNotExist" (a helper guard cannot be
-decided); no fmt.Errorf link, and no entry for the default document path.
+and returns it unwrapped otherwise. Expected: the origins of ReadFile's os.Open (an
+Unresolved captured variable under *fs.PathError.Unwrap) and of its f.Read (poll and
+errno values, mostly under *fs.PathError.Unwrap; io.EOF is turned into nil inside
+ReadFile and must not appear), each kept and marked "possibly handled: guarded by call
+to os.IsNotExist" (a helper guard cannot be decided). ReadFile discards the results of
+f.Stat and of the deferred f.Close, which contribute nothing. No fmt.Errorf link, and
+no entry for the default-document path.
 -- args --
 config/config.go:@readraw
 -- stdout --

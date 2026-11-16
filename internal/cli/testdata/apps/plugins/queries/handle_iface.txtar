@@ -1,6 +1,6 @@
-Negative: the position is a method in an interface type declaration, not
-a function declaration or a call. Expected: exit 2, "no function
-declaration or call at position".
+Negative: the position is a method name in an interface type declaration,
+which has no body to analyse. Expected: exit 2, "interface method has no
+body; query a call site", nothing on stdout.
 -- args --
 core/core.go:@handle_iface
 -- stdout --

@@ -11,4 +11,4 @@ $WORK/drivers/drivers.go:13:2-10: sentinel example.com/plugins/drivers.ErrEmail
 $WORK/drivers/drivers.go:14:2-8: sentinel example.com/plugins/drivers.ErrSMS
 	path (origin → target):
 		$WORK/drivers/drivers.go:37:10-16: in (*example.com/plugins/drivers.SMS).Send
-		$WORK/dispatch/funcs.go:99:12-35: in example.com/plugins/dispatch.ViaMethodExpr, call to (*example.com/plugins/drivers.SMS).Send
+		$WORK/dispatch/funcs.go:99:27-50: in example.com/plugins/dispatch.ViaMethodExpr, call to (*example.com/plugins/drivers.SMS).Send

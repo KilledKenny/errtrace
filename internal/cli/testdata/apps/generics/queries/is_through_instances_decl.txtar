@@ -1,0 +1,19 @@
+errors.Is(err, ErrNotFound) over findUser: ErrNotFound wrapped by "find %v: %w" ((*Repo).Find) and by Retry[User]'s
+"after %d attempts: %w". Retry wraps `last`, which is nil when its loop never runs (n <= 0), so in general the wrap may
+hold nothing and the guard may fail. With the constant n = 3 of this program the set is empty at run time; errtrace does
+not track constants, so expect the entry kept and marked possibly handled ("wrapped value may be nil"), not removed.
+-- args --
+handling.go:@quietfind
+-- stdout --
+$WORK/handling.go:48:20-29: Error Set of example.com/generics.quietFind: 1 entries, 1 possibly handled
+$WORK/errs/errs.go:12:2-13: sentinel example.com/generics/errs.ErrNotFound
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:44:13-47: fmt.Errorf "find %v: %w"
+		$WORK/seq/seq.go:83:15-59: fmt.Errorf "after %d attempts: %w"
+	possibly handled:
+		$WORK/handling.go:50:5-37: errors.Is with example.com/generics/errs.ErrNotFound: wrapped value may be nil
+	path (origin → target):
+		$WORK/cache/cache.go:33:16-32: in (*example.com/generics/cache.Cache[example.com/generics/validate.UserID, example.com/generics/model.User]).Get
+		$WORK/caching.go:105:58-68: in example.com/generics.findUser$1, call to (*example.com/generics/cache.Cache[example.com/generics/validate.UserID, example.com/generics/model.User]).Get
+		$WORK/caching.go:105:9-71: in example.com/generics.findUser, call to example.com/generics.findUser$1 (dynamic function value op: 1 of 1 candidates)
+		$WORK/handling.go:49:12-27: in example.com/generics.quietFind, call to example.com/generics.findUser

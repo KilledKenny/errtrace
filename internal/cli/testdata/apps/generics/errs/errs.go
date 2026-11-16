@@ -92,3 +92,8 @@ func /*@skip*/Skip[T comparable](v, skip T) T {
 	}
 	return v
 }
+
+// NewErr builds a TypedErr; its result is the concrete pointer type.
+func /*@newerr*/NewErr[T any](op string, v T) *TypedErr[T] {
+	return &TypedErr[T]{Op: op, Val: v}
+}

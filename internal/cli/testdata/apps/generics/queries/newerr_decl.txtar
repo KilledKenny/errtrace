@@ -1,0 +1,9 @@
+Declaration of the generic constructor NewErr[T], whose result type is the concrete *TypedErr[T], not error.
+The result type implements error, so the Target is accepted; the only instance is NewErr[int]: expect one concrete *TypedErr[int].
+-- args --
+errs/errs.go:@newerr
+-- stdout --
+$WORK/errs/errs.go:97:17-23: Error Set of example.com/generics/errs.NewErr: 1 entries
+$WORK/errs/errs.go:98:9-37: concrete *example.com/generics/errs.TypedErr[int]
+	path (origin → target):
+		$WORK/errs/errs.go:98:9-37: in example.com/generics/errs.NewErr[int]

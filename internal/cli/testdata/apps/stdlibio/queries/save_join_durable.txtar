@@ -1,11 +1,15 @@
-SUSPECTED BUG: same Target with -tags durable (flush is the f.Sync variant).
-Expected: os.Create origins under "source: create: %w", and under errors.Join the union of
-the (*os.File).Write origins, the (*os.File).Close origins and the (*os.File).Sync origins
-(these with the extra link fmt.Errorf "source: sync: %w"); no Unresolved(fixpoint-limit).
-Actual: an "unresolved(fixpoint-limit): result 0 of source.Save can carry more than 1024
-values" entry: the three operand sets of errors.Join appear to be multiplied instead of
-united, so the listing may be cut (e.g. poll.ErrDeadlineExceeded is listed under
-errors.Join but its *fs.PathError-wrapped Write variant is not).
+SUSPECTED BUG: same Target as save_join_nil_operand with -tags durable (flush is the
+f.Sync variant). Expected: the os.Create origin under "source: create: %w", and under
+errors.Join the union of the (*os.File).Write origins (seal_write_call_site), the Sync
+origins (flush_call_site_durable, with the extra link fmt.Errorf "source: sync: %w") and
+the Close origins; a few dozen entries and no Unresolved(fixpoint-limit). Actual: an
+"unresolved(fixpoint-limit): result 0 of source.Save can carry more than 1024 values"
+entry and a cut listing: the Write operand's io.ErrUnexpectedEOF, the opaque "waiting
+for unsupported file type" and the *fs.PathError-wrapped poll.ErrDeadlineExceeded /
+ErrNotPollable are missing. The three operand sets of errors.Join are multiplied
+(22 x 17 x 8 combinations) and cut at 1024; the marker only appears because the
+os.Create value pushes the result over the per-result cap (see
+seal_join_silent_truncation for the same cut without any marker).
 -- args --
 -tags durable source/source.go:@save
 -- stdout --

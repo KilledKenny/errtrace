@@ -96,7 +96,7 @@ func /*@retrydriver*/RetryDriver(d core.Driver, e core.Event) error {
 // ViaMethodExpr calls through method expressions.
 func /*@mexpr*/ViaMethodExpr(e core.Event) error {
 	send := (*drivers.SMS).Send
-	if err := send(&drivers.SMS{}, e); err != nil {
+	if err := /*@mexpr_send*/send(&drivers.SMS{}, e); err != nil {
 		return err
 	}
 	mail := drivers.Email.Send
@@ -107,4 +107,18 @@ func /*@mexpr*/ViaMethodExpr(e core.Event) error {
 func /*@imexpr*/ViaIfaceMethodExpr(h core.Handler, e core.Event) error {
 	handle := core.Handler.Handle
 	return handle(h, e)
+}
+
+var ErrMaintenance = errors.New("dispatch: maintenance window")
+
+// failWith returns a check that always fails with err: the closure
+// captures an error value.
+func failWith(err error) func(core.Event) error {
+	return func(core.Event) error { return err }
+}
+
+// Maintenance rejects every event.
+func /*@maintenance*/Maintenance(e core.Event) error {
+	check := failWith(ErrMaintenance)
+	return check(e)
 }

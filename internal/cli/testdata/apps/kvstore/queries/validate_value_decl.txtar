@@ -4,6 +4,6 @@ Expect: 1 entry, concrete kverr.Code built by a conversion of a non-constant int
 validate/validate.go:@value
 -- stdout --
 $WORK/validate/validate.go:28:16-21: Error Set of example.com/kvstore/validate.Value: 1 entries
-$WORK/validate/validate.go:30:10-28: concrete example.com/kvstore/kverr.Code
+$WORK/validate/validate.go:30:10-37: concrete example.com/kvstore/kverr.Code
 	path (origin → target):
-		$WORK/validate/validate.go:30:10-28: in example.com/kvstore/validate.Value
+		$WORK/validate/validate.go:30:10-37: in example.com/kvstore/validate.Value

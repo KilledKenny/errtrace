@@ -1,7 +1,7 @@
 Cross-function wraps: Line wraps Amount's and When's errors with "transfer %d: %w".
 Expect *ValidationError bare (line) and twice behind "transfer %d: %w" (from Amount), strconv.ErrSyntax behind
 NumError.Unwrap + "amount %q: %w" + "transfer %d: %w", ErrBadDate behind "%w: near %q" + "transfer %d: %w";
-no strconv.ErrRange, no *time.ParseError.
+no strconv.ErrRange, no *time.ParseError. (internal/strconv.Error entries: see parse_amount_decl.)
 -- args --
 parse/parse.go:@line
 -- stdout --

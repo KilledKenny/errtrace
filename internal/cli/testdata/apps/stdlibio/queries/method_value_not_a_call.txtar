@@ -5,6 +5,6 @@ or call at position".
 main.go:@methodvalue
 -- stdout --
 -- stderr --
-errtrace: $WORK/main.go:176:25: no function declaration or call at position
+errtrace: $WORK/main.go:179:25: no function declaration or call at position
 -- exit --
 2

@@ -4,4 +4,4 @@ through the custom Unwrap.
 -- args --
 pipeline.go:@titlelenient
 -- stdout --
-$WORK/pipeline.go:53:23-35: Error Set of example.com/wrapchain.titleLenient: 0 entries
+$WORK/pipeline.go:54:23-35: Error Set of example.com/wrapchain.titleLenient: 0 entries

@@ -51,7 +51,7 @@ func (e *Email) Validate() error {
 }
 
 // Check validates one value; the errors depend on the type argument.
-func /*@check*/Check[/*@tparam*/T Validator](v T) error { return v.Validate() }
+func /*@check*/Check[/*@tparam*/T Validator](v T) error { return v./*@checkcall*/Validate() }
 
 // All validates every value and reports the first failure with its index.
 func /*@all*/All[T Validator](vs ...T) error {
@@ -65,7 +65,7 @@ func /*@all*/All[T Validator](vs ...T) error {
 
 // Unused is never instantiated anywhere in the program.
 func /*@unused*/Unused[T Validator](v T) error {
-	if err := v.Validate(); err != nil {
+	if err := v./*@unusedcall*/Validate(); err != nil {
 		return fmt.Errorf("unused: %w", err)
 	}
 	return nil
@@ -102,7 +102,7 @@ func /*@positive*/Positive[N Number](n N) error {
 
 // InRange rejects n outside [lo, hi] with an error typed by N.
 func /*@inrange*/InRange[N Number](n, lo, hi N) error {
-	if clamped := min(max(n, lo), hi); clamped != n {
+	if clamped := /*@min*/min(max(n, lo), hi); clamped != n {
 		return &errs.TypedErr[N]{Op: "range", Val: n}
 	}
 	return nil

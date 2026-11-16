@@ -151,3 +151,21 @@ func /*@section*/Section(name, body string) error {
 	}
 	return nil
 }
+
+// Anchor rejects an empty anchor: %[3]w points past the operands, so
+// nothing is wrapped.
+func /*@anchor*/Anchor(name string) error {
+	layout := "anchor %[3]w: %v" // a variable, so vet does not reject the index
+	if name == "" {
+		return fmt.Errorf(layout, doc.ErrSyntax, doc.ErrEmpty)
+	}
+	return nil
+}
+
+// Echo wraps the same operand with two %w.
+func /*@echo*/Echo(raw string) error {
+	if _, err := digits(raw); err != nil {
+		return fmt.Errorf("echo %w (again: %w)", err, err)
+	}
+	return nil
+}

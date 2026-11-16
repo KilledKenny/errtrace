@@ -1,7 +1,8 @@
 SUSPECTED BUG: &xerr.OpError{Err: upper(d)} is built unconditionally, so the
 result is non-nil even when upper returns nil. Expected 2 entries: doc.ErrNoTitle
 [*xerr.OpError.Unwrap] and concrete *xerr.OpError for the nil-inner case (as in
-wrapper_nil_inner). Actual: only doc.ErrNoTitle; the nil-inner wrapper is dropped.
+wrapper_nil_inner). Actual: only doc.ErrNoTitle; the nil-inner wrapper is dropped,
+although Always never returns nil.
 -- args --
 transform/transform.go:@always
 -- stdout --

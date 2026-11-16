@@ -1,5 +1,7 @@
-SUSPECTED BUG: ErrNotFound is kept with no possibly-handled note: a == between two parameters (v == skip) is silently
-ignored when the arguments are substituted at the call site (same for a non-generic func skip(v, s error) error).
+SUSPECTED BUG: (low confidence) ErrNotFound is kept with no possibly-handled note: the == between two parameters
+(v == skip) is ignored when the arguments are substituted at the call site (same for a non-generic
+func skip(v, s error) error). The plan's guard table only lists == against a sentinel or nil, so the kept entry is a
+sound over-approximation; what is missing is the removal or at least a note.
 Skip with inferred T = error and the errors.New sentinel ErrNotFound: v == skip inside the generic body turns the only
 error of (*Cache).Get into the zero value (nil). Expect 0 entries.
 -- args --

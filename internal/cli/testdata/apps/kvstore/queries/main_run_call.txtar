@@ -1,11 +1,13 @@
 Top of the program: everything that can reach main's error, at -chain-depth=1 to keep the output bounded.
-Must include: config's 3 opaque errors + ErrNoCommand, the engine.Open opaque under "open: %w", validate.Pair's origins (bare),
-unresolved(memory) for LastErr's field load, repo.ErrTooMany, api's opaque/FieldError origins, service.errGaveUp (via Delete).
-Must not include repo.ErrNotFound (cleared in api.find). Inherits the defects of service_put_decl (unresolved '-:' entries) and engine_verify_decl (dead ErrCorrupt/errTorn).
+Must include: config's 3 opaque errors + ErrNoCommand, the engine.Open opaque under "open: %w", validate.Pair's 5 origins (bare),
+unresolved(memory) for LastErr's field load, repo.ErrTooMany (truncated chain), api's 2 opaque and 3 FieldError origins, service.errGaveUp (via Delete),
+bare repo.ErrNotFound (via the "has" command; the one from "find" is cleared in api.find) and nothing from the two discarded defers (eng.Close, h.Shutdown).
+Inherits the defects of service_put_decl (5 unresolved 'escaping variable err' entries, one at '-:'), engine_verify_decl (dead ErrCorrupt/errTorn)
+and repo_stat_decl / repo_probe_decl (two `concrete *kverr.OpError` entries without their Unwrap chains or a typed nil).
 -- args --
 -chain-depth=1 cmd/kvstore/main.go:@run_call
 -- stdout --
-$WORK/cmd/kvstore/main.go:17:25-41: Error Set of call to run in example.com/kvstore/cmd/kvstore.main: 60 entries, 10 unresolved, 2 possibly handled
+$WORK/cmd/kvstore/main.go:17:25-41: Error Set of call to run in example.com/kvstore/cmd/kvstore.main: 65 entries, 11 unresolved, 4 possibly handled
 $WORK/config/config.go:12:5-17: sentinel example.com/kvstore/config.ErrNoCommand
 	path (origin → target):
 		$WORK/config/config.go:39:15-27: in example.com/kvstore/config.Load
@@ -56,7 +58,7 @@ $WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed [
 	wrap chain (origin → target):
 		$WORK/service/service.go:56:14-50: fmt.Errorf "alias %s: %w"
 	possibly handled:
-		$WORK/api/api.go:85:5-38: errors.Is with example.com/kvstore/kverr.ErrNotFound: Wrap Chain truncated
+		$WORK/api/api.go:89:5-38: errors.Is with example.com/kvstore/kverr.ErrNotFound: Wrap Chain truncated
 	path (origin → target):
 		$WORK/engine/engine.go:68:15-24: in (*example.com/kvstore/engine.Engine).Get
 		$WORK/repo/repo.go:46:12-47: in (*example.com/kvstore/repo.Repo).Load, call to (*example.com/kvstore/engine.Engine).Get
@@ -64,7 +66,7 @@ $WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed [
 		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
 		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
 		$WORK/service/service.go:35:9-43: in (*example.com/kvstore/service.Service).Get, call to (*example.com/kvstore/service.Service).resolve
-		$WORK/api/api.go:84:12-46: in (*example.com/kvstore/api.Handler).get, call to (*example.com/kvstore/service.Service).Get (dynamic (example.com/kvstore/api.Backend).Get: 1 of 1 candidates)
+		$WORK/api/api.go:88:12-46: in (*example.com/kvstore/api.Handler).get, call to (*example.com/kvstore/service.Service).Get (dynamic (example.com/kvstore/api.Backend).Get: 1 of 1 candidates)
 		$WORK/api/api.go:42:10-34: in (*example.com/kvstore/api.Handler).Handle, call to (*example.com/kvstore/api.Handler).get
 		$WORK/cmd/kvstore/main.go:47:14-61: in example.com/kvstore/cmd/kvstore.run, call to (*example.com/kvstore/api.Handler).Handle
 		$WORK/cmd/kvstore/main.go:17:25-41: in example.com/kvstore/cmd/kvstore.main, call to example.com/kvstore/cmd/kvstore.run
@@ -91,6 +93,15 @@ $WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed [
 		$WORK/service/service.go:132:5-8: in example.com/kvstore/service.annotate
 		$WORK/service/service.go:169:27-50: in (*example.com/kvstore/service.Service).Health, call to example.com/kvstore/service.annotate
 		$WORK/api/api.go:51:16-33: in (*example.com/kvstore/api.Handler).Handle, call to (*example.com/kvstore/service.Service).Health
+		$WORK/cmd/kvstore/main.go:47:14-61: in example.com/kvstore/cmd/kvstore.run, call to (*example.com/kvstore/api.Handler).Handle
+		$WORK/cmd/kvstore/main.go:17:25-41: in example.com/kvstore/cmd/kvstore.main, call to example.com/kvstore/cmd/kvstore.run
+$WORK/engine/engine.go:24:2-9: sentinel example.com/kvstore/engine.errTorn
+	path (origin → target):
+		$WORK/engine/engine.go:173:10-17: in (*example.com/kvstore/engine.Engine).compactOnce
+		$WORK/engine/engine.go:183:8-26: in (*example.com/kvstore/engine.Engine).Compact, call to (*example.com/kvstore/engine.Engine).compactOnce
+		$WORK/repo/repo.go:149:39-54: in (*example.com/kvstore/repo.Repo).Flush, call to (*example.com/kvstore/engine.Engine).Compact
+		$WORK/service/service.go:237:8-22: in (*example.com/kvstore/service.Service).Sync, call to (*example.com/kvstore/repo.Repo).Flush
+		$WORK/api/api.go:81:16-28: in (*example.com/kvstore/api.Handler).Handle, call to (*example.com/kvstore/service.Service).Sync
 		$WORK/cmd/kvstore/main.go:47:14-61: in example.com/kvstore/cmd/kvstore.run, call to (*example.com/kvstore/api.Handler).Handle
 		$WORK/cmd/kvstore/main.go:17:25-41: in example.com/kvstore/cmd/kvstore.main, call to example.com/kvstore/cmd/kvstore.run
 $WORK/engine/engine.go:24:2-9: sentinel example.com/kvstore/engine.errTorn
@@ -167,6 +178,17 @@ $WORK/kverr/kverr.go:16:2-13: sentinel example.com/kvstore/kverr.ErrReadOnly
 		$WORK/cmd/kvstore/main.go:47:14-61: in example.com/kvstore/cmd/kvstore.run, call to (*example.com/kvstore/api.Handler).Handle
 		$WORK/cmd/kvstore/main.go:17:25-41: in example.com/kvstore/cmd/kvstore.main, call to example.com/kvstore/cmd/kvstore.run
 $WORK/kverr/kverr.go:18:2-13: sentinel example.com/kvstore/kverr.errInternal
+	possibly handled:
+		$WORK/repo/repo.go:176:5-28: comparison with example.com/kvstore/engine.ErrClosed: sentinel kverr.errInternal may be the same value as engine.ErrClosed
+	path (origin → target):
+		$WORK/kverr/kverr.go:22:45-56: in example.com/kvstore/kverr.Internal
+		$WORK/repo/repo.go:26:10-26: in (*example.com/kvstore/repo.base).Ping, call to example.com/kvstore/kverr.Internal
+		$WORK/repo/repo.go:175:9-17: in (*example.com/kvstore/repo.Repo).Alive, call to (*example.com/kvstore/repo.base).Ping
+		$WORK/service/service.go:248:12-26: in (*example.com/kvstore/service.Service).Probe, call to (*example.com/kvstore/repo.Repo).Alive
+		$WORK/api/api.go:79:16-32: in (*example.com/kvstore/api.Handler).Handle, call to (*example.com/kvstore/service.Service).Probe
+		$WORK/cmd/kvstore/main.go:47:14-61: in example.com/kvstore/cmd/kvstore.run, call to (*example.com/kvstore/api.Handler).Handle
+		$WORK/cmd/kvstore/main.go:17:25-41: in example.com/kvstore/cmd/kvstore.main, call to example.com/kvstore/cmd/kvstore.run
+$WORK/kverr/kverr.go:18:2-13: sentinel example.com/kvstore/kverr.errInternal
 	wrap chain (origin → target):
 		$WORK/service/service.go:135:9-38: fmt.Errorf "%s: %w"
 	path (origin → target):
@@ -230,7 +252,7 @@ $WORK/kverr/kverr.go:44:5-16: sentinel example.com/kvstore/kverr.ErrEmptyKey
 	path (origin → target):
 		$WORK/validate/validate.go:13:10-27: in example.com/kvstore/validate.Key
 		$WORK/service/service.go:32:12-42: in (*example.com/kvstore/service.Service).Get, call to example.com/kvstore/validate.Key
-		$WORK/api/api.go:84:12-46: in (*example.com/kvstore/api.Handler).get, call to (*example.com/kvstore/service.Service).Get (dynamic (example.com/kvstore/api.Backend).Get: 1 of 1 candidates)
+		$WORK/api/api.go:88:12-46: in (*example.com/kvstore/api.Handler).get, call to (*example.com/kvstore/service.Service).Get (dynamic (example.com/kvstore/api.Backend).Get: 1 of 1 candidates)
 		$WORK/api/api.go:42:10-34: in (*example.com/kvstore/api.Handler).Handle, call to (*example.com/kvstore/api.Handler).get
 		$WORK/cmd/kvstore/main.go:47:14-61: in example.com/kvstore/cmd/kvstore.run, call to (*example.com/kvstore/api.Handler).Handle
 		$WORK/cmd/kvstore/main.go:17:25-41: in example.com/kvstore/cmd/kvstore.main, call to example.com/kvstore/cmd/kvstore.run
@@ -285,14 +307,14 @@ $WORK/repo/repo.go:16:5-15: sentinel example.com/kvstore/repo.ErrTooMany [chain 
 		$WORK/service/service.go:184:15-39: in (*example.com/kvstore/service.Service).List, call to (*example.com/kvstore/repo.Repo).Keys
 		$WORK/service/service.go:132:5-8: in example.com/kvstore/service.annotate
 		$WORK/service/service.go:186:15-36: in (*example.com/kvstore/service.Service).List, call to example.com/kvstore/service.annotate
-		$WORK/api/api.go:102:15-37: in (*example.com/kvstore/api.Handler).List, call to (*example.com/kvstore/service.Service).List (dynamic (example.com/kvstore/api.Backend).List: 1 of 1 candidates)
+		$WORK/api/api.go:106:15-37: in (*example.com/kvstore/api.Handler).List, call to (*example.com/kvstore/service.Service).List (dynamic (example.com/kvstore/api.Backend).List: 1 of 1 candidates)
 		$WORK/cmd/kvstore/main.go:43:15-25: in example.com/kvstore/cmd/kvstore.run, call to (*example.com/kvstore/api.Handler).List
 		$WORK/cmd/kvstore/main.go:17:25-41: in example.com/kvstore/cmd/kvstore.main, call to example.com/kvstore/cmd/kvstore.run
 $WORK/service/service.go:15:5-12: sentinel example.com/kvstore/service.ErrLoop
 	path (origin → target):
 		$WORK/service/service.go:41:14-21: in (*example.com/kvstore/service.Service).resolve
 		$WORK/service/service.go:35:9-43: in (*example.com/kvstore/service.Service).Get, call to (*example.com/kvstore/service.Service).resolve
-		$WORK/api/api.go:84:12-46: in (*example.com/kvstore/api.Handler).get, call to (*example.com/kvstore/service.Service).Get (dynamic (example.com/kvstore/api.Backend).Get: 1 of 1 candidates)
+		$WORK/api/api.go:88:12-46: in (*example.com/kvstore/api.Handler).get, call to (*example.com/kvstore/service.Service).Get (dynamic (example.com/kvstore/api.Backend).Get: 1 of 1 candidates)
 		$WORK/api/api.go:42:10-34: in (*example.com/kvstore/api.Handler).Handle, call to (*example.com/kvstore/api.Handler).get
 		$WORK/cmd/kvstore/main.go:47:14-61: in example.com/kvstore/cmd/kvstore.run, call to (*example.com/kvstore/api.Handler).Handle
 		$WORK/cmd/kvstore/main.go:17:25-41: in example.com/kvstore/cmd/kvstore.main, call to example.com/kvstore/cmd/kvstore.run
@@ -304,7 +326,7 @@ $WORK/service/service.go:15:5-12: sentinel example.com/kvstore/service.ErrLoop
 		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
 		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
 		$WORK/service/service.go:35:9-43: in (*example.com/kvstore/service.Service).Get, call to (*example.com/kvstore/service.Service).resolve
-		$WORK/api/api.go:84:12-46: in (*example.com/kvstore/api.Handler).get, call to (*example.com/kvstore/service.Service).Get (dynamic (example.com/kvstore/api.Backend).Get: 1 of 1 candidates)
+		$WORK/api/api.go:88:12-46: in (*example.com/kvstore/api.Handler).get, call to (*example.com/kvstore/service.Service).Get (dynamic (example.com/kvstore/api.Backend).Get: 1 of 1 candidates)
 		$WORK/api/api.go:42:10-34: in (*example.com/kvstore/api.Handler).Handle, call to (*example.com/kvstore/api.Handler).get
 		$WORK/cmd/kvstore/main.go:47:14-61: in example.com/kvstore/cmd/kvstore.run, call to (*example.com/kvstore/api.Handler).Handle
 		$WORK/cmd/kvstore/main.go:17:25-41: in example.com/kvstore/cmd/kvstore.main, call to example.com/kvstore/cmd/kvstore.run
@@ -312,7 +334,7 @@ $WORK/service/service.go:15:5-12: sentinel example.com/kvstore/service.ErrLoop [
 	wrap chain (origin → target):
 		$WORK/service/service.go:56:14-50: fmt.Errorf "alias %s: %w"
 	possibly handled:
-		$WORK/api/api.go:85:5-38: errors.Is with example.com/kvstore/kverr.ErrNotFound: Wrap Chain truncated
+		$WORK/api/api.go:89:5-38: errors.Is with example.com/kvstore/kverr.ErrNotFound: Wrap Chain truncated
 	path (origin → target):
 		$WORK/service/service.go:41:14-21: in (*example.com/kvstore/service.Service).resolve
 		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
@@ -320,7 +342,7 @@ $WORK/service/service.go:15:5-12: sentinel example.com/kvstore/service.ErrLoop [
 		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
 		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
 		$WORK/service/service.go:35:9-43: in (*example.com/kvstore/service.Service).Get, call to (*example.com/kvstore/service.Service).resolve
-		$WORK/api/api.go:84:12-46: in (*example.com/kvstore/api.Handler).get, call to (*example.com/kvstore/service.Service).Get (dynamic (example.com/kvstore/api.Backend).Get: 1 of 1 candidates)
+		$WORK/api/api.go:88:12-46: in (*example.com/kvstore/api.Handler).get, call to (*example.com/kvstore/service.Service).Get (dynamic (example.com/kvstore/api.Backend).Get: 1 of 1 candidates)
 		$WORK/api/api.go:42:10-34: in (*example.com/kvstore/api.Handler).Handle, call to (*example.com/kvstore/api.Handler).get
 		$WORK/cmd/kvstore/main.go:47:14-61: in example.com/kvstore/cmd/kvstore.run, call to (*example.com/kvstore/api.Handler).Handle
 		$WORK/cmd/kvstore/main.go:17:25-41: in example.com/kvstore/cmd/kvstore.main, call to example.com/kvstore/cmd/kvstore.run
@@ -377,6 +399,27 @@ $WORK/engine/engine.go:104:3-3: concrete example.com/kvstore/kverr.Code
 		$WORK/api/api.go:63:16-40: in (*example.com/kvstore/api.Handler).Handle, call to (*example.com/kvstore/service.Service).Copy
 		$WORK/cmd/kvstore/main.go:47:14-61: in example.com/kvstore/cmd/kvstore.run, call to (*example.com/kvstore/api.Handler).Handle
 		$WORK/cmd/kvstore/main.go:17:25-41: in example.com/kvstore/cmd/kvstore.main, call to example.com/kvstore/cmd/kvstore.run
+$WORK/kverr/kverr.go:75:5-6: concrete *example.com/kvstore/kverr.OpError
+	path (origin → target):
+		$WORK/kverr/kverr.go:75:5-6: in (*example.com/kvstore/kverr.OpError).OrNil
+		$WORK/repo/repo.go:171:57-76: in (*example.com/kvstore/repo.Repo).Stat, call to (*example.com/kvstore/kverr.OpError).OrNil
+		$WORK/service/service.go:251:12-28: in (*example.com/kvstore/service.Service).Probe, call to (*example.com/kvstore/repo.Repo).Stat
+		$WORK/api/api.go:79:16-32: in (*example.com/kvstore/api.Handler).Handle, call to (*example.com/kvstore/service.Service).Probe
+		$WORK/cmd/kvstore/main.go:47:14-61: in example.com/kvstore/cmd/kvstore.run, call to (*example.com/kvstore/api.Handler).Handle
+		$WORK/cmd/kvstore/main.go:17:25-41: in example.com/kvstore/cmd/kvstore.main, call to example.com/kvstore/cmd/kvstore.run
+$WORK/repo/repo.go:167:9-11: concrete *example.com/kvstore/kverr.OpError
+	wrap chain (origin → target):
+		$WORK/service/service.go:135:9-38: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/repo/repo.go:167:9-11: in (*example.com/kvstore/repo.Repo).Probe
+		$WORK/service/service.go:254:13-30: in (*example.com/kvstore/service.Service).Probe, call to (*example.com/kvstore/repo.Repo).Probe
+		$WORK/service/service.go:243:42-45: in example.com/kvstore/service.tag
+		$WORK/service/service.go:132:5-8: in example.com/kvstore/service.annotate
+		$WORK/service/service.go:243:22-46: in example.com/kvstore/service.tag, call to example.com/kvstore/service.annotate
+		$WORK/service/service.go:254:9-31: in (*example.com/kvstore/service.Service).Probe, call to example.com/kvstore/service.tag
+		$WORK/api/api.go:79:16-32: in (*example.com/kvstore/api.Handler).Handle, call to (*example.com/kvstore/service.Service).Probe
+		$WORK/cmd/kvstore/main.go:47:14-61: in example.com/kvstore/cmd/kvstore.run, call to (*example.com/kvstore/api.Handler).Handle
+		$WORK/cmd/kvstore/main.go:17:25-41: in example.com/kvstore/cmd/kvstore.main, call to example.com/kvstore/cmd/kvstore.run
 $WORK/validate/validate.go:16:10-68: concrete example.com/kvstore/kverr.FieldError
 	path (origin → target):
 		$WORK/validate/validate.go:16:10-68: in example.com/kvstore/validate.Key
@@ -389,7 +432,7 @@ $WORK/validate/validate.go:16:10-68: concrete example.com/kvstore/kverr.FieldErr
 	path (origin → target):
 		$WORK/validate/validate.go:16:10-68: in example.com/kvstore/validate.Key
 		$WORK/service/service.go:32:12-42: in (*example.com/kvstore/service.Service).Get, call to example.com/kvstore/validate.Key
-		$WORK/api/api.go:84:12-46: in (*example.com/kvstore/api.Handler).get, call to (*example.com/kvstore/service.Service).Get (dynamic (example.com/kvstore/api.Backend).Get: 1 of 1 candidates)
+		$WORK/api/api.go:88:12-46: in (*example.com/kvstore/api.Handler).get, call to (*example.com/kvstore/service.Service).Get (dynamic (example.com/kvstore/api.Backend).Get: 1 of 1 candidates)
 		$WORK/api/api.go:42:10-34: in (*example.com/kvstore/api.Handler).Handle, call to (*example.com/kvstore/api.Handler).get
 		$WORK/cmd/kvstore/main.go:47:14-61: in example.com/kvstore/cmd/kvstore.run, call to (*example.com/kvstore/api.Handler).Handle
 		$WORK/cmd/kvstore/main.go:17:25-41: in example.com/kvstore/cmd/kvstore.main, call to example.com/kvstore/cmd/kvstore.run
@@ -405,7 +448,7 @@ $WORK/validate/validate.go:19:3-3: concrete example.com/kvstore/kverr.Reason
 	path (origin → target):
 		$WORK/validate/validate.go:19:3-3: in example.com/kvstore/validate.Key
 		$WORK/service/service.go:32:12-42: in (*example.com/kvstore/service.Service).Get, call to example.com/kvstore/validate.Key
-		$WORK/api/api.go:84:12-46: in (*example.com/kvstore/api.Handler).get, call to (*example.com/kvstore/service.Service).Get (dynamic (example.com/kvstore/api.Backend).Get: 1 of 1 candidates)
+		$WORK/api/api.go:88:12-46: in (*example.com/kvstore/api.Handler).get, call to (*example.com/kvstore/service.Service).Get (dynamic (example.com/kvstore/api.Backend).Get: 1 of 1 candidates)
 		$WORK/api/api.go:42:10-34: in (*example.com/kvstore/api.Handler).Handle, call to (*example.com/kvstore/api.Handler).get
 		$WORK/cmd/kvstore/main.go:47:14-61: in example.com/kvstore/cmd/kvstore.run, call to (*example.com/kvstore/api.Handler).Handle
 		$WORK/cmd/kvstore/main.go:17:25-41: in example.com/kvstore/cmd/kvstore.main, call to example.com/kvstore/cmd/kvstore.run
@@ -421,13 +464,13 @@ $WORK/validate/validate.go:22:3-3: concrete example.com/kvstore/kverr.Code
 	path (origin → target):
 		$WORK/validate/validate.go:22:3-3: in example.com/kvstore/validate.Key
 		$WORK/service/service.go:32:12-42: in (*example.com/kvstore/service.Service).Get, call to example.com/kvstore/validate.Key
-		$WORK/api/api.go:84:12-46: in (*example.com/kvstore/api.Handler).get, call to (*example.com/kvstore/service.Service).Get (dynamic (example.com/kvstore/api.Backend).Get: 1 of 1 candidates)
+		$WORK/api/api.go:88:12-46: in (*example.com/kvstore/api.Handler).get, call to (*example.com/kvstore/service.Service).Get (dynamic (example.com/kvstore/api.Backend).Get: 1 of 1 candidates)
 		$WORK/api/api.go:42:10-34: in (*example.com/kvstore/api.Handler).Handle, call to (*example.com/kvstore/api.Handler).get
 		$WORK/cmd/kvstore/main.go:47:14-61: in example.com/kvstore/cmd/kvstore.run, call to (*example.com/kvstore/api.Handler).Handle
 		$WORK/cmd/kvstore/main.go:17:25-41: in example.com/kvstore/cmd/kvstore.main, call to example.com/kvstore/cmd/kvstore.run
-$WORK/validate/validate.go:30:10-28: concrete example.com/kvstore/kverr.Code
+$WORK/validate/validate.go:30:10-37: concrete example.com/kvstore/kverr.Code
 	path (origin → target):
-		$WORK/validate/validate.go:30:10-28: in example.com/kvstore/validate.Value
+		$WORK/validate/validate.go:30:10-37: in example.com/kvstore/validate.Value
 		$WORK/validate/validate.go:38:14-22: in example.com/kvstore/validate.Pair, call to example.com/kvstore/validate.Value
 		$WORK/cmd/kvstore/main.go:34:17-70: in example.com/kvstore/cmd/kvstore.run, call to example.com/kvstore/validate.Pair
 		$WORK/cmd/kvstore/main.go:17:25-41: in example.com/kvstore/cmd/kvstore.main, call to example.com/kvstore/cmd/kvstore.run
@@ -436,9 +479,9 @@ $WORK/api/api.go:37:14-52: opaque fmt.Errorf "api: %s needs a key"
 		$WORK/api/api.go:37:14-52: in (*example.com/kvstore/api.Handler).Handle
 		$WORK/cmd/kvstore/main.go:47:14-61: in example.com/kvstore/cmd/kvstore.run, call to (*example.com/kvstore/api.Handler).Handle
 		$WORK/cmd/kvstore/main.go:17:25-41: in example.com/kvstore/cmd/kvstore.main, call to example.com/kvstore/cmd/kvstore.run
-$WORK/api/api.go:79:13-55: opaque fmt.Errorf "api: unknown command %q"
+$WORK/api/api.go:83:13-55: opaque fmt.Errorf "api: unknown command %q"
 	path (origin → target):
-		$WORK/api/api.go:79:13-55: in (*example.com/kvstore/api.Handler).Handle
+		$WORK/api/api.go:83:13-55: in (*example.com/kvstore/api.Handler).Handle
 		$WORK/cmd/kvstore/main.go:47:14-61: in example.com/kvstore/cmd/kvstore.run, call to (*example.com/kvstore/api.Handler).Handle
 		$WORK/cmd/kvstore/main.go:17:25-41: in example.com/kvstore/cmd/kvstore.main, call to example.com/kvstore/cmd/kvstore.run
 $WORK/config/config.go:34:16-59: opaque fmt.Errorf "config: unknown flag %s"
@@ -487,6 +530,17 @@ $WORK/engine/engine.go:111:19-34: unresolved(no-body): example.com/kvstore/engin
 		$WORK/repo/repo.go:55:12-48: in (*example.com/kvstore/repo.Repo).Store, call to (*example.com/kvstore/engine.Engine).Put
 		$WORK/service/service.go:125:9-29: in (*example.com/kvstore/service.Service).Copy, call to (*example.com/kvstore/repo.Repo).Store
 		$WORK/api/api.go:63:16-40: in (*example.com/kvstore/api.Handler).Handle, call to (*example.com/kvstore/service.Service).Copy
+		$WORK/cmd/kvstore/main.go:47:14-61: in example.com/kvstore/cmd/kvstore.run, call to (*example.com/kvstore/api.Handler).Handle
+		$WORK/cmd/kvstore/main.go:17:25-41: in example.com/kvstore/cmd/kvstore.main, call to example.com/kvstore/cmd/kvstore.run
+$WORK/engine/engine.go:196:14-22: unresolved(memory): channel receive in select
+	possibly handled:
+		$WORK/repo/repo.go:176:5-28: comparison with example.com/kvstore/engine.ErrClosed: unresolved value
+	path (origin → target):
+		$WORK/engine/engine.go:196:14-22: in (*example.com/kvstore/engine.Engine).Wait
+		$WORK/repo/repo.go:28:9-21: in (*example.com/kvstore/repo.base).Ping, call to (*example.com/kvstore/engine.Engine).Wait
+		$WORK/repo/repo.go:175:9-17: in (*example.com/kvstore/repo.Repo).Alive, call to (*example.com/kvstore/repo.base).Ping
+		$WORK/service/service.go:248:12-26: in (*example.com/kvstore/service.Service).Probe, call to (*example.com/kvstore/repo.Repo).Alive
+		$WORK/api/api.go:79:16-32: in (*example.com/kvstore/api.Handler).Handle, call to (*example.com/kvstore/service.Service).Probe
 		$WORK/cmd/kvstore/main.go:47:14-61: in example.com/kvstore/cmd/kvstore.run, call to (*example.com/kvstore/api.Handler).Handle
 		$WORK/cmd/kvstore/main.go:17:25-41: in example.com/kvstore/cmd/kvstore.main, call to example.com/kvstore/cmd/kvstore.run
 $WORK/engine/engine.go:196:14-22: unresolved(memory): channel receive in select

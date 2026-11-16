@@ -1,0 +1,14 @@
+Negative: call-site Target inside a function nothing calls (d.Send in
+LegacySend, d is a parameter). Expected: the "not reachable" warning on
+stderr and a single unresolved(no-candidates) entry for this call only (the
+h.Handle call of the same function is not part of the Target); no Origin
+borrowed from the reachable d.Send sites.
+-- args --
+dispatch/legacy.go:@legacy_send
+-- stdout --
+$WORK/dispatch/legacy.go:13:9-34: Error Set of call to d.Send in example.com/plugins/dispatch.LegacySend: 1 entries, 1 unresolved
+$WORK/dispatch/legacy.go:13:9-34: unresolved(no-candidates): dynamic call to (example.com/plugins/core.Driver).Send
+	path (origin → target):
+		$WORK/dispatch/legacy.go:13:9-34: in example.com/plugins/dispatch.LegacySend
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates

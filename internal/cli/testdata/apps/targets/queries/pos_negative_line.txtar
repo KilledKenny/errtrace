@@ -1,5 +1,5 @@
 Negative line number.
-Negative: exit 2 with a message that names the bad line; "-" is also the range separator, so the wording may be about a missing start position.
+Negative: exit 2, invalid position. "-" is the range separator, so ":-5:6" has an empty start and the message is "missing start position" rather than one about a negative line; it must not resolve to 5:6.
 -- args --
 internal/platform/platform.go:-5:6
 -- stdout --

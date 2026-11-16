@@ -1,8 +1,14 @@
-End to end (large, -fanout=2): retry.Do over txm.WithTx over a closure calling execute; the result is wrapped
-"transfer %d: %w", an audit failure is joined, and the success path ends in bus.Notify, which swallows everything.
-Expect execute's set behind "transfer %d: %w" (also joined with rollback errors), begin errors behind "tx: begin: %w",
-ErrGaveUp, and audit.ErrClosed/ErrFull/write errors behind errors.Join. NO event-handler origin
-(opaque "cli: more than %d transfers", the handler's *ValidationError{Field: "id"}, "needs review").
+SUSPECTED BUG: end to end (large, -fanout=2). retry.Do over txm.WithTx over a closure calling execute; the result is
+wrapped "transfer %d: %w", an audit failure is joined, the success path ends in bus.Notify, which swallows
+everything. Correct set: execute's set behind "transfer %d: %w" (also joined with rollback errors), Begin errors
+behind "tx: begin: %w", ErrGaveUp, ctx errors behind "retry: interrupted: %w", each with and without errors.Join;
+audit.ErrClosed/ErrFull/write errors behind errors.Join; NO event-handler origin.
+Actual: no event-handler origin (good), but (1) execute's errors are missing (only WithTx's unresolved values,
+plan S08, see tx_withtx_decl); (2) the errors of other callers' retry closures appear (NotFoundError, filerepo read
+errors, errDryRun via probe$2; plan S09); (3) errors.Join(err, aerr) makes one value per combination of its
+operands' values (about 50 x 25), which exceeds the cap of 1024: the result is cut, with an
+unresolved(fixpoint-limit) entry, and every entry without errors.Join (the plain "return err" path) and the
+"retry: interrupted: %w" entries are gone.
 -- args --
 -fanout=2 service/service.go:@transfer
 -- stdout --
@@ -95,6 +101,6 @@ $WORK/retry/retry.go:31:10-14: group of 41 entries via dynamic call to function 
 	$GOROOT/src/strconv/number.go:*: opaque errors.New (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
 	-: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
 	$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
-	$WORK/tx/tx.go:24:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
-	$WORK/tx/tx.go:38:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
-	$WORK/tx/tx.go:40:2-2: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
+	$WORK/tx/tx.go:25:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
+	$WORK/tx/tx.go:39:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
+	$WORK/tx/tx.go:41:2-2: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)

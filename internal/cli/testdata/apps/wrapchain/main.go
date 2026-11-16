@@ -35,7 +35,7 @@ func load(path string) (*doc.Document, error) {
 	checks := []error{
 		parse.Row(1, "a"), parse.Cell("a", "b"), parse.Column(1, 4, "x"),
 		parse.Reorder("x"), parse.Tag("t", true), parse.Footer("EOF"), parse.Label("l"),
-		parse.Section("intro", "text"),
+		parse.Section("intro", "text"), parse.Anchor("top"), parse.Echo("7"),
 	}
 	for _, err := range checks {
 		if err != nil {
@@ -61,7 +61,8 @@ func rewrite(d *doc.Document) []error {
 		transform.Retryable(d), transform.OverLimit(d), transform.Include(d, 0),
 		transform.Normalize(d, true), transform.Trim(d), transform.Trace(d),
 		transform.Peel(d), transform.PeelJoin(), transform.PeelPlain(),
-		transform.PeelTwice(d),
+		transform.PeelTwice(d), transform.Settle(d), transform.Patient(d),
+		transform.Durable(d), transform.FieldRef(d, "summary"),
 		titleStrict(d), titleLenient(d), titleQuiet(d), normalizeQuiet(d),
 	}
 }
@@ -72,7 +73,7 @@ func ship(d *doc.Document) []error {
 	for _, s := range sinks {
 		errs = append(errs, export.Export(s, d), export.Flush(s, d))
 	}
-	return append(errs, export.RunHook(export.Audit, d), export.Rollout())
+	return append(errs, export.RunHook(export.Audit, d), export.Rollout(), rolloutLenient(), export.SyncLenient())
 }
 
 func main() {

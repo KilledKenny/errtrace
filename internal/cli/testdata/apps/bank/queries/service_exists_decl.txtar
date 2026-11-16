@@ -1,7 +1,7 @@
 errors.Is against a sentinel matched through a custom Is method: NotFoundError[ID].Is(ErrNotFound) is true,
-so "not found" never leaves Exists.
-Expect NotFoundError[AccountID] absent, or at least marked possibly handled (custom Is is may-match in v1);
-remaining: ctx.Err() origins (memory), read errors behind "filerepo: read %s: %w", decode errors behind CorruptError.Unwrap.
+so "not found" never leaves Exists (Go semantics: no NotFoundError entry).
+Custom Is methods are may-match in v1, so expect NotFoundError[AccountID] kept and marked possibly handled;
+remaining: ctx.Err() (memory), read errors behind "filerepo: read %s: %w", decode errors behind CorruptError.Unwrap.
 -- args --
 -fanout=2 service/service.go:@exists
 -- stdout --
@@ -54,7 +54,7 @@ $WORK/service/service.go:161:12-32: group of 56 entries via dynamic call to (exa
 	$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno (candidate (*example.com/bank/repo/filerepo.Store).Get)
 	$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno (candidate (*example.com/bank/repo/filerepo.Store).Get)
 	$WORK/repo/filerepo/filerepo.go:46:15-78: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate (*example.com/bank/repo/filerepo.Store).Get)
-	$WORK/repo/memory/memory.go:76:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate (*example.com/bank/repo/memory.Store).Get)
+	$WORK/repo/memory/memory.go:88:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate (*example.com/bank/repo/memory.Store).Get)
 	$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type" (candidate (*example.com/bank/repo/filerepo.Store).Get)
 	$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type" (candidate (*example.com/bank/repo/filerepo.Store).Get)
 	$GOROOT/src/strconv/number.go:*: opaque errors.New (candidate (*example.com/bank/repo/filerepo.Store).Get)

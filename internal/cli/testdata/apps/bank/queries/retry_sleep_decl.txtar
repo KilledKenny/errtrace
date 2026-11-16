@@ -1,7 +1,7 @@
-Context cancellation: sleep returns ctx.Err() wrapped "retry: interrupted: %w"; ctx.Err is a dynamic call on
-context.Context. Under Go semantics the origins are context.Canceled and context.DeadlineExceeded.
-Expect those two behind the errorf chain; the tool may instead (documented scope) report unresolved(memory)
-for the err field of *context.cancelCtx. Nothing unwrapped.
+Context cancellation: sleep returns ctx.Err() wrapped "retry: interrupted: %w"; ctx.Err is a dynamic call.
+Go semantics: context.Canceled and context.DeadlineExceeded behind the errorf. (*context.cancelCtx).Err loads the
+error from an atomic.Value field, which is out of scope, so expect 1 unresolved(memory) entry behind the errorf
+chain (1 of 1 candidates) and nothing unwrapped.
 -- args --
 retry/retry.go:@sleep
 -- stdout --

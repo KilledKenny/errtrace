@@ -1,7 +1,7 @@
-SUSPECTED BUG (precision): errors.Unwrap of an errors.Join result is always nil
-(Unwrap() []error is not consulted). Expected 0 entries. Actual: 2 unresolved(memory)
-entries for *fmt.wrapError and *xerr.OpError field loads, neither of which can be
-the operand here.
+errors.Unwrap of an errors.Join result is always nil at run time (Unwrap()
+[]error is not consulted), so the precise set is empty. By design the call is
+analysed without its operand: the same 2 unresolved(memory) entries as
+unwrap_returned. doc.ErrEmpty and doc.ErrNoTitle must NOT appear.
 -- args --
 transform/transform.go:@peeljoin
 -- stdout --

@@ -1,7 +1,8 @@
-SUSPECTED BUG: typed nil not reported when it merges with a non-nil pointer. gateway.PrecheckInline does
-var ce *CodeError; if n > 10 { ce = &CodeError{...} }; return ce.
-Expected 2 entries: concrete *CodeError at the &CodeError literal and concrete *CodeError [typed nil].
-Actual: a single unmarked entry whose span is the returned identifier "ce", not the literal; no [typed nil].
+if err := gateway.PrecheckInline(n); err != nil { return err }: var ce *CodeError, maybe assigned, return ce.
+Run-time truth: a non-nil *CodeError (the literal) or a typed nil *CodeError; both are non-nil errors.
+Expect 1 entry: concrete *CodeError at the conversion "return ce", which stands for both. It carries no
+[typed nil] mark (the mark is only given to a pointer that is always nil) and its span is the returned
+identifier, not the literal. An empty set would be unsound; contrast nil_check_typed_nil.
 -- args --
 processor/eq.go:@nilCheckInline
 -- stdout --

@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"example.com/bank/repo"
+	"example.com/bank/retry"
 )
 
 // Manager begins transactions on a store.
@@ -52,4 +53,18 @@ func (m *Manager) /*@readonly*/ReadOnly(fn func() error) error {
 		return ferr
 	}
 	return rerr
+}
+
+// Ping checks that a transaction can be started. A busy store is reported as
+// such, so that callers may try again; any other failure is returned as is.
+func (m *Manager) /*@ping*/Ping() error {
+	t, err := m.store.Begin()
+	if err != nil {
+		var te *retry.TimeoutError
+		if !errors.Is(err, retry.ErrBusy) && !errors.As(err, &te) {
+			return err
+		}
+		return fmt.Errorf("tx: store busy: %w", err)
+	}
+	return t.Rollback()
 }

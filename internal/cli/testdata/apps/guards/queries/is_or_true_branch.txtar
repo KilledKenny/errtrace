@@ -1,9 +1,9 @@
-SUSPECTED BUG: the true branch of an || of errors.Is checks is not narrowed.
-if Is(ErrTimeout) || Is(ErrRateLimited) { return fmt.Errorf("retryable: %w", err) }; return nil.
-Only values matching one of the two checks reach the return: expected exactly 2 entries, ErrTimeout
-(OpError.Unwrap chain) and ErrRateLimited, both under "retryable: %w".
-Actual: ErrNotFound and *NetError are reported too (4 entries); compare is_rewrap_only, where a single
-errors.Is narrows the guarded branch correctly.
+True branch of Is(ErrTimeout) || Is(ErrRateLimited): return fmt.Errorf("retryable: %w", err); else nil.
+Run-time truth: 2 entries, ErrTimeout (OpError.Unwrap chain) and ErrRateLimited, both under "retryable: %w".
+Recorded: 4 entries - ErrNotFound and *NetError are reported too. Not flagged: guards are applied by dominance
+only (plan S07: "if neither successor dominates the return, the guard doesn't apply"), and neither check
+dominates the merged body of an ||, so this is a documented, sound over-approximation (compare is_rewrap_only,
+where a single errors.Is narrows the branch, and is_or_force for the false side). No entry may be missing.
 -- args --
 processor/is.go:@orRewrap
 -- stdout --

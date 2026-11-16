@@ -1,0 +1,14 @@
+SUSPECTED BUG: the only error that can be returned (a typed nil) is missing, and an impossible origin is listed.
+if err == (*CodeError)(nil) { return err }; return nil on gateway.Precheck (typed nil through helper check).
+The guarded branch returns the typed nil itself, a non-nil error. Expected exactly 1 entry: concrete
+*CodeError [typed nil] (check's "return nil"). Actual: 1 entry, the &CodeError literal of gateway.check, which
+is never == a nil pointer and so cannot reach this return; the typed nil is dropped as in nil_check_typed_nil.
+-- args --
+processor/edge.go:@onlyTypedNil
+-- stdout --
+$WORK/processor/edge.go:54:23-43: Error Set of example.com/guards/processor.PrecheckOnlyTypedNil: 1 entries
+$WORK/gateway/gateway.go:112:10-54: concrete *example.com/guards/payerr.CodeError
+	path (origin → target):
+		$WORK/gateway/gateway.go:112:10-54: in example.com/guards/gateway.check
+		$WORK/gateway/gateway.go:119:9-17: in example.com/guards/gateway.Precheck, call to example.com/guards/gateway.check
+		$WORK/processor/edge.go:55:9-28: in example.com/guards/processor.PrecheckOnlyTypedNil, call to example.com/guards/gateway.Precheck

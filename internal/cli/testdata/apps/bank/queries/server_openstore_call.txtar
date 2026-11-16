@@ -1,5 +1,11 @@
-Interface-typed result built from two concrete stores; only filerepo.Open can fail.
-Expect os.MkdirAll's errors behind "filerepo: %w" + "server: store: %w"; nothing from package memory.
+SUSPECTED BUG: interface-typed result built from two concrete stores; only filerepo.Open can fail. Correct set:
+os.MkdirAll's errors behind (*fs.PathError).Unwrap + "filerepo: %w" + "server: store: %w"; nothing from package
+memory. Actual: right chains and nothing from memory, but (1) the syscall.ENOTDIR origin in os.MkdirAll (a constant
+converted to error inside &PathError{...}) is printed with the position "-" instead of a $GOROOT span, and (2) the
+Candidates of fn in os.ignoringEINTR are those of every caller (9), so MkdirAll gets the errors of closures it
+never passes (os.chmod$1, os.openFileNolog$1, os.checkPidfd$1): no narrowing at substitution (plan S09 is not
+implemented). The identical lines in the group are distinct entries: they differ in the *fs.PathError site (Mkdir,
+chmod, Stat), which a group line does not show (documented group format).
 -- args --
 cmd/server/main.go:@openstore_call
 -- stdout --

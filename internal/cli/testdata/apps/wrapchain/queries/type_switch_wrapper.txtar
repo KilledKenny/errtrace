@@ -3,4 +3,4 @@ Expected 0 entries.
 -- args --
 pipeline.go:@quiet
 -- stdout --
-$WORK/pipeline.go:34:16-26: Error Set of example.com/wrapchain.titleQuiet: 0 entries
+$WORK/pipeline.go:35:16-26: Error Set of example.com/wrapchain.titleQuiet: 0 entries

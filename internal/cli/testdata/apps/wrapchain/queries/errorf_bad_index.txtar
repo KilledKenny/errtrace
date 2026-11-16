@@ -1,0 +1,10 @@
+Negative: "anchor %[3]w: %v" with two operands. The index is out of range, so
+fmt.Errorf wraps nothing ("%!w(BADINDEX)") and still returns a non-nil error.
+Expected 1 entry: opaque fmt.Errorf; doc.ErrSyntax and doc.ErrEmpty must NOT appear.
+-- args --
+parse/parse.go:@anchor
+-- stdout --
+$WORK/parse/parse.go:157:17-23: Error Set of example.com/wrapchain/parse.Anchor: 1 entries
+$WORK/parse/parse.go:160:10-57: opaque fmt.Errorf "anchor %[3]w: %v"
+	path (origin → target):
+		$WORK/parse/parse.go:160:10-57: in example.com/wrapchain/parse.Anchor

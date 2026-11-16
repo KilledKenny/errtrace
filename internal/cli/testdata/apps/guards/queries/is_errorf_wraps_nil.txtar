@@ -1,0 +1,25 @@
+SUSPECTED BUG: fmt.Errorf with a %w operand that may be nil has no entry for the wrap-of-nil error.
+err := fmt.Errorf("void %d: %w", n, gateway.Void(n)) wraps unconditionally, then errors.Is(err, ErrDeclined) -> nil.
+Run-time truth: ErrInternal under "void %d: %w", plus a non-nil error wrapping nothing whenever Void succeeds
+(the app prints "void 3: %!w(<nil>)"); a wrapped ErrDeclined is always handled.
+Expected: ErrInternal with the chain and an opaque fmt.Errorf "void %d: %w" entry for the wrap of nil.
+Actual: ErrInternal, and ErrDeclined kept as possibly handled "wrapped value may be nil" (the documented
+conservative rule, e2e guards/is_errorf_nil_operand) - but nothing that stands for the nil-wrapping error.
+-- args --
+processor/edge.go:@wrapNil
+-- stdout --
+$WORK/processor/edge.go:72:18-30: Error Set of example.com/guards/processor.VoidDescribe: 2 entries, 1 possibly handled
+$WORK/payerr/payerr.go:8:2-13: sentinel example.com/guards/payerr.ErrDeclined
+	wrap chain (origin → target):
+		$WORK/processor/edge.go:73:9-54: fmt.Errorf "void %d: %w"
+	possibly handled:
+		$WORK/processor/edge.go:74:5-39: errors.Is with example.com/guards/payerr.ErrDeclined: wrapped value may be nil
+	path (origin → target):
+		$WORK/gateway/gateway.go:59:10-28: in example.com/guards/gateway.Void
+		$WORK/processor/edge.go:73:38-53: in example.com/guards/processor.VoidDescribe, call to example.com/guards/gateway.Void
+$WORK/payerr/payerr.go:12:2-13: sentinel example.com/guards/payerr.ErrInternal
+	wrap chain (origin → target):
+		$WORK/processor/edge.go:73:9-54: fmt.Errorf "void %d: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:62:10-28: in example.com/guards/gateway.Void
+		$WORK/processor/edge.go:73:38-53: in example.com/guards/processor.VoidDescribe, call to example.com/guards/gateway.Void

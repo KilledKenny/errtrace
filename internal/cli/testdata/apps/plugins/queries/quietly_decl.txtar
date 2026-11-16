@@ -10,5 +10,5 @@ $WORK/dispatch/dispatch.go:246:18-29: Error Set of example.com/plugins/dispatch.
 $WORK/drivers/drivers.go:13:2-10: sentinel example.com/plugins/drivers.ErrEmail
 	path (origin → target):
 		$WORK/drivers/drivers.go:26:10-18: in (example.com/plugins/drivers.Email).Send
-		$WORK/dispatch/fanout.go:13:68-77: in example.com/plugins/dispatch.SendPair, call to (example.com/plugins/drivers.Email).Send (dynamic (example.com/plugins/core.Driver).Send: 2 of 2 candidates)
+		$WORK/dispatch/fanout.go:13:68-93: in example.com/plugins/dispatch.SendPair, call to (example.com/plugins/drivers.Email).Send (dynamic (example.com/plugins/core.Driver).Send: 2 of 2 candidates)
 		$WORK/dispatch/dispatch.go:247:9-36: in example.com/plugins/dispatch.SendQuietly, call to example.com/plugins/dispatch.SendPair

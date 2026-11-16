@@ -1,0 +1,43 @@
+SUSPECTED BUG (precision): same Target as is_truncated_default with
+-chain-depth=10, so the whole chain is visible. errors.Is finds doc.ErrDisk below
+all 10 Wraps; expected 0 entries. Actual: doc.ErrDisk is kept as possibly handled
+with "wrapped value may be nil": a Wrap of an unguarded call result
+(fmt.Errorf("fsync: %w", commit()), &OpError{Err: writeFile()}) counts as possibly
+holding nil although none of these callees can return nil.
+-- args --
+-chain-depth=10 pipeline.go:@rolloutlenient
+-- stdout --
+$WORK/pipeline.go:75:25-39: Error Set of example.com/wrapchain.rolloutLenient: 1 entries, 1 possibly handled
+$WORK/doc/doc.go:22:2-9: sentinel example.com/wrapchain/doc.ErrDisk
+	wrap chain (origin → target):
+		$WORK/export/deliver.go:16:36-69: fmt.Errorf "fsync: %w"
+		$WORK/xerr/helpers.go:29:9-35: *example.com/wrapchain/xerr.OpError.Unwrap
+		$WORK/export/deliver.go:20:43-68: errors.Join
+		$WORK/export/deliver.go:22:40-78: fmt.Errorf "file: %w"
+		$WORK/export/deliver.go:24:39-81: *example.com/wrapchain/xerr.OpError.Unwrap
+		$WORK/xerr/helpers.go:21:9-64: fmt.Errorf "%s: %w"
+		$WORK/export/deliver.go:28:37-76: fmt.Errorf "upload: %w"
+		$WORK/export/deliver.go:31:38-73: fmt.Errorf "deliver: %w"
+		$WORK/export/deliver.go:34:38-74: fmt.Errorf "release: %w"
+		$WORK/export/deliver.go:37:39-75: fmt.Errorf "rollout: %w"
+	possibly handled:
+		$WORK/pipeline.go:77:5-32: errors.Is with example.com/wrapchain/doc.ErrDisk: wrapped value may be nil
+	path (origin → target):
+		$WORK/export/deliver.go:14:30-41: in example.com/wrapchain/export.commit
+		$WORK/export/deliver.go:16:60-68: in example.com/wrapchain/export.fsync, call to example.com/wrapchain/export.commit
+		$WORK/export/deliver.go:18:62-69: in example.com/wrapchain/export.writeBlock, call to example.com/wrapchain/export.fsync
+		$WORK/xerr/helpers.go:26:5-8: in example.com/wrapchain/xerr.WithOp
+		$WORK/export/deliver.go:18:41-70: in example.com/wrapchain/export.writeBlock, call to example.com/wrapchain/xerr.WithOp
+		$WORK/export/deliver.go:20:55-67: in example.com/wrapchain/export.writeSegment, call to example.com/wrapchain/export.writeBlock
+		$WORK/export/deliver.go:22:63-77: in example.com/wrapchain/export.writeFile, call to example.com/wrapchain/export.writeSegment
+		$WORK/export/deliver.go:24:69-80: in example.com/wrapchain/export.writeDir, call to example.com/wrapchain/export.writeFile
+		$WORK/export/deliver.go:26:49-59: in example.com/wrapchain/export.publish, call to example.com/wrapchain/export.writeDir
+		$WORK/xerr/helpers.go:18:5-8: in example.com/wrapchain/xerr.Wrapf
+		$WORK/export/deliver.go:26:38-77: in example.com/wrapchain/export.publish, call to example.com/wrapchain/xerr.Wrapf
+		$WORK/export/deliver.go:28:66-75: in example.com/wrapchain/export.upload, call to example.com/wrapchain/export.publish
+		$WORK/xerr/helpers.go:8:9-36: in example.com/wrapchain/xerr.Annotatef
+		$WORK/export/deliver.go:28:37-76: in example.com/wrapchain/export.upload, call to example.com/wrapchain/xerr.Annotatef
+		$WORK/export/deliver.go:31:64-72: in example.com/wrapchain/export.Deliver, call to example.com/wrapchain/export.upload
+		$WORK/export/deliver.go:34:64-73: in example.com/wrapchain/export.Release, call to example.com/wrapchain/export.Deliver
+		$WORK/export/deliver.go:37:65-74: in example.com/wrapchain/export.Rollout, call to example.com/wrapchain/export.Release
+		$WORK/pipeline.go:76:9-25: in example.com/wrapchain.rolloutLenient, call to example.com/wrapchain/export.Rollout

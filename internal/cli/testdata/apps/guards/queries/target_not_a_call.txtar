@@ -4,6 +4,6 @@ Expect exit 2 and a "no function declaration or call at position" style message;
 cmd/guards/main.go:@mainIf
 -- stdout --
 -- stderr --
-errtrace: $WORK/cmd/guards/main.go:99:16: no function declaration or call at position
+errtrace: $WORK/cmd/guards/main.go:110:16: no function declaration or call at position
 -- exit --
 2

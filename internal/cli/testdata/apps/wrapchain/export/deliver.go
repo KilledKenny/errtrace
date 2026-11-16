@@ -35,3 +35,13 @@ func /*@l9*/Release() error { return fmt.Errorf("release: %w", Deliver()) }
 
 // Rollout is 10 Wraps away.
 func /*@l10*/Rollout() error { return fmt.Errorf("rollout: %w", Release()) }
+
+// SyncLenient swallows disk failures of fsync, which wraps the result of
+// commit without a nil check; commit never returns nil.
+func /*@synclenient*/SyncLenient() error {
+	err := fsync()
+	if errors.Is(err, doc.ErrDisk) {
+		return nil
+	}
+	return err
+}

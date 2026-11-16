@@ -14,7 +14,7 @@ $WORK/drivers/drivers.go:16:2-10: sentinel example.com/plugins/drivers.ErrPager
 	path (origin → target):
 		$WORK/drivers/drivers.go:82:10-18: in (example.com/plugins/drivers.Pager).Send
 		$WORK/dispatch/fanout.go:31:74-83: in example.com/plugins/dispatch.SendWrapped, call to (example.com/plugins/drivers.Pager).Send (dynamic (example.com/plugins/core.Driver).Send: 3 of 3 candidates)
-$WORK/drivers/extra.go:14:2-9: sentinel example.com/plugins/drivers.ErrBase
+$WORK/drivers/extra.go:15:2-9: sentinel example.com/plugins/drivers.ErrBase
 	path (origin → target):
-		$WORK/drivers/extra.go:39:47-54: in (example.com/plugins/drivers.base).Send
+		$WORK/drivers/extra.go:40:47-54: in (example.com/plugins/drivers.base).Send
 		$WORK/dispatch/fanout.go:31:74-83: in example.com/plugins/dispatch.SendWrapped, call to (example.com/plugins/drivers.base).Send (dynamic (example.com/plugins/core.Driver).Send: 3 of 3 candidates)

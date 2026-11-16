@@ -2,6 +2,7 @@ package drivers
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"strconv"
 
@@ -90,6 +91,17 @@ func (g Gateway) /*@gw_send*/Send(e core.Event) error {
 	}
 	if e.Priority > 9 {
 		return ErrBusy
+	}
+	return nil
+}
+
+// Audited decorates a Driver. It embeds the interface but declares its own
+// Send, which shadows the promoted one.
+type Audited struct{ core.Driver }
+
+func (a Audited) Send(e core.Event) error {
+	if err := a.Driver.Send(e); err != nil {
+		return fmt.Errorf("audited: %w", err)
 	}
 	return nil
 }

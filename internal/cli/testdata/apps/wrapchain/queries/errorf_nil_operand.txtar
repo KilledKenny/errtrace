@@ -1,7 +1,8 @@
 SUSPECTED BUG: expected 2 entries: doc.ErrSyntax wrapped by fmt.Errorf "tag: %w",
 and an entry for the path where the %w operand is a nil error (fmt.Errorf still
 returns a non-nil error; errorf_always_nil_operand shows it as opaque fmt.Errorf).
-Actual: only doc.ErrSyntax; the nil alternative of the operand is dropped silently.
+Actual: only doc.ErrSyntax; the nil alternative of the operand is dropped silently,
+so the set misses a path on which Tag fails.
 -- args --
 parse/parse.go:@tag
 -- stdout --

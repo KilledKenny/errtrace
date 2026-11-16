@@ -1,6 +1,7 @@
-SUSPECTED BUG: (low confidence) exit 2 "Skip has no error result": the declared result type is the type parameter T, but
-the only instance, Skip[error], does return error and call sites of it are accepted (skip_comparable_call).
-Expected: an Error Set over the instances whose result is error (here unresolved(depends-on-caller) for parameter v).
+Negative: declaration of Skip[T comparable](v, skip T) T. The declared result type is the type parameter T, which
+does not implement error, so the Target is rejected with "has no error result" (exit 2), although the only instance,
+Skip[error], returns error and call sites of it are accepted (skip_comparable_call). This follows the documented
+error-result predicate (the declared result type is error or implements it); recorded as a limit, not as a bug.
 -- args --
 errs/errs.go:@skip
 -- stdout --

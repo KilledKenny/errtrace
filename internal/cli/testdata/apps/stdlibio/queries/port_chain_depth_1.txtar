@@ -1,6 +1,8 @@
-Same Target as port_wrap_numerror with -chain-depth 1: the chains are two links deep
-(NumError.Unwrap, fmt.Errorf), so every entry must be marked [chain truncated]; the
-same origins (ErrSyntax, ErrRange, ...) must still be listed.
+Same Target as port_wrap_numerror with -chain-depth 1. The entries whose chain is two
+links deep (*strconv.NumError.Unwrap -> fmt.Errorf: ErrSyntax, ErrRange and the two
+opaque base/bitSize errors) must be marked [chain truncated] and show only the outer
+link fmt.Errorf "config: port %q: %w"; the bare internal/strconv.Error entries have a
+one-link chain, which fits, and must NOT be marked. The same 17 origins are listed.
 -- args --
 -chain-depth 1 config/config.go:@port
 -- stdout --

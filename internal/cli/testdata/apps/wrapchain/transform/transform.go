@@ -210,3 +210,45 @@ func /*@peeltwice*/PeelTwice(d *doc.Document) error {
 	outer := fmt.Errorf("outer: %w", inner)
 	return errors.Unwrap(outer)
 }
+
+// Settle drops what matches ErrRetryable; only CodeError.Is can.
+func /*@settle*/Settle(d *doc.Document) error {
+	err := fetch(d)
+	if errors.Is(err, xerr.ErrRetryable) {
+		return nil
+	}
+	return err
+}
+
+func deadline(d *doc.Document) error {
+	if d.Version > 3 {
+		return &xerr.TimeoutError{Op: "deadline", Err: doc.ErrDisk}
+	}
+	return nil
+}
+
+// Patient drops timeouts: TimeoutError.Is always matches ErrRetryable.
+func /*@patient*/Patient(d *doc.Document) error {
+	err := deadline(d)
+	if errors.Is(err, xerr.ErrRetryable) {
+		return nil
+	}
+	return err
+}
+
+// Durable drops disk failures, found through TimeoutError.Unwrap.
+func /*@durable*/Durable(d *doc.Document) error {
+	err := deadline(d)
+	if errors.Is(err, doc.ErrDisk) {
+		return nil
+	}
+	return err
+}
+
+// FieldRef returns a pointer to the value-receiver wrapper.
+func /*@fieldref*/FieldRef(d *doc.Document, name string) error {
+	if v := d.Fields[name]; len(v) > doc.MaxLine {
+		return &xerr.FieldError{Field: name, Cause: doc.ErrTooLong}
+	}
+	return nil
+}

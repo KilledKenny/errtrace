@@ -1,9 +1,9 @@
-SUSPECTED BUG: wrong span for the zero-size literal. The entry for the fresh payerr.Empty{} (gateway.go
-"return payerr.Empty{}") is reported at a zero-width span on the return keyword (L:3-3) for both the entry
-and its first path hop; expected the span of the composite literal (L:10-24), as for ValidationError{...}.
-Otherwise as expected: == against a value-type sentinel (ErrBadAmount = ValidationError{"amount"}) and a
-zero-size one (ErrEmpty = Empty{}) removes both sentinels; the fresh ValidationError{"amount"} and Empty{}
-may compare equal by value, so they are kept and marked possibly handled (precise answer: 0 entries).
+SUSPECTED BUG (cosmetic): zero-width span for the zero-size literal payerr.Empty{}.
+== against a value-type sentinel (ErrBadAmount = ValidationError{"amount"}) and a zero-size one (ErrEmpty =
+Empty{}) removes both sentinels; the fresh ValidationError{"amount"} and Empty{} compare equal by value at run
+time (precise answer: 0 entries), so keeping them marked possibly handled is the expected sound result.
+But the entry for "return payerr.Empty{}" is reported at a zero-width span on the return keyword (L:3-3), for
+the entry and its first hop; expected the span of the composite literal (L:10-24), as for ValidationError{...}.
 -- args --
 processor/eq.go:@valueSentinels
 -- stdout --

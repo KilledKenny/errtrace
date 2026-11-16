@@ -1,4 +1,4 @@
-Negative: a handler that logs and swallows every error of svc.Exists.
+Negative: a handler that logs and swallows every error of svc.Exists (dynamic store.Get + errors.Is guard).
 Expect 0 entries.
 -- args --
 api/api.go:@handle_health

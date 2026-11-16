@@ -1,0 +1,22 @@
+Call site in an if-init statement whose result is wrapped afterwards.
+Expect validate.Key's 4 origins bare (no "get: %w").
+-- args --
+service/service.go:@key_call
+-- stdout --
+$WORK/service/service.go:32:12-42: Error Set of call to validate.Key in (*example.com/kvstore/service.Service).Get: 4 entries
+$WORK/kverr/kverr.go:44:5-16: sentinel example.com/kvstore/kverr.ErrEmptyKey
+	path (origin → target):
+		$WORK/validate/validate.go:13:10-27: in example.com/kvstore/validate.Key
+		$WORK/service/service.go:32:12-42: in (*example.com/kvstore/service.Service).Get, call to example.com/kvstore/validate.Key
+$WORK/validate/validate.go:16:10-68: concrete example.com/kvstore/kverr.FieldError
+	path (origin → target):
+		$WORK/validate/validate.go:16:10-68: in example.com/kvstore/validate.Key
+		$WORK/service/service.go:32:12-42: in (*example.com/kvstore/service.Service).Get, call to example.com/kvstore/validate.Key
+$WORK/validate/validate.go:19:3-3: concrete example.com/kvstore/kverr.Reason
+	path (origin → target):
+		$WORK/validate/validate.go:19:3-3: in example.com/kvstore/validate.Key
+		$WORK/service/service.go:32:12-42: in (*example.com/kvstore/service.Service).Get, call to example.com/kvstore/validate.Key
+$WORK/validate/validate.go:22:3-3: concrete example.com/kvstore/kverr.Code
+	path (origin → target):
+		$WORK/validate/validate.go:22:3-3: in example.com/kvstore/validate.Key
+		$WORK/service/service.go:32:12-42: in (*example.com/kvstore/service.Service).Get, call to example.com/kvstore/validate.Key

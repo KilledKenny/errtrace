@@ -1,5 +1,5 @@
-Negative-ish: errors.As guard leaves a single origin. Get's errors are swallowed (return nil), Debit's
-sentinels (wrapped "debit %s: %w") fail errors.As(InsufficientFundsError) and become nil.
+Guard that leaves a single origin: Get's errors are swallowed (return nil), Debit's sentinels (wrapped
+"debit %s: %w") fail errors.As(InsufficientFundsError) and become nil.
 Expect exactly 1 entry: concrete domain.InsufficientFundsError, no chain.
 -- args --
 service/service.go:@canpay

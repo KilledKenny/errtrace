@@ -1,0 +1,14 @@
+SUSPECTED BUG: exit 2 "no SSA call instruction for call to v.Validate in validate.Check[T]". Check is also called from
+other generic bodies (All[T], (*Repo[ID,T]).Save) with their type parameter as type argument; that abstract instance
+Check[T] is an instantiation wrapper without the call, and the call-site Target fails on it instead of skipping it.
+The declaration query (check_decl) works. Minimal repro: func Check[T V](v T) error { return v.Validate() } plus
+func All[T V](v T) error { return Check(v) }; without All the same call-site query succeeds.
+Call site v.Validate() inside the generic body of Check: one site per instance, static in five of them (UserID, Name,
+*Email, model.User, model.Tag) and dynamic in Check[Validator]. Expect the same 7 entries as check_decl.
+-- args --
+validate/validate.go:@checkcall
+-- stdout --
+-- stderr --
+errtrace: $WORK/validate/validate.go:54:82: no SSA call instruction for call to v.Validate in example.com/generics/validate.Check[T]
+-- exit --
+2

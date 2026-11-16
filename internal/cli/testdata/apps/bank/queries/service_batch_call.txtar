@@ -1,11 +1,13 @@
-Guards over the whole Transfer set: Batch skips errors.Is(err, ErrDuplicate), returns cancellations as is and
-joins the rest.
-Expect Transfer's set behind errors.Join (and context.Canceled-containing errors also bare);
-domain.ErrDuplicate must NOT appear.
+SUSPECTED BUG: guards over the whole Transfer set. Batch skips errors.Is(err, ErrDuplicate), returns cancellations as
+is and joins the rest in a loop. Correct set: Transfer's set (see service_transfer_decl) behind errors.Join, the
+context.Canceled-containing ones also bare; domain.ErrDuplicate must NOT appear. Actual: ErrDuplicate is absent only
+because execute's errors are invisible (tx_withtx_decl); 88 of 89 entries are "possibly handled" because every
+operand of the joins may be unresolved, the result hits unresolved(fixpoint-limit), and the errors of other
+callers' retry closures (errDryRun, NotFoundError) are included.
 -- args --
 -fanout=2 cmd/cli/main.go:@svc_batch_call
 -- stdout --
-$WORK/cmd/cli/main.go:137:9-46: Error Set of call to svc.Batch in example.com/bank/cmd/cli.batch: 89 entries, 13 unresolved, 88 possibly handled
+$WORK/cmd/cli/main.go:141:9-46: Error Set of call to svc.Batch in example.com/bank/cmd/cli.batch: 89 entries, 13 unresolved, 88 possibly handled
 $GOROOT/src/io/io.go:*: sentinel io.ErrShortWrite
 	wrap chain (origin → target):
 		$WORK/audit/audit.go:68:10-58: fmt.Errorf "audit: write: %w"
@@ -19,7 +21,7 @@ $GOROOT/src/io/io.go:*: sentinel io.ErrShortWrite
 		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
 		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
 		$WORK/service/service.go:91:10-28: in (*example.com/bank/service.Service).Batch, call to (*example.com/bank/service.Service).Transfer
-		$WORK/cmd/cli/main.go:137:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
+		$WORK/cmd/cli/main.go:141:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
 $WORK/audit/audit.go:16:2-11: sentinel example.com/bank/audit.ErrClosed
 	wrap chain (origin → target):
 		$WORK/service/service.go:47:10-32: errors.Join
@@ -31,7 +33,7 @@ $WORK/audit/audit.go:16:2-11: sentinel example.com/bank/audit.ErrClosed
 		$WORK/audit/audit.go:51:10-19: in (*example.com/bank/audit.Logger).Record
 		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
 		$WORK/service/service.go:91:10-28: in (*example.com/bank/service.Service).Batch, call to (*example.com/bank/service.Service).Transfer
-		$WORK/cmd/cli/main.go:137:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
+		$WORK/cmd/cli/main.go:141:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
 $WORK/audit/audit.go:16:2-11: sentinel example.com/bank/audit.ErrClosed
 	wrap chain (origin → target):
 		$WORK/service/service.go:47:10-32: errors.Join
@@ -44,7 +46,7 @@ $WORK/audit/audit.go:16:2-11: sentinel example.com/bank/audit.ErrClosed
 		$WORK/audit/audit.go:51:10-19: in (*example.com/bank/audit.Logger).Record
 		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
 		$WORK/service/service.go:91:10-28: in (*example.com/bank/service.Service).Batch, call to (*example.com/bank/service.Service).Transfer
-		$WORK/cmd/cli/main.go:137:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
+		$WORK/cmd/cli/main.go:141:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
 $WORK/audit/audit.go:16:2-11: sentinel example.com/bank/audit.ErrClosed
 	wrap chain (origin → target):
 		$WORK/service/service.go:47:10-32: errors.Join
@@ -58,7 +60,7 @@ $WORK/audit/audit.go:16:2-11: sentinel example.com/bank/audit.ErrClosed
 		$WORK/audit/audit.go:51:10-19: in (*example.com/bank/audit.Logger).Record
 		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
 		$WORK/service/service.go:91:10-28: in (*example.com/bank/service.Service).Batch, call to (*example.com/bank/service.Service).Transfer
-		$WORK/cmd/cli/main.go:137:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
+		$WORK/cmd/cli/main.go:141:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
 $WORK/audit/audit.go:16:2-11: sentinel example.com/bank/audit.ErrClosed
 	wrap chain (origin → target):
 		$WORK/service/service.go:47:10-32: errors.Join
@@ -73,27 +75,10 @@ $WORK/audit/audit.go:16:2-11: sentinel example.com/bank/audit.ErrClosed
 		$WORK/audit/audit.go:51:10-19: in (*example.com/bank/audit.Logger).Record
 		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
 		$WORK/service/service.go:91:10-28: in (*example.com/bank/service.Service).Batch, call to (*example.com/bank/service.Service).Transfer
-		$WORK/cmd/cli/main.go:137:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
+		$WORK/cmd/cli/main.go:141:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
 $WORK/audit/audit.go:16:2-11: sentinel example.com/bank/audit.ErrClosed
 	wrap chain (origin → target):
 		$WORK/service/service.go:47:10-32: errors.Join
-		$WORK/service/service.go:98:12-36: errors.Join
-		$WORK/service/service.go:98:12-36: errors.Join
-		$WORK/service/service.go:98:12-36: errors.Join
-		$WORK/service/service.go:98:12-36: errors.Join
-		$WORK/service/service.go:98:12-36: errors.Join
-	possibly handled:
-		$WORK/service/service.go:93:20-55: errors.Is with example.com/bank/domain.ErrDuplicate: unresolved value
-		$WORK/service/service.go:95:8-40: errors.Is with context.Canceled: unresolved value
-	path (origin → target):
-		$WORK/audit/audit.go:51:10-19: in (*example.com/bank/audit.Logger).Record
-		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
-		$WORK/service/service.go:91:10-28: in (*example.com/bank/service.Service).Batch, call to (*example.com/bank/service.Service).Transfer
-		$WORK/cmd/cli/main.go:137:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
-$WORK/audit/audit.go:16:2-11: sentinel example.com/bank/audit.ErrClosed
-	wrap chain (origin → target):
-		$WORK/service/service.go:47:10-32: errors.Join
-		$WORK/service/service.go:98:12-36: errors.Join
 		$WORK/service/service.go:98:12-36: errors.Join
 		$WORK/service/service.go:98:12-36: errors.Join
 		$WORK/service/service.go:98:12-36: errors.Join
@@ -106,11 +91,10 @@ $WORK/audit/audit.go:16:2-11: sentinel example.com/bank/audit.ErrClosed
 		$WORK/audit/audit.go:51:10-19: in (*example.com/bank/audit.Logger).Record
 		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
 		$WORK/service/service.go:91:10-28: in (*example.com/bank/service.Service).Batch, call to (*example.com/bank/service.Service).Transfer
-		$WORK/cmd/cli/main.go:137:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
+		$WORK/cmd/cli/main.go:141:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
 $WORK/audit/audit.go:16:2-11: sentinel example.com/bank/audit.ErrClosed
 	wrap chain (origin → target):
 		$WORK/service/service.go:47:10-32: errors.Join
-		$WORK/service/service.go:98:12-36: errors.Join
 		$WORK/service/service.go:98:12-36: errors.Join
 		$WORK/service/service.go:98:12-36: errors.Join
 		$WORK/service/service.go:98:12-36: errors.Join
@@ -124,7 +108,25 @@ $WORK/audit/audit.go:16:2-11: sentinel example.com/bank/audit.ErrClosed
 		$WORK/audit/audit.go:51:10-19: in (*example.com/bank/audit.Logger).Record
 		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
 		$WORK/service/service.go:91:10-28: in (*example.com/bank/service.Service).Batch, call to (*example.com/bank/service.Service).Transfer
-		$WORK/cmd/cli/main.go:137:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
+		$WORK/cmd/cli/main.go:141:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
+$WORK/audit/audit.go:16:2-11: sentinel example.com/bank/audit.ErrClosed
+	wrap chain (origin → target):
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/service/service.go:98:12-36: errors.Join
+		$WORK/service/service.go:98:12-36: errors.Join
+		$WORK/service/service.go:98:12-36: errors.Join
+		$WORK/service/service.go:98:12-36: errors.Join
+		$WORK/service/service.go:98:12-36: errors.Join
+		$WORK/service/service.go:98:12-36: errors.Join
+		$WORK/service/service.go:98:12-36: errors.Join
+	possibly handled:
+		$WORK/service/service.go:93:20-55: errors.Is with example.com/bank/domain.ErrDuplicate: unresolved value
+		$WORK/service/service.go:95:8-40: errors.Is with context.Canceled: unresolved value
+	path (origin → target):
+		$WORK/audit/audit.go:51:10-19: in (*example.com/bank/audit.Logger).Record
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/service/service.go:91:10-28: in (*example.com/bank/service.Service).Batch, call to (*example.com/bank/service.Service).Transfer
+		$WORK/cmd/cli/main.go:141:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
 $WORK/audit/audit.go:16:2-11: sentinel example.com/bank/audit.ErrClosed [chain truncated]
 	wrap chain (origin → target):
 		$WORK/service/service.go:98:12-36: errors.Join
@@ -142,7 +144,7 @@ $WORK/audit/audit.go:16:2-11: sentinel example.com/bank/audit.ErrClosed [chain t
 		$WORK/audit/audit.go:51:10-19: in (*example.com/bank/audit.Logger).Record
 		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
 		$WORK/service/service.go:91:10-28: in (*example.com/bank/service.Service).Batch, call to (*example.com/bank/service.Service).Transfer
-		$WORK/cmd/cli/main.go:137:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
+		$WORK/cmd/cli/main.go:141:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
 $WORK/retry/retry.go:15:2-11: sentinel example.com/bank/retry.ErrGaveUp
 	wrap chain (origin → target):
 		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
@@ -156,7 +158,7 @@ $WORK/retry/retry.go:15:2-11: sentinel example.com/bank/retry.ErrGaveUp
 		$WORK/retry/retry.go:44:48-57: in example.com/bank/retry.Do
 		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
 		$WORK/service/service.go:91:10-28: in (*example.com/bank/service.Service).Batch, call to (*example.com/bank/service.Service).Transfer
-		$WORK/cmd/cli/main.go:137:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
+		$WORK/cmd/cli/main.go:141:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
 $WORK/retry/retry.go:15:2-11: sentinel example.com/bank/retry.ErrGaveUp
 	wrap chain (origin → target):
 		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
@@ -171,7 +173,7 @@ $WORK/retry/retry.go:15:2-11: sentinel example.com/bank/retry.ErrGaveUp
 		$WORK/retry/retry.go:44:48-57: in example.com/bank/retry.Do
 		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
 		$WORK/service/service.go:91:10-28: in (*example.com/bank/service.Service).Batch, call to (*example.com/bank/service.Service).Transfer
-		$WORK/cmd/cli/main.go:137:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
+		$WORK/cmd/cli/main.go:141:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
 $WORK/retry/retry.go:15:2-11: sentinel example.com/bank/retry.ErrGaveUp
 	wrap chain (origin → target):
 		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
@@ -187,7 +189,7 @@ $WORK/retry/retry.go:15:2-11: sentinel example.com/bank/retry.ErrGaveUp
 		$WORK/retry/retry.go:44:48-57: in example.com/bank/retry.Do
 		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
 		$WORK/service/service.go:91:10-28: in (*example.com/bank/service.Service).Batch, call to (*example.com/bank/service.Service).Transfer
-		$WORK/cmd/cli/main.go:137:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
+		$WORK/cmd/cli/main.go:141:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
 $WORK/retry/retry.go:15:2-11: sentinel example.com/bank/retry.ErrGaveUp
 	wrap chain (origin → target):
 		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
@@ -204,7 +206,7 @@ $WORK/retry/retry.go:15:2-11: sentinel example.com/bank/retry.ErrGaveUp
 		$WORK/retry/retry.go:44:48-57: in example.com/bank/retry.Do
 		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
 		$WORK/service/service.go:91:10-28: in (*example.com/bank/service.Service).Batch, call to (*example.com/bank/service.Service).Transfer
-		$WORK/cmd/cli/main.go:137:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
+		$WORK/cmd/cli/main.go:141:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
 $WORK/retry/retry.go:15:2-11: sentinel example.com/bank/retry.ErrGaveUp
 	wrap chain (origin → target):
 		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
@@ -222,7 +224,7 @@ $WORK/retry/retry.go:15:2-11: sentinel example.com/bank/retry.ErrGaveUp
 		$WORK/retry/retry.go:44:48-57: in example.com/bank/retry.Do
 		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
 		$WORK/service/service.go:91:10-28: in (*example.com/bank/service.Service).Batch, call to (*example.com/bank/service.Service).Transfer
-		$WORK/cmd/cli/main.go:137:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
+		$WORK/cmd/cli/main.go:141:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
 $WORK/retry/retry.go:15:2-11: sentinel example.com/bank/retry.ErrGaveUp [chain truncated]
 	wrap chain (origin → target):
 		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
@@ -240,7 +242,7 @@ $WORK/retry/retry.go:15:2-11: sentinel example.com/bank/retry.ErrGaveUp [chain t
 		$WORK/retry/retry.go:44:48-57: in example.com/bank/retry.Do
 		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
 		$WORK/service/service.go:91:10-28: in (*example.com/bank/service.Service).Batch, call to (*example.com/bank/service.Service).Transfer
-		$WORK/cmd/cli/main.go:137:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
+		$WORK/cmd/cli/main.go:141:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
 $WORK/retry/retry.go:15:2-11: sentinel example.com/bank/retry.ErrGaveUp [chain truncated]
 	wrap chain (origin → target):
 		$WORK/service/service.go:47:10-32: errors.Join
@@ -258,7 +260,7 @@ $WORK/retry/retry.go:15:2-11: sentinel example.com/bank/retry.ErrGaveUp [chain t
 		$WORK/retry/retry.go:44:48-57: in example.com/bank/retry.Do
 		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
 		$WORK/service/service.go:91:10-28: in (*example.com/bank/service.Service).Batch, call to (*example.com/bank/service.Service).Transfer
-		$WORK/cmd/cli/main.go:137:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
+		$WORK/cmd/cli/main.go:141:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
 $WORK/retry/retry.go:15:2-11: sentinel example.com/bank/retry.ErrGaveUp [chain truncated]
 	wrap chain (origin → target):
 		$WORK/service/service.go:98:12-36: errors.Join
@@ -276,11 +278,11 @@ $WORK/retry/retry.go:15:2-11: sentinel example.com/bank/retry.ErrGaveUp [chain t
 		$WORK/retry/retry.go:44:48-57: in example.com/bank/retry.Do
 		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
 		$WORK/service/service.go:91:10-28: in (*example.com/bank/service.Service).Batch, call to (*example.com/bank/service.Service).Transfer
-		$WORK/cmd/cli/main.go:137:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
+		$WORK/cmd/cli/main.go:141:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
 $WORK/service/service.go:88:29-34: unresolved(fixpoint-limit): result 0 of (*example.com/bank/service.Service).Batch can carry more than 1024 values
 	path (origin → target):
 		$WORK/service/service.go:88:29-34: in (*example.com/bank/service.Service).Batch
-		$WORK/cmd/cli/main.go:137:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
+		$WORK/cmd/cli/main.go:141:9-46: in example.com/bank/cmd/cli.batch, call to (*example.com/bank/service.Service).Batch
 $WORK/audit/audit.go:63:12-50: group of 23 entries via dynamic call to (io.Writer).Write (3 candidates) in example.com/bank/audit.Write
 	$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing (candidate (*os.File).Write)
 	$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing (candidate (*os.File).Write)
@@ -344,13 +346,13 @@ $WORK/retry/retry.go:31:10-14: group of 48 entries via dynamic call to function 
 	$GOROOT/src/strconv/number.go:*: opaque errors.New (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
 	-: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
 	$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
-	$WORK/tx/tx.go:24:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
-	$WORK/tx/tx.go:24:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
-	$WORK/tx/tx.go:24:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
-	$WORK/tx/tx.go:24:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
-	$WORK/tx/tx.go:24:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
-	$WORK/tx/tx.go:24:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
-	$WORK/tx/tx.go:24:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
-	$WORK/tx/tx.go:24:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
-	$WORK/tx/tx.go:38:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
-	$WORK/tx/tx.go:40:2-2: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
+	$WORK/tx/tx.go:25:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
+	$WORK/tx/tx.go:25:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
+	$WORK/tx/tx.go:25:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
+	$WORK/tx/tx.go:25:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
+	$WORK/tx/tx.go:25:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
+	$WORK/tx/tx.go:25:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
+	$WORK/tx/tx.go:25:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
+	$WORK/tx/tx.go:25:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
+	$WORK/tx/tx.go:39:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
+	$WORK/tx/tx.go:41:2-2: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)

@@ -8,70 +8,70 @@ $WORK/main.go:49:22-35: Error Set of call to diagnostics in example.com/stdlibio
 $WORK/murky/murky.go:27:5-12: sentinel example.com/stdlibio/murky.lastErr
 	path (origin → target):
 		$WORK/murky/murky.go:34:9-16: in example.com/stdlibio/murky.Last
-		$WORK/main.go:188:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio/murky.Last (dynamic function value of type func() error: 12 of 12 candidates)
+		$WORK/main.go:191:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio/murky.Last (dynamic function value of type func() error: 12 of 12 candidates)
 		$WORK/main.go:49:22-35: in example.com/stdlibio.run, call to example.com/stdlibio.diagnostics
 -: unresolved(memory): load of escaping variable err
 	path (origin → target):
 		-: in example.com/stdlibio/murky.Guarded
-		$WORK/main.go:179:25-72: in example.com/stdlibio.diagnostics$3, call to example.com/stdlibio/murky.Guarded
-		$WORK/main.go:188:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio.diagnostics$3 (dynamic function value of type func() error: 12 of 12 candidates)
+		$WORK/main.go:182:25-72: in example.com/stdlibio.diagnostics$3, call to example.com/stdlibio/murky.Guarded
+		$WORK/main.go:191:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio.diagnostics$3 (dynamic function value of type func() error: 12 of 12 candidates)
 		$WORK/main.go:49:22-35: in example.com/stdlibio.run, call to example.com/stdlibio.diagnostics
 $WORK/murky/murky.go:41:9-15: unresolved(memory): channel receive
 	path (origin → target):
 		$WORK/murky/murky.go:41:9-15: in example.com/stdlibio/murky.FromChannel
-		$WORK/main.go:188:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio/murky.FromChannel (dynamic function value of type func() error: 12 of 12 candidates)
+		$WORK/main.go:191:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio/murky.FromChannel (dynamic function value of type func() error: 12 of 12 candidates)
 		$WORK/main.go:49:22-35: in example.com/stdlibio.run, call to example.com/stdlibio.diagnostics
 $WORK/murky/murky.go:55:9-14: unresolved(memory): load of field err of *example.com/stdlibio/murky.Stage
 	path (origin → target):
 		$WORK/murky/murky.go:55:9-14: in (*example.com/stdlibio/murky.Stage).Err
-		$WORK/main.go:188:27-34: in example.com/stdlibio.diagnostics, call to (*example.com/stdlibio/murky.Stage).Err (dynamic function value of type func() error: 12 of 12 candidates)
+		$WORK/main.go:191:27-34: in example.com/stdlibio.diagnostics, call to (*example.com/stdlibio/murky.Stage).Err (dynamic function value of type func() error: 12 of 12 candidates)
 		$WORK/main.go:49:22-35: in example.com/stdlibio.run, call to example.com/stdlibio.diagnostics
 $WORK/murky/murky.go:61:9-23: unresolved(memory): load of map element
 	path (origin → target):
 		$WORK/murky/murky.go:61:9-23: in example.com/stdlibio/murky.FromMap
-		$WORK/main.go:177:25-47: in example.com/stdlibio.diagnostics$1, call to example.com/stdlibio/murky.FromMap
-		$WORK/main.go:188:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio.diagnostics$1 (dynamic function value of type func() error: 12 of 12 candidates)
+		$WORK/main.go:180:25-47: in example.com/stdlibio.diagnostics$1, call to example.com/stdlibio/murky.FromMap
+		$WORK/main.go:191:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio.diagnostics$1 (dynamic function value of type func() error: 12 of 12 candidates)
 		$WORK/main.go:49:22-35: in example.com/stdlibio.run, call to example.com/stdlibio.diagnostics
 $WORK/murky/murky.go:75:9-16: unresolved(memory): load of slice or array element
 	path (origin → target):
 		$WORK/murky/murky.go:75:9-16: in example.com/stdlibio/murky.FromSlice
-		$WORK/main.go:178:25-63: in example.com/stdlibio.diagnostics$2, call to example.com/stdlibio/murky.FromSlice
-		$WORK/main.go:188:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio.diagnostics$2 (dynamic function value of type func() error: 12 of 12 candidates)
+		$WORK/main.go:181:25-63: in example.com/stdlibio.diagnostics$2, call to example.com/stdlibio/murky.FromSlice
+		$WORK/main.go:191:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio.diagnostics$2 (dynamic function value of type func() error: 12 of 12 candidates)
 		$WORK/main.go:49:22-35: in example.com/stdlibio.run, call to example.com/stdlibio.diagnostics
 $WORK/murky/murky.go:90:2-2: unresolved(memory): load of escaping variable err
 	path (origin → target):
 		$WORK/murky/murky.go:90:2-2: in example.com/stdlibio/murky.Guarded
-		$WORK/main.go:179:25-72: in example.com/stdlibio.diagnostics$3, call to example.com/stdlibio/murky.Guarded
-		$WORK/main.go:188:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio.diagnostics$3 (dynamic function value of type func() error: 12 of 12 candidates)
+		$WORK/main.go:182:25-72: in example.com/stdlibio.diagnostics$3, call to example.com/stdlibio/murky.Guarded
+		$WORK/main.go:191:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio.diagnostics$3 (dynamic function value of type func() error: 12 of 12 candidates)
 		$WORK/main.go:49:22-35: in example.com/stdlibio.run, call to example.com/stdlibio.diagnostics
 $WORK/murky/murky.go:105:5-8: unresolved(memory): value of TypeAssert not modelled
 	path (origin → target):
 		$WORK/murky/murky.go:105:5-8: in example.com/stdlibio/murky.Reflective
-		$WORK/main.go:188:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio/murky.Reflective (dynamic function value of type func() error: 12 of 12 candidates)
+		$WORK/main.go:191:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio/murky.Reflective (dynamic function value of type func() error: 12 of 12 candidates)
 		$WORK/main.go:49:22-35: in example.com/stdlibio.run, call to example.com/stdlibio.diagnostics
 $WORK/murky/murky.go:132:9-14: unresolved(memory): load of field err of *example.com/stdlibio/murky.Group
 	path (origin → target):
 		$WORK/murky/murky.go:132:9-14: in (*example.com/stdlibio/murky.Group).Wait
 		$WORK/murky/murky.go:140:9-17: in example.com/stdlibio/murky.Parallel, call to (*example.com/stdlibio/murky.Group).Wait
-		$WORK/main.go:188:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio/murky.Parallel (dynamic function value of type func() error: 12 of 12 candidates)
+		$WORK/main.go:191:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio/murky.Parallel (dynamic function value of type func() error: 12 of 12 candidates)
 		$WORK/main.go:49:22-35: in example.com/stdlibio.run, call to example.com/stdlibio.diagnostics
 $WORK/murky/murky.go:154:9-11: unresolved(memory): load through pointer
 	path (origin → target):
 		$WORK/murky/murky.go:154:9-11: in example.com/stdlibio/murky.Health
-		$WORK/main.go:188:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio/murky.Health (dynamic function value of type func() error: 12 of 12 candidates)
+		$WORK/main.go:191:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio/murky.Health (dynamic function value of type func() error: 12 of 12 candidates)
 		$WORK/main.go:49:22-35: in example.com/stdlibio.run, call to example.com/stdlibio.diagnostics
 $WORK/murky/murky.go:161:9-21: unresolved(memory): load through pointer
 	path (origin → target):
 		$WORK/murky/murky.go:161:9-21: in example.com/stdlibio/murky.Reinterpret
-		$WORK/main.go:188:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio/murky.Reinterpret (dynamic function value of type func() error: 12 of 12 candidates)
+		$WORK/main.go:191:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio/murky.Reinterpret (dynamic function value of type func() error: 12 of 12 candidates)
 		$WORK/main.go:49:22-35: in example.com/stdlibio.run, call to example.com/stdlibio.diagnostics
 $WORK/murky/murky.go:167:9-22: unresolved(memory): value of TypeAssert not modelled
 	path (origin → target):
 		$WORK/murky/murky.go:167:9-22: in example.com/stdlibio/murky.RoundTrip
-		$WORK/main.go:188:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio/murky.RoundTrip (dynamic function value of type func() error: 12 of 12 candidates)
+		$WORK/main.go:191:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio/murky.RoundTrip (dynamic function value of type func() error: 12 of 12 candidates)
 		$WORK/main.go:49:22-35: in example.com/stdlibio.run, call to example.com/stdlibio.diagnostics
 $WORK/murky/murky.go:173:5-8: unresolved(memory): value of TypeAssert not modelled
 	path (origin → target):
 		$WORK/murky/murky.go:173:5-8: in example.com/stdlibio/murky.Boxed
-		$WORK/main.go:188:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio/murky.Boxed (dynamic function value of type func() error: 12 of 12 candidates)
+		$WORK/main.go:191:27-34: in example.com/stdlibio.diagnostics, call to example.com/stdlibio/murky.Boxed (dynamic function value of type func() error: 12 of 12 candidates)
 		$WORK/main.go:49:22-35: in example.com/stdlibio.run, call to example.com/stdlibio.diagnostics

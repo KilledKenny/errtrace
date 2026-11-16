@@ -66,7 +66,7 @@ func /*@strict*/Strict(s string) (bool, error) {
 
 // Since parses the "since" date.
 func /*@since*/Since(s string) (time.Time, error) {
-	t, err := time.Parse(time.DateOnly, s)
+	t, err := time./*@timeparse*/Parse(time.DateOnly, s)
 	if err != nil {
 		var pe *time.ParseError
 		if errors.As(err, &pe) {

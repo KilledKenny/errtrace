@@ -1,9 +1,13 @@
-SUSPECTED BUG: Slurp has a named result err that a deferred closure
-overwrites with fmt.Errorf("source: close: %w", cerr). Expected: os.Open origins under
-"source: open: %w", io.ReadAll/(*os.File).Read origins under "source: read: %w", sentinel
-source.ErrEmpty, and the (*os.File).Close origins under "source: close: %w" (plan S08).
-Actual: none of these origins or wraps; only Unresolved(memory) "load of escaping
-variable err" entries, one of them with the placeholder span "-" instead of a site.
+SUSPECTED BUG: (placeholder span "-") Slurp has a named result err that a deferred closure
+overwrites with fmt.Errorf("source: close: %w", cerr). The final expectation (plan S08,
+not implemented yet) is: os.Open origins under "source: open: %w", the io.ReadAll set
+(readall_call_site) under "source: read: %w", sentinel source.ErrEmpty, and the Close set
+(close_in_deferred_closure) under "source: close: %w". Today a variable captured and
+written by a closure is documented as Unresolved(memory) "load of escaping variable err"
+(e2e dynamic/freevar_other_closure_store), so 5 such entries, one per return plus the
+recover exit, and no origins is the honest interim result: nothing is silently dropped.
+What is wrong today is the entry for the recover exit: its span and its path hop are
+printed as "-" although the output contract says an Unresolved entry's span is its site.
 -- args --
 source/source.go:@slurp
 -- stdout --

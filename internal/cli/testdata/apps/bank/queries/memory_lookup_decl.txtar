@@ -1,13 +1,13 @@
-Generic function with a generic error type: lookup[K,V] returns domain.NotFoundError[K].
+Generic function with a generic error type: lookup[K, V] returns domain.NotFoundError[K].
 Two instances are reachable (AccountID from Get, TransferID from FindTransfer).
 Expect 2 entries: concrete NotFoundError[domain.AccountID] and NotFoundError[domain.TransferID].
 -- args --
 repo/memory/memory.go:@lookup
 -- stdout --
-$WORK/repo/memory/memory.go:73:17-23: Error Set of example.com/bank/repo/memory.lookup: 2 entries
-$WORK/repo/memory/memory.go:76:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID]
+$WORK/repo/memory/memory.go:85:17-23: Error Set of example.com/bank/repo/memory.lookup: 2 entries
+$WORK/repo/memory/memory.go:88:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID]
 	path (origin → target):
-		$WORK/repo/memory/memory.go:76:13-56: in example.com/bank/repo/memory.lookup[example.com/bank/domain.AccountID, *example.com/bank/domain.Account]
-$WORK/repo/memory/memory.go:76:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.TransferID]
+		$WORK/repo/memory/memory.go:88:13-56: in example.com/bank/repo/memory.lookup[example.com/bank/domain.AccountID, *example.com/bank/domain.Account]
+$WORK/repo/memory/memory.go:88:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.TransferID]
 	path (origin → target):
-		$WORK/repo/memory/memory.go:76:13-56: in example.com/bank/repo/memory.lookup[example.com/bank/domain.TransferID, bool]
+		$WORK/repo/memory/memory.go:88:13-56: in example.com/bank/repo/memory.lookup[example.com/bank/domain.TransferID, bool]

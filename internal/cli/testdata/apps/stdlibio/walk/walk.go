@@ -39,8 +39,8 @@ func /*@find*/Find(root string, max int) ([]string, error) {
 }
 
 // Has reports whether a file named name exists below root. The callback
-// only ever returns fs.SkipAll, so the walk's own failures are all that is
-// left.
+// ignores its err argument and only ever returns nil or fs.SkipAll, which
+// WalkDir consumes, so Has never actually fails.
 func /*@has*/Has(root, name string) (bool, error) {
 	found := false
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {

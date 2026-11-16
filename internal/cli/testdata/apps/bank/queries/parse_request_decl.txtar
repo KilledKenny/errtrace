@@ -2,6 +2,7 @@ JSON input with a translation boundary: *json.SyntaxError -> opaque message, *js
 *domain.ValidationError, anything else flattened with %v; then build() adds Amount's and Date's errors.
 Expect opaque "parse: malformed JSON at offset %d", opaque "parse: %v", *ValidationError (4 sites) and
 strconv.ErrSyntax behind NumError.Unwrap + "amount %q: %w". NO encoding/json origin and no strconv.ErrRange.
+(internal/strconv.Error entries: see parse_amount_decl.)
 -- args --
 parse/parse.go:@request
 -- stdout --

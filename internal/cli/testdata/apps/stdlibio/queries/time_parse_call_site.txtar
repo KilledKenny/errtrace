@@ -1,0 +1,15 @@
+Call site directly on time.Parse, before Since's errors.As guard. Every failure of
+time.Parse is built by time.newParseError: expected exactly 1 entry, concrete
+*time.ParseError, with no chain. The internal placeholders time.errBad / errAtoi /
+errLeadingInt must NOT appear (they are replaced inside time.parse), nor Since's
+opaque fmt.Errorf (that happens after the call).
+-- args --
+config/config.go:@timeparse
+-- stdout --
+$WORK/config/config.go:69:12-54: Error Set of call to time.Parse in example.com/stdlibio/config.Since: 1 entries
+$GOROOT/src/time/format.go:*: concrete *time.ParseError
+	path (origin → target):
+		$GOROOT/src/time/format.go:*: in time.newParseError
+		$GOROOT/src/time/format.go:*: in time.parse, call to time.newParseError
+		$GOROOT/src/time/format.go:*: in time.Parse, call to time.parse
+		$WORK/config/config.go:69:12-54: in example.com/stdlibio/config.Since, call to time.Parse

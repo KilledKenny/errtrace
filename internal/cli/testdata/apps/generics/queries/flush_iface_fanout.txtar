@@ -1,5 +1,5 @@
 Same call site with -fanout=1: the entry through the 3-Candidate dynamic call is grouped.
-Expect ErrEmpty printed inside a group naming the dynamic call (E/cache.Flusher).Flush and its generic Candidate.
+Expect ErrEmpty printed inside a group naming the dynamic call (cache.Flusher).Flush and its generic Candidate.
 -- args --
 -fanout=1 caching.go:@flush
 -- stdout --

@@ -80,6 +80,9 @@ func runCaching() error {
 	report(err)
 	report(tag(scores, "q"))
 	report(skipMissing(scores, "q"))
+	report(lazyQuiet(scores, "c"))
+	_, err = peek(scores, "a")
+	report(err)
 	_, err = viaResult("8080")
 	report(err)
 	_, err = firstName(result.Some(validate.Name("ada")))
@@ -92,6 +95,8 @@ func runRepo() error {
 	tags := repo.New[string, model.Tag](16)
 	report(saveUser(users, model.User{ID: 1, Name: "ada"}))
 	report(saveTags(tags, []model.Tag{"go", "generics"}))
+	report(quietFind(users, 3))
+	report(missingOK(users, 4))
 	_, err := findUser(users, 2)
 	return err
 }
@@ -106,6 +111,10 @@ func runFailures() error {
 	report(dropInts(1, "a"))
 	report(viaAsType(1, "a"))
 	report(skipRange(1, "a"))
+	report(onlyInts(1, "a"))
+	report(notFloats(1, "a"))
+	report(liftRange())
+	report(rejected(-1))
 	return deepWrap()
 }
 

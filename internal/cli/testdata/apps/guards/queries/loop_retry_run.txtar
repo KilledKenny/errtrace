@@ -1,9 +1,12 @@
-SUSPECTED BUG: same || narrowing gap as is_or_true_branch, on a continue edge.
+SUSPECTED BUG: the wrap of a nil error has no entry (same as loop_retry_single / is_errorf_wraps_nil).
 Retry loop: nil -> return; Is(ErrTimeout) || Is(ErrRateLimited) -> continue; else fail fast with "job %s: %w";
-after the loop "retries exhausted: %w" wraps the last retryable error.
-Expected: ErrNotFound and *NetError ONLY with the "job %s: %w" chain, ErrTimeout and ErrRateLimited ONLY with
-the "retries exhausted" chain (4 entries). Actual: ErrNotFound and *NetError also appear with the "retries
-exhausted" chain (6 entries). The false side is right: ErrTimeout / ErrRateLimited never get "job %s: %w".
+after the loop "retries exhausted: %w" wraps the last error. With Max == 0 the loop never runs and the function
+returns fmt.Errorf("...: %w", nil), a non-nil error wrapping nothing: expected an opaque fmt.Errorf entry
+for it, actual: none.
+Otherwise: ErrTimeout / ErrRateLimited only under "retries exhausted", ErrNotFound / *NetError under
+"job %s: %w" - and, as a documented over-approximation, ALSO under "retries exhausted" (6 entries, run-time
+truth 4 + the wrap of nil): the continue sits on the true side of an ||, which dominance-based guards do not
+narrow (see is_or_true_branch).
 -- args --
 runner/runner.go:@run
 -- stdout --

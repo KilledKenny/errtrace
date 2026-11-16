@@ -1,6 +1,7 @@
 Call site of the method cfg.set inside Load's scanner loop: set's errors without Load's "config: %s:%d: %w".
 Expect opaque errors.New "missing '='", opaque fmt.Errorf "unknown key %q", and strconv.ErrSyntax / strconv.ErrRange
-(plus ParseInt's opaque base errors) behind (*strconv.NumError).Unwrap, from ParseInt and Atoi.
+(plus ParseInt's opaque base / bit-size errors) behind (*strconv.NumError).Unwrap, from ParseInt and Atoi.
+(internal/strconv.Error entries: see parse_amount_decl.)
 -- args --
 config/config.go:@set_call
 -- stdout --

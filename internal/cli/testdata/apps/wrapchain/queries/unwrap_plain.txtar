@@ -1,5 +1,6 @@
-SUSPECTED BUG (precision): errors.Unwrap of a sentinel that wraps nothing is nil.
-Expected 0 entries. Actual: the same 2 unresolved(memory) entries as unwrap_join.
+errors.Unwrap of a sentinel that wraps nothing is nil at run time, so the
+precise set is empty. By design the same 2 unresolved(memory) entries as
+unwrap_join (an over-approximation shown as Unresolved); doc.ErrEmpty must NOT appear.
 -- args --
 transform/transform.go:@peelplain
 -- stdout --

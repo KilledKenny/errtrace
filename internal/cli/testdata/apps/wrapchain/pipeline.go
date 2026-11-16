@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"example.com/wrapchain/doc"
+	"example.com/wrapchain/export"
 	"example.com/wrapchain/parse"
 	"example.com/wrapchain/transform"
 	"example.com/wrapchain/validate"
@@ -67,4 +68,14 @@ func /*@fieldzero*/fieldOrZero(raw string) (int, error) {
 		return 0, nil
 	}
 	return n, err
+}
+
+// rolloutLenient swallows disk failures, found below the 10 Wraps of the
+// delivery ladder.
+func /*@rolloutlenient*/rolloutLenient() error {
+	err := export.Rollout()
+	if errors.Is(err, doc.ErrDisk) {
+		return nil
+	}
+	return err
 }

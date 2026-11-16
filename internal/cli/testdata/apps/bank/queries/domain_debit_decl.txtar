@@ -1,4 +1,4 @@
-Leaf: Account.Debit wraps Usable()'s sentinels and builds a value-type error.
+Leaf: Account.Debit wraps Usable()'s sentinels (value switch) and builds a value-type error.
 Expect 3 entries: ErrAccountClosed and ErrFrozen, each only with the chain "debit %s: %w", and
 concrete domain.InsufficientFundsError (value type, no chain).
 -- args --

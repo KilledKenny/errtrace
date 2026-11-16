@@ -1,7 +1,10 @@
-Generic helper over a closure: Value[T] runs op through Do and smuggles the result out via captured variables.
-Only instance: Value[*domain.Account] from Service.Balance, op = store.Get (memory + filerepo Candidates).
-Expect NotFoundError[AccountID], filerepo's read errors behind "filerepo: read %s: %w", decode errors behind
-(*CorruptError).Unwrap, ctx.Err() origins, and ErrGaveUp behind "%w after %d attempts: %w".
+SUSPECTED BUG: generic helper over a closure. Value[T] runs op through Do and smuggles the result out via captured
+variables; only instance Value[*domain.Account] from Service.Balance, op = store.Get (memory + filerepo). Correct
+set: NotFoundError[AccountID], filerepo read errors behind "filerepo: read %s: %w", decode errors behind
+(*CorruptError).Unwrap, ctx.Err() origins, ErrGaveUp behind "%w after %d attempts: %w" (around unresolved /
+may-match values only). Actual: also errDryRun, retry.ErrBusy and WithTx's unresolved values, i.e. the errors of
+the closures that OTHER callers pass to retry.Do (cmd/cli.probe$2, Service.Transfer$1): the closure passed by Value
+does not narrow op's Candidates inside Do.
 -- args --
 -fanout=1 retry/retry.go:@value
 -- stdout --
@@ -110,8 +113,8 @@ $WORK/retry/retry.go:31:10-14: group of 123 entries via dynamic call to function
 	$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
 	$WORK/repo/filerepo/filerepo.go:46:15-78: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
 	$WORK/repo/filerepo/filerepo.go:46:15-78: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
-	$WORK/repo/memory/memory.go:76:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
-	$WORK/repo/memory/memory.go:76:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$WORK/repo/memory/memory.go:88:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$WORK/repo/memory/memory.go:88:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
 	$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type" (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
 	$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type" (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
 	$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type" (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
@@ -130,11 +133,11 @@ $WORK/retry/retry.go:31:10-14: group of 123 entries via dynamic call to function
 	$GOROOT/src/context/context.go:*: unresolved(memory): value of TypeAssert not modelled (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
 	$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
 	$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
-	$WORK/tx/tx.go:24:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
-	$WORK/tx/tx.go:24:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
-	$WORK/tx/tx.go:38:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
-	$WORK/tx/tx.go:38:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
-	$WORK/tx/tx.go:40:2-2: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
-	$WORK/tx/tx.go:40:2-2: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
+	$WORK/tx/tx.go:25:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
+	$WORK/tx/tx.go:25:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
+	$WORK/tx/tx.go:39:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
+	$WORK/tx/tx.go:39:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
+	$WORK/tx/tx.go:41:2-2: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
+	$WORK/tx/tx.go:41:2-2: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
 $WORK/retry/retry.go:63:47-56: group of 1 entries via dynamic call to (context.Context).Err (1 candidates) in example.com/bank/retry.sleep
 	$GOROOT/src/context/context.go:*: unresolved(memory): value of TypeAssert not modelled (candidate (*context.cancelCtx).Err)

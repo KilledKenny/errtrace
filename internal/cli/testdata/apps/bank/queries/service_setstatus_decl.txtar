@@ -1,6 +1,10 @@
-Three layers: store.Get (2 Candidates), store.Put (2 Candidates), then bus.Publish (dynamic handlers, joined).
-Expect Get's set (NotFoundError[AccountID], read/corrupt errors, ctx.Err()), Put's ("filerepo: write %s: %w", ctx.Err()),
-and Publish's 3 handler origins behind "events: %s handler %d: %w" + errors.Join. -fanout=2 groups by nearest dynamic call.
+SUSPECTED BUG: three layers. store.Get (2 Candidates), store.Put (2 Candidates), then bus.Publish (dynamic handlers,
+joined in a loop). Correct set: Get's set (NotFoundError[AccountID], read/corrupt errors, ctx.Err()), Put's
+("filerepo: write %s: %w", ctx.Err()) and Publish's 3 handler origins behind "events: %s handler %d: %w" +
+errors.Join. Actual: those (56 + 30 + 21 entries), plus unresolved(fixpoint-limit) "result 0 of SetStatus can carry
+more than 1024 values" although the three callee sets together have ~110 entries and Publish alone
+(events_publish_decl) reports no limit: all = errors.Join(all, ...) in Publish's loop makes one value per
+combination of operand values, and the cap counts those combinations, not origins.
 -- args --
 -fanout=2 service/service.go:@setstatus
 -- stdout --
@@ -56,7 +60,7 @@ $WORK/service/service.go:185:12-32: group of 56 entries via dynamic call to (exa
 	$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno (candidate (*example.com/bank/repo/filerepo.Store).Get)
 	$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno (candidate (*example.com/bank/repo/filerepo.Store).Get)
 	$WORK/repo/filerepo/filerepo.go:46:15-78: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate (*example.com/bank/repo/filerepo.Store).Get)
-	$WORK/repo/memory/memory.go:76:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate (*example.com/bank/repo/memory.Store).Get)
+	$WORK/repo/memory/memory.go:88:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate (*example.com/bank/repo/memory.Store).Get)
 	$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type" (candidate (*example.com/bank/repo/filerepo.Store).Get)
 	$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type" (candidate (*example.com/bank/repo/filerepo.Store).Get)
 	$GOROOT/src/strconv/number.go:*: opaque errors.New (candidate (*example.com/bank/repo/filerepo.Store).Get)
@@ -103,13 +107,13 @@ $WORK/events/events.go:36:13-18: group of 21 entries via dynamic call to functio
 	$WORK/domain/errors.go:14:2-18: sentinel example.com/bank/domain.ErrLimitExceeded (candidate example.com/bank/cmd/server.run$2)
 	$WORK/domain/errors.go:14:2-18: sentinel example.com/bank/domain.ErrLimitExceeded (candidate example.com/bank/cmd/server.run$2)
 	$WORK/domain/errors.go:14:2-18: sentinel example.com/bank/domain.ErrLimitExceeded (candidate example.com/bank/cmd/server.run$2)
-	$WORK/cmd/cli/main.go:72:11-81: concrete *example.com/bank/domain.ValidationError (candidate example.com/bank/cmd/cli.newApp$2)
-	$WORK/cmd/cli/main.go:72:11-81: concrete *example.com/bank/domain.ValidationError (candidate example.com/bank/cmd/cli.newApp$2)
-	$WORK/cmd/cli/main.go:72:11-81: concrete *example.com/bank/domain.ValidationError (candidate example.com/bank/cmd/cli.newApp$2)
-	$WORK/cmd/cli/main.go:72:11-81: concrete *example.com/bank/domain.ValidationError (candidate example.com/bank/cmd/cli.newApp$2)
-	$WORK/cmd/cli/main.go:72:11-81: concrete *example.com/bank/domain.ValidationError (candidate example.com/bank/cmd/cli.newApp$2)
-	$WORK/cmd/cli/main.go:72:11-81: concrete *example.com/bank/domain.ValidationError (candidate example.com/bank/cmd/cli.newApp$2)
-	$WORK/cmd/cli/main.go:72:11-81: concrete *example.com/bank/domain.ValidationError (candidate example.com/bank/cmd/cli.newApp$2)
+	$WORK/cmd/cli/main.go:73:11-81: concrete *example.com/bank/domain.ValidationError (candidate example.com/bank/cmd/cli.newApp$2)
+	$WORK/cmd/cli/main.go:73:11-81: concrete *example.com/bank/domain.ValidationError (candidate example.com/bank/cmd/cli.newApp$2)
+	$WORK/cmd/cli/main.go:73:11-81: concrete *example.com/bank/domain.ValidationError (candidate example.com/bank/cmd/cli.newApp$2)
+	$WORK/cmd/cli/main.go:73:11-81: concrete *example.com/bank/domain.ValidationError (candidate example.com/bank/cmd/cli.newApp$2)
+	$WORK/cmd/cli/main.go:73:11-81: concrete *example.com/bank/domain.ValidationError (candidate example.com/bank/cmd/cli.newApp$2)
+	$WORK/cmd/cli/main.go:73:11-81: concrete *example.com/bank/domain.ValidationError (candidate example.com/bank/cmd/cli.newApp$2)
+	$WORK/cmd/cli/main.go:73:11-81: concrete *example.com/bank/domain.ValidationError (candidate example.com/bank/cmd/cli.newApp$2)
 	$WORK/cmd/cli/main.go:37:10-69: opaque fmt.Errorf "cli: more than %d transfers in one run" (candidate (*example.com/bank/cmd/cli.stats).onTransfer)
 	$WORK/cmd/cli/main.go:37:10-69: opaque fmt.Errorf "cli: more than %d transfers in one run" (candidate (*example.com/bank/cmd/cli.stats).onTransfer)
 	$WORK/cmd/cli/main.go:37:10-69: opaque fmt.Errorf "cli: more than %d transfers in one run" (candidate (*example.com/bank/cmd/cli.stats).onTransfer)

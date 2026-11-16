@@ -39,7 +39,7 @@ and must be re-compared after an `-update`:
   `pos_line_col_offset`, `pos_dot_slash`, `pos_dotdot`, `pos_line_only`,
   `pos_range_short_end`, `pos_offset_range`, `pos_line_range`,
   `pos_leading_zeros`, `cli_double_dash`, `cli_debug_summary`, `p_empty_list`,
-  `p_type_error_excluded`, `p_import_path`, `tags_empty`
+  `p_type_error_excluded`, `p_import_path`, `p_repeated_flag`, `tags_empty`
 - `(*Store).Get` declaration: `decl_name`, `decl_func_keyword`
 - `s.Get(key)` call: `call_selector_sel`, `call_lparen`, `cli_debug_target`
 - `fetch`: `decl_main_pkg_ingest`, `chain_depth_exact`, `chain_depth_large`,
@@ -56,7 +56,7 @@ and must be re-compared after an `-update`:
 | --- | --- |
 | `call_go`, `call_main_run`, `decl_run_ingest` (reference: `decl_warm_paths`) | `[+N more paths]` does not count paths that merge inside a callee: a call-site Target shows no marker where the declaration Target of the same callee shows one, and a declaration shows +1 where there are two more paths. |
 | `p_wildcard_matches_nothing`, `p_malformed` | A `-p` wildcard pattern that matches no package is silently dropped (go list's "matched no packages" warning is swallowed); the query runs on the target file's package alone and exits 0. |
-| `pos_column_out_of_range` | On the last line of a newline-terminated file one extra column is accepted (8:3 on a 1-byte line) and echoed back as a position. |
+| `pos_column_out_of_range`, `pos_column_last_line_past_eof` | On the last line of a newline-terminated file the final newline is counted as line content: one extra column is accepted (8:3 on a 1-byte line) and the out-of-range message says "line 8 has 2 bytes" (low confidence: 8:3 is also how the tool prints the documented EOF offset). |
 | `file_nested_module` | A file of a nested module is analysed as the ad-hoc package `command-line-arguments` (low confidence). |
 | `file_nonexistent` | A missing file (also a directory, a non-Go file) gets the generic "file is not in any loaded package" (low confidence, message only). |
 | `p_no_go_files` | go list errors are printed with a stray `-: ` position placeholder (low confidence, cosmetic). |
@@ -66,10 +66,15 @@ and must be re-compared after an `-update`:
 - An absolute path to an *existing* file, and an existing file outside the
   module tree: the harness runs each query in a fresh temporary directory and
   args cannot refer to it (`file_abs_nonexistent`, `file_parent_outside` and
-  `file_nested_module` are the closest).
+  `file_nested_module` are the closest). Checked by hand on a copy of the app:
+  `errtrace /abs/copy/internal/platform/platform.go:5:6` prints the Probe set.
+- `_test.go` Targets and test roots with a positive result: the CLI has no
+  `-tests` flag yet (plan step S12), so the three `test_file_*` queries only
+  record the "not in any loaded package" failure.
 - Arguments containing spaces or an empty-string argument (args are split on
   white space).
-- `-debug=timing` (nondeterministic output).
+- `-debug=timing` on its own (nondeterministic output); only its rejection
+  next to an invalid mode is recorded (`cli_debug_timing_invalid`).
 
 ## Queries
 
@@ -90,6 +95,7 @@ and must be re-compared after an `-update`:
 | call_concrete_error_type | `internal/store/disk/disk.go:@validate_call` | Call-site target: Validate(root) inside Open, result type *DiskError. | positive | no |
 | call_conversion | `cmd/ingest/main.go:@conv` | Position on the conversion kind(len(raw)): T(x) is not a call. | negative | no |
 | call_defer | `cmd/ingest/main.go:@defer_call` | Call-site target in a defer statement: defer s.Close(). | positive | no |
+| call_defer_keyword | `cmd/ingest/main.go:49:2` | Literal position on the "defer" keyword of defer s.Close(). | negative | no |
 | call_embedded_field_method | `internal/store/store.go:@embedded` | Call-site target s.Check() inside Get: method reached through the embedded field base. | positive | no |
 | call_func_param_in_generic | `internal/codec/codec.go:@parse_call` | Call-site target parse(raw): call to a function-typed parameter inside the generic Decode. | positive | no |
 | call_func_var | `cmd/ingest/main.go:@fnvar` | Call-site target hook(key): call to a package-level function-typed variable. | positive | no |
@@ -98,6 +104,7 @@ and must be re-compared after an `-update`:
 | call_generic_inferred | `cmd/report/main.go:@decode_inferred` | Call-site target codec.Decode(raw, codec.ParseInt) with an inferred type argument, in cmd/report. | positive | no |
 | call_generic_type_arg | `cmd/ingest/main.go:@decode_targ` | Position on the type argument "string" of codec.Decode[string](...). | negative | no |
 | call_go | `cmd/ingest/main.go:@go_call` | Call-site target in a go statement: go warm(s). | positive | yes |
+| call_go_keyword | `cmd/ingest/main.go:50:2` | Literal position on the "go" keyword of go warm(s). | negative | no |
 | call_in_init | `cmd/ingest/main.go:@init_call` | Call-site target inside init(): codec.Register("text"), marker on the package qualifier "codec". | negative | no |
 | call_in_init_sel | `cmd/ingest/main.go:@init_sel` | Call-site target inside init(): codec.Register("text"), marker on the Sel "Register" of the package-qualified call (init itself has no error result, the call does). | positive | no |
 | call_inner_arg_call | `cmd/ingest/main.go:@inner` | Position on "s" of the inner argument call s.Ping() (selector X). | negative | no |
@@ -112,6 +119,7 @@ and must be re-compared after an `-update`:
 | call_promoted_method | `cmd/ingest/main.go:@promoted` | Call-site target s.Check(): method promoted from the embedded base. | positive | no |
 | call_report_get_all_binaries | `cmd/report/main.go:@get_call` | Call-site s.Get("total") in cmd/report with the default ./... (both binaries loaded). | positive | no |
 | call_rparen | `cmd/ingest/main.go:@rparen` | Position on the closing paren of s.Get(key). | negative | no |
+| call_selector_inner_sel | `internal/store/store.go:49:16` | Literal position on "be" in s.be.Read(key): the Sel of the inner selector, not the callee. | negative | no |
 | call_selector_sel | `cmd/ingest/main.go:@sel_sel` | Call-site target on the selector Sel "Get" of s.Get(key) in fetch. | positive | no |
 | call_selector_x | `cmd/ingest/main.go:@sel_x` | Position on the receiver expression "s" (selector X) of s.Get(key). | negative | no |
 | chain_depth_exact | `-chain-depth=2 cmd/ingest/main.go:@fetch` | -chain-depth equal to the longest chain (2). | positive | no |
@@ -127,6 +135,7 @@ and must be re-compared after an `-update`:
 | cli_debug_summary | `-debug=summary internal/platform/platform.go:5:6` | Hidden -debug=summary. | positive | no |
 | cli_debug_target | `-debug=target cmd/ingest/main.go:@sel_sel` | Hidden -debug=target on a call-site target. | positive | no |
 | cli_debug_target_generic | `-debug target internal/codec/codec.go:@decode` | Hidden -debug target on the generic declaration. | positive | no |
+| cli_debug_timing_invalid | `-debug=timing,nope internal/platform/platform.go:5:6` | -debug list mixing timing with an invalid mode: rejected before anything runs. | negative | no |
 | cli_debug_trailing_comma | `-debug=target, internal/platform/platform.go:5:6` | Debug list with a trailing comma, i.e. an empty mode (unlike -p and -tags, empty elements are not skipped). | negative | no |
 | cli_double_dash | `-fanout=2 -- internal/platform/platform.go:5:6` | The "--" terminator before the target. | positive | no |
 | cli_flag_after_target | `internal/platform/platform.go:5:6 -fanout=2` | A flag after the target: Go flag parsing stops at the first positional argument, so it counts as a second target. | negative | no |
@@ -139,6 +148,7 @@ and must be re-compared after an `-update`:
 | closure_literal_call_paren | `cmd/ingest/main.go:@iife_paren` | Position on the call paren of the immediately invoked literal. | positive | no |
 | closure_literal_func_keyword | `cmd/ingest/main.go:@iife_kw` | Position on the "func" keyword of an immediately invoked literal func() error {...}(). | positive | no |
 | crlf_call_func_var | `internal/codec/crlf.go:@trim_call` | Call-site target in the CRLF file: Trim(raw), a call through a package-level function variable. | positive | no |
+| crlf_column_past_end | `internal/codec/crlf.go:1:16` | CRLF file: column 16 of line 1, one past the accepted end-of-line column. | negative | no |
 | crlf_decl | `internal/codec/crlf.go:@checksum` | Declaration target in a file with CRLF line endings: codec.Checksum calls the func-valued var Trim. | positive | no |
 | crlf_line_end | `internal/codec/crlf.go:1:15` | CRLF file, line 1 is "package codec\r\n": column 14 is the \r, column 15 the \n position (line has 14 bytes incl. \r). | negative | no |
 | decl_closing_brace | `internal/store/store.go:@get_close` | Position on the closing brace of Get. | negative | no |
@@ -191,7 +201,9 @@ and must be re-compared after an `-update`:
 | method_value | `cmd/ingest/main.go:@mval` | Position on Ping in the method value "ping := s.Ping" (no call). | negative | no |
 | p_changes_candidates | `-p ./cmd/report internal/store/store.go:@iface_call` | Same interface call, but only cmd/report (mem Backend) is loaded with -p. | positive | no |
 | p_empty_list | `-p , internal/platform/platform.go:5:6` | -p with only a comma: the list is empty, which falls back to ./... . | positive | no |
+| p_file_pattern | `-p ./cmd/report/main.go cmd/report/main.go:@run` | -p given as a Go file that is also the Target file: loaded as command-line-arguments. | positive | no |
 | p_import_path | `-p example.com/targets/cmd/report,example.com/targets/internal/platform internal/platform/platform.go:5:6` | -p given as import paths rather than ./ directories. | positive | no |
+| p_library_only_no_candidates | `-p ./internal/store/... internal/store/store.go:@iface_call` | Interface call with only library packages loaded: unresolved(no-candidates) plus the unreachable warning. | positive | no |
 | p_malformed | `-p ./cmd/...ingest/[ internal/platform/platform.go:5:6` | -p with a garbled pattern "./cmd/...ingest/[" that matches no package. | negative (but accepted today) | yes |
 | p_matches_nothing | `-p ./nope/... internal/platform/platform.go:5:6` | -p directory wildcard whose root directory does not exist. | negative | no |
 | p_nested_module_pattern | `-p ./tools/lintcfg internal/platform/platform.go:5:6` | -p naming the directory of the nested module tools/lintcfg (not part of example.com/targets). | negative | no |
@@ -199,14 +211,18 @@ and must be re-compared after an `-update`:
 | p_nonexistent_dir | `-p ./cmd/missing internal/platform/platform.go:5:6` | -p naming a directory that does not exist. | negative | no |
 | p_not_matching_target | `-p ./cmd/report internal/store/disk/disk.go:@read` | Target file in a package (internal/store/disk) that the -p pattern does not match and cmd/report does not import. | positive | no |
 | p_one_pattern | `-p ./cmd/ingest cmd/ingest/main.go:@fetch` | -p with one pattern: only cmd/ingest and its dependencies. | positive | no |
+| p_other_binary_target | `-p ./cmd/ingest cmd/report/main.go:@run` | Target run of cmd/report while -p names only ./cmd/ingest: both mains become roots. | positive | no |
+| p_repeated_flag | `-p ./nope/... -p ./cmd/report internal/platform/platform.go:5:6` | The -p flag given twice: the last value wins, the failing first pattern is dropped. | positive | no |
 | p_syntax_error_included | `-p ./cmd/report,./_broken/syntaxerr internal/platform/platform.go:5:6` | A package with syntax errors explicitly included next to a healthy one, Target elsewhere. | negative | no |
 | p_two_patterns | `-p ./cmd/ingest,./cmd/report cmd/ingest/main.go:@fetch` | -p with two comma-separated patterns covering both binaries. | positive | no |
 | p_type_error_excluded | `-p ./cmd/...,./internal/... internal/platform/platform.go:5:6` | Explicit patterns that exclude _broken: the type-error package must not disturb the Query. | positive | no |
 | p_type_error_included | `-p ./...,./_broken/typeerr internal/platform/platform.go:5:6` | The isolated type-error package is explicitly included while the Target is elsewhere. | negative | no |
+| p_unknown_import_path | `-p example.com/nope internal/platform/platform.go:5:6` | -p naming an import path no module provides. | negative | no |
 | p_wildcard_matches_nothing | `-p ./cmd/zzz... internal/platform/platform.go:5:6` | -p with a well-formed wildcard pattern that matches no package (go list prints: warning: "./cmd/zzz..." matched no packages). | negative (but accepted today) | yes |
 | pos_blank_line | `internal/platform/platform.go:3:1` | Position on the blank line between the package clause and the doc comment. | negative | no |
 | pos_call_ident | `internal/platform/platform.go:6:12` | Literal position on the callee identifier MaxBatch (6:12). | positive | no |
 | pos_column_huge | `internal/platform/platform.go:5:9999` | Very large column on the declaration line. | negative | no |
+| pos_column_last_line_past_eof | `internal/platform/platform.go:8:4` | Column 4 on the last line: rejected, but the message counts the final newline ("line 8 has 2 bytes"). | negative | yes |
 | pos_column_one_past_end | `internal/platform/platform.go:5:21` | Column one past the last byte of line 5 ("func Probe() error {" has 20 bytes, so 5:21 is the newline position). | negative | no |
 | pos_column_out_of_range | `internal/platform/platform.go:8:3` | Column beyond the end of the LAST line. Line 8 is "}" + newline, so it has 1 byte; 8:2 (the newline position) is the last valid column. | negative | yes |
 | pos_column_two_past_end | `internal/platform/platform.go:5:22` | Column two past the last byte of line 5 (20 bytes): the first rejected column. | negative | no |
@@ -243,6 +259,7 @@ and must be re-compared after an `-update`:
 | pos_range_short_end | `internal/platform/platform.go:5:6-11` | Range form L:C-C2 (end column on the same line). | positive | no |
 | pos_too_many_parts | `internal/platform/platform.go:5:6:7` | Three numeric components. | negative | no |
 | pos_trailing_colon | `internal/platform/platform.go:5:` | Trailing colon with a missing column. | negative | no |
+| pos_trailing_colon_no_line | `internal/platform/platform.go:` | File name followed by a bare colon. | negative | no |
 | pos_whitespace | `internal/platform/platform.go:6:1` | Position on the leading tab of the line "_, err := MaxBatch()". | negative | no |
 | return_operand_err | `cmd/ingest/main.go:@warm_ret` | Position on the identifier err in "return err" of warm (a plain error variable, after the errors.Is guard). | negative | no |
 | return_operand_ident | `internal/codec/gen.go:@format_ret` | Position on the sentinel identifier ErrUnknownFormat in a return statement. | negative | no |

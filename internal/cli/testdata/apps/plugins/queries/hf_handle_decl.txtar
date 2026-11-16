@@ -94,13 +94,13 @@ $WORK/drivers/drivers.go:16:2-10: sentinel example.com/plugins/drivers.ErrPager 
 		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
 $WORK/main.go:24:2-10: sentinel example.com/plugins.errQuota [+1 more paths]
 	path (origin → target):
-		$WORK/main.go:211:56-64: in example.com/plugins.quota$1
+		$WORK/main.go:216:56-64: in example.com/plugins.quota$1
 		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins.quota$1 (dynamic function value f: 5 of 5 candidates)
 $WORK/main.go:24:2-10: sentinel example.com/plugins.errQuota [+1 more paths]
 	wrap chain (origin → target):
 		$WORK/middleware/middleware.go:30:12-44: fmt.Errorf "%s: %w"
 	path (origin → target):
-		$WORK/main.go:211:56-64: in example.com/plugins.quota$1
+		$WORK/main.go:216:56-64: in example.com/plugins.quota$1
 		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins.quota$1 (dynamic function value f: 5 of 5 candidates)
 		$WORK/middleware/middleware.go:29:14-28: in example.com/plugins/middleware.Tag$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
 		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Tag$1$1 (dynamic function value f: 5 of 5 candidates)
@@ -108,7 +108,7 @@ $WORK/main.go:24:2-10: sentinel example.com/plugins.errQuota [chain truncated] [
 	wrap chain (origin → target):
 		$WORK/middleware/middleware.go:30:12-44: fmt.Errorf "%s: %w"
 	path (origin → target):
-		$WORK/main.go:211:56-64: in example.com/plugins.quota$1
+		$WORK/main.go:216:56-64: in example.com/plugins.quota$1
 		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins.quota$1 (dynamic function value f: 5 of 5 candidates)
 		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
 		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
@@ -118,7 +118,7 @@ $WORK/main.go:24:2-10: sentinel example.com/plugins.errQuota [+1 more paths]
 	wrap chain (origin → target):
 		$WORK/middleware/middleware.go:59:11-47: fmt.Errorf "%w: %w"
 	path (origin → target):
-		$WORK/main.go:211:56-64: in example.com/plugins.quota$1
+		$WORK/main.go:216:56-64: in example.com/plugins.quota$1
 		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins.quota$1 (dynamic function value f: 5 of 5 candidates)
 		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
 		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
@@ -126,7 +126,7 @@ $WORK/main.go:24:2-10: sentinel example.com/plugins.errQuota [chain truncated] [
 	wrap chain (origin → target):
 		$WORK/middleware/middleware.go:59:11-47: fmt.Errorf "%w: %w"
 	path (origin → target):
-		$WORK/main.go:211:56-64: in example.com/plugins.quota$1
+		$WORK/main.go:216:56-64: in example.com/plugins.quota$1
 		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins.quota$1 (dynamic function value f: 5 of 5 candidates)
 		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
 		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)

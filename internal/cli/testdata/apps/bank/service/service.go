@@ -204,3 +204,15 @@ func (s *Service) /*@settled*/Settled(id domain.TransferID) error {
 	}
 	return f./*@find_call*/FindTransfer(id)
 }
+
+// Ready reports whether the store accepts transactions.
+func (s *Service) /*@ready*/Ready() error { return s.txm.Ping() }
+
+// Import records a transfer that was executed elsewhere: it only enters the
+// ledger, no money moves and no rule is consulted.
+func (s *Service) /*@import*/Import(ctx context.Context, t domain.Transfer) error {
+	if err := t.Validate(); err != nil {
+		return err
+	}
+	return s.store./*@import_append_call*/Append(ctx, t)
+}

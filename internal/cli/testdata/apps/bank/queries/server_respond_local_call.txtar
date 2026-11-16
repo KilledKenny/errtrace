@@ -1,5 +1,5 @@
-Negative: respond(out, srv.Transfer(...)). api.Server.Transfer only ever returns nil, an *api.Error or
-api.ErrUnavailable (itself an *api.Error), all of which respond prints and swallows.
+Negative: respond(out, srv.Transfer(...)). api.Server.Transfer only ever returns nil, a fresh *api.Error or
+api.ErrUnavailable (itself an *api.Error); respond prints and swallows all of them (top-level errors.As match).
 Expect 0 entries.
 -- args --
 cmd/server/main.go:@respond_local_call

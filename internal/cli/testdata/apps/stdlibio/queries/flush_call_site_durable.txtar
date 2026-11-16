@@ -1,7 +1,11 @@
 Call site flush(f) inside the errors.Join arguments, with -tags durable selecting
-flush_durable.go: the (*os.File).Sync origins (os.ErrInvalid for a nil file, poll and
-errno values under *fs.PathError.Unwrap) each with the link fmt.Errorf "source: sync:
-%w". No errors.Join link: the Target is the inner call.
+flush_durable.go: the (*os.File).Sync origins, each with the link fmt.Errorf "source:
+sync: %w" and no errors.Join link (the Target is the inner call). At run time Sync
+returns os.ErrInvalid (nil file) or a *fs.PathError (os.ErrClosed, errno values, ...).
+The entries without *fs.PathError.Unwrap other than os.ErrInvalid (poll.ErrFileClosing,
+poll.ErrNetClosing, errno values) are an accepted over-approximation: (*os.File).wrapErr
+starts with "if err == nil || err == io.EOF { return err }", a merge of two guard edges
+without phi, which plan P07 says is ignored.
 -- args --
 -tags durable source/source.go:@flushcall
 -- stdout --

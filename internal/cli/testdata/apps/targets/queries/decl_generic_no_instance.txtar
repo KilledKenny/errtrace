@@ -1,5 +1,5 @@
 Generic declaration with only its own package loaded: no main, so Decode has no instance at all.
-Expected: either an Error Set from the generic body (codec.ErrEmpty plus an Unresolved for the parse parameter) or a clear error saying there is no instantiation; never an empty "0 entries" set and never a crash.
+Expected (plan S02/S06): the generic body is never analysed on its own, so exit 0 with exactly 1 entry, unresolved(no-instances); never an empty "0 entries" set. No unreachable warning (there is no function to root). With a binary loaded see decl_generic_one_binary.
 -- args --
 -p ./internal/codec internal/codec/codec.go:@decode
 -- stdout --

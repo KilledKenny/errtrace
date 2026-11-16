@@ -1,8 +1,11 @@
-SUSPECTED BUG: Durability returns fmt.Errorf("source: flush %s: %w",
-f.Name(), flush(f)); in the default build flush only returns nil. fmt.Errorf never
-returns nil, so the function always returns a non-nil error with nothing to unwrap.
-Expected: 1 entry for the fmt.Errorf "source: flush %s: %w" value itself (an opaque
-origin). Actual: "0 entries", i.e. the tool claims the function cannot return an error.
+SUSPECTED BUG: Durability returns fmt.Errorf("source: flush %s: %w", f.Name(),
+flush(f)); in the default build flush only returns nil. fmt.Errorf never returns nil, so
+the function ALWAYS returns a non-nil error with nothing to unwrap (main prints
+"source: flush /dev/stdout: %!w(<nil>)"). Expected: 1 entry, opaque fmt.Errorf "source:
+flush %s: %w", which is what the tool prints for a literal nil or a nil local variable
+as %w operand. Actual: "0 entries", i.e. the tool claims the function cannot return an
+error. Same cause as save_join_nil_operand: the empty value set of the call operand
+erases the Wrap when the callee summary is substituted.
 -- args --
 source/source.go:@durability
 -- stdout --

@@ -1,5 +1,6 @@
-io.Closer held in a field: Close returns ErrClosed or l.c.Close() (only *os.File is ever stored).
-Expect sentinel audit.ErrClosed and (*os.File).Close's errors (os.ErrInvalid, os.ErrClosed behind *fs.PathError, ...).
+io.Closer held in a field + guard on a flag: Close returns ErrClosed or l.c.Close() (only *os.File is ever stored).
+Expect sentinel audit.ErrClosed bare and (*os.File).Close's errors: os.ErrInvalid and syscall.EINVAL bare, os.ErrClosed and the
+syscall errors behind (*fs.PathError).Unwrap. No write errors.
 -- args --
 audit/audit.go:@close
 -- stdout --

@@ -10,7 +10,7 @@ func /*@legacy*/LegacySend(d core.Driver, h core.Handler, e core.Event) error {
 	if err := h.Handle(e); err != nil {
 		return err
 	}
-	return d.Send(e)
+	return d./*@legacy_send*/Send(e)
 }
 
 // debugCarrier is a leftover debugging helper, also never called. It is

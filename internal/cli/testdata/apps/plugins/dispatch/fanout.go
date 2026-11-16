@@ -10,7 +10,7 @@ import "example.com/plugins/core"
 func /*@direct*/SendDirect(d core.Driver, e core.Event) error { return d.Send(e) }
 
 // SendPair is given an Email and an *SMS.
-func /*@pair*/SendPair(d core.Driver, e core.Event) error { return d.Send(e) }
+func /*@pair*/SendPair(d core.Driver, e core.Event) error { return d.Send/*@pair_lparen*/(e) }
 
 // SendEither is given an Email and an *Email.
 func /*@either*/SendEither(d core.Driver, e core.Event) error { return d.Send(e) }
@@ -29,3 +29,7 @@ func /*@nine*/SendNine(d core.Driver, e core.Event) error { return d./*@nine_cal
 
 // SendWrapped is given drivers whose Send is a promoted method.
 func /*@wrapped*/SendWrapped(d core.Driver, e core.Event) error { return d.Send(e) }
+
+// SendAudited is only ever given an Audited, whose own Send shadows the
+// one promoted from the Driver it embeds.
+func /*@audited*/SendAudited(d core.Driver, e core.Event) error { return d.Send(e) }

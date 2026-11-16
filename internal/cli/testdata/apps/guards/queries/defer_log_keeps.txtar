@@ -1,7 +1,6 @@
-SUSPECTED BUG: as defer_clear_named. The deferred closure only reads err (logs on err == ErrDeclined) and
-never assigns it, so nothing is filtered.
+SUSPECTED BUG: as defer_clear_named; the deferred closure only reads err (logs on err == ErrDeclined), so nothing is filtered.
 Expected 2 entries: ErrDeclined and ErrInternal from gateway.Void. Actual: 2 unresolved(memory) entries (one
-without a position) and no origins.
+without a position, "-:") and no origins, although no closure ever writes err.
 -- args --
 processor/flow.go:@deferLog
 -- stdout --

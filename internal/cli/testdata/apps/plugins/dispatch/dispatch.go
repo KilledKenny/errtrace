@@ -121,7 +121,7 @@ func (d *Dispatcher) /*@audit*/Audit(e core.Event) error {
 	if d.auditor == nil {
 		return nil
 	}
-	return d.auditor.Audit(e)
+	return d.auditor./*@audit_call*/Audit(e)
 }
 
 // Drop calls the onDrop callback, which nobody ever sets.
@@ -246,6 +246,16 @@ func /*@release*/Release(d core.Driver) error {
 func /*@quietly*/SendQuietly(e core.Event) error {
 	err := SendPair(&drivers.SMS{}, e)
 	if errors.Is(err, drivers.ErrSMS) {
+		return nil
+	}
+	return err
+}
+
+// SendNoHTTP treats an HTTP failure of the webhook as delivered.
+func /*@nohttp*/SendNoHTTP(e core.Event) error {
+	err := SendSeven(&drivers.Webhook{}, e)
+	var he *drivers.HTTPError
+	if errors.As(err, &he) {
 		return nil
 	}
 	return err

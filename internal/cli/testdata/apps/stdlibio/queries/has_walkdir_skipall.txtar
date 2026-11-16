@@ -1,9 +1,13 @@
-SUSPECTED BUG: Has passes WalkDir a callback that only returns
-fs.SkipAll or nil. Expected: only WalkDir's own lstat/readdir errors; fs.SkipAll must not
-appear (consumed by WalkDir) and neither may walk.ErrTooMany. Actual: sentinel
-walk.ErrTooMany is listed with a path through walk.Find$1, the callback of the other
-WalkDir caller (Candidates of the fn parameter are not narrowed to the function literal
-passed at this call; plan P08/S09).
+SUSPECTED BUG: Has passes filepath.WalkDir a callback that ignores its err argument
+and only returns nil or fs.SkipAll. WalkDir never returns an error of its own: the
+os.Lstat and os.ReadDir failures are handed to the callback (fn(root, nil, err),
+walkDirFn(path, d, err)) and only the callback's results come back, with SkipDir /
+SkipAll turned into nil. So at run time Has cannot fail at all. Expected: 0 entries
+(with Candidates narrowed to the function literal passed at this call, plan P08/S09).
+Actual: 41 entries, the same set as find_walkdir_callback: walk.ErrTooMany and all
+lstat/readdir origins, every one through walk.Find$1, the callback of the other
+WalkDir caller, which is listed as Candidate "2 of 2" of the fn parameter. fs.SkipDir
+and fs.SkipAll are correctly absent.
 -- args --
 walk/walk.go:@has
 -- stdout --

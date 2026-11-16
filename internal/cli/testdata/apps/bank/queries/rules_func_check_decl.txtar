@@ -1,11 +1,11 @@
 Func value stored in a struct field and called through an adapter method: Func.Check calls f.Fn.
 The only Func in the program wraps the cmd/cli closure returning errDryRun.
-Expect 1 entry: sentinel example.com/bank/cmd/cli.errDryRun.
+Expect 1 entry: sentinel example.com/bank/cmd/cli.errDryRun (1 of 1 candidates).
 -- args --
 rules/builtin.go:@func_check
 -- stdout --
 $WORK/rules/builtin.go:115:30-35: Error Set of (example.com/bank/rules.Func).Check: 1 entries
 $WORK/cmd/cli/main.go:29:2-11: sentinel example.com/bank/cmd/cli.errDryRun
 	path (origin → target):
-		$WORK/cmd/cli/main.go:65:94-103: in example.com/bank/cmd/cli.newApp$1
+		$WORK/cmd/cli/main.go:66:94-103: in example.com/bank/cmd/cli.newApp$1
 		$WORK/rules/builtin.go:116:9-22: in (example.com/bank/rules.Func).Check, call to example.com/bank/cmd/cli.newApp$1 (dynamic function value of type func(context.Context, example.com/bank/rules.Input) error: 1 of 1 candidates)

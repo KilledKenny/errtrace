@@ -1,5 +1,5 @@
 Chained call: position on Commit (last link, returns error).
-Expected: sentinel store.ErrEmptyBatch; plus b.err, an error read from a struct field: out of scope, so an Unresolved entry (or absent by design). Span covers the whole chain expression.
+Expected: sentinel store.ErrEmptyBatch; plus b.err, an error read from a struct field. At run time that is what Backend.Write returned in Add (store.ErrClosed from mem, *disk.DiskError from Disk); the tool does not track errors through memory, so the documented outcome is one explicit unresolved(memory) entry. Span covers the whole chain expression.
 -- args --
 cmd/ingest/main.go:@chain_commit
 -- stdout --

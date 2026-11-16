@@ -1,6 +1,7 @@
 Evaluate's declaration with -fanout=0 (never group), so the wrap chains are visible.
-Expect the same 15 origins as rules_evaluate_decl, ungrouped, each behind (*rules.Violation).Unwrap
-(custom Unwrap over the field Err set in the composite literal).
+Expect the same 15 entries as rules_evaluate_decl, ungrouped, each with (*rules.Violation).Unwrap as outermost link
+(custom Unwrap over the field Err set in the composite literal); ErrAccountClosed of DestOpen also behind
+"destination %s: %w", ErrCurrency behind "%w %q".
 -- args --
 -fanout=0 rules/rules.go:@evaluate
 -- stdout --
@@ -9,7 +10,7 @@ $WORK/cmd/cli/main.go:29:2-11: sentinel example.com/bank/cmd/cli.errDryRun
 	wrap chain (origin → target):
 		$WORK/rules/rules.go:46:11-47: *example.com/bank/rules.Violation.Unwrap
 	path (origin → target):
-		$WORK/cmd/cli/main.go:65:94-103: in example.com/bank/cmd/cli.newApp$1
+		$WORK/cmd/cli/main.go:66:94-103: in example.com/bank/cmd/cli.newApp$1
 		$WORK/rules/builtin.go:116:9-22: in (example.com/bank/rules.Func).Check, call to example.com/bank/cmd/cli.newApp$1 (dynamic function value of type func(context.Context, example.com/bank/rules.Input) error: 1 of 1 candidates)
 		$WORK/rules/rules.go:45:13-44: in (*example.com/bank/rules.Engine).Evaluate, call to (example.com/bank/rules.Func).Check (dynamic (example.com/bank/rules.Rule).Check: 10 of 10 candidates)
 $WORK/domain/errors.go:11:2-18: sentinel example.com/bank/domain.ErrAccountClosed

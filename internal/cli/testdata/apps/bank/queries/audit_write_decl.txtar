@@ -1,6 +1,9 @@
 io.Writer dispatch + wrap: Write wraps w.Write's error and io.ErrShortWrite in "audit: write: %w".
-Writers reaching w: *os.File (stderr / audit.Open), *audit.Quota, *bytes.Buffer.
-Expect audit.ErrFull, io.ErrShortWrite and (*os.File).Write's errors, all behind "audit: write: %w".
+Writers reaching w: *os.File (stderr / audit.Open), *audit.Quota, *bytes.Buffer (3 Candidates).
+Expect audit.ErrFull, io.ErrShortWrite (two sites) and (*os.File).Write's errors, every entry behind
+"audit: write: %w"; os errors additionally behind (*fs.PathError).Unwrap, except os.ErrInvalid.
+(The variants of poll/syscall errors without *fs.PathError are the documented || over-approximation of
+filerepo_commit_decl, here inside os.(*File).wrapErr.)
 -- args --
 audit/audit.go:@write
 -- stdout --

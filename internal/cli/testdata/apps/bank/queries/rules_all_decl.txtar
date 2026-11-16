@@ -1,6 +1,6 @@
-errors.Join over a slice built with append in a loop.
-Under Go semantics every rule origin is reachable behind "%s: %w" + errors.Join. Slice elements are documented as
-out of scope (memory), so expect either those origins or an explicit unresolved(memory) entry - never 0 entries.
+errors.Join over a slice built with append in a loop (errors.Join(errs...)).
+Go semantics: every rule origin behind "%s: %w" + errors.Join. Slice elements are out of scope, so expect a
+single unresolved(memory) entry behind errors.Join - never 0 entries.
 -- args --
 rules/rules.go:@all
 -- stdout --

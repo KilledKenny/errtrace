@@ -1,10 +1,10 @@
-Call site in cmd/cli of Service.Preview: input()'s wrapped Get errors plus Engine.Advisory (limits dropped).
-Expect "source: %w"/"destination: %w" entries and the rule origins behind (*Violation).Unwrap, without
-ErrLimitExceeded / limits.Exceeded.
+Call site in cmd/cli of Service.Preview: input()'s wrapped Get errors plus Engine.Advisory.
+Expect "source: %w" / "destination: %w" entries (two groups of store.Get Candidates) and the 15 rule entries
+behind (*Violation).Unwrap; the Limit results stay as unresolved, possibly handled (rules_advisory_decl).
 -- args --
 -fanout=2 cmd/cli/main.go:@preview_call
 -- stdout --
-$WORK/cmd/cli/main.go:114:10-48: Error Set of call to a.svc.Preview in example.com/bank/cmd/cli.run: 127 entries, 7 unresolved, 21 possibly handled
+$WORK/cmd/cli/main.go:116:10-48: Error Set of call to a.svc.Preview in example.com/bank/cmd/cli.run: 127 entries, 7 unresolved, 21 possibly handled
 $WORK/service/service.go:133:15-39: group of 56 entries via dynamic call to (example.com/bank/repo.Store).Get (2 candidates) in (*example.com/bank/service.Service).input
 	$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing (candidate (*example.com/bank/repo/filerepo.Store).Get)
 	$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing (candidate (*example.com/bank/repo/filerepo.Store).Get)
@@ -53,7 +53,7 @@ $WORK/service/service.go:133:15-39: group of 56 entries via dynamic call to (exa
 	$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno (candidate (*example.com/bank/repo/filerepo.Store).Get)
 	$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno (candidate (*example.com/bank/repo/filerepo.Store).Get)
 	$WORK/repo/filerepo/filerepo.go:46:15-78: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate (*example.com/bank/repo/filerepo.Store).Get)
-	$WORK/repo/memory/memory.go:76:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate (*example.com/bank/repo/memory.Store).Get)
+	$WORK/repo/memory/memory.go:88:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate (*example.com/bank/repo/memory.Store).Get)
 	$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type" (candidate (*example.com/bank/repo/filerepo.Store).Get)
 	$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type" (candidate (*example.com/bank/repo/filerepo.Store).Get)
 	$GOROOT/src/strconv/number.go:*: opaque errors.New (candidate (*example.com/bank/repo/filerepo.Store).Get)
@@ -110,7 +110,7 @@ $WORK/service/service.go:137:13-35: group of 56 entries via dynamic call to (exa
 	$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno (candidate (*example.com/bank/repo/filerepo.Store).Get)
 	$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno (candidate (*example.com/bank/repo/filerepo.Store).Get)
 	$WORK/repo/filerepo/filerepo.go:46:15-78: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate (*example.com/bank/repo/filerepo.Store).Get)
-	$WORK/repo/memory/memory.go:76:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate (*example.com/bank/repo/memory.Store).Get)
+	$WORK/repo/memory/memory.go:88:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate (*example.com/bank/repo/memory.Store).Get)
 	$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type" (candidate (*example.com/bank/repo/filerepo.Store).Get)
 	$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type" (candidate (*example.com/bank/repo/filerepo.Store).Get)
 	$GOROOT/src/strconv/number.go:*: opaque errors.New (candidate (*example.com/bank/repo/filerepo.Store).Get)

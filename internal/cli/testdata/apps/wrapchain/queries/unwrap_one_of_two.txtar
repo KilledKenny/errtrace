@@ -1,7 +1,7 @@
-SUSPECTED BUG (precision): errors.Unwrap of a doubly wrapped error returns the
-inner wrap. Expected 1 entry: doc.ErrNoTitle with the chain fmt.Errorf "inner: %w"
-only. Actual: 2 unresolved(memory) entries (errors.Unwrap is not modelled), one
-through *xerr.OpError, which never reaches this call.
+errors.Unwrap of a doubly wrapped error: at run time doc.ErrNoTitle under
+fmt.Errorf "inner: %w" only. By design (errors.Unwrap is analysed as ordinary
+code, field loads are unresolved(memory)) the result is the same 2 Unresolved
+entries as unwrap_returned; the "outer: %w" chain must NOT be shown.
 -- args --
 transform/transform.go:@peeltwice
 -- stdout --

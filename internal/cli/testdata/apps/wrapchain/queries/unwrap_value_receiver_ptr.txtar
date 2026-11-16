@@ -1,0 +1,11 @@
+Value-receiver Unwrap reached through a pointer: &xerr.FieldError{Cause: ...}.
+Expected 1 entry: doc.ErrTooLong with the chain *xerr.FieldError.Unwrap.
+-- args --
+transform/transform.go:@fieldref
+-- stdout --
+$WORK/transform/transform.go:249:19-27: Error Set of example.com/wrapchain/transform.FieldRef: 1 entries
+$WORK/doc/doc.go:19:2-12: sentinel example.com/wrapchain/doc.ErrTooLong
+	wrap chain (origin → target):
+		$WORK/transform/transform.go:251:10-62: *example.com/wrapchain/xerr.FieldError.Unwrap
+	path (origin → target):
+		$WORK/transform/transform.go:251:47-61: in example.com/wrapchain/transform.FieldRef

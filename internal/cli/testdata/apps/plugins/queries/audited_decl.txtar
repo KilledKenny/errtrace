@@ -1,0 +1,17 @@
+A struct that embeds the core.Driver interface AND declares its own Send
+(decorator): the Candidate must be the declared (drivers.Audited).Send, not
+a promoted wrapper, and inside it a.Driver.Send has the one Candidate
+stored in the field (Push). Expected: opaque errors.New "push: negative
+priority" wrapped by "audited: %w"; two dynamic hops, each 1 of 1
+candidates. ErrPager (held by the other embedding struct, Logged) absent.
+-- args --
+dispatch/fanout.go:@audited
+-- stdout --
+$WORK/dispatch/fanout.go:35:18-29: Error Set of example.com/plugins/dispatch.SendAudited: 1 entries
+$WORK/drivers/drivers.go:72:10-47: opaque errors.New "push: negative priority"
+	wrap chain (origin → target):
+		$WORK/drivers/extra.go:104:10-40: fmt.Errorf "audited: %w"
+	path (origin → target):
+		$WORK/drivers/drivers.go:72:10-47: in (example.com/plugins/drivers.Push).Send
+		$WORK/drivers/extra.go:103:12-28: in (example.com/plugins/drivers.Audited).Send, call to (example.com/plugins/drivers.Push).Send (dynamic (example.com/plugins/core.Driver).Send: 1 of 1 candidates)
+		$WORK/dispatch/fanout.go:35:74-83: in example.com/plugins/dispatch.SendAudited, call to (example.com/plugins/drivers.Audited).Send (dynamic (example.com/plugins/core.Driver).Send: 1 of 1 candidates)

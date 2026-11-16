@@ -1,8 +1,7 @@
-SUSPECTED BUG: as defer_clear_named. The deferred closure replaces err == ErrTimeout by
-fmt.Errorf("settle: %w", ErrInternal).
-Expected 5 entries: ErrInternal with the "settle: %w" chain, ErrDeclined, *CodeError, ValidationError, opaque;
-no bare ErrTimeout. Actual: 2 unresolved(memory) entries (one without a position), no origins - not even the
-ErrInternal that the closure itself stores.
+SUSPECTED BUG: as defer_clear_named; the deferred closure replaces err == ErrTimeout by fmt.Errorf("settle: %w", ErrInternal).
+Expected (plan S08) 5 entries: ErrInternal with the "settle: %w" chain, ErrDeclined, *CodeError,
+ValidationError, opaque; no bare ErrTimeout. Actual: 2 unresolved(memory) entries (one without a position,
+"-:"), no origins - not even the ErrInternal that the closure itself stores.
 -- args --
 processor/flow.go:@deferTranslate
 -- stdout --

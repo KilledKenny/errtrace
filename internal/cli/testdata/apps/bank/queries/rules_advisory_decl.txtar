@@ -1,6 +1,7 @@
 Guard over the fanout: Advisory drops errors for which errors.Is(err, domain.ErrLimitExceeded).
-(*Violation).Unwrap -> (*Exceeded).Unwrap -> ErrLimitExceeded, so both Limit results match the guard.
-Expect rules_evaluate_decl's set WITHOUT any ErrLimitExceeded / limits.Exceeded entry; everything else stays.
+Go semantics: rules_evaluate_decl's set without the two Limit results ((*Violation).Unwrap -> (*Exceeded).Unwrap ->
+ErrLimitExceeded). Because (*Exceeded).Unwrap is not modelled (limits_check_decl), expect all 15 entries to stay,
+with the 3 unresolved ones (2x Limit, 1x Alive) counted as possibly handled.
 -- args --
 rules/rules.go:@advisory
 -- stdout --

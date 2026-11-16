@@ -86,3 +86,13 @@ func (e *QuotaError) As(target any) bool {
 	}
 	return false
 }
+
+// TimeoutError wraps Err and also matches ErrRetryable through Is.
+type TimeoutError struct {
+	Op  string
+	Err error
+}
+
+func (e *TimeoutError) Error() string        { return e.Op + ": timeout: " + e.Err.Error() }
+func (e *TimeoutError) Unwrap() error        { return e.Err }
+func (e *TimeoutError) Is(target error) bool { return target == ErrRetryable }

@@ -1,0 +1,17 @@
+A wrapper type with both Unwrap and a custom Is: errors.Is(err, xerr.ErrRetryable)
+{ return nil } on &xerr.TimeoutError{Err: doc.ErrDisk}. At run time Is always
+matches, so nothing comes back. Custom Is methods are may-match by design (plan
+S07). Expected 1 entry: doc.ErrDisk under *xerr.TimeoutError.Unwrap, marked
+possibly handled (custom Is method of *xerr.TimeoutError).
+-- args --
+transform/transform.go:@patient
+-- stdout --
+$WORK/transform/transform.go:231:18-25: Error Set of example.com/wrapchain/transform.Patient: 1 entries, 1 possibly handled
+$WORK/doc/doc.go:22:2-9: sentinel example.com/wrapchain/doc.ErrDisk
+	wrap chain (origin → target):
+		$WORK/transform/transform.go:225:10-62: *example.com/wrapchain/xerr.TimeoutError.Unwrap
+	possibly handled:
+		$WORK/transform/transform.go:233:5-38: errors.Is with example.com/wrapchain/xerr.ErrRetryable: custom Is method of *example.com/wrapchain/xerr.TimeoutError
+	path (origin → target):
+		$WORK/transform/transform.go:225:50-61: in example.com/wrapchain/transform.deadline
+		$WORK/transform/transform.go:232:9-20: in example.com/wrapchain/transform.Patient, call to example.com/wrapchain/transform.deadline

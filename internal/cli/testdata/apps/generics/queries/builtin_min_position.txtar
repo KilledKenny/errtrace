@@ -1,0 +1,9 @@
+Negative: the position is on the builtin min inside the generic InRange.
+Expect exit 2: not a call to a function.
+-- args --
+validate/validate.go:@min
+-- stdout --
+-- stderr --
+errtrace: $WORK/validate/validate.go:105:24: not a call to a function
+-- exit --
+2

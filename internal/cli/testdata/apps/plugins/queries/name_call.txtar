@@ -1,5 +1,6 @@
 Negative: call-site Target on a dynamic call whose method has no error
-result (p.Name()). Expected: rejected or an empty Error Set, no Origins.
+result (p.Name()). Expected: exit 2, "p.Name has no error result", nothing
+on stdout.
 -- args --
 registry/registry.go:@name_call
 -- stdout --

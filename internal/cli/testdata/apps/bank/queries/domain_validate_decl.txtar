@@ -1,0 +1,19 @@
+Leaf with a value receiver: Transfer.Validate returns three distinct *ValidationError values and one sentinel.
+Expect 4 entries without chains: concrete *domain.ValidationError x3 (from, to, amount) and sentinel
+domain.ErrSameAccount.
+-- args --
+domain/domain.go:@validate
+-- stdout --
+$WORK/domain/domain.go:75:32-40: Error Set of (example.com/bank/domain.Transfer).Validate: 4 entries
+$WORK/domain/errors.go:15:2-16: sentinel example.com/bank/domain.ErrSameAccount
+	path (origin → target):
+		$WORK/domain/domain.go:83:10-24: in (example.com/bank/domain.Transfer).Validate
+$WORK/domain/domain.go:77:10-61: concrete *example.com/bank/domain.ValidationError
+	path (origin → target):
+		$WORK/domain/domain.go:77:10-61: in (example.com/bank/domain.Transfer).Validate
+$WORK/domain/domain.go:80:10-59: concrete *example.com/bank/domain.ValidationError
+	path (origin → target):
+		$WORK/domain/domain.go:80:10-59: in (example.com/bank/domain.Transfer).Validate
+$WORK/domain/domain.go:86:10-71: concrete *example.com/bank/domain.ValidationError
+	path (origin → target):
+		$WORK/domain/domain.go:86:10-71: in (example.com/bank/domain.Transfer).Validate

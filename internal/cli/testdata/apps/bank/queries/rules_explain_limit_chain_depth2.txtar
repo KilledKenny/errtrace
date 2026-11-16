@@ -1,16 +1,18 @@
-Same call site with -chain-depth=2: the 3-link chain must be cut.
-Expect the daily-budget entry marked [chain truncated] with 2 links; the 2-link entry unchanged.
+Same call site with -chain-depth=2: only the 3-link chain is cut.
+Expect the daily-budget entry marked [chain truncated] with its 2 outermost links ("daily budget of %s: %w",
+"%s says no: %w"); the 2-link entry complete and unmarked.
+(The InsufficientFundsError entry is the missing narrowing of rules_explain_limit_call.)
 -- args --
 -chain-depth=2 cmd/cli/main.go:@explain_limit_call
 -- stdout --
-$WORK/cmd/cli/main.go:169:12-111: Error Set of call to rules.Explain in example.com/bank/cmd/cli.check: 3 entries, 2 unresolved
+$WORK/cmd/cli/main.go:173:12-111: Error Set of call to rules.Explain in example.com/bank/cmd/cli.check: 3 entries, 2 unresolved
 $WORK/rules/builtin.go:52:10-109: concrete example.com/bank/domain.InsufficientFundsError
 	wrap chain (origin → target):
 		$WORK/rules/rules.go:76:10-53: fmt.Errorf "%s says no: %w"
 	path (origin → target):
 		$WORK/rules/builtin.go:52:10-109: in (example.com/bank/rules.Funds).Check
 		$WORK/rules/rules.go:75:12-28: in example.com/bank/rules.Explain, call to (example.com/bank/rules.Funds).Check (dynamic (example.com/bank/rules.Rule).Check: 2 of 2 candidates)
-		$WORK/cmd/cli/main.go:169:12-111: in example.com/bank/cmd/cli.check, call to example.com/bank/rules.Explain
+		$WORK/cmd/cli/main.go:173:12-111: in example.com/bank/cmd/cli.check, call to example.com/bank/rules.Explain
 $WORK/limits/limits.go:32:10-82: unresolved(memory): *example.com/bank/limits.Exceeded.Unwrap not modelled
 	wrap chain (origin → target):
 		$WORK/limits/limits.go:32:10-82: *example.com/bank/limits.Exceeded.Unwrap
@@ -19,7 +21,7 @@ $WORK/limits/limits.go:32:10-82: unresolved(memory): *example.com/bank/limits.Ex
 		$WORK/limits/limits.go:32:10-82: in (example.com/bank/limits.Policy).Check
 		$WORK/rules/builtin.go:62:9-56: in (example.com/bank/rules.Limit).Check, call to (example.com/bank/limits.Policy).Check
 		$WORK/rules/rules.go:75:12-28: in example.com/bank/rules.Explain, call to (example.com/bank/rules.Limit).Check (dynamic (example.com/bank/rules.Rule).Check: 2 of 2 candidates)
-		$WORK/cmd/cli/main.go:169:12-111: in example.com/bank/cmd/cli.check, call to example.com/bank/rules.Explain
+		$WORK/cmd/cli/main.go:173:12-111: in example.com/bank/cmd/cli.check, call to example.com/bank/rules.Explain
 $WORK/limits/limits.go:36:4-71: unresolved(memory): *example.com/bank/limits.Exceeded.Unwrap not modelled [chain truncated]
 	wrap chain (origin → target):
 		$WORK/limits/limits.go:35:10-36:72: fmt.Errorf "daily budget of %s: %w"
@@ -28,4 +30,4 @@ $WORK/limits/limits.go:36:4-71: unresolved(memory): *example.com/bank/limits.Exc
 		$WORK/limits/limits.go:36:4-71: in (example.com/bank/limits.Policy).Check
 		$WORK/rules/builtin.go:62:9-56: in (example.com/bank/rules.Limit).Check, call to (example.com/bank/limits.Policy).Check
 		$WORK/rules/rules.go:75:12-28: in example.com/bank/rules.Explain, call to (example.com/bank/rules.Limit).Check (dynamic (example.com/bank/rules.Rule).Check: 2 of 2 candidates)
-		$WORK/cmd/cli/main.go:169:12-111: in example.com/bank/cmd/cli.check, call to example.com/bank/rules.Explain
+		$WORK/cmd/cli/main.go:173:12-111: in example.com/bank/cmd/cli.check, call to example.com/bank/rules.Explain

@@ -1,0 +1,13 @@
+Call site whose error argument is the enclosing function's own parameter.
+Expect: 1 entry unresolved(depends-on-caller) for parameter err of service.tag, under the chain fmt.Errorf "%s: %w".
+-- args --
+service/service.go:@tag_call
+-- stdout --
+$WORK/service/service.go:243:22-46: Error Set of call to annotate in example.com/kvstore/service.tag: 1 entries, 1 unresolved
+$WORK/service/service.go:243:42-45: unresolved(depends-on-caller): parameter err (error)
+	wrap chain (origin → target):
+		$WORK/service/service.go:135:9-38: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/service/service.go:243:42-45: in example.com/kvstore/service.tag
+		$WORK/service/service.go:132:5-8: in example.com/kvstore/service.annotate
+		$WORK/service/service.go:243:22-46: in example.com/kvstore/service.tag, call to example.com/kvstore/service.annotate

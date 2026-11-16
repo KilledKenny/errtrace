@@ -1,0 +1,10 @@
+Call through a method expression of an aliased instantiation: (*Scores).Get(c, k) is (*Cache[string,int]).Get.
+Expect one entry, sentinel ErrNotFound.
+-- args --
+handling.go:@methodexpr
+-- stdout --
+$WORK/handling.go:68:9-43: Error Set of call to (*Scores).Get in example.com/generics.peek: 1 entries
+$WORK/errs/errs.go:12:2-13: sentinel example.com/generics/errs.ErrNotFound
+	path (origin → target):
+		$WORK/cache/cache.go:33:16-32: in (*example.com/generics/cache.Cache[string, int]).Get
+		$WORK/handling.go:68:9-43: in example.com/generics.peek, call to (*example.com/generics/cache.Cache[string, int]).Get

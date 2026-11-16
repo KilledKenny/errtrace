@@ -1,5 +1,7 @@
-err == (*CodeError)(nil) on gateway.Precheck, which returns a typed nil or &CodeError.
-Expect 1 entry: the non-nil concrete *CodeError built in gateway.check. The typed nil is handled and must not appear.
+err == (*CodeError)(nil) -> return nil on gateway.Precheck, which returns a typed nil or &CodeError.
+Expect 1 entry: the non-nil concrete *CodeError built in gateway.check; the typed nil is handled.
+Note: the recorded output is right, but it does not prove the guard removed anything: the typed nil is never
+reported in the first place (see nil_check_typed_nil and eq_typed_nil_return_self).
 -- args --
 processor/eq.go:@typedNil
 -- stdout --

@@ -114,7 +114,15 @@ type fileTx struct {
 	done bool
 }
 
-func (t *fileTx) Commit() error { return t.release() }
+// Commit releases the lock. A transaction that is already finished is
+// reported as is; any other failure is labelled.
+func (t *fileTx) /*@commit*/Commit() error {
+	err := t.release()
+	if err == nil || err == repo.ErrTxDone {
+		return err
+	}
+	return fmt.Errorf("filerepo: commit: %w", err)
+}
 
 // Rollback tolerates a lock that is already gone.
 func (t *fileTx) /*@rollback*/Rollback() error {

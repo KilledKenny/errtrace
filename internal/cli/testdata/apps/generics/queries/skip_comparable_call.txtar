@@ -1,5 +1,5 @@
-SUSPECTED BUG: ErrIntRange is kept, without even a possibly-handled note: the == between the two parameters of
-Skip[error] is not applied when the arguments are substituted (see skip_plain_sentinel_call for a plain sentinel).
+SUSPECTED BUG: (low confidence) ErrIntRange is kept, without a possibly-handled note: the == between the two parameters
+of Skip[error] is not applied when the arguments are substituted (see skip_plain_sentinel_call).
 Skip[T comparable] instantiated with T = error: its result type T is an error result and its v == skip
 compares against ErrIntRange. Expect concrete *TypedErr[int], concrete *TypedErr[string] and ErrStrRange;
 ErrIntRange is turned into nil and must not appear.

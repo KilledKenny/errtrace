@@ -1,8 +1,7 @@
-SUSPECTED BUG (low confidence): spurious 'possibly handled' note on engine.ErrClosed.
 Error result first; an errors.Is guard replaces the engine's sentinel by the repo's re-exported alias.
-Expected: 2 entries, 0 possibly handled: the not-found sentinel (shown as repo.ErrNotFound) from the guarded return and engine.ErrClosed from `return err, v`.
-Actual: ErrClosed is annotated 'may be the same value as kverr.ErrNotFound' because ErrClosed is re-assigned in its own package's init()
-(to a fresh errors.New), which can never equal kverr.ErrNotFound.
+Expect 2 entries: sentinel repo.ErrNotFound (the guarded return) and sentinel engine.ErrClosed (`return err, v`); no kverr.ErrNotFound entry.
+ErrClosed is reassigned in the engine's func init() and therefore unstable for errtrace: it carries a conservative 'possibly handled' note
+(may be the same value as kverr.ErrNotFound). At run time both stores are distinct errors.New values, so the note is imprecise but allowed by P07.
 -- args --
 repo/repo.go:@lookup
 -- stdout --

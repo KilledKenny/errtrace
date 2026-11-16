@@ -1,4 +1,4 @@
-errors.Join of two independently nil-able errors.
+errors.Join of two independently nil-able errors (sentinel + concrete pointer type from another package).
 Expect 2 entries, both with the chain errors.Join: sentinel config.ErrNoToken and concrete *domain.ValidationError.
 -- args --
 config/config.go:@validate

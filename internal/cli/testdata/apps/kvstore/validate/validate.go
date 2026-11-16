@@ -27,7 +27,7 @@ func /*@key*/Key(k string) error {
 // Value validates a value; the error is the first result.
 func /*@value*/Value(v string) (error, int) {
 	if len(v) > 1024 {
-		return kverr.Code(len(v)), 0
+		return kverr./*@conv*/Code(len(v)), 0
 	}
 	return nil, len(v)
 }

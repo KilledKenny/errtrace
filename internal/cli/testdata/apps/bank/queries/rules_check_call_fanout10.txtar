@@ -1,5 +1,6 @@
 -fanout boundary: the call site r.Check has exactly 10 Candidates, so -fanout=10 still groups.
-Expect one group line "(10 candidates)" holding all rule origins (see rules_evaluate_decl).
+Expect one group line "(10 candidates)" holding all 15 rule entries (see rules_evaluate_decl), each naming its
+Candidate.
 -- args --
 -fanout=10 rules/rules.go:@check_call
 -- stdout --

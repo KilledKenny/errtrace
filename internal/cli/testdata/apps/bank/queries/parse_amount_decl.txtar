@@ -1,7 +1,9 @@
-stdlib + guard + replace: strconv.ParseInt errors are wrapped "amount %q: %w" unless errors.Is(err, strconv.ErrRange),
-which is replaced by *domain.ValidationError.
-Expect strconv.ErrSyntax (and ParseInt's opaque base/bit-size errors) behind (*strconv.NumError).Unwrap + "amount %q: %w",
-two concrete *domain.ValidationError; strconv.ErrRange must NOT appear.
+SUSPECTED BUG: stdlib + guard + replace. strconv.ParseInt errors are wrapped "amount %q: %w" unless
+errors.Is(err, strconv.ErrRange), which is replaced by *domain.ValidationError. Correct set: strconv.ErrSyntax (and
+ParseInt's opaque base / bit-size errors) behind (*strconv.NumError).Unwrap + "amount %q: %w", two concrete
+*domain.ValidationError; no strconv.ErrRange. Actual: correct, plus 11 spurious "concrete internal/strconv.Error"
+entries: strconv.toError maps every internal/strconv.Error constant to a *NumError in a value switch
+(switch err { case strconv.ErrSyntax: ... }), so that type never leaves strconv.ParseInt.
 -- args --
 parse/parse.go:@amount
 -- stdout --

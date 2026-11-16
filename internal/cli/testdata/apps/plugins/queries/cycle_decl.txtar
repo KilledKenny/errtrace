@@ -5,11 +5,11 @@ is the only implementation. Expected: ErrConnReset (Send) and ErrConnClosed
 dispatch/dispatch.go:@cycle
 -- stdout --
 $WORK/dispatch/dispatch.go:229:16-21: Error Set of example.com/plugins/dispatch.Cycle: 2 entries
-$WORK/drivers/extra.go:15:2-14: sentinel example.com/plugins/drivers.ErrConnReset
+$WORK/drivers/extra.go:16:2-14: sentinel example.com/plugins/drivers.ErrConnReset
 	path (origin → target):
-		$WORK/drivers/extra.go:62:10-22: in (*example.com/plugins/drivers.Conn).Send
+		$WORK/drivers/extra.go:63:10-22: in (*example.com/plugins/drivers.Conn).Send
 		$WORK/dispatch/dispatch.go:230:12-21: in example.com/plugins/dispatch.Cycle, call to (*example.com/plugins/drivers.Conn).Send (dynamic (example.com/plugins/drivers.Channel).Send: 1 of 1 candidates)
-$WORK/drivers/extra.go:16:2-15: sentinel example.com/plugins/drivers.ErrConnClosed
+$WORK/drivers/extra.go:17:2-15: sentinel example.com/plugins/drivers.ErrConnClosed
 	path (origin → target):
-		$WORK/drivers/extra.go:69:10-23: in (*example.com/plugins/drivers.Conn).Close
+		$WORK/drivers/extra.go:70:10-23: in (*example.com/plugins/drivers.Conn).Close
 		$WORK/dispatch/dispatch.go:234:9-18: in example.com/plugins/dispatch.Cycle, call to (*example.com/plugins/drivers.Conn).Close (dynamic (example.com/plugins/drivers.Channel).Close: 1 of 1 candidates)

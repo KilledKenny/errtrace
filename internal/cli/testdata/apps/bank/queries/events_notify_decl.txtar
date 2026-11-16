@@ -1,4 +1,4 @@
-Negative: Notify logs Publish's error and always returns nil.
+Negative: Notify logs Publish's joined handler errors and always returns nil.
 Expect 0 entries.
 -- args --
 events/events.go:@notify

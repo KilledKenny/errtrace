@@ -131,7 +131,9 @@ func dispatcher(ev core.Event) {
 	report(d.Send(ev))
 	report(d.Audit(ev))
 	report(d.Drop(ev))
-	report(dispatch.Probe(ev))
+	if os.Getenv("PLUGINS_PROBE") != "" {
+		report(dispatch.Probe(ev)) // panics: the driver is not wired yet
+	}
 	report(d.Async(registry.MustLookup("audit"), ev))
 	dispatch.Fire(registry.MustLookup("metrics"), ev)
 	report(d.Shutdown())
@@ -148,6 +150,8 @@ func alerts(ev core.Event) {
 	report(dispatch.Release(conn))
 	report(dispatch.Release(drivers.Email{}))
 	report(dispatch.SendQuietly(ev))
+	report(dispatch.SendNoHTTP(ev))
+	report(dispatch.SendAudited(drivers.Audited{Driver: drivers.Push{}}, ev))
 }
 
 func callbacks(ev core.Event) {
@@ -155,6 +159,7 @@ func callbacks(ev core.Event) {
 	report(dispatch.FirstError(drivers.Slack{}, []core.Event{ev, ev}))
 	report(dispatch.ByAddr(drivers.File{}, ev))
 	report(dispatch.Limited(ev))
+	report(dispatch.Maintenance(ev))
 	report(dispatch.RetrySMS(&drivers.SMS{}, ev))
 	report(dispatch.RetryValidate(ev))
 	report(dispatch.RetryDriver(drivers.Pager{}, ev))

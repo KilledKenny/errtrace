@@ -1,8 +1,8 @@
 Fanout: r.Check has 10 Candidates (>= default -fanout 8), each result wrapped in &Violation{Err: err}.
-Expect one group via the dynamic call (rules.Rule).Check listing every rule's origins behind (*Violation).Unwrap:
-3 *ValidationError + ErrSameAccount (Shape), ErrAccountClosed + ErrFrozen (SourceUsable), ErrAccountClosed behind
-"destination %s: %w", InsufficientFundsError, ErrLimitExceeded behind Exceeded.Unwrap (x2), ErrCurrency behind "%w %q",
-ErrBlocked, opaque "rules: outside business hours", ctx.Err() (Alive), errDryRun (Func -> closure in cmd/cli).
+Expect one group via the dynamic call (rules.Rule).Check with 15 entries: 3 *ValidationError + ErrSameAccount (Shape),
+ErrAccountClosed + ErrFrozen (SourceUsable), ErrAccountClosed (DestOpen), InsufficientFundsError (Funds), ErrCurrency,
+ErrBlocked, opaque "rules: outside business hours", errDryRun (Func -> closure in cmd/cli), and 3 unresolved:
+ctx.Err() (Alive) and the two (*Exceeded).Unwrap results of Limit (limits_check_decl).
 -- args --
 rules/rules.go:@evaluate
 -- stdout --

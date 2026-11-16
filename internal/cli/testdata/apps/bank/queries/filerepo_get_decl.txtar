@@ -1,7 +1,8 @@
 stdlib + guard + custom wrapper type: os.ReadFile's error is replaced by NotFoundError[AccountID] when it is
 fs.ErrNotExist, otherwise wrapped "filerepo: read %s: %w"; decode errors are wrapped in &CorruptError{Err: err}.
-Expect concrete NotFoundError[AccountID], ReadFile errors behind the errorf, and errShortRecord /
-strconv.ErrSyntax / strconv.ErrRange behind (*CorruptError).Unwrap (strconv ones also behind "balance: %w" or "status: %w").
+Expect concrete NotFoundError[AccountID] bare, ReadFile errors behind the errorf (ENOENT-like ones possibly handled:
+syscall.Errno has a custom Is), and errShortRecord / strconv.ErrSyntax / strconv.ErrRange behind
+(*CorruptError).Unwrap (strconv ones also behind NumError.Unwrap + "balance: %w" or "status: %w").
 -- args --
 repo/filerepo/filerepo.go:@get
 -- stdout --

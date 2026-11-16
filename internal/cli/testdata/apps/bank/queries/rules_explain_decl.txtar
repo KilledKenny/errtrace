@@ -1,6 +1,7 @@
 Parameter-driven dispatch: Explain's r is only ever rules.Funds{} or rules.Limit{} (two call sites in cmd/cli).
-Expect InsufficientFundsError and ErrLimitExceeded (behind Exceeded.Unwrap, with/without "daily budget of %s: %w"),
-all behind "%s says no: %w"; no origin of the other 8 rules.
+Expect 3 entries, all behind "%s says no: %w": InsufficientFundsError (Funds) and the two unresolved
+(*Exceeded).Unwrap results of Limit (one also behind "daily budget of %s: %w"); 2 of 2 candidates, no origin of
+the other 8 rules.
 -- args --
 rules/rules.go:@explain
 -- stdout --

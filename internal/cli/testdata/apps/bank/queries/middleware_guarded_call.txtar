@@ -1,13 +1,16 @@
-Curried closures called immediately: Auth(token)(h)(ctx, req) with h = a closure returning nil.
-Expect 1 entry: sentinel middleware.ErrUnauthorized.
+SUSPECTED BUG: curried closures called immediately, Auth(token)(h)(ctx, req), queried at a call site where h is
+a local closure that returns nil. Correct set: 1 entry, sentinel middleware.ErrUnauthorized. Actual: 209 entries and
+unresolved(fixpoint-limit): the function value returned by Auth(token)(h) and its free variable next are resolved
+to every Handler in the program (handleTransfer, handleBalance, the other middlewares), not to Auth's closure
+over the argument.
 -- args --
 -fanout=1 cmd/cli/main.go:@guarded_ok_call
 -- stdout --
-$WORK/cmd/cli/main.go:181:12-96: Error Set of call to middleware.Guarded in example.com/bank/cmd/cli.probe: 209 entries, 19 unresolved, 33 possibly handled
+$WORK/cmd/cli/main.go:185:12-96: Error Set of call to middleware.Guarded in example.com/bank/cmd/cli.probe: 209 entries, 19 unresolved, 33 possibly handled
 $WORK/middleware/middleware.go:82:18-25: unresolved(fixpoint-limit): result 0 of example.com/bank/middleware.Guarded can carry more than 1024 values
 	path (origin → target):
 		$WORK/middleware/middleware.go:82:18-25: in example.com/bank/middleware.Guarded
-		$WORK/cmd/cli/main.go:181:12-96: in example.com/bank/cmd/cli.probe, call to example.com/bank/middleware.Guarded
+		$WORK/cmd/cli/main.go:185:12-96: in example.com/bank/cmd/cli.probe, call to example.com/bank/middleware.Guarded
 $WORK/middleware/middleware.go:83:26-50: group of 208 entries via dynamic call to function value of type example.com/bank/middleware.Handler (1 candidates) in example.com/bank/middleware.Guarded
 	$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing (candidate example.com/bank/middleware.Auth$1$1)
 	$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing (candidate example.com/bank/middleware.Auth$1$1)
@@ -175,8 +178,8 @@ $WORK/middleware/middleware.go:83:26-50: group of 208 entries via dynamic call t
 	$WORK/repo/filerepo/filerepo.go:46:15-78: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate example.com/bank/middleware.Auth$1$1)
 	$WORK/repo/filerepo/filerepo.go:46:15-78: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate example.com/bank/middleware.Auth$1$1)
 	$WORK/repo/filerepo/filerepo.go:46:15-78: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate example.com/bank/middleware.Auth$1$1)
-	$WORK/repo/memory/memory.go:76:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate example.com/bank/middleware.Auth$1$1)
-	$WORK/repo/memory/memory.go:76:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate example.com/bank/middleware.Auth$1$1)
+	$WORK/repo/memory/memory.go:88:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate example.com/bank/middleware.Auth$1$1)
+	$WORK/repo/memory/memory.go:88:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate example.com/bank/middleware.Auth$1$1)
 	$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type" (candidate example.com/bank/middleware.Auth$1$1)
 	$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type" (candidate example.com/bank/middleware.Auth$1$1)
 	$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type" (candidate example.com/bank/middleware.Auth$1$1)
@@ -208,12 +211,12 @@ $WORK/middleware/middleware.go:83:26-50: group of 208 entries via dynamic call t
 	$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e (candidate example.com/bank/middleware.Auth$1$1)
 	$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e (candidate example.com/bank/middleware.Auth$1$1)
 	$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e (candidate example.com/bank/middleware.Auth$1$1)
-	$WORK/tx/tx.go:24:3-3: unresolved(memory): load of escaping variable err (candidate example.com/bank/middleware.Auth$1$1)
-	$WORK/tx/tx.go:24:3-3: unresolved(memory): load of escaping variable err (candidate example.com/bank/middleware.Auth$1$1)
-	$WORK/tx/tx.go:24:3-3: unresolved(memory): load of escaping variable err (candidate example.com/bank/middleware.Auth$1$1)
-	$WORK/tx/tx.go:38:3-3: unresolved(memory): load of escaping variable err (candidate example.com/bank/middleware.Auth$1$1)
-	$WORK/tx/tx.go:38:3-3: unresolved(memory): load of escaping variable err (candidate example.com/bank/middleware.Auth$1$1)
-	$WORK/tx/tx.go:38:3-3: unresolved(memory): load of escaping variable err (candidate example.com/bank/middleware.Auth$1$1)
-	$WORK/tx/tx.go:40:2-2: unresolved(memory): load of escaping variable err (candidate example.com/bank/middleware.Auth$1$1)
-	$WORK/tx/tx.go:40:2-2: unresolved(memory): load of escaping variable err (candidate example.com/bank/middleware.Auth$1$1)
-	$WORK/tx/tx.go:40:2-2: unresolved(memory): load of escaping variable err (candidate example.com/bank/middleware.Auth$1$1)
+	$WORK/tx/tx.go:25:3-3: unresolved(memory): load of escaping variable err (candidate example.com/bank/middleware.Auth$1$1)
+	$WORK/tx/tx.go:25:3-3: unresolved(memory): load of escaping variable err (candidate example.com/bank/middleware.Auth$1$1)
+	$WORK/tx/tx.go:25:3-3: unresolved(memory): load of escaping variable err (candidate example.com/bank/middleware.Auth$1$1)
+	$WORK/tx/tx.go:39:3-3: unresolved(memory): load of escaping variable err (candidate example.com/bank/middleware.Auth$1$1)
+	$WORK/tx/tx.go:39:3-3: unresolved(memory): load of escaping variable err (candidate example.com/bank/middleware.Auth$1$1)
+	$WORK/tx/tx.go:39:3-3: unresolved(memory): load of escaping variable err (candidate example.com/bank/middleware.Auth$1$1)
+	$WORK/tx/tx.go:41:2-2: unresolved(memory): load of escaping variable err (candidate example.com/bank/middleware.Auth$1$1)
+	$WORK/tx/tx.go:41:2-2: unresolved(memory): load of escaping variable err (candidate example.com/bank/middleware.Auth$1$1)
+	$WORK/tx/tx.go:41:2-2: unresolved(memory): load of escaping variable err (candidate example.com/bank/middleware.Auth$1$1)

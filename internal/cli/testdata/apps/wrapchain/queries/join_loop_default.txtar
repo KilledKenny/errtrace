@@ -1,0 +1,83 @@
+The accumulating loop of join_loop_depth3 at the default -chain-depth 8.
+Expected 8 entries, all doc.ErrTooLong: fmt.Errorf "line %d: %w" followed by 1 to 7
+errors.Join links, plus one [chain truncated] entry showing 8 errors.Join links
+(the innermost fmt.Errorf link is the one cut).
+-- args --
+validate/validate.go:@lines
+-- stdout --
+$WORK/validate/validate.go:82:16-21: Error Set of example.com/wrapchain/validate.Lines: 8 entries
+$WORK/doc/doc.go:19:2-12: sentinel example.com/wrapchain/doc.ErrTooLong [chain truncated]
+	wrap chain (origin → target):
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+	path (origin → target):
+		$WORK/validate/validate.go:86:56-70: in example.com/wrapchain/validate.Lines
+$WORK/doc/doc.go:19:2-12: sentinel example.com/wrapchain/doc.ErrTooLong
+	wrap chain (origin → target):
+		$WORK/validate/validate.go:86:27-71: fmt.Errorf "line %d: %w"
+		$WORK/validate/validate.go:86:10-72: errors.Join
+	path (origin → target):
+		$WORK/validate/validate.go:86:56-70: in example.com/wrapchain/validate.Lines
+$WORK/doc/doc.go:19:2-12: sentinel example.com/wrapchain/doc.ErrTooLong
+	wrap chain (origin → target):
+		$WORK/validate/validate.go:86:27-71: fmt.Errorf "line %d: %w"
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+	path (origin → target):
+		$WORK/validate/validate.go:86:56-70: in example.com/wrapchain/validate.Lines
+$WORK/doc/doc.go:19:2-12: sentinel example.com/wrapchain/doc.ErrTooLong
+	wrap chain (origin → target):
+		$WORK/validate/validate.go:86:27-71: fmt.Errorf "line %d: %w"
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+	path (origin → target):
+		$WORK/validate/validate.go:86:56-70: in example.com/wrapchain/validate.Lines
+$WORK/doc/doc.go:19:2-12: sentinel example.com/wrapchain/doc.ErrTooLong
+	wrap chain (origin → target):
+		$WORK/validate/validate.go:86:27-71: fmt.Errorf "line %d: %w"
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+	path (origin → target):
+		$WORK/validate/validate.go:86:56-70: in example.com/wrapchain/validate.Lines
+$WORK/doc/doc.go:19:2-12: sentinel example.com/wrapchain/doc.ErrTooLong
+	wrap chain (origin → target):
+		$WORK/validate/validate.go:86:27-71: fmt.Errorf "line %d: %w"
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+	path (origin → target):
+		$WORK/validate/validate.go:86:56-70: in example.com/wrapchain/validate.Lines
+$WORK/doc/doc.go:19:2-12: sentinel example.com/wrapchain/doc.ErrTooLong
+	wrap chain (origin → target):
+		$WORK/validate/validate.go:86:27-71: fmt.Errorf "line %d: %w"
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+	path (origin → target):
+		$WORK/validate/validate.go:86:56-70: in example.com/wrapchain/validate.Lines
+$WORK/doc/doc.go:19:2-12: sentinel example.com/wrapchain/doc.ErrTooLong
+	wrap chain (origin → target):
+		$WORK/validate/validate.go:86:27-71: fmt.Errorf "line %d: %w"
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+	path (origin → target):
+		$WORK/validate/validate.go:86:56-70: in example.com/wrapchain/validate.Lines

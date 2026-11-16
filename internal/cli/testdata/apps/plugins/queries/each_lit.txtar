@@ -3,7 +3,7 @@ main. Expected: only main.errUnnamed.
 -- args --
 main.go:@each_lit
 -- stdout --
-$WORK/main.go:168:36-40: Error Set of example.com/plugins.handlers$1: 1 entries
+$WORK/main.go:173:36-40: Error Set of example.com/plugins.handlers$1: 1 entries
 $WORK/main.go:23:2-12: sentinel example.com/plugins.errUnnamed
 	path (origin → target):
-		$WORK/main.go:170:11-21: in example.com/plugins.handlers$1
+		$WORK/main.go:175:11-21: in example.com/plugins.handlers$1

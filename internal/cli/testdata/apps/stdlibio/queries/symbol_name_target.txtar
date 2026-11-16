@@ -1,0 +1,11 @@
+Negative: a symbol-name Target (import/path.Func) is planned for step S13 and not
+implemented yet. Today the argument is read as a file name without position: exit 2,
+empty stdout, "example.com/stdlibio/config.Port: file is not in any loaded package".
+Once S13 lands this query must instead print the set of port_wrap_numerror.
+-- args --
+example.com/stdlibio/config.Port
+-- stdout --
+-- stderr --
+errtrace: $WORK/example.com/stdlibio/config.Port: file is not in any loaded package
+-- exit --
+2

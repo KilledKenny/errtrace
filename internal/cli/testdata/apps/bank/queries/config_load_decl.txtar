@@ -1,8 +1,8 @@
-Top of the config layer: os.Open guarded by errors.Is(fs.ErrNotExist) (returns defaults), set() errors
-wrapped "config: %s:%d: %w", scanner error flattened with %v, validate()'s joined errors returned as is.
-Expect os.Open's errors behind "config: %w" (ErrNotExist-like ones removed or marked possibly handled), set's origins
-behind "config: %s:%d: %w", opaque "config: read %s: %v" with NO bufio/os origin behind it, ErrNoToken and
-*ValidationError behind errors.Join.
+Top of the config layer: os.Open guarded by errors.Is(fs.ErrNotExist) (defaults), set() errors wrapped
+"config: %s:%d: %w", scanner error flattened with %v, validate()'s joined errors returned as is, defer f.Close().
+Expect os.Open's errors behind "config: %w" (not-exist ones removed or possibly handled), set's origins behind
+"config: %s:%d: %w", opaque "config: read %s: %v" with NO bufio/os origin behind it, ErrNoToken and
+*ValidationError behind errors.Join; nothing from f.Close().
 -- args --
 config/config.go:@load
 -- stdout --

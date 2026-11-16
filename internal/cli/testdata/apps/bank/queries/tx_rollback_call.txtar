@@ -1,17 +1,17 @@
 Dynamic call t.Rollback() in ReadOnly: memTx.Rollback returns repo.ErrTxDone; fileTx.Rollback filters release()'s
 errors with errors.Is(fs.ErrNotExist) || errors.Is(repo.ErrTxDone).
 Expect repo.ErrTxDone only via the memTx Candidate (path through memTx.finish, not fileTx.release), and os.Remove's
-errors (*fs.PathError) via fileTx, not-exist ones removed or marked possibly handled.
+errors (*fs.PathError) via fileTx, possibly handled.
 -- args --
 tx/tx.go:@rollback_call
 -- stdout --
-$WORK/tx/tx.go:50:10-40: Error Set of call to t.Rollback in (*example.com/bank/tx.Manager).ReadOnly: 10 entries, 2 unresolved, 9 possibly handled
+$WORK/tx/tx.go:51:10-40: Error Set of call to t.Rollback in (*example.com/bank/tx.Manager).ReadOnly: 10 entries, 2 unresolved, 9 possibly handled
 $GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN
 	wrap chain (origin → target):
 		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
 	possibly handled:
-		$WORK/repo/filerepo/filerepo.go:122:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
-		$WORK/repo/filerepo/filerepo.go:122:39-69: errors.Is with example.com/bank/repo.ErrTxDone: custom Is method of syscall.Errno
+		$WORK/repo/filerepo/filerepo.go:130:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+		$WORK/repo/filerepo/filerepo.go:130:39-69: errors.Is with example.com/bank/repo.ErrTxDone: custom Is method of syscall.Errno
 	path (origin → target):
 		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
 		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Mkdirat, call to syscall.errnoErr
@@ -19,15 +19,15 @@ $GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN
 		$GOROOT/src/os/file.go:*: in os.Mkdir$1, call to syscall.Mkdir
 		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Mkdir$1 (dynamic function value fn: 9 of 9 candidates)
 		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
-		$WORK/repo/filerepo/filerepo.go:133:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
-		$WORK/repo/filerepo/filerepo.go:121:9-20: in (*example.com/bank/repo/filerepo.fileTx).Rollback, call to (*example.com/bank/repo/filerepo.fileTx).release
-		$WORK/tx/tx.go:50:10-40: in (*example.com/bank/tx.Manager).ReadOnly, call to (*example.com/bank/repo/filerepo.fileTx).Rollback (dynamic (example.com/bank/repo.Tx).Rollback: 2 of 2 candidates)
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:129:9-20: in (*example.com/bank/repo/filerepo.fileTx).Rollback, call to (*example.com/bank/repo/filerepo.fileTx).release
+		$WORK/tx/tx.go:51:10-40: in (*example.com/bank/tx.Manager).ReadOnly, call to (*example.com/bank/repo/filerepo.fileTx).Rollback (dynamic (example.com/bank/repo.Tx).Rollback: 2 of 2 candidates)
 $GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL
 	wrap chain (origin → target):
 		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
 	possibly handled:
-		$WORK/repo/filerepo/filerepo.go:122:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
-		$WORK/repo/filerepo/filerepo.go:122:39-69: errors.Is with example.com/bank/repo.ErrTxDone: custom Is method of syscall.Errno
+		$WORK/repo/filerepo/filerepo.go:130:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+		$WORK/repo/filerepo/filerepo.go:130:39-69: errors.Is with example.com/bank/repo.ErrTxDone: custom Is method of syscall.Errno
 	path (origin → target):
 		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
 		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Mkdirat, call to syscall.errnoErr
@@ -35,15 +35,15 @@ $GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL
 		$GOROOT/src/os/file.go:*: in os.Mkdir$1, call to syscall.Mkdir
 		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Mkdir$1 (dynamic function value fn: 9 of 9 candidates)
 		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
-		$WORK/repo/filerepo/filerepo.go:133:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
-		$WORK/repo/filerepo/filerepo.go:121:9-20: in (*example.com/bank/repo/filerepo.fileTx).Rollback, call to (*example.com/bank/repo/filerepo.fileTx).release
-		$WORK/tx/tx.go:50:10-40: in (*example.com/bank/tx.Manager).ReadOnly, call to (*example.com/bank/repo/filerepo.fileTx).Rollback (dynamic (example.com/bank/repo.Tx).Rollback: 2 of 2 candidates)
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:129:9-20: in (*example.com/bank/repo/filerepo.fileTx).Rollback, call to (*example.com/bank/repo/filerepo.fileTx).release
+		$WORK/tx/tx.go:51:10-40: in (*example.com/bank/tx.Manager).ReadOnly, call to (*example.com/bank/repo/filerepo.fileTx).Rollback (dynamic (example.com/bank/repo.Tx).Rollback: 2 of 2 candidates)
 $GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT
 	wrap chain (origin → target):
 		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
 	possibly handled:
-		$WORK/repo/filerepo/filerepo.go:122:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
-		$WORK/repo/filerepo/filerepo.go:122:39-69: errors.Is with example.com/bank/repo.ErrTxDone: custom Is method of syscall.Errno
+		$WORK/repo/filerepo/filerepo.go:130:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+		$WORK/repo/filerepo/filerepo.go:130:39-69: errors.Is with example.com/bank/repo.ErrTxDone: custom Is method of syscall.Errno
 	path (origin → target):
 		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
 		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Mkdirat, call to syscall.errnoErr
@@ -51,20 +51,20 @@ $GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT
 		$GOROOT/src/os/file.go:*: in os.Mkdir$1, call to syscall.Mkdir
 		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Mkdir$1 (dynamic function value fn: 9 of 9 candidates)
 		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
-		$WORK/repo/filerepo/filerepo.go:133:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
-		$WORK/repo/filerepo/filerepo.go:121:9-20: in (*example.com/bank/repo/filerepo.fileTx).Rollback, call to (*example.com/bank/repo/filerepo.fileTx).release
-		$WORK/tx/tx.go:50:10-40: in (*example.com/bank/tx.Manager).ReadOnly, call to (*example.com/bank/repo/filerepo.fileTx).Rollback (dynamic (example.com/bank/repo.Tx).Rollback: 2 of 2 candidates)
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:129:9-20: in (*example.com/bank/repo/filerepo.fileTx).Rollback, call to (*example.com/bank/repo/filerepo.fileTx).release
+		$WORK/tx/tx.go:51:10-40: in (*example.com/bank/tx.Manager).ReadOnly, call to (*example.com/bank/repo/filerepo.fileTx).Rollback (dynamic (example.com/bank/repo.Tx).Rollback: 2 of 2 candidates)
 $WORK/repo/repo.go:12:5-14: sentinel example.com/bank/repo.ErrTxDone
 	path (origin → target):
-		$WORK/repo/memory/memory.go:98:10-24: in (*example.com/bank/repo/memory.memTx).finish
-		$WORK/repo/memory/memory.go:94:43-53: in (*example.com/bank/repo/memory.memTx).Rollback, call to (*example.com/bank/repo/memory.memTx).finish
-		$WORK/tx/tx.go:50:10-40: in (*example.com/bank/tx.Manager).ReadOnly, call to (*example.com/bank/repo/memory.memTx).Rollback (dynamic (example.com/bank/repo.Tx).Rollback: 2 of 2 candidates)
+		$WORK/repo/memory/memory.go:113:10-24: in (*example.com/bank/repo/memory.memTx).finish
+		$WORK/repo/memory/memory.go:109:43-53: in (*example.com/bank/repo/memory.memTx).Rollback, call to (*example.com/bank/repo/memory.memTx).finish
+		$WORK/tx/tx.go:51:10-40: in (*example.com/bank/tx.Manager).ReadOnly, call to (*example.com/bank/repo/memory.memTx).Rollback (dynamic (example.com/bank/repo.Tx).Rollback: 2 of 2 candidates)
 $GOROOT/src/syscall/syscall.go:*: concrete syscall.Errno
 	wrap chain (origin → target):
 		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
 	possibly handled:
-		$WORK/repo/filerepo/filerepo.go:122:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
-		$WORK/repo/filerepo/filerepo.go:122:39-69: errors.Is with example.com/bank/repo.ErrTxDone: custom Is method of syscall.Errno
+		$WORK/repo/filerepo/filerepo.go:130:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+		$WORK/repo/filerepo/filerepo.go:130:39-69: errors.Is with example.com/bank/repo.ErrTxDone: custom Is method of syscall.Errno
 	path (origin → target):
 		$GOROOT/src/syscall/syscall.go:*: in syscall.ByteSliceFromString
 		$GOROOT/src/syscall/syscall.go:*: in syscall.BytePtrFromString, call to syscall.ByteSliceFromString
@@ -73,45 +73,45 @@ $GOROOT/src/syscall/syscall.go:*: concrete syscall.Errno
 		$GOROOT/src/os/file.go:*: in os.Mkdir$1, call to syscall.Mkdir
 		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Mkdir$1 (dynamic function value fn: 9 of 9 candidates)
 		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
-		$WORK/repo/filerepo/filerepo.go:133:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
-		$WORK/repo/filerepo/filerepo.go:121:9-20: in (*example.com/bank/repo/filerepo.fileTx).Rollback, call to (*example.com/bank/repo/filerepo.fileTx).release
-		$WORK/tx/tx.go:50:10-40: in (*example.com/bank/tx.Manager).ReadOnly, call to (*example.com/bank/repo/filerepo.fileTx).Rollback (dynamic (example.com/bank/repo.Tx).Rollback: 2 of 2 candidates)
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:129:9-20: in (*example.com/bank/repo/filerepo.fileTx).Rollback, call to (*example.com/bank/repo/filerepo.fileTx).release
+		$WORK/tx/tx.go:51:10-40: in (*example.com/bank/tx.Manager).ReadOnly, call to (*example.com/bank/repo/filerepo.fileTx).Rollback (dynamic (example.com/bank/repo.Tx).Rollback: 2 of 2 candidates)
 $GOROOT/src/syscall/syscall_linux.go:*: concrete syscall.Errno
 	wrap chain (origin → target):
 		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
 	possibly handled:
-		$WORK/repo/filerepo/filerepo.go:122:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
-		$WORK/repo/filerepo/filerepo.go:122:39-69: errors.Is with example.com/bank/repo.ErrTxDone: custom Is method of syscall.Errno
+		$WORK/repo/filerepo/filerepo.go:130:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+		$WORK/repo/filerepo/filerepo.go:130:39-69: errors.Is with example.com/bank/repo.ErrTxDone: custom Is method of syscall.Errno
 	path (origin → target):
 		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Fchmodat
 		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Chmod, call to syscall.Fchmodat
 		$GOROOT/src/os/file_posix.go:*: in os.chmod$1, call to syscall.Chmod
 		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.chmod$1 (dynamic function value fn: 9 of 9 candidates)
 		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
-		$WORK/repo/filerepo/filerepo.go:133:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
-		$WORK/repo/filerepo/filerepo.go:121:9-20: in (*example.com/bank/repo/filerepo.fileTx).Rollback, call to (*example.com/bank/repo/filerepo.fileTx).release
-		$WORK/tx/tx.go:50:10-40: in (*example.com/bank/tx.Manager).ReadOnly, call to (*example.com/bank/repo/filerepo.fileTx).Rollback (dynamic (example.com/bank/repo.Tx).Rollback: 2 of 2 candidates)
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:129:9-20: in (*example.com/bank/repo/filerepo.fileTx).Rollback, call to (*example.com/bank/repo/filerepo.fileTx).release
+		$WORK/tx/tx.go:51:10-40: in (*example.com/bank/tx.Manager).ReadOnly, call to (*example.com/bank/repo/filerepo.fileTx).Rollback (dynamic (example.com/bank/repo.Tx).Rollback: 2 of 2 candidates)
 $GOROOT/src/syscall/syscall_linux.go:*: concrete syscall.Errno
 	wrap chain (origin → target):
 		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
 	possibly handled:
-		$WORK/repo/filerepo/filerepo.go:122:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
-		$WORK/repo/filerepo/filerepo.go:122:39-69: errors.Is with example.com/bank/repo.ErrTxDone: custom Is method of syscall.Errno
+		$WORK/repo/filerepo/filerepo.go:130:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+		$WORK/repo/filerepo/filerepo.go:130:39-69: errors.Is with example.com/bank/repo.ErrTxDone: custom Is method of syscall.Errno
 	path (origin → target):
 		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Fchmodat
 		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Chmod, call to syscall.Fchmodat
 		$GOROOT/src/os/file_posix.go:*: in os.chmod$1, call to syscall.Chmod
 		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.chmod$1 (dynamic function value fn: 9 of 9 candidates)
 		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
-		$WORK/repo/filerepo/filerepo.go:133:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
-		$WORK/repo/filerepo/filerepo.go:121:9-20: in (*example.com/bank/repo/filerepo.fileTx).Rollback, call to (*example.com/bank/repo/filerepo.fileTx).release
-		$WORK/tx/tx.go:50:10-40: in (*example.com/bank/tx.Manager).ReadOnly, call to (*example.com/bank/repo/filerepo.fileTx).Rollback (dynamic (example.com/bank/repo.Tx).Rollback: 2 of 2 candidates)
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:129:9-20: in (*example.com/bank/repo/filerepo.fileTx).Rollback, call to (*example.com/bank/repo/filerepo.fileTx).release
+		$WORK/tx/tx.go:51:10-40: in (*example.com/bank/tx.Manager).ReadOnly, call to (*example.com/bank/repo/filerepo.fileTx).Rollback (dynamic (example.com/bank/repo.Tx).Rollback: 2 of 2 candidates)
 $GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno
 	wrap chain (origin → target):
 		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
 	possibly handled:
-		$WORK/repo/filerepo/filerepo.go:122:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
-		$WORK/repo/filerepo/filerepo.go:122:39-69: errors.Is with example.com/bank/repo.ErrTxDone: custom Is method of syscall.Errno
+		$WORK/repo/filerepo/filerepo.go:130:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+		$WORK/repo/filerepo/filerepo.go:130:39-69: errors.Is with example.com/bank/repo.ErrTxDone: custom Is method of syscall.Errno
 	path (origin → target):
 		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
 		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Mkdirat, call to syscall.errnoErr
@@ -119,29 +119,29 @@ $GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno
 		$GOROOT/src/os/file.go:*: in os.Mkdir$1, call to syscall.Mkdir
 		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Mkdir$1 (dynamic function value fn: 9 of 9 candidates)
 		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
-		$WORK/repo/filerepo/filerepo.go:133:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
-		$WORK/repo/filerepo/filerepo.go:121:9-20: in (*example.com/bank/repo/filerepo.fileTx).Rollback, call to (*example.com/bank/repo/filerepo.fileTx).release
-		$WORK/tx/tx.go:50:10-40: in (*example.com/bank/tx.Manager).ReadOnly, call to (*example.com/bank/repo/filerepo.fileTx).Rollback (dynamic (example.com/bank/repo.Tx).Rollback: 2 of 2 candidates)
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:129:9-20: in (*example.com/bank/repo/filerepo.fileTx).Rollback, call to (*example.com/bank/repo/filerepo.fileTx).release
+		$WORK/tx/tx.go:51:10-40: in (*example.com/bank/tx.Manager).ReadOnly, call to (*example.com/bank/repo/filerepo.fileTx).Rollback (dynamic (example.com/bank/repo.Tx).Rollback: 2 of 2 candidates)
 $GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e
 	wrap chain (origin → target):
 		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
 	possibly handled:
-		$WORK/repo/filerepo/filerepo.go:122:5-35: errors.Is with io/fs.ErrNotExist: unresolved value
-		$WORK/repo/filerepo/filerepo.go:122:39-69: errors.Is with example.com/bank/repo.ErrTxDone: unresolved value
+		$WORK/repo/filerepo/filerepo.go:130:5-35: errors.Is with io/fs.ErrNotExist: unresolved value
+		$WORK/repo/filerepo/filerepo.go:130:39-69: errors.Is with example.com/bank/repo.ErrTxDone: unresolved value
 	path (origin → target):
 		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog
 		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog$1
 		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.openFileNolog$1 (dynamic function value fn: 9 of 9 candidates)
 		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
-		$WORK/repo/filerepo/filerepo.go:133:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
-		$WORK/repo/filerepo/filerepo.go:121:9-20: in (*example.com/bank/repo/filerepo.fileTx).Rollback, call to (*example.com/bank/repo/filerepo.fileTx).release
-		$WORK/tx/tx.go:50:10-40: in (*example.com/bank/tx.Manager).ReadOnly, call to (*example.com/bank/repo/filerepo.fileTx).Rollback (dynamic (example.com/bank/repo.Tx).Rollback: 2 of 2 candidates)
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:129:9-20: in (*example.com/bank/repo/filerepo.fileTx).Rollback, call to (*example.com/bank/repo/filerepo.fileTx).release
+		$WORK/tx/tx.go:51:10-40: in (*example.com/bank/tx.Manager).ReadOnly, call to (*example.com/bank/repo/filerepo.fileTx).Rollback (dynamic (example.com/bank/repo.Tx).Rollback: 2 of 2 candidates)
 $GOROOT/src/syscall/syscall_linux.go:*: unresolved(no-body): internal/runtime/syscall/linux.Syscall6 has no body
 	wrap chain (origin → target):
 		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
 	possibly handled:
-		$WORK/repo/filerepo/filerepo.go:122:5-35: errors.Is with io/fs.ErrNotExist: unresolved value
-		$WORK/repo/filerepo/filerepo.go:122:39-69: errors.Is with example.com/bank/repo.ErrTxDone: unresolved value
+		$WORK/repo/filerepo/filerepo.go:130:5-35: errors.Is with io/fs.ErrNotExist: unresolved value
+		$WORK/repo/filerepo/filerepo.go:130:39-69: errors.Is with example.com/bank/repo.ErrTxDone: unresolved value
 	path (origin → target):
 		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.RawSyscall6
 		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Syscall6, call to syscall.RawSyscall6
@@ -149,6 +149,6 @@ $GOROOT/src/syscall/syscall_linux.go:*: unresolved(no-body): internal/runtime/sy
 		$GOROOT/src/os/pidfd_linux.go:*: in os.checkPidfd$1, call to internal/syscall/unix.Waitid
 		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.checkPidfd$1 (dynamic function value fn: 9 of 9 candidates)
 		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
-		$WORK/repo/filerepo/filerepo.go:133:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
-		$WORK/repo/filerepo/filerepo.go:121:9-20: in (*example.com/bank/repo/filerepo.fileTx).Rollback, call to (*example.com/bank/repo/filerepo.fileTx).release
-		$WORK/tx/tx.go:50:10-40: in (*example.com/bank/tx.Manager).ReadOnly, call to (*example.com/bank/repo/filerepo.fileTx).Rollback (dynamic (example.com/bank/repo.Tx).Rollback: 2 of 2 candidates)
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:129:9-20: in (*example.com/bank/repo/filerepo.fileTx).Rollback, call to (*example.com/bank/repo/filerepo.fileTx).release
+		$WORK/tx/tx.go:51:10-40: in (*example.com/bank/tx.Manager).ReadOnly, call to (*example.com/bank/repo/filerepo.fileTx).Rollback (dynamic (example.com/bank/repo.Tx).Rollback: 2 of 2 candidates)

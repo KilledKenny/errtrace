@@ -1,7 +1,9 @@
-SUSPECTED BUG (known gap? plan S08): a named result modified by a deferred closure is not followed.
+SUSPECTED BUG (plan S08, deferred changes to named results, is not implemented; the '-:' position is a rendering defect either way).
 Put's defer does `if err != nil { err = fmt.Errorf("put %s: %w", key, err) }`.
 Expected: every origin ONLY under the outermost wrap "put %s: %w": kverr.ErrReadOnly, validate.Key's 4, Value's concrete Code, Store's 4 (under *kverr.OpError.Unwrap).
-Actual: 5 x unresolved(memory) 'load of escaping variable err' with NO origins at all (even `return kverr.ErrReadOnly` is lost), and one entry has no position ('-:').
+Actual: 5 x unresolved(memory) 'load of escaping variable err' and no origins at all (even `return kverr.ErrReadOnly` is hidden); the entries have zero-width spans
+at the return statements and one has no position ('-:', with the path hop '-: in (*service.Service).Put').
+The set is honest (everything is Unresolved) but useless; compare service_sync_decl, where the defer does not capture err.
 -- args --
 service/service.go:@put
 -- stdout --

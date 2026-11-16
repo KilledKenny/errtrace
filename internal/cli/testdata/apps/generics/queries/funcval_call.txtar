@@ -1,6 +1,7 @@
 SUSPECTED BUG: errOdd is reported (via labelOdd$1, "2 of 2 candidates"): the callback Candidates of the shared instance
-Map[int,string] are not narrowed to the closure passed at this call site (same without the function value, and for
-non-generic callees: narrowing at substitution does not happen for a literal closure argument).
+Map[int,string] are not narrowed to the closure passed at this call site. Not specific to generics or function values:
+a non-generic apply(cb) called from two functions leaks the same way. The plan specifies this narrowing (S09, "narrowing
+at substitution"), which is not built yet.
 Call through a generic function value conv := seq.Map[int, string].
 Expect only concrete *TypedErr[int] from this call's closure; errOdd, returned by the other user of
 Map[int,string] (labelOdd), must not appear.
