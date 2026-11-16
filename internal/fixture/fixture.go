@@ -113,6 +113,81 @@ func runFixture(t *testing.T, path string, fn RunFunc, update bool) {
 	}
 }
 
+// RunApp runs one Query against a test application: appDir is a Go module
+// kept as ordinary files, and queryPath is a txtar archive holding only the
+// args, stdout, stderr and exit sections. The module is copied into a
+// temporary directory (without its queries directory), markers in args are
+// resolved against its files, and the result is compared or, with -update,
+// rewritten in queryPath.
+func RunApp(t *testing.T, appDir, queryPath string, fn RunFunc) {
+	t.Helper()
+	runApp(t, appDir, queryPath, fn, *update)
+}
+
+func runApp(t *testing.T, appDir, queryPath string, fn RunFunc, update bool) {
+	t.Helper()
+	data, err := os.ReadFile(queryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	query := txtar.Parse(data)
+	for _, f := range query.Files {
+		if !isSpecial(f.Name) {
+			t.Fatalf("%s: section %q: a query holds only args, stdout, stderr and exit", queryPath, f.Name)
+		}
+	}
+	// full is the query plus the module files, for writeFiles and markers.
+	full := &txtar.Archive{Files: append([]txtar.File(nil), query.Files...)}
+	err = filepath.WalkDir(appDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(appDir, path)
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if rel == AppQueriesDir {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		full.Files = append(full.Files, txtar.File{Name: filepath.ToSlash(rel), Data: content})
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("%s: %v", appDir, err)
+	}
+	dir := t.TempDir()
+	if err := writeFiles(dir, full); err != nil {
+		t.Fatalf("%s: %v", appDir, err)
+	}
+	args, err := substitute(string(section(query, sectionArgs)), full)
+	if err != nil {
+		t.Fatalf("%s: %v", queryPath, err)
+	}
+	res := fn(t, Invocation{Dir: dir, Env: Env(), Args: args})
+	res.Stdout = Normalize(res.Stdout, dir)
+	res.Stderr = Normalize(res.Stderr, dir)
+	if update {
+		if err := os.WriteFile(queryPath, rewrite(query, res), 0o666); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	for _, msg := range compare(query, res) {
+		t.Errorf("%s: %s", queryPath, msg)
+	}
+}
+
+// AppQueriesDir is the directory of a test application that holds its
+// queries; it is not part of the module.
+const AppQueriesDir = "queries"
+
 // Env returns the process environment with the fixture overrides applied.
 func Env() []string {
 	var env []string

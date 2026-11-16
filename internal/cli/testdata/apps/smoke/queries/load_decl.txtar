@@ -1,0 +1,11 @@
+load wraps store.ErrMissing with %w: one sentinel entry with a wrap chain.
+-- args --
+main.go:@load
+-- stdout --
+$WORK/main.go:10:15-19: Error Set of example.com/smoke.load: 1 entries
+$WORK/store/store.go:7:5-15: sentinel example.com/smoke/store.ErrMissing
+	wrap chain (origin → target):
+		$WORK/main.go:12:10-45: fmt.Errorf "load %q: %w"
+	path (origin → target):
+		$WORK/store/store.go:12:10-20: in example.com/smoke/store.Get
+		$WORK/main.go:11:12-26: in example.com/smoke.load, call to example.com/smoke/store.Get
