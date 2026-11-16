@@ -8,6 +8,20 @@ every Query in-process.
 Unlike the single-purpose fixtures in `../e2e`, an application combines many
 features in one program, so Queries exercise their interactions.
 
+## Applications
+
+| App | Queries | Focus |
+|---|---|---|
+| `smoke` | 1 | harness check |
+| `kvstore` | 88 | Error Origins and propagation across layers |
+| `wrapchain` | 79 | Wraps and Wrap Chains, `-chain-depth` |
+| `guards` | 80 | guard filtering, holding and not holding |
+| `plugins` | 88 | dynamic calls, Candidates, `-fanout` |
+| `generics` | 85 | generic functions, types and instantiations |
+| `stdlibio` | 85 | following errors into the standard library; Unresolved constructs |
+| `targets` | 198 | CLI surface, Target resolution, package loading |
+| `bank` | 78 | larger realistic app: feature interactions |
+
 ## Layout
 
     <app>/
@@ -41,3 +55,5 @@ passes. When that output is believed to be wrong, the query's comment starts
 with `SUSPECTED BUG:` and describes the correct result:
 
     grep -rl 'SUSPECTED BUG' internal/cli/testdata/apps
+
+The confirmed findings are collected in [FINDINGS.md](FINDINGS.md).
