@@ -1,0 +1,10 @@
+Call-site target inside init(): codec.Register("text"), marker on the Sel "Register" of the package-qualified call (init itself has no error result, the call does).
+Expected: 1 entry, sentinel codec.ErrEmpty (the analysis is not value-sensitive about name == ""); enclosing function is named init#1.
+-- args --
+cmd/ingest/main.go:@init_sel
+-- stdout --
+$WORK/cmd/ingest/main.go:28:26-61: Error Set of call to codec.Register in example.com/targets/cmd/ingest.init#1: 1 entries
+$WORK/internal/codec/codec.go:12:2-10: sentinel example.com/targets/internal/codec.ErrEmpty
+	path (origin → target):
+		$WORK/internal/codec/codec.go:22:10-18: in example.com/targets/internal/codec.Register
+		$WORK/cmd/ingest/main.go:28:26-61: in example.com/targets/cmd/ingest.init#1, call to example.com/targets/internal/codec.Register

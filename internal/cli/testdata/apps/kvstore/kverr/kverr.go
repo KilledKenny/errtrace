@@ -69,3 +69,11 @@ func (e *OpError) Unwrap() error { return e.Err }
 
 // ErrCorrupt is a pointer-typed sentinel.
 var ErrCorrupt = &OpError{Op: "verify"}
+
+// OrNil returns e as an error, and an untyped nil for a nil pointer.
+func (e *OpError) /*@ornil*/OrNil() error {
+	if e == nil {
+		return nil
+	}
+	return e
+}

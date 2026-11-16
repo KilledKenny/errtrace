@@ -1,0 +1,86 @@
+-fanout boundary, other side: 10 Candidates < 11, so nothing is grouped.
+Expect the same 15 entries as rules_check_call_fanout10 as individual entries with paths, no group line and
+(call-site Target) no (*Violation).Unwrap chain.
+-- args --
+-fanout=11 rules/rules.go:@check_call
+-- stdout --
+$WORK/rules/rules.go:45:13-44: Error Set of call to r.Check in (*example.com/bank/rules.Engine).Evaluate: 15 entries, 3 unresolved
+$WORK/cmd/cli/main.go:29:2-11: sentinel example.com/bank/cmd/cli.errDryRun
+	path (origin → target):
+		$WORK/cmd/cli/main.go:65:94-103: in example.com/bank/cmd/cli.newApp$1
+		$WORK/rules/builtin.go:116:9-22: in (example.com/bank/rules.Func).Check, call to example.com/bank/cmd/cli.newApp$1 (dynamic function value of type func(context.Context, example.com/bank/rules.Input) error: 1 of 1 candidates)
+		$WORK/rules/rules.go:45:13-44: in (*example.com/bank/rules.Engine).Evaluate, call to (example.com/bank/rules.Func).Check (dynamic (example.com/bank/rules.Rule).Check: 10 of 10 candidates)
+$WORK/domain/errors.go:11:2-18: sentinel example.com/bank/domain.ErrAccountClosed
+	path (origin → target):
+		$WORK/domain/domain.go:45:10-26: in (*example.com/bank/domain.Account).Usable
+		$WORK/rules/builtin.go:32:9-25: in (example.com/bank/rules.SourceUsable).Check, call to (*example.com/bank/domain.Account).Usable
+		$WORK/rules/rules.go:45:13-44: in (*example.com/bank/rules.Engine).Evaluate, call to (example.com/bank/rules.SourceUsable).Check (dynamic (example.com/bank/rules.Rule).Check: 10 of 10 candidates)
+$WORK/domain/errors.go:11:2-18: sentinel example.com/bank/domain.ErrAccountClosed
+	wrap chain (origin → target):
+		$WORK/rules/builtin.go:41:10-77: fmt.Errorf "destination %s: %w"
+	path (origin → target):
+		$WORK/rules/builtin.go:41:53-76: in (example.com/bank/rules.DestOpen).Check
+		$WORK/rules/rules.go:45:13-44: in (*example.com/bank/rules.Engine).Evaluate, call to (example.com/bank/rules.DestOpen).Check (dynamic (example.com/bank/rules.Rule).Check: 10 of 10 candidates)
+$WORK/domain/errors.go:12:2-11: sentinel example.com/bank/domain.ErrFrozen
+	path (origin → target):
+		$WORK/domain/domain.go:47:10-19: in (*example.com/bank/domain.Account).Usable
+		$WORK/rules/builtin.go:32:9-25: in (example.com/bank/rules.SourceUsable).Check, call to (*example.com/bank/domain.Account).Usable
+		$WORK/rules/rules.go:45:13-44: in (*example.com/bank/rules.Engine).Evaluate, call to (example.com/bank/rules.SourceUsable).Check (dynamic (example.com/bank/rules.Rule).Check: 10 of 10 candidates)
+$WORK/domain/errors.go:15:2-16: sentinel example.com/bank/domain.ErrSameAccount
+	path (origin → target):
+		$WORK/domain/domain.go:83:10-24: in (example.com/bank/domain.Transfer).Validate
+		$WORK/rules/builtin.go:24:9-31: in (example.com/bank/rules.Shape).Check, call to (example.com/bank/domain.Transfer).Validate
+		$WORK/rules/rules.go:45:13-44: in (*example.com/bank/rules.Engine).Evaluate, call to (example.com/bank/rules.Shape).Check (dynamic (example.com/bank/rules.Rule).Check: 10 of 10 candidates)
+$WORK/rules/builtin.go:14:2-13: sentinel example.com/bank/rules.ErrCurrency
+	wrap chain (origin → target):
+		$WORK/rules/builtin.go:75:9-63: fmt.Errorf "%w %q"
+	path (origin → target):
+		$WORK/rules/builtin.go:75:29-40: in (example.com/bank/rules.Currency).Check
+		$WORK/rules/rules.go:45:13-44: in (*example.com/bank/rules.Engine).Evaluate, call to (example.com/bank/rules.Currency).Check (dynamic (example.com/bank/rules.Rule).Check: 10 of 10 candidates)
+$WORK/rules/builtin.go:16:2-12: sentinel example.com/bank/rules.ErrBlocked
+	path (origin → target):
+		$WORK/rules/builtin.go:84:10-20: in (example.com/bank/rules.Blocklist).Check
+		$WORK/rules/rules.go:45:13-44: in (*example.com/bank/rules.Engine).Evaluate, call to (example.com/bank/rules.Blocklist).Check (dynamic (example.com/bank/rules.Rule).Check: 10 of 10 candidates)
+$WORK/domain/domain.go:77:10-61: concrete *example.com/bank/domain.ValidationError
+	path (origin → target):
+		$WORK/domain/domain.go:77:10-61: in (example.com/bank/domain.Transfer).Validate
+		$WORK/rules/builtin.go:24:9-31: in (example.com/bank/rules.Shape).Check, call to (example.com/bank/domain.Transfer).Validate
+		$WORK/rules/rules.go:45:13-44: in (*example.com/bank/rules.Engine).Evaluate, call to (example.com/bank/rules.Shape).Check (dynamic (example.com/bank/rules.Rule).Check: 10 of 10 candidates)
+$WORK/domain/domain.go:80:10-59: concrete *example.com/bank/domain.ValidationError
+	path (origin → target):
+		$WORK/domain/domain.go:80:10-59: in (example.com/bank/domain.Transfer).Validate
+		$WORK/rules/builtin.go:24:9-31: in (example.com/bank/rules.Shape).Check, call to (example.com/bank/domain.Transfer).Validate
+		$WORK/rules/rules.go:45:13-44: in (*example.com/bank/rules.Engine).Evaluate, call to (example.com/bank/rules.Shape).Check (dynamic (example.com/bank/rules.Rule).Check: 10 of 10 candidates)
+$WORK/domain/domain.go:86:10-71: concrete *example.com/bank/domain.ValidationError
+	path (origin → target):
+		$WORK/domain/domain.go:86:10-71: in (example.com/bank/domain.Transfer).Validate
+		$WORK/rules/builtin.go:24:9-31: in (example.com/bank/rules.Shape).Check, call to (example.com/bank/domain.Transfer).Validate
+		$WORK/rules/rules.go:45:13-44: in (*example.com/bank/rules.Engine).Evaluate, call to (example.com/bank/rules.Shape).Check (dynamic (example.com/bank/rules.Rule).Check: 10 of 10 candidates)
+$WORK/rules/builtin.go:52:10-109: concrete example.com/bank/domain.InsufficientFundsError
+	path (origin → target):
+		$WORK/rules/builtin.go:52:10-109: in (example.com/bank/rules.Funds).Check
+		$WORK/rules/rules.go:45:13-44: in (*example.com/bank/rules.Engine).Evaluate, call to (example.com/bank/rules.Funds).Check (dynamic (example.com/bank/rules.Rule).Check: 10 of 10 candidates)
+$WORK/rules/builtin.go:95:10-53: opaque errors.New "rules: outside business hours"
+	path (origin → target):
+		$WORK/rules/builtin.go:95:10-53: in (example.com/bank/rules.Hours).Check
+		$WORK/rules/rules.go:45:13-44: in (*example.com/bank/rules.Engine).Evaluate, call to (example.com/bank/rules.Hours).Check (dynamic (example.com/bank/rules.Rule).Check: 10 of 10 candidates)
+$GOROOT/src/context/context.go:*: unresolved(memory): value of TypeAssert not modelled
+	path (origin → target):
+		$GOROOT/src/context/context.go:*: in (*context.cancelCtx).Err
+		$WORK/rules/builtin.go:105:9-18: in (example.com/bank/rules.Alive).Check, call to (*context.cancelCtx).Err (dynamic (context.Context).Err: 1 of 1 candidates)
+		$WORK/rules/rules.go:45:13-44: in (*example.com/bank/rules.Engine).Evaluate, call to (example.com/bank/rules.Alive).Check (dynamic (example.com/bank/rules.Rule).Check: 10 of 10 candidates)
+$WORK/limits/limits.go:32:10-82: unresolved(memory): *example.com/bank/limits.Exceeded.Unwrap not modelled
+	wrap chain (origin → target):
+		$WORK/limits/limits.go:32:10-82: *example.com/bank/limits.Exceeded.Unwrap
+	path (origin → target):
+		$WORK/limits/limits.go:32:10-82: in (example.com/bank/limits.Policy).Check
+		$WORK/rules/builtin.go:62:9-56: in (example.com/bank/rules.Limit).Check, call to (example.com/bank/limits.Policy).Check
+		$WORK/rules/rules.go:45:13-44: in (*example.com/bank/rules.Engine).Evaluate, call to (example.com/bank/rules.Limit).Check (dynamic (example.com/bank/rules.Rule).Check: 10 of 10 candidates)
+$WORK/limits/limits.go:36:4-71: unresolved(memory): *example.com/bank/limits.Exceeded.Unwrap not modelled
+	wrap chain (origin → target):
+		$WORK/limits/limits.go:36:4-71: *example.com/bank/limits.Exceeded.Unwrap
+		$WORK/limits/limits.go:35:10-36:72: fmt.Errorf "daily budget of %s: %w"
+	path (origin → target):
+		$WORK/limits/limits.go:36:4-71: in (example.com/bank/limits.Policy).Check
+		$WORK/rules/builtin.go:62:9-56: in (example.com/bank/rules.Limit).Check, call to (example.com/bank/limits.Policy).Check
+		$WORK/rules/rules.go:45:13-44: in (*example.com/bank/rules.Engine).Evaluate, call to (example.com/bank/rules.Limit).Check (dynamic (example.com/bank/rules.Rule).Check: 10 of 10 candidates)

@@ -1,0 +1,22 @@
+-fanout boundary: the call site r.Check has exactly 10 Candidates, so -fanout=10 still groups.
+Expect one group line "(10 candidates)" holding all rule origins (see rules_evaluate_decl).
+-- args --
+-fanout=10 rules/rules.go:@check_call
+-- stdout --
+$WORK/rules/rules.go:45:13-44: Error Set of call to r.Check in (*example.com/bank/rules.Engine).Evaluate: 15 entries, 3 unresolved
+$WORK/rules/rules.go:45:13-44: group of 15 entries via dynamic call to (example.com/bank/rules.Rule).Check (10 candidates) in (*example.com/bank/rules.Engine).Evaluate
+	$WORK/cmd/cli/main.go:29:2-11: sentinel example.com/bank/cmd/cli.errDryRun (candidate (example.com/bank/rules.Func).Check)
+	$WORK/domain/errors.go:11:2-18: sentinel example.com/bank/domain.ErrAccountClosed (candidate (example.com/bank/rules.SourceUsable).Check)
+	$WORK/domain/errors.go:11:2-18: sentinel example.com/bank/domain.ErrAccountClosed (candidate (example.com/bank/rules.DestOpen).Check)
+	$WORK/domain/errors.go:12:2-11: sentinel example.com/bank/domain.ErrFrozen (candidate (example.com/bank/rules.SourceUsable).Check)
+	$WORK/domain/errors.go:15:2-16: sentinel example.com/bank/domain.ErrSameAccount (candidate (example.com/bank/rules.Shape).Check)
+	$WORK/rules/builtin.go:14:2-13: sentinel example.com/bank/rules.ErrCurrency (candidate (example.com/bank/rules.Currency).Check)
+	$WORK/rules/builtin.go:16:2-12: sentinel example.com/bank/rules.ErrBlocked (candidate (example.com/bank/rules.Blocklist).Check)
+	$WORK/domain/domain.go:77:10-61: concrete *example.com/bank/domain.ValidationError (candidate (example.com/bank/rules.Shape).Check)
+	$WORK/domain/domain.go:80:10-59: concrete *example.com/bank/domain.ValidationError (candidate (example.com/bank/rules.Shape).Check)
+	$WORK/domain/domain.go:86:10-71: concrete *example.com/bank/domain.ValidationError (candidate (example.com/bank/rules.Shape).Check)
+	$WORK/rules/builtin.go:52:10-109: concrete example.com/bank/domain.InsufficientFundsError (candidate (example.com/bank/rules.Funds).Check)
+	$WORK/rules/builtin.go:95:10-53: opaque errors.New "rules: outside business hours" (candidate (example.com/bank/rules.Hours).Check)
+	$GOROOT/src/context/context.go:*: unresolved(memory): value of TypeAssert not modelled (candidate (example.com/bank/rules.Alive).Check)
+	$WORK/limits/limits.go:32:10-82: unresolved(memory): *example.com/bank/limits.Exceeded.Unwrap not modelled (candidate (example.com/bank/rules.Limit).Check)
+	$WORK/limits/limits.go:36:4-71: unresolved(memory): *example.com/bank/limits.Exceeded.Unwrap not modelled (candidate (example.com/bank/rules.Limit).Check)

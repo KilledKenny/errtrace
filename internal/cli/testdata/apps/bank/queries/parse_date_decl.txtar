@@ -1,0 +1,9 @@
+Errors dropped in a loop: both time.Parse errors are discarded (err == nil check only).
+Expect exactly 1 entry: concrete *domain.ValidationError; nothing from package time.
+-- args --
+parse/parse.go:@date
+-- stdout --
+$WORK/parse/parse.go:34:15-19: Error Set of example.com/bank/parse.Date: 1 entries
+$WORK/parse/parse.go:40:22-87: concrete *example.com/bank/domain.ValidationError
+	path (origin → target):
+		$WORK/parse/parse.go:40:22-87: in example.com/bank/parse.Date

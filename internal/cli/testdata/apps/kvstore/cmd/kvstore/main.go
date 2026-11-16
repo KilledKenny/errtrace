@@ -29,7 +29,7 @@ func /*@run*/run(args []string) error {
 	if err != nil {
 		return fmt.Errorf("open: %w", err)
 	}
-	defer eng.Close()
+	defer eng./*@eng_close_call*/Close()
 	if cfg.Command == "check" {
 		kerr, verr := validate./*@pair_call*/Pair(cfg.Args[0], cfg.Args[1])
 		if kerr != nil {

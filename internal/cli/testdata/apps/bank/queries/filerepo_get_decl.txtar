@@ -1,0 +1,721 @@
+stdlib + guard + custom wrapper type: os.ReadFile's error is replaced by NotFoundError[AccountID] when it is
+fs.ErrNotExist, otherwise wrapped "filerepo: read %s: %w"; decode errors are wrapped in &CorruptError{Err: err}.
+Expect concrete NotFoundError[AccountID], ReadFile errors behind the errorf, and errShortRecord /
+strconv.ErrSyntax / strconv.ErrRange behind (*CorruptError).Unwrap (strconv ones also behind "balance: %w" or "status: %w").
+-- args --
+repo/filerepo/filerepo.go:@get
+-- stdout --
+$WORK/repo/filerepo/filerepo.go:43:25-28: Error Set of (*example.com/bank/repo/filerepo.Store).Get: 54 entries, 1 unresolved, 9 possibly handled
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).readLock, call to internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).readLock
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).readLock, call to internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).readLock
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrFileClosing
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).readLock, call to internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).readLock
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrDeadlineExceeded
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepare, call to internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepareRead, call to (*internal/poll.pollDesc).prepare
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.pollDesc).prepareRead
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrDeadlineExceeded
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepare, call to internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepareRead, call to (*internal/poll.pollDesc).prepare
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.pollDesc).prepareRead
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNotPollable
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepare, call to internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepareRead, call to (*internal/poll.pollDesc).prepare
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.pollDesc).prepareRead
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNotPollable
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepare, call to internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepareRead, call to (*internal/poll.pollDesc).prepare
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.pollDesc).prepareRead
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+	path (origin → target):
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).checkValid
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).checkValid
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+	path (origin → target):
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrRange
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.rangeError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.rangeError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrRange
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:70:15-44: fmt.Errorf "status: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.rangeError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.rangeError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:68:13-35: in example.com/bank/repo/filerepo.decode, call to strconv.Atoi
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrSyntax
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.syntaxError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.syntaxError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrSyntax
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:70:15-44: fmt.Errorf "status: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.syntaxError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.syntaxError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:68:13-35: in example.com/bank/repo/filerepo.decode, call to strconv.Atoi
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+	possibly handled:
+		$WORK/repo/filerepo/filerepo.go:45:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+	possibly handled:
+		$WORK/repo/filerepo/filerepo.go:45:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+	possibly handled:
+		$WORK/repo/filerepo/filerepo.go:45:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+	possibly handled:
+		$WORK/repo/filerepo/filerepo.go:45:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+	possibly handled:
+		$WORK/repo/filerepo/filerepo.go:45:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+	possibly handled:
+		$WORK/repo/filerepo/filerepo.go:45:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+$WORK/repo/filerepo/filerepo.go:28:5-19: sentinel example.com/bank/repo/filerepo.errShortRecord
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$WORK/repo/filerepo/filerepo.go:62:15-29: in example.com/bank/repo/filerepo.decode
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:70:15-44: fmt.Errorf "status: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:68:13-35: in example.com/bank/repo/filerepo.decode, call to strconv.Atoi
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:70:15-44: fmt.Errorf "status: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:68:13-35: in example.com/bank/repo/filerepo.decode, call to strconv.Atoi
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:70:15-44: fmt.Errorf "status: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:68:13-35: in example.com/bank/repo/filerepo.decode, call to strconv.Atoi
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:70:15-44: fmt.Errorf "status: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:68:13-35: in example.com/bank/repo/filerepo.decode, call to strconv.Atoi
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:70:15-44: fmt.Errorf "status: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:68:13-35: in example.com/bank/repo/filerepo.decode, call to strconv.Atoi
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:70:15-44: fmt.Errorf "status: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:68:13-35: in example.com/bank/repo/filerepo.decode, call to strconv.Atoi
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:70:15-44: fmt.Errorf "status: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:68:13-35: in example.com/bank/repo/filerepo.decode, call to strconv.Atoi
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:70:15-44: fmt.Errorf "status: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:68:13-35: in example.com/bank/repo/filerepo.decode, call to strconv.Atoi
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:70:15-44: fmt.Errorf "status: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:68:13-35: in example.com/bank/repo/filerepo.decode, call to strconv.Atoi
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:70:15-44: fmt.Errorf "status: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:68:13-35: in example.com/bank/repo/filerepo.decode, call to strconv.Atoi
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:70:15-44: fmt.Errorf "status: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:68:13-35: in example.com/bank/repo/filerepo.decode, call to strconv.Atoi
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:70:15-44: fmt.Errorf "status: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:68:13-35: in example.com/bank/repo/filerepo.decode, call to strconv.Atoi
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:70:15-44: fmt.Errorf "status: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:68:13-35: in example.com/bank/repo/filerepo.decode, call to strconv.Atoi
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+	possibly handled:
+		$WORK/repo/filerepo/filerepo.go:45:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+	possibly handled:
+		$WORK/repo/filerepo/filerepo.go:45:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+$WORK/repo/filerepo/filerepo.go:46:15-78: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID]
+	path (origin → target):
+		$WORK/repo/filerepo/filerepo.go:46:15-78: in (*example.com/bank/repo/filerepo.Store).Get
+$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type"
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).waitRead, call to (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.pollDesc).waitRead
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type"
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).waitRead, call to (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.pollDesc).waitRead
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+$GOROOT/src/strconv/number.go:*: opaque errors.New
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.baseError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.baseError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/strconv/number.go:*: opaque errors.New
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:70:15-44: fmt.Errorf "status: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.baseError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.baseError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:68:13-35: in example.com/bank/repo/filerepo.decode, call to strconv.Atoi
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/strconv/number.go:*: opaque errors.New
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.bitSizeError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.bitSizeError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/strconv/number.go:*: opaque errors.New
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:70:15-44: fmt.Errorf "status: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.bitSizeError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.bitSizeError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:68:13-35: in example.com/bank/repo/filerepo.decode, call to strconv.Atoi
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+	possibly handled:
+		$WORK/repo/filerepo/filerepo.go:45:5-35: errors.Is with io/fs.ErrNotExist: unresolved value
+	path (origin → target):
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.OpenFile, call to os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.Open, call to os.OpenFile
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.Open
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile

@@ -156,3 +156,25 @@ func (r *Repo) /*@tail*/Tail(max int) (n int, err error) {
 	}
 	return
 }
+
+// Probe reports why key cannot be used. It has the typed-nil bug in a local
+// variable: oe stays a nil pointer for a usable key.
+func (r *Repo) /*@probe*/Probe(key string) error {
+	var oe *kverr.OpError
+	if key == "" {
+		oe = &kverr.OpError{Op: "probe", Err: kverr.ErrEmptyKey}
+	}
+	return oe
+}
+
+// Stat is Exists done right, through the nil-safe (*OpError).OrNil.
+func (r *Repo) /*@stat*/Stat(key string) error { return r.find(key).OrNil() }
+
+// Alive is Ping for callers that treat a closed engine as healthy.
+func (r *Repo) /*@alive*/Alive() error {
+	err := r.Ping()
+	if err == engine.ErrClosed {
+		return nil
+	}
+	return err
+}

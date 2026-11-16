@@ -1,5 +1,6 @@
--p with a malformed pattern.
-Negative: exit 2 with a go list error (or "matched no packages"); must not be silently ignored.
+SUSPECTED BUG (same cause as p_wildcard_matches_nothing): -p with a garbled pattern "./cmd/...ingest/[" that matches no package.
+Expected: exit 2 with a go list error, or at least a "matched no packages" warning; it must not be silently ignored.
+Actual: silently ignored; only the target file package is loaded, the Error Set of Probe is printed (plus the unrelated not-reachable warning), exit 0.
 -- args --
 -p ./cmd/...ingest/[ internal/platform/platform.go:5:6
 -- stdout --

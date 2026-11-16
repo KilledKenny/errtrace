@@ -1,0 +1,9 @@
+Negative column: "-" is the range separator, so 5:-6 parses as start "5:" and end "6".
+Negative: exit 2, invalid position (the wording is about a missing column rather than a negative one); must not resolve to 5:6.
+-- args --
+internal/platform/platform.go:5:-6
+-- stdout --
+-- stderr --
+errtrace: invalid position "internal/platform/platform.go:5:-6": missing column
+-- exit --
+2

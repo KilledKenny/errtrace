@@ -1,5 +1,5 @@
--p pattern that matches no package; the target file's package is still loaded on its own.
-Expected: 1 entry platform.ErrNoLimit with the not-reachable warning (no main loaded), or a clear "matched no packages" error. Not a crash.
+-p directory wildcard whose root directory does not exist.
+Negative: exit 2 with the go list error for ./nope/... (lstat ... no such file or directory); no Error Set. Contrast p_wildcard_matches_nothing, where the root exists.
 -- args --
 -p ./nope/... internal/platform/platform.go:5:6
 -- stdout --

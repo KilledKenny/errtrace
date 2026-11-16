@@ -35,33 +35,31 @@ func New(store repo.Store, eng *rules.Engine, bus *events.Bus, log *audit.Logger
 }
 
 // Transfer executes t in a transaction, retrying while the store is busy.
-// The outcome is audited; a failing audit is joined to the result.
-func (s *Service) /*@transfer*/Transfer(ctx context.Context, t domain.Transfer) (err error) {
-	defer func() {
-		if aerr := s.audit.Record("transfer", t, err); aerr != nil {
-			err = errors.Join(err, aerr)
-		}
-	}()
-	err = retry./*@retry_call*/Do(ctx, s.retries, func() error {
+// The outcome is always audited; a failing audit is joined to the result.
+func (s *Service) /*@transfer*/Transfer(ctx context.Context, t domain.Transfer) error {
+	err := retry./*@retry_call*/Do(ctx, s.retries, func() error {
 		return s.txm./*@withtx_call*/WithTx(ctx, func(repo.Tx) error { return s./*@execute_call*/execute(ctx, t) })
 	})
 	if err != nil {
-		return fmt.Errorf("transfer %d: %w", t.ID, err)
+		err = fmt.Errorf("transfer %d: %w", t.ID, err)
+	}
+	if aerr := s.audit./*@record_call*/Record("transfer", t, err); aerr != nil {
+		return errors.Join(err, aerr)
+	}
+	if err != nil {
+		return err
 	}
 	return s.bus./*@notify_call*/Notify(events.Event{Kind: "transfer.done", Transfer: t})
 }
 
 // execute is the body of the transaction.
 func (s *Service) /*@execute*/execute(ctx context.Context, t domain.Transfer) error {
-	from, err := s.store.Get(ctx, t.From)
+	in, err := s./*@input_call*/input(ctx, t)
 	if err != nil {
-		return fmt.Errorf("source: %w", err)
+		return err
 	}
-	to, err := s.store./*@get_to_call*/Get(ctx, t.To)
-	if err != nil {
-		return fmt.Errorf("destination: %w", err)
-	}
-	if err := s.rules./*@evaluate_call*/Evaluate(ctx, rules.Input{Transfer: t, From: from, To: to}); err != nil {
+	from, to := in.From, in.To
+	if err := s.rules./*@evaluate_call*/Evaluate(ctx, in); err != nil {
 		return err
 	}
 	if err := from./*@debit_call*/Debit(t.Amount); err != nil {
@@ -111,6 +109,50 @@ func (s *Service) /*@balance*/Balance(ctx context.Context, id domain.AccountID) 
 		return 0, err
 	}
 	return a.Balance, nil
+}
+
+// Preview says whether t would pass the rules, treating limits as advice.
+func (s *Service) /*@preview*/Preview(ctx context.Context, t domain.Transfer) error {
+	in, err := s.input(ctx, t)
+	if err != nil {
+		return err
+	}
+	return s.rules./*@advisory_call*/Advisory(ctx, in)
+}
+
+// Explain lists every rule t would break.
+func (s *Service) /*@explain*/Explain(ctx context.Context, t domain.Transfer) error {
+	in, err := s.input(ctx, t)
+	if err != nil {
+		return err
+	}
+	return s.rules.EvaluateAll(ctx, in)
+}
+
+func (s *Service) input(ctx context.Context, t domain.Transfer) (rules.Input, error) {
+	from, err := s.store.Get(ctx, t.From)
+	if err != nil {
+		return rules.Input{}, fmt.Errorf("source: %w", err)
+	}
+	to, err := s.store.Get(ctx, t.To)
+	if err != nil {
+		return rules.Input{}, fmt.Errorf("destination: %w", err)
+	}
+	return rules.Input{Transfer: t, From: from, To: to}, nil
+}
+
+// Owner reads the account holder's name in a read-only transaction.
+func (s *Service) /*@owner*/Owner(ctx context.Context, id domain.AccountID) (string, error) {
+	var owner string
+	err := s.txm./*@readonly_call*/ReadOnly(func() error {
+		a, err := s.store.Get(ctx, id)
+		if err != nil {
+			return err
+		}
+		owner = a.Owner
+		return nil
+	})
+	return owner, err
 }
 
 // Exists reports whether the account is known. "Not found" is an answer,

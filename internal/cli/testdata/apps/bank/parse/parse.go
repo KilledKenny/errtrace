@@ -62,7 +62,8 @@ type wireTransfer struct {
 	At       string `json:"at"`
 }
 
-// Request decodes the JSON body of a transfer request.
+// Request decodes the JSON body of a transfer request. Decoder errors never
+// leave this function: they are turned into a message or a ValidationError.
 func /*@request*/Request(data []byte) (domain.Transfer, error) {
 	var w wireTransfer
 	if err := json./*@unmarshal_call*/Unmarshal(data, &w); err != nil {
@@ -70,7 +71,11 @@ func /*@request*/Request(data []byte) (domain.Transfer, error) {
 		if errors.As(err, &se) {
 			return domain.Transfer{}, fmt.Errorf("parse: malformed JSON at offset %d", se.Offset)
 		}
-		return domain.Transfer{}, fmt.Errorf("parse: %w", err)
+		var te *json.UnmarshalTypeError
+		if errors.As(err, &te) {
+			return domain.Transfer{}, &domain.ValidationError{Field: te.Field, Reason: "wrong JSON type"}
+		}
+		return domain.Transfer{}, fmt.Errorf("parse: %v", err)
 	}
 	return w.build()
 }

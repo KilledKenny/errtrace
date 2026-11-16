@@ -1,0 +1,29 @@
+Same call site with -chain-depth=1: both chains (2 and 3 links) are cut to 1 link.
+Expect every entry marked [chain truncated].
+-- args --
+-chain-depth=1 cmd/cli/main.go:@explain_limit_call
+-- stdout --
+$WORK/cmd/cli/main.go:169:12-111: Error Set of call to rules.Explain in example.com/bank/cmd/cli.check: 3 entries, 2 unresolved
+$WORK/rules/builtin.go:52:10-109: concrete example.com/bank/domain.InsufficientFundsError
+	wrap chain (origin → target):
+		$WORK/rules/rules.go:76:10-53: fmt.Errorf "%s says no: %w"
+	path (origin → target):
+		$WORK/rules/builtin.go:52:10-109: in (example.com/bank/rules.Funds).Check
+		$WORK/rules/rules.go:75:12-28: in example.com/bank/rules.Explain, call to (example.com/bank/rules.Funds).Check (dynamic (example.com/bank/rules.Rule).Check: 2 of 2 candidates)
+		$WORK/cmd/cli/main.go:169:12-111: in example.com/bank/cmd/cli.check, call to example.com/bank/rules.Explain
+$WORK/limits/limits.go:32:10-82: unresolved(memory): *example.com/bank/limits.Exceeded.Unwrap not modelled [chain truncated]
+	wrap chain (origin → target):
+		$WORK/rules/rules.go:76:10-53: fmt.Errorf "%s says no: %w"
+	path (origin → target):
+		$WORK/limits/limits.go:32:10-82: in (example.com/bank/limits.Policy).Check
+		$WORK/rules/builtin.go:62:9-56: in (example.com/bank/rules.Limit).Check, call to (example.com/bank/limits.Policy).Check
+		$WORK/rules/rules.go:75:12-28: in example.com/bank/rules.Explain, call to (example.com/bank/rules.Limit).Check (dynamic (example.com/bank/rules.Rule).Check: 2 of 2 candidates)
+		$WORK/cmd/cli/main.go:169:12-111: in example.com/bank/cmd/cli.check, call to example.com/bank/rules.Explain
+$WORK/limits/limits.go:36:4-71: unresolved(memory): *example.com/bank/limits.Exceeded.Unwrap not modelled [chain truncated]
+	wrap chain (origin → target):
+		$WORK/rules/rules.go:76:10-53: fmt.Errorf "%s says no: %w"
+	path (origin → target):
+		$WORK/limits/limits.go:36:4-71: in (example.com/bank/limits.Policy).Check
+		$WORK/rules/builtin.go:62:9-56: in (example.com/bank/rules.Limit).Check, call to (example.com/bank/limits.Policy).Check
+		$WORK/rules/rules.go:75:12-28: in example.com/bank/rules.Explain, call to (example.com/bank/rules.Limit).Check (dynamic (example.com/bank/rules.Rule).Check: 2 of 2 candidates)
+		$WORK/cmd/cli/main.go:169:12-111: in example.com/bank/cmd/cli.check, call to example.com/bank/rules.Explain

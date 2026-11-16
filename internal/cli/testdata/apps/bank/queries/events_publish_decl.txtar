@@ -1,0 +1,224 @@
+Dynamic func values from a map of slices, wrapped and joined in a loop.
+Handlers subscribed anywhere: the server's closure (ErrLimitExceeded behind "server: transfer %d needs review: %w"),
+(*stats).onTransfer (method value, opaque) and the cli closure returning *domain.ValidationError.
+Expect exactly those 3 origins, each behind "events: %s handler %d: %w" + errors.Join.
+-- args --
+events/events.go:@publish
+-- stdout --
+$WORK/events/events.go:33:27-34: Error Set of (*example.com/bank/events.Bus).Publish: 21 entries
+$WORK/domain/errors.go:14:2-18: sentinel example.com/bank/domain.ErrLimitExceeded
+	wrap chain (origin → target):
+		$WORK/cmd/server/main.go:58:11-102: fmt.Errorf "server: transfer %d needs review: %w"
+		$WORK/events/events.go:37:27-83: fmt.Errorf "events: %s handler %d: %w"
+		$WORK/events/events.go:37:10-84: errors.Join
+	path (origin → target):
+		$WORK/cmd/server/main.go:58:78-101: in example.com/bank/cmd/server.run$2
+		$WORK/events/events.go:36:13-18: in (*example.com/bank/events.Bus).Publish, call to example.com/bank/cmd/server.run$2 (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)
+$WORK/domain/errors.go:14:2-18: sentinel example.com/bank/domain.ErrLimitExceeded
+	wrap chain (origin → target):
+		$WORK/cmd/server/main.go:58:11-102: fmt.Errorf "server: transfer %d needs review: %w"
+		$WORK/events/events.go:37:27-83: fmt.Errorf "events: %s handler %d: %w"
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+	path (origin → target):
+		$WORK/cmd/server/main.go:58:78-101: in example.com/bank/cmd/server.run$2
+		$WORK/events/events.go:36:13-18: in (*example.com/bank/events.Bus).Publish, call to example.com/bank/cmd/server.run$2 (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)
+$WORK/domain/errors.go:14:2-18: sentinel example.com/bank/domain.ErrLimitExceeded
+	wrap chain (origin → target):
+		$WORK/cmd/server/main.go:58:11-102: fmt.Errorf "server: transfer %d needs review: %w"
+		$WORK/events/events.go:37:27-83: fmt.Errorf "events: %s handler %d: %w"
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+	path (origin → target):
+		$WORK/cmd/server/main.go:58:78-101: in example.com/bank/cmd/server.run$2
+		$WORK/events/events.go:36:13-18: in (*example.com/bank/events.Bus).Publish, call to example.com/bank/cmd/server.run$2 (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)
+$WORK/domain/errors.go:14:2-18: sentinel example.com/bank/domain.ErrLimitExceeded
+	wrap chain (origin → target):
+		$WORK/cmd/server/main.go:58:11-102: fmt.Errorf "server: transfer %d needs review: %w"
+		$WORK/events/events.go:37:27-83: fmt.Errorf "events: %s handler %d: %w"
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+	path (origin → target):
+		$WORK/cmd/server/main.go:58:78-101: in example.com/bank/cmd/server.run$2
+		$WORK/events/events.go:36:13-18: in (*example.com/bank/events.Bus).Publish, call to example.com/bank/cmd/server.run$2 (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)
+$WORK/domain/errors.go:14:2-18: sentinel example.com/bank/domain.ErrLimitExceeded
+	wrap chain (origin → target):
+		$WORK/cmd/server/main.go:58:11-102: fmt.Errorf "server: transfer %d needs review: %w"
+		$WORK/events/events.go:37:27-83: fmt.Errorf "events: %s handler %d: %w"
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+	path (origin → target):
+		$WORK/cmd/server/main.go:58:78-101: in example.com/bank/cmd/server.run$2
+		$WORK/events/events.go:36:13-18: in (*example.com/bank/events.Bus).Publish, call to example.com/bank/cmd/server.run$2 (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)
+$WORK/domain/errors.go:14:2-18: sentinel example.com/bank/domain.ErrLimitExceeded
+	wrap chain (origin → target):
+		$WORK/cmd/server/main.go:58:11-102: fmt.Errorf "server: transfer %d needs review: %w"
+		$WORK/events/events.go:37:27-83: fmt.Errorf "events: %s handler %d: %w"
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+	path (origin → target):
+		$WORK/cmd/server/main.go:58:78-101: in example.com/bank/cmd/server.run$2
+		$WORK/events/events.go:36:13-18: in (*example.com/bank/events.Bus).Publish, call to example.com/bank/cmd/server.run$2 (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)
+$WORK/cmd/cli/main.go:72:11-81: concrete *example.com/bank/domain.ValidationError
+	wrap chain (origin → target):
+		$WORK/events/events.go:37:27-83: fmt.Errorf "events: %s handler %d: %w"
+		$WORK/events/events.go:37:10-84: errors.Join
+	path (origin → target):
+		$WORK/cmd/cli/main.go:72:11-81: in example.com/bank/cmd/cli.newApp$2
+		$WORK/events/events.go:36:13-18: in (*example.com/bank/events.Bus).Publish, call to example.com/bank/cmd/cli.newApp$2 (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)
+$WORK/cmd/cli/main.go:72:11-81: concrete *example.com/bank/domain.ValidationError
+	wrap chain (origin → target):
+		$WORK/events/events.go:37:27-83: fmt.Errorf "events: %s handler %d: %w"
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+	path (origin → target):
+		$WORK/cmd/cli/main.go:72:11-81: in example.com/bank/cmd/cli.newApp$2
+		$WORK/events/events.go:36:13-18: in (*example.com/bank/events.Bus).Publish, call to example.com/bank/cmd/cli.newApp$2 (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)
+$WORK/cmd/cli/main.go:72:11-81: concrete *example.com/bank/domain.ValidationError
+	wrap chain (origin → target):
+		$WORK/events/events.go:37:27-83: fmt.Errorf "events: %s handler %d: %w"
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+	path (origin → target):
+		$WORK/cmd/cli/main.go:72:11-81: in example.com/bank/cmd/cli.newApp$2
+		$WORK/events/events.go:36:13-18: in (*example.com/bank/events.Bus).Publish, call to example.com/bank/cmd/cli.newApp$2 (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)
+$WORK/cmd/cli/main.go:72:11-81: concrete *example.com/bank/domain.ValidationError
+	wrap chain (origin → target):
+		$WORK/events/events.go:37:27-83: fmt.Errorf "events: %s handler %d: %w"
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+	path (origin → target):
+		$WORK/cmd/cli/main.go:72:11-81: in example.com/bank/cmd/cli.newApp$2
+		$WORK/events/events.go:36:13-18: in (*example.com/bank/events.Bus).Publish, call to example.com/bank/cmd/cli.newApp$2 (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)
+$WORK/cmd/cli/main.go:72:11-81: concrete *example.com/bank/domain.ValidationError
+	wrap chain (origin → target):
+		$WORK/events/events.go:37:27-83: fmt.Errorf "events: %s handler %d: %w"
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+	path (origin → target):
+		$WORK/cmd/cli/main.go:72:11-81: in example.com/bank/cmd/cli.newApp$2
+		$WORK/events/events.go:36:13-18: in (*example.com/bank/events.Bus).Publish, call to example.com/bank/cmd/cli.newApp$2 (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)
+$WORK/cmd/cli/main.go:72:11-81: concrete *example.com/bank/domain.ValidationError
+	wrap chain (origin → target):
+		$WORK/events/events.go:37:27-83: fmt.Errorf "events: %s handler %d: %w"
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+	path (origin → target):
+		$WORK/cmd/cli/main.go:72:11-81: in example.com/bank/cmd/cli.newApp$2
+		$WORK/events/events.go:36:13-18: in (*example.com/bank/events.Bus).Publish, call to example.com/bank/cmd/cli.newApp$2 (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)
+$WORK/cmd/cli/main.go:72:11-81: concrete *example.com/bank/domain.ValidationError
+	wrap chain (origin → target):
+		$WORK/events/events.go:37:27-83: fmt.Errorf "events: %s handler %d: %w"
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+	path (origin → target):
+		$WORK/cmd/cli/main.go:72:11-81: in example.com/bank/cmd/cli.newApp$2
+		$WORK/events/events.go:36:13-18: in (*example.com/bank/events.Bus).Publish, call to example.com/bank/cmd/cli.newApp$2 (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)
+$WORK/cmd/cli/main.go:37:10-69: opaque fmt.Errorf "cli: more than %d transfers in one run" [chain truncated]
+	wrap chain (origin → target):
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+	path (origin → target):
+		$WORK/cmd/cli/main.go:37:10-69: in (*example.com/bank/cmd/cli.stats).onTransfer
+		$WORK/events/events.go:36:13-18: in (*example.com/bank/events.Bus).Publish, call to (*example.com/bank/cmd/cli.stats).onTransfer (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)
+$WORK/cmd/cli/main.go:37:10-69: opaque fmt.Errorf "cli: more than %d transfers in one run"
+	wrap chain (origin → target):
+		$WORK/events/events.go:37:27-83: fmt.Errorf "events: %s handler %d: %w"
+		$WORK/events/events.go:37:10-84: errors.Join
+	path (origin → target):
+		$WORK/cmd/cli/main.go:37:10-69: in (*example.com/bank/cmd/cli.stats).onTransfer
+		$WORK/events/events.go:36:13-18: in (*example.com/bank/events.Bus).Publish, call to (*example.com/bank/cmd/cli.stats).onTransfer (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)
+$WORK/cmd/cli/main.go:37:10-69: opaque fmt.Errorf "cli: more than %d transfers in one run"
+	wrap chain (origin → target):
+		$WORK/events/events.go:37:27-83: fmt.Errorf "events: %s handler %d: %w"
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+	path (origin → target):
+		$WORK/cmd/cli/main.go:37:10-69: in (*example.com/bank/cmd/cli.stats).onTransfer
+		$WORK/events/events.go:36:13-18: in (*example.com/bank/events.Bus).Publish, call to (*example.com/bank/cmd/cli.stats).onTransfer (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)
+$WORK/cmd/cli/main.go:37:10-69: opaque fmt.Errorf "cli: more than %d transfers in one run"
+	wrap chain (origin → target):
+		$WORK/events/events.go:37:27-83: fmt.Errorf "events: %s handler %d: %w"
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+	path (origin → target):
+		$WORK/cmd/cli/main.go:37:10-69: in (*example.com/bank/cmd/cli.stats).onTransfer
+		$WORK/events/events.go:36:13-18: in (*example.com/bank/events.Bus).Publish, call to (*example.com/bank/cmd/cli.stats).onTransfer (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)
+$WORK/cmd/cli/main.go:37:10-69: opaque fmt.Errorf "cli: more than %d transfers in one run"
+	wrap chain (origin → target):
+		$WORK/events/events.go:37:27-83: fmt.Errorf "events: %s handler %d: %w"
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+	path (origin → target):
+		$WORK/cmd/cli/main.go:37:10-69: in (*example.com/bank/cmd/cli.stats).onTransfer
+		$WORK/events/events.go:36:13-18: in (*example.com/bank/events.Bus).Publish, call to (*example.com/bank/cmd/cli.stats).onTransfer (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)
+$WORK/cmd/cli/main.go:37:10-69: opaque fmt.Errorf "cli: more than %d transfers in one run"
+	wrap chain (origin → target):
+		$WORK/events/events.go:37:27-83: fmt.Errorf "events: %s handler %d: %w"
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+	path (origin → target):
+		$WORK/cmd/cli/main.go:37:10-69: in (*example.com/bank/cmd/cli.stats).onTransfer
+		$WORK/events/events.go:36:13-18: in (*example.com/bank/events.Bus).Publish, call to (*example.com/bank/cmd/cli.stats).onTransfer (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)
+$WORK/cmd/cli/main.go:37:10-69: opaque fmt.Errorf "cli: more than %d transfers in one run"
+	wrap chain (origin → target):
+		$WORK/events/events.go:37:27-83: fmt.Errorf "events: %s handler %d: %w"
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+	path (origin → target):
+		$WORK/cmd/cli/main.go:37:10-69: in (*example.com/bank/cmd/cli.stats).onTransfer
+		$WORK/events/events.go:36:13-18: in (*example.com/bank/events.Bus).Publish, call to (*example.com/bank/cmd/cli.stats).onTransfer (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)
+$WORK/cmd/cli/main.go:37:10-69: opaque fmt.Errorf "cli: more than %d transfers in one run"
+	wrap chain (origin → target):
+		$WORK/events/events.go:37:27-83: fmt.Errorf "events: %s handler %d: %w"
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+		$WORK/events/events.go:37:10-84: errors.Join
+	path (origin → target):
+		$WORK/cmd/cli/main.go:37:10-69: in (*example.com/bank/cmd/cli.stats).onTransfer
+		$WORK/events/events.go:36:13-18: in (*example.com/bank/events.Bus).Publish, call to (*example.com/bank/cmd/cli.stats).onTransfer (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)

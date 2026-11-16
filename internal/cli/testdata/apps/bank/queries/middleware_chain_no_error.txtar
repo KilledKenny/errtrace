@@ -1,0 +1,9 @@
+Negative target: Chain returns a Handler, not an error.
+Expect exit 2 with a message that the function has no error result.
+-- args --
+middleware/middleware.go:@chain
+-- stdout --
+-- stderr --
+errtrace: $WORK/middleware/middleware.go:27:16: example.com/bank/middleware.Chain has no error result
+-- exit --
+2

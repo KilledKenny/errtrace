@@ -1,0 +1,163 @@
+Call site of the method cfg.set inside Load's scanner loop: set's errors without Load's "config: %s:%d: %w".
+Expect opaque errors.New "missing '='", opaque fmt.Errorf "unknown key %q", and strconv.ErrSyntax / strconv.ErrRange
+(plus ParseInt's opaque base errors) behind (*strconv.NumError).Unwrap, from ParseInt and Atoi.
+-- args --
+config/config.go:@set_call
+-- stdout --
+$WORK/config/config.go:47:13-44: Error Set of call to cfg.set in example.com/bank/config.Load: 19 entries
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrRange
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.rangeError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.rangeError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/config/config.go:74:24-53: in (*example.com/bank/config.Config).set, call to strconv.ParseInt
+		$WORK/config/config.go:47:13-44: in example.com/bank/config.Load, call to (*example.com/bank/config.Config).set
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrSyntax
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.syntaxError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.syntaxError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/config/config.go:74:24-53: in (*example.com/bank/config.Config).set, call to strconv.ParseInt
+		$WORK/config/config.go:47:13-44: in example.com/bank/config.Load, call to (*example.com/bank/config.Config).set
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/config/config.go:74:24-53: in (*example.com/bank/config.Config).set, call to strconv.ParseInt
+		$WORK/config/config.go:47:13-44: in example.com/bank/config.Load, call to (*example.com/bank/config.Config).set
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/config/config.go:74:24-53: in (*example.com/bank/config.Config).set, call to strconv.ParseInt
+		$WORK/config/config.go:47:13-44: in example.com/bank/config.Load, call to (*example.com/bank/config.Config).set
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/config/config.go:74:24-53: in (*example.com/bank/config.Config).set, call to strconv.ParseInt
+		$WORK/config/config.go:47:13-44: in example.com/bank/config.Load, call to (*example.com/bank/config.Config).set
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/config/config.go:74:24-53: in (*example.com/bank/config.Config).set, call to strconv.ParseInt
+		$WORK/config/config.go:47:13-44: in example.com/bank/config.Load, call to (*example.com/bank/config.Config).set
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/config/config.go:74:24-53: in (*example.com/bank/config.Config).set, call to strconv.ParseInt
+		$WORK/config/config.go:47:13-44: in example.com/bank/config.Load, call to (*example.com/bank/config.Config).set
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/config/config.go:74:24-53: in (*example.com/bank/config.Config).set, call to strconv.ParseInt
+		$WORK/config/config.go:47:13-44: in example.com/bank/config.Load, call to (*example.com/bank/config.Config).set
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/config/config.go:74:24-53: in (*example.com/bank/config.Config).set, call to strconv.ParseInt
+		$WORK/config/config.go:47:13-44: in example.com/bank/config.Load, call to (*example.com/bank/config.Config).set
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/config/config.go:74:24-53: in (*example.com/bank/config.Config).set, call to strconv.ParseInt
+		$WORK/config/config.go:47:13-44: in example.com/bank/config.Load, call to (*example.com/bank/config.Config).set
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/config/config.go:74:24-53: in (*example.com/bank/config.Config).set, call to strconv.ParseInt
+		$WORK/config/config.go:47:13-44: in example.com/bank/config.Load, call to (*example.com/bank/config.Config).set
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/config/config.go:74:24-53: in (*example.com/bank/config.Config).set, call to strconv.ParseInt
+		$WORK/config/config.go:47:13-44: in example.com/bank/config.Load, call to (*example.com/bank/config.Config).set
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/config/config.go:74:24-53: in (*example.com/bank/config.Config).set, call to strconv.ParseInt
+		$WORK/config/config.go:47:13-44: in example.com/bank/config.Load, call to (*example.com/bank/config.Config).set
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/config/config.go:78:20-37: in (*example.com/bank/config.Config).set, call to strconv.Atoi
+		$WORK/config/config.go:47:13-44: in example.com/bank/config.Load, call to (*example.com/bank/config.Config).set
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/config/config.go:78:20-37: in (*example.com/bank/config.Config).set, call to strconv.Atoi
+		$WORK/config/config.go:47:13-44: in example.com/bank/config.Load, call to (*example.com/bank/config.Config).set
+$GOROOT/src/strconv/number.go:*: opaque errors.New
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.baseError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.baseError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/config/config.go:74:24-53: in (*example.com/bank/config.Config).set, call to strconv.ParseInt
+		$WORK/config/config.go:47:13-44: in example.com/bank/config.Load, call to (*example.com/bank/config.Config).set
+$GOROOT/src/strconv/number.go:*: opaque errors.New
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.bitSizeError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.bitSizeError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/config/config.go:74:24-53: in (*example.com/bank/config.Config).set, call to strconv.ParseInt
+		$WORK/config/config.go:47:13-44: in example.com/bank/config.Load, call to (*example.com/bank/config.Config).set
+$WORK/config/config.go:63:10-35: opaque errors.New "missing '='"
+	path (origin → target):
+		$WORK/config/config.go:63:10-35: in (*example.com/bank/config.Config).set
+		$WORK/config/config.go:47:13-44: in example.com/bank/config.Load, call to (*example.com/bank/config.Config).set
+$WORK/config/config.go:80:10-43: opaque fmt.Errorf "unknown key %q"
+	path (origin → target):
+		$WORK/config/config.go:80:10-43: in (*example.com/bank/config.Config).set
+		$WORK/config/config.go:47:13-44: in example.com/bank/config.Load, call to (*example.com/bank/config.Config).set

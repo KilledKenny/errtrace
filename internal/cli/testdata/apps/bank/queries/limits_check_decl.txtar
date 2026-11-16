@@ -1,0 +1,19 @@
+Policy.Check returns *limits.Exceeded bare and wrapped by "daily budget of %s: %w"; Exceeded.Unwrap
+returns the sentinel domain.ErrLimitExceeded (constant Unwrap, not a field).
+Expect ErrLimitExceeded reachable behind (*Exceeded).Unwrap (with and without the errorf wrap) and
+nothing else; the two &Exceeded{} literals are the wrappers.
+-- args --
+limits/limits.go:@check
+-- stdout --
+$WORK/limits/limits.go:30:27-32: Error Set of (example.com/bank/limits.Policy).Check: 2 entries, 2 unresolved
+$WORK/limits/limits.go:32:10-82: unresolved(memory): *example.com/bank/limits.Exceeded.Unwrap not modelled
+	wrap chain (origin → target):
+		$WORK/limits/limits.go:32:10-82: *example.com/bank/limits.Exceeded.Unwrap
+	path (origin → target):
+		$WORK/limits/limits.go:32:10-82: in (example.com/bank/limits.Policy).Check
+$WORK/limits/limits.go:36:4-71: unresolved(memory): *example.com/bank/limits.Exceeded.Unwrap not modelled
+	wrap chain (origin → target):
+		$WORK/limits/limits.go:36:4-71: *example.com/bank/limits.Exceeded.Unwrap
+		$WORK/limits/limits.go:35:10-36:72: fmt.Errorf "daily budget of %s: %w"
+	path (origin → target):
+		$WORK/limits/limits.go:36:4-71: in (example.com/bank/limits.Policy).Check

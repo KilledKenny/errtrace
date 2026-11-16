@@ -219,3 +219,37 @@ func (s *Service) /*@find*/Find(key string) (string, error) {
 	err, v := s.repo./*@lookup_call*/Lookup(key)
 	return string(v), err
 }
+
+// inflight counts running maintenance operations.
+var inflight int
+
+func begin() { inflight++ }
+func end()   { inflight-- }
+
+// Sync flushes the repository. The deferred call does not touch the named
+// result.
+func (s *Service) /*@sync*/Sync() (err error) {
+	begin()
+	defer end()
+	if s.readOnly {
+		return kverr.ErrReadOnly
+	}
+	err = s.repo.Flush()
+	return err
+}
+
+// tag marks err as coming from the service layer.
+func tag(err error) error {
+	return /*@tag_call*/annotate("service", err)
+}
+
+// Probe checks that key could be stored, without touching its value.
+func (s *Service) /*@probe*/Probe(key string) error {
+	if err := s.repo.Alive(); err != nil {
+		return err
+	}
+	if err := s.repo.Stat(key); err != nil {
+		return err
+	}
+	return tag(s.repo.Probe(key))
+}

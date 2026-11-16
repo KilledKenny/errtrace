@@ -1,0 +1,9 @@
+Range with a dangling "-".
+Negative: exit 2, "missing end position after '-'".
+-- args --
+internal/platform/platform.go:5:6-
+-- stdout --
+-- stderr --
+errtrace: invalid position "internal/platform/platform.go:5:6-": missing end position after '-'
+-- exit --
+2

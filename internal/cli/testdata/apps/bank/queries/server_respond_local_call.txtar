@@ -1,0 +1,7 @@
+Negative: respond(out, srv.Transfer(...)). api.Server.Transfer only ever returns nil, an *api.Error or
+api.ErrUnavailable (itself an *api.Error), all of which respond prints and swallows.
+Expect 0 entries.
+-- args --
+cmd/server/main.go:@respond_local_call
+-- stdout --
+$WORK/cmd/server/main.go:100:37-82: Error Set of call to respond in example.com/bank/cmd/server.serve: 0 entries

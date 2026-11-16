@@ -1,0 +1,12 @@
+SUSPECTED BUG: -p with a well-formed wildcard pattern that matches no package (go list prints: warning: "./cmd/zzz..." matched no packages).
+Expected: an error (exit 2) or at least that warning on stderr, as for ./nope/... in p_matches_nothing. Actual: the pattern is dropped silently; only the target file package is loaded, the Error Set is printed with just the unrelated "not reachable from main/init" warning, exit 0.
+-- args --
+-p ./cmd/zzz... internal/platform/platform.go:5:6
+-- stdout --
+$WORK/internal/platform/platform.go:5:6-11: Error Set of example.com/targets/internal/platform.Probe: 1 entries
+$WORK/internal/platform/limits_default.go:8:5-15: sentinel example.com/targets/internal/platform.ErrNoLimit
+	path (origin → target):
+		$WORK/internal/platform/limits_default.go:12:12-22: in example.com/targets/internal/platform.MaxBatch
+		$WORK/internal/platform/platform.go:6:12-22: in example.com/targets/internal/platform.Probe, call to example.com/targets/internal/platform.MaxBatch
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates

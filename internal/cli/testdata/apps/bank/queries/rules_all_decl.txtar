@@ -1,0 +1,12 @@
+errors.Join over a slice built with append in a loop.
+Under Go semantics every rule origin is reachable behind "%s: %w" + errors.Join. Slice elements are documented as
+out of scope (memory), so expect either those origins or an explicit unresolved(memory) entry - never 0 entries.
+-- args --
+rules/rules.go:@all
+-- stdout --
+$WORK/rules/rules.go:53:26-37: Error Set of (*example.com/bank/rules.Engine).EvaluateAll: 1 entries, 1 unresolved
+$WORK/rules/rules.go:60:9-29: unresolved(memory): operands of errors.Join passed in a slice that is not followed
+	wrap chain (origin → target):
+		$WORK/rules/rules.go:60:9-29: errors.Join
+	path (origin → target):
+		$WORK/rules/rules.go:60:9-29: in (*example.com/bank/rules.Engine).EvaluateAll

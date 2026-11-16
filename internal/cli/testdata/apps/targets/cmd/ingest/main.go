@@ -25,7 +25,7 @@ var hook = func(key string) error {
 }
 
 func /*@init*/init() {
-	if err := /*@init_call*/codec.Register("text"); err != nil {
+	if err := /*@init_call*/codec./*@init_sel*/Register("text"); err != nil {
 		panic(err)
 	}
 }
@@ -57,7 +57,7 @@ func /*@run*/run(args []string) error {
 }
 
 // warm primes the store; a missing warm-up record is fine.
-func warm(s *store.Store) error {
+func /*@warm*/warm(s *store.Store) error {
 	ping := s./*@mval*/Ping
 	if err := /*@bound*/ping(); err != nil {
 		return err
@@ -94,7 +94,7 @@ func ingest(s *store.Store, key string) error {
 	if s./*@hits_call*/Hits() > 1000 {
 		return s./*@promoted*/Check()
 	}
-	return /*@outer*/annotate(key, /*@inner*/s.Ping())
+	return /*@outer*/annotate(key, /*@inner*/s./*@inner_sel*/Ping())
 }
 
 // fetch reads one record and says which key failed.

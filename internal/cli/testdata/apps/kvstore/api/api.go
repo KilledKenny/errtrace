@@ -12,7 +12,7 @@ import (
 
 // Backend is what the handlers need from the service layer.
 type Backend interface {
-	Get(key string) (string, error)
+	/*@iface_get*/Get(key string) (string, error)
 	Put(key, val string) error
 	Delete(key string, n int) error
 	List(prefix string) ([]string, error)
@@ -75,6 +75,10 @@ func (h *Handler) /*@handle*/Handle(cmd string, args []string) (string, error) {
 	case "stats":
 		n, err := h.svc.Stats()
 		return fmt.Sprint(n), err
+	case "probe":
+		return "ok", h.svc.Probe(key)
+	case "sync":
+		return "ok", h.svc.Sync()
 	}
 	return "", fmt.Errorf("api: unknown command %q", cmd)
 }

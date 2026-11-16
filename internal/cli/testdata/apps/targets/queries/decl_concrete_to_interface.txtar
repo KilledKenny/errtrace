@@ -1,0 +1,10 @@
+Declaration target disk.Open: returns the *DiskError result of Validate converted to error after an e != nil check.
+Expected: 1 entry, concrete *disk.DiskError with a path through Validate; not flagged as typed nil (guarded by e != nil).
+-- args --
+internal/store/disk/disk.go:@open
+-- stdout --
+$WORK/internal/store/disk/disk.go:29:15-19: Error Set of example.com/targets/internal/store/disk.Open: 1 entries
+$WORK/internal/store/disk/disk.go:23:10-48: concrete *example.com/targets/internal/store/disk.DiskError
+	path (origin → target):
+		$WORK/internal/store/disk/disk.go:23:10-48: in example.com/targets/internal/store/disk.Validate
+		$WORK/internal/store/disk/disk.go:30:28-42: in example.com/targets/internal/store/disk.Open, call to example.com/targets/internal/store/disk.Validate

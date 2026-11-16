@@ -1,0 +1,22 @@
+Leaf: Account.Debit wraps Usable()'s sentinels and builds a value-type error.
+Expect 3 entries: ErrAccountClosed and ErrFrozen, each only with the chain "debit %s: %w", and
+concrete domain.InsufficientFundsError (value type, no chain).
+-- args --
+domain/domain.go:@debit
+-- stdout --
+$WORK/domain/domain.go:53:29-34: Error Set of (*example.com/bank/domain.Account).Debit: 3 entries
+$WORK/domain/errors.go:11:2-18: sentinel example.com/bank/domain.ErrAccountClosed
+	wrap chain (origin → target):
+		$WORK/domain/domain.go:55:10-47: fmt.Errorf "debit %s: %w"
+	path (origin → target):
+		$WORK/domain/domain.go:45:10-26: in (*example.com/bank/domain.Account).Usable
+		$WORK/domain/domain.go:54:12-22: in (*example.com/bank/domain.Account).Debit, call to (*example.com/bank/domain.Account).Usable
+$WORK/domain/errors.go:12:2-11: sentinel example.com/bank/domain.ErrFrozen
+	wrap chain (origin → target):
+		$WORK/domain/domain.go:55:10-47: fmt.Errorf "debit %s: %w"
+	path (origin → target):
+		$WORK/domain/domain.go:47:10-19: in (*example.com/bank/domain.Account).Usable
+		$WORK/domain/domain.go:54:12-22: in (*example.com/bank/domain.Account).Debit, call to (*example.com/bank/domain.Account).Usable
+$WORK/domain/domain.go:58:10-73: concrete example.com/bank/domain.InsufficientFundsError
+	path (origin → target):
+		$WORK/domain/domain.go:58:10-73: in (*example.com/bank/domain.Account).Debit

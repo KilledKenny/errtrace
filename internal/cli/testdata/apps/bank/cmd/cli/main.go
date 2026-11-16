@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"example.com/bank/audit"
@@ -24,7 +25,7 @@ import (
 )
 
 var (
-	errUsage  = errors.New("usage: cli transfer FROM TO AMOUNT [TIME] | balance ID | settled N | freeze ID | check FROM AMOUNT")
+	errUsage  = errors.New("usage: cli transfer|preview|explain FROM TO AMOUNT [TIME] | batch FROM:TO:AMOUNT... | balance ID | owner ID | settled N | freeze ID | check FROM AMOUNT")
 	errDryRun = errors.New("cli: dry run, nothing was moved")
 )
 
@@ -96,6 +97,21 @@ func /*@run*/run(ctx context.Context, args []string, out io.Writer) error {
 		}
 		fmt.Fprintln(out, bal)
 		return nil
+	case "owner":
+		name, err := a.svc.Owner(ctx, domain.AccountID(rest[0]))
+		fmt.Fprintln(out, name)
+		return err
+	case "batch":
+		return /*@batch_call*/batch(ctx, a.svc, rest)
+	case "preview", "explain":
+		t, err := parse.Line(1, rest)
+		if err != nil {
+			return err
+		}
+		if cmd == "explain" {
+			return a.svc./*@explain_call*/Explain(ctx, t)
+		}
+		return a.svc./*@preview_call*/Preview(ctx, t)
 	case "settled":
 		return /*@settled_call*/settled(a.svc, rest[0])
 	case "freeze":
@@ -106,6 +122,19 @@ func /*@run*/run(ctx context.Context, args []string, out io.Writer) error {
 		return a.bus./*@first_call*/PublishFirst(events.Event{Kind: "transfer.done"})
 	}
 	return fmt.Errorf("%w (unknown command %q)", errUsage, args[0])
+}
+
+// batch runs "FROM:TO:AMOUNT" items as transfers 1, 2, ...
+func /*@batch*/batch(ctx context.Context, svc *service.Service, items []string) error {
+	var ts []domain.Transfer
+	for i, it := range items {
+		t, err := parse.Line(int64(i+1), strings.Split(it, ":"))
+		if err != nil {
+			return err
+		}
+		ts = append(ts, t)
+	}
+	return svc./*@svc_batch_call*/Batch(ctx, ts)
 }
 
 func /*@settled*/settled(svc *service.Service, arg string) error {

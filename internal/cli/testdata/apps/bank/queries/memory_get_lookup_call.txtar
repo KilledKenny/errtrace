@@ -1,0 +1,10 @@
+Call site of the generic lookup inside Get: only the AccountID instance.
+Expect 1 entry: concrete domain.NotFoundError[domain.AccountID]; NotFoundError[TransferID] must NOT appear.
+-- args --
+repo/memory/memory.go:@lookup_call
+-- stdout --
+$WORK/repo/memory/memory.go:38:28-61: Error Set of call to lookup in (*example.com/bank/repo/memory.Store).Get: 1 entries
+$WORK/repo/memory/memory.go:76:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID]
+	path (origin → target):
+		$WORK/repo/memory/memory.go:76:13-56: in example.com/bank/repo/memory.lookup[example.com/bank/domain.AccountID, *example.com/bank/domain.Account]
+		$WORK/repo/memory/memory.go:38:28-61: in (*example.com/bank/repo/memory.Store).Get, call to example.com/bank/repo/memory.lookup[example.com/bank/domain.AccountID, *example.com/bank/domain.Account]

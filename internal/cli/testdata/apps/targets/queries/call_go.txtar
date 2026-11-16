@@ -1,6 +1,6 @@
-Call-site target in a go statement: go warm(s).
-Expected: store.ErrClosed (bound Ping, and Get via Check, unwrapped) and store.ErrNotFound wrapped "get %q: %w".
-Must NOT contain disk.ErrNoEntry: warm returns nil when errors.Is(err, disk.ErrNoEntry).
+SUSPECTED BUG: call-site target in a go statement: go warm(s).
+Expected 2 entries: store.ErrNotFound wrapped "get %q: %w"; store.ErrClosed unwrapped with [+1 more paths] (it reaches warm via ping() AND via s.Get->Check), exactly as the declaration target decl_warm_paths prints it. Must NOT contain disk.ErrNoEntry (warm returns nil when errors.Is(err, disk.ErrNoEntry)).
+Actual: entries are right, but the ErrClosed entry lacks the [+1 more paths] marker: paths merged inside the callee are not counted for a call-site Target (same with a plain, non-go call).
 -- args --
 cmd/ingest/main.go:@go_call
 -- stdout --

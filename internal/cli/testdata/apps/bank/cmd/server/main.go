@@ -54,8 +54,10 @@ func /*@run*/run(path string, in io.Reader, out io.Writer) (err error) {
 
 	bus := events.NewBus()
 	bus.Subscribe("transfer.done", func(ev events.Event) error {
-		_, err := fmt.Fprintf(out, "event %s %d\n", ev.Kind, ev.Transfer.ID)
-		return err
+		if ev.Transfer.Amount > domain.Money(cfg.Daily) {
+			return fmt.Errorf("server: transfer %d needs review: %w", ev.Transfer.ID, domain.ErrLimitExceeded)
+		}
+		return nil
 	})
 	policy := limits.Policy{PerTransfer: domain.Money(cfg.PerTransfer), Daily: domain.Money(cfg.Daily)}
 	svc := service.New(store, rules.Default(policy), bus, logger, cfg.Retries)
@@ -63,6 +65,9 @@ func /*@run*/run(path string, in io.Reader, out io.Writer) (err error) {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+	if err := srv./*@selftest_call*/Balance(ctx, "cash"); err != nil {
+		log.Printf("server: self-test: %v", err)
+	}
 	return /*@serve_call*/serve(ctx, srv, in, out)
 }
 
@@ -91,6 +96,12 @@ func /*@serve*/serve(ctx context.Context, srv *api.Server, in io.Reader, out io.
 	for sc.Scan() {
 		path, rest, _ := strings.Cut(sc.Text(), " ")
 		token, body, _ := strings.Cut(rest, " ")
+		if path == "local" { // trusted in-process caller: no middleware
+			if err := /*@respond_local_call*/respond(out, srv.Transfer(ctx, []byte(rest))); err != nil {
+				return err
+			}
+			continue
+		}
 		req := middleware.Request{Path: path, Token: token, Body: []byte(body)}
 		if err := /*@respond_call*/respond(out, srv./*@srv_serve_call*/Serve(ctx, req)); err != nil {
 			return err

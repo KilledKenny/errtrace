@@ -1,0 +1,6 @@
+Negative: Notify logs Publish's error and always returns nil.
+Expect 0 entries.
+-- args --
+events/events.go:@notify
+-- stdout --
+$WORK/events/events.go:54:26-32: Error Set of (*example.com/bank/events.Bus).Notify: 0 entries

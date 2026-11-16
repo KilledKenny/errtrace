@@ -1,0 +1,9 @@
+After "--" a -h is a positional argument, i.e. the Target file name.
+Negative: exit 2, no usage text; "-h" is a file that is in no loaded package.
+-- args --
+-- -h
+-- stdout --
+-- stderr --
+errtrace: $WORK/-h: file is not in any loaded package
+-- exit --
+2

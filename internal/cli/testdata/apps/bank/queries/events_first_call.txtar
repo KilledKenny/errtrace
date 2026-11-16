@@ -1,0 +1,21 @@
+Dynamic call h(ev) in PublishFirst (handler loaded from the bus map): same Candidates as Publish, no extra wraps.
+Expect 3 entries: ErrLimitExceeded behind "server: transfer %d needs review: %w", opaque "cli: more than %d transfers
+in one run", concrete *domain.ValidationError (3 of 3 candidates).
+-- args --
+events/events.go:@first_call
+-- stdout --
+$WORK/events/events.go:46:28-33: Error Set of call to h in (*example.com/bank/events.Bus).PublishFirst: 3 entries
+$WORK/domain/errors.go:14:2-18: sentinel example.com/bank/domain.ErrLimitExceeded
+	wrap chain (origin → target):
+		$WORK/cmd/server/main.go:58:11-102: fmt.Errorf "server: transfer %d needs review: %w"
+	path (origin → target):
+		$WORK/cmd/server/main.go:58:78-101: in example.com/bank/cmd/server.run$2
+		$WORK/events/events.go:46:28-33: in (*example.com/bank/events.Bus).PublishFirst, call to example.com/bank/cmd/server.run$2 (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)
+$WORK/cmd/cli/main.go:72:11-81: concrete *example.com/bank/domain.ValidationError
+	path (origin → target):
+		$WORK/cmd/cli/main.go:72:11-81: in example.com/bank/cmd/cli.newApp$2
+		$WORK/events/events.go:46:28-33: in (*example.com/bank/events.Bus).PublishFirst, call to example.com/bank/cmd/cli.newApp$2 (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)
+$WORK/cmd/cli/main.go:37:10-69: opaque fmt.Errorf "cli: more than %d transfers in one run"
+	path (origin → target):
+		$WORK/cmd/cli/main.go:37:10-69: in (*example.com/bank/cmd/cli.stats).onTransfer
+		$WORK/events/events.go:46:28-33: in (*example.com/bank/events.Bus).PublishFirst, call to (*example.com/bank/cmd/cli.stats).onTransfer (dynamic function value of type example.com/bank/events.Handler: 3 of 3 candidates)

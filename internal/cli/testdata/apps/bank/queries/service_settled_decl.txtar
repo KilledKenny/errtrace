@@ -1,0 +1,15 @@
+Type assertion to an anonymous interface, then a dynamic call: only memory.Store has FindTransfer.
+Expect 2 entries: sentinel service.ErrUnsupported and concrete NotFoundError[domain.TransferID] (generic lookup
+instance for the ledger); NotFoundError[AccountID] must NOT appear.
+-- args --
+service/service.go:@settled
+-- stdout --
+$WORK/service/service.go:198:31-38: Error Set of (*example.com/bank/service.Service).Settled: 2 entries
+$WORK/service/service.go:20:5-19: sentinel example.com/bank/service.ErrUnsupported
+	path (origin → target):
+		$WORK/service/service.go:203:10-24: in (*example.com/bank/service.Service).Settled
+$WORK/repo/memory/memory.go:76:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.TransferID]
+	path (origin → target):
+		$WORK/repo/memory/memory.go:76:13-56: in example.com/bank/repo/memory.lookup[example.com/bank/domain.TransferID, bool]
+		$WORK/repo/memory/memory.go:68:12-42: in (*example.com/bank/repo/memory.Store).FindTransfer, call to example.com/bank/repo/memory.lookup[example.com/bank/domain.TransferID, bool]
+		$WORK/service/service.go:205:9-41: in (*example.com/bank/service.Service).Settled, call to (*example.com/bank/repo/memory.Store).FindTransfer (dynamic (interface{FindTransfer(example.com/bank/domain.TransferID) error}).FindTransfer: 1 of 1 candidates)

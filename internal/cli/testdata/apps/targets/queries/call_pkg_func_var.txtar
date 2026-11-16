@@ -1,0 +1,10 @@
+Call-site target codec.Trim(raw) in cmd/report: the Sel of a package-qualified function-typed VARIABLE (not a func declaration).
+Expected: 1 entry codec.ErrEmpty from the literal assigned to Trim, reached as a dynamic function value.
+-- args --
+cmd/report/main.go:@trim_call
+-- stdout --
+$WORK/cmd/report/main.go:33:16-45: Error Set of call to codec.Trim in example.com/targets/cmd/report.run: 1 entries
+$WORK/internal/codec/codec.go:12:2-10: sentinel example.com/targets/internal/codec.ErrEmpty
+	path (origin → target):
+		$WORK/internal/codec/codec.go:44:15-23: in example.com/targets/internal/codec.init$1
+		$WORK/cmd/report/main.go:33:16-45: in example.com/targets/cmd/report.run, call to example.com/targets/internal/codec.init$1 (dynamic function value example.com/targets/internal/codec.Trim: 1 of 1 candidates)
