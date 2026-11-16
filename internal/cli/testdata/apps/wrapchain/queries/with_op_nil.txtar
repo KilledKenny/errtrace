@@ -1,0 +1,6 @@
+WithOp("noop", nil): the helper returns nil for a nil err. Expected 0 entries
+(in particular no *OpError wrapping nothing).
+-- args --
+transform/transform.go:@noop
+-- stdout --
+$WORK/transform/transform.go:26:15-19: Error Set of example.com/wrapchain/transform.Noop: 0 entries

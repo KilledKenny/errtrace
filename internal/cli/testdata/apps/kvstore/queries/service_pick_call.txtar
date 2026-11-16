@@ -1,0 +1,40 @@
+Two error arguments, either of which may be returned (param passthrough of a call result and of a pointer sentinel).
+Expect: Check's 3 entries under *kverr.OpError.Unwrap and sentinel kverr.ErrCorrupt. No typed nil, no depends-on-caller.
+-- args --
+service/service.go:@pick_call
+-- stdout --
+$WORK/service/service.go:179:23-64: Error Set of call to pick in (*example.com/kvstore/service.Service).Verify: 4 entries
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:98:10-56: *example.com/kvstore/kverr.OpError.Unwrap
+	path (origin → target):
+		$WORK/engine/engine.go:68:15-24: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:97:15-37: in (*example.com/kvstore/repo.Repo).find, call to (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:110:10-21: in (*example.com/kvstore/repo.Repo).Check, call to (*example.com/kvstore/repo.Repo).find
+		$WORK/service/service.go:179:28-45: in (*example.com/kvstore/service.Service).Verify, call to (*example.com/kvstore/repo.Repo).Check
+		$WORK/service/service.go:150:5-8: in example.com/kvstore/service.pick
+		$WORK/service/service.go:179:23-64: in (*example.com/kvstore/service.Service).Verify, call to example.com/kvstore/service.pick
+$WORK/kverr/kverr.go:10:5-16: sentinel example.com/kvstore/kverr.ErrNotFound
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:98:10-56: *example.com/kvstore/kverr.OpError.Unwrap
+	path (origin → target):
+		$WORK/engine/engine.go:72:15-32: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:97:15-37: in (*example.com/kvstore/repo.Repo).find, call to (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:110:10-21: in (*example.com/kvstore/repo.Repo).Check, call to (*example.com/kvstore/repo.Repo).find
+		$WORK/service/service.go:179:28-45: in (*example.com/kvstore/service.Service).Verify, call to (*example.com/kvstore/repo.Repo).Check
+		$WORK/service/service.go:150:5-8: in example.com/kvstore/service.pick
+		$WORK/service/service.go:179:23-64: in (*example.com/kvstore/service.Service).Verify, call to example.com/kvstore/service.pick
+$WORK/kverr/kverr.go:44:5-16: sentinel example.com/kvstore/kverr.ErrEmptyKey
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:95:10-60: *example.com/kvstore/kverr.OpError.Unwrap
+	path (origin → target):
+		$WORK/repo/repo.go:95:42-59: in (*example.com/kvstore/repo.Repo).find
+		$WORK/repo/repo.go:110:10-21: in (*example.com/kvstore/repo.Repo).Check, call to (*example.com/kvstore/repo.Repo).find
+		$WORK/service/service.go:179:28-45: in (*example.com/kvstore/service.Service).Verify, call to (*example.com/kvstore/repo.Repo).Check
+		$WORK/service/service.go:150:5-8: in example.com/kvstore/service.pick
+		$WORK/service/service.go:179:23-64: in (*example.com/kvstore/service.Service).Verify, call to example.com/kvstore/service.pick
+$WORK/kverr/kverr.go:71:5-15: sentinel example.com/kvstore/kverr.ErrCorrupt
+	path (origin → target):
+		$WORK/service/service.go:179:47-63: in (*example.com/kvstore/service.Service).Verify
+		$WORK/service/service.go:153:9-17: in example.com/kvstore/service.pick
+		$WORK/service/service.go:179:23-64: in (*example.com/kvstore/service.Service).Verify, call to example.com/kvstore/service.pick

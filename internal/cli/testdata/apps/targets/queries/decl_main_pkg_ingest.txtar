@@ -1,0 +1,30 @@
+Declaration target in package main of cmd/ingest: fetch wraps (*Store).Get.
+Expected 3 entries: store.ErrClosed wrapped by "fetch %s: %w"; store.ErrNotFound and disk.ErrNoEntry wrapped by "get %q: %w" then "fetch %s: %w" (chain depth 2).
+(ErrNotFound comes from the mem Backend that only cmd/report wires up: both binaries are loaded by ./..., VTA is not per-binary.)
+-- args --
+cmd/ingest/main.go:@fetch
+-- stdout --
+$WORK/cmd/ingest/main.go:101:16-21: Error Set of example.com/targets/cmd/ingest.fetch: 3 entries
+$WORK/internal/store/disk/disk.go:7:5-15: sentinel example.com/targets/internal/store/disk.ErrNoEntry
+	wrap chain (origin → target):
+		$WORK/internal/store/store.go:51:30-79: fmt.Errorf "get %q: %w"
+		$WORK/cmd/ingest/main.go:104:15-51: fmt.Errorf "fetch %s: %w"
+	path (origin → target):
+		$WORK/internal/store/disk/disk.go:40:15-25: in (*example.com/targets/internal/store/disk.Disk).Read
+		$WORK/internal/store/store.go:49:14-43: in (*example.com/targets/internal/store.Store).Get, call to (*example.com/targets/internal/store/disk.Disk).Read (dynamic (example.com/targets/internal/store.Backend).Read: 2 of 2 candidates)
+		$WORK/cmd/ingest/main.go:102:24-82: in example.com/targets/cmd/ingest.fetch, call to (*example.com/targets/internal/store.Store).Get
+$WORK/internal/store/store.go:11:2-13: sentinel example.com/targets/internal/store.ErrNotFound
+	wrap chain (origin → target):
+		$WORK/internal/store/store.go:51:30-79: fmt.Errorf "get %q: %w"
+		$WORK/cmd/ingest/main.go:104:15-51: fmt.Errorf "fetch %s: %w"
+	path (origin → target):
+		$WORK/internal/store/store.go:111:15-26: in (*example.com/targets/internal/store.mem).Read
+		$WORK/internal/store/store.go:49:14-43: in (*example.com/targets/internal/store.Store).Get, call to (*example.com/targets/internal/store.mem).Read (dynamic (example.com/targets/internal/store.Backend).Read: 2 of 2 candidates)
+		$WORK/cmd/ingest/main.go:102:24-82: in example.com/targets/cmd/ingest.fetch, call to (*example.com/targets/internal/store.Store).Get
+$WORK/internal/store/store.go:12:2-11: sentinel example.com/targets/internal/store.ErrClosed
+	wrap chain (origin → target):
+		$WORK/cmd/ingest/main.go:104:15-51: fmt.Errorf "fetch %s: %w"
+	path (origin → target):
+		$WORK/internal/store/store.go:28:10-19: in (*example.com/targets/internal/store.base).Check
+		$WORK/internal/store/store.go:45:12-34: in (*example.com/targets/internal/store.Store).Get, call to (*example.com/targets/internal/store.base).Check
+		$WORK/cmd/ingest/main.go:102:24-82: in example.com/targets/cmd/ingest.fetch, call to (*example.com/targets/internal/store.Store).Get

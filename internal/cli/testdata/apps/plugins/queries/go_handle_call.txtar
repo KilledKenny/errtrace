@@ -1,0 +1,21 @@
+Call-site Target on a dynamic call inside a goroutine closure; h is a
+captured parameter fed from the registry map. Expected (VTA merges map
+values): ErrAuditFull, ErrMetricsDown and ErrPager (pagerHandler); no
+ErrOrphan. At run time only "audit" is passed.
+-- args --
+dispatch/dispatch.go:@go_handle
+-- stdout --
+$WORK/dispatch/dispatch.go:177:22-47: Error Set of call to h.Handle in (*example.com/plugins/dispatch.Dispatcher).Async$1: 3 entries
+$WORK/drivers/drivers.go:16:2-10: sentinel example.com/plugins/drivers.ErrPager
+	path (origin → target):
+		$WORK/drivers/drivers.go:82:10-18: in (example.com/plugins/drivers.Pager).Send
+		$WORK/main.go:30:57-80: in (example.com/plugins.pagerHandler).Handle, call to (example.com/plugins/drivers.Pager).Send
+		$WORK/dispatch/dispatch.go:177:22-47: in (*example.com/plugins/dispatch.Dispatcher).Async$1, call to (example.com/plugins.pagerHandler).Handle (dynamic (example.com/plugins/core.Handler).Handle: 3 of 3 candidates)
+$WORK/registry/registry.go:13:2-14: sentinel example.com/plugins/registry.ErrAuditFull
+	path (origin → target):
+		$WORK/registry/registry.go:22:10-22: in (example.com/plugins/registry.auditHandler).Handle
+		$WORK/dispatch/dispatch.go:177:22-47: in (*example.com/plugins/dispatch.Dispatcher).Async$1, call to (example.com/plugins/registry.auditHandler).Handle (dynamic (example.com/plugins/core.Handler).Handle: 3 of 3 candidates)
+$WORK/registry/registry.go:14:2-16: sentinel example.com/plugins/registry.ErrMetricsDown
+	path (origin → target):
+		$WORK/registry/registry.go:34:10-24: in (*example.com/plugins/registry.metricsHandler).Handle
+		$WORK/dispatch/dispatch.go:177:22-47: in (*example.com/plugins/dispatch.Dispatcher).Async$1, call to (*example.com/plugins/registry.metricsHandler).Handle (dynamic (example.com/plugins/core.Handler).Handle: 3 of 3 candidates)

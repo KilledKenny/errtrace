@@ -1,0 +1,9 @@
+Negative: the Target position is a package-level sentinel variable, not a function or call.
+Expect: exit 2 with a 'no function declaration or call at position' diagnostic.
+-- args --
+engine/engine.go:@errclosed
+-- stdout --
+-- stderr --
+errtrace: $WORK/engine/engine.go:14:19: no function declaration or call at position
+-- exit --
+2

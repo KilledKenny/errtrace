@@ -1,0 +1,13 @@
+Unreachable Target that is the only place instantiating Carrier as a
+core.Driver. Expected: the warning on stderr and drivers.ErrCarrier (the
+Target is added as a root, so Carrier becomes a Candidate here).
+-- args --
+dispatch/legacy.go:@debugcarrier
+-- stdout --
+$WORK/dispatch/legacy.go:18:23-35: Error Set of example.com/plugins/dispatch.debugCarrier: 1 entries
+$WORK/drivers/extra.go:12:2-12: sentinel example.com/plugins/drivers.ErrCarrier
+	path (origin → target):
+		$WORK/drivers/extra.go:22:50-60: in (example.com/plugins/drivers.Carrier).Send
+		$WORK/dispatch/legacy.go:20:9-18: in example.com/plugins/dispatch.debugCarrier, call to (example.com/plugins/drivers.Carrier).Send (dynamic (example.com/plugins/core.Driver).Send: 1 of 1 candidates)
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates

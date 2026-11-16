@@ -1,0 +1,18 @@
+SUSPECTED BUG: errOdd is reported (via labelOdd$1, "2 of 2 candidates"): the callback Candidates of the shared instance
+Map[int,string] are not narrowed to the closure passed at this call site (same without the function value, and for
+non-generic callees: narrowing at substitution does not happen for a literal closure argument).
+Call through a generic function value conv := seq.Map[int, string].
+Expect only concrete *TypedErr[int] from this call's closure; errOdd, returned by the other user of
+Map[int,string] (labelOdd), must not appear.
+-- args --
+pipeline.go:@funcval
+-- stdout --
+$WORK/pipeline.go:58:21-63:4: Error Set of call to conv in example.com/generics.stringify: 2 entries
+$WORK/pipeline.go:13:5-11: sentinel example.com/generics.errOdd
+	path (origin → target):
+		$WORK/pipeline.go:70:15-21: in example.com/generics.labelOdd$1
+		$WORK/pipeline.go:58:21-63:4: in example.com/generics.stringify, call to example.com/generics.labelOdd$1 (dynamic function value f: 2 of 2 candidates)
+$WORK/pipeline.go:60:15-59: concrete *example.com/generics/errs.TypedErr[int]
+	path (origin → target):
+		$WORK/pipeline.go:60:15-59: in example.com/generics.stringify$1
+		$WORK/pipeline.go:58:21-63:4: in example.com/generics.stringify, call to example.com/generics.stringify$1 (dynamic function value f: 2 of 2 candidates)

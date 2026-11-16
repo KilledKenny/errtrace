@@ -1,0 +1,18 @@
+Wraps the engine error with %w.
+Expect: engine.ErrClosed and kverr.ErrNotFound, each only with the chain fmt.Errorf "repo: load %s: %w".
+-- args --
+repo/repo.go:@load
+-- stdout --
+$WORK/repo/repo.go:45:25-29: Error Set of (*example.com/kvstore/repo.Repo).Load: 2 entries
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:48:15-56: fmt.Errorf "repo: load %s: %w"
+	path (origin → target):
+		$WORK/engine/engine.go:68:15-24: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:46:12-47: in (*example.com/kvstore/repo.Repo).Load, call to (*example.com/kvstore/engine.Engine).Get
+$WORK/kverr/kverr.go:10:5-16: sentinel example.com/kvstore/kverr.ErrNotFound
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:48:15-56: fmt.Errorf "repo: load %s: %w"
+	path (origin → target):
+		$WORK/engine/engine.go:72:15-32: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:46:12-47: in (*example.com/kvstore/repo.Repo).Load, call to (*example.com/kvstore/engine.Engine).Get

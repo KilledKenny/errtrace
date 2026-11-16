@@ -1,0 +1,10 @@
+Same interface call, but only cmd/report (mem Backend) is loaded with -p.
+Expected: 1 entry store.ErrNotFound; disk.ErrNoEntry must NOT appear (package disk is not loaded).
+-- args --
+-p ./cmd/report internal/store/store.go:@iface_call
+-- stdout --
+$WORK/internal/store/store.go:49:14-43: Error Set of call to s.be.Read in (*example.com/targets/internal/store.Store).Get: 1 entries
+$WORK/internal/store/store.go:11:2-13: sentinel example.com/targets/internal/store.ErrNotFound
+	path (origin → target):
+		$WORK/internal/store/store.go:111:15-26: in (*example.com/targets/internal/store.mem).Read
+		$WORK/internal/store/store.go:49:14-43: in (*example.com/targets/internal/store.Store).Get, call to (*example.com/targets/internal/store.mem).Read (dynamic (example.com/targets/internal/store.Backend).Read: 1 of 1 candidates)

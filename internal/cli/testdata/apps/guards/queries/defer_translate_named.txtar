@@ -1,0 +1,15 @@
+SUSPECTED BUG: as defer_clear_named. The deferred closure replaces err == ErrTimeout by
+fmt.Errorf("settle: %w", ErrInternal).
+Expected 5 entries: ErrInternal with the "settle: %w" chain, ErrDeclined, *CodeError, ValidationError, opaque;
+no bare ErrTimeout. Actual: 2 unresolved(memory) entries (one without a position), no origins - not even the
+ErrInternal that the closure itself stores.
+-- args --
+processor/flow.go:@deferTranslate
+-- stdout --
+$WORK/processor/flow.go:24:25-48: Error Set of example.com/guards/processor.SettleDeferredTranslate: 2 entries, 2 unresolved
+-: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		-: in example.com/guards/processor.SettleDeferredTranslate
+$WORK/processor/flow.go:31:2-2: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/processor/flow.go:31:2-2: in example.com/guards/processor.SettleDeferredTranslate

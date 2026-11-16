@@ -1,0 +1,10 @@
+Call-site target in a defer statement: defer s.Close().
+Expected: 1 entry, store.ErrClosed.
+-- args --
+cmd/ingest/main.go:@defer_call
+-- stdout --
+$WORK/cmd/ingest/main.go:49:8-32: Error Set of call to s.Close in example.com/targets/cmd/ingest.run: 1 entries
+$WORK/internal/store/store.go:12:2-11: sentinel example.com/targets/internal/store.ErrClosed
+	path (origin → target):
+		$WORK/internal/store/store.go:70:10-19: in (*example.com/targets/internal/store.Store).Close
+		$WORK/cmd/ingest/main.go:49:8-32: in example.com/targets/cmd/ingest.run, call to (*example.com/targets/internal/store.Store).Close

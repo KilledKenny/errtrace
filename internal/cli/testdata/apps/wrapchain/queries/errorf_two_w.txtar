@@ -1,0 +1,26 @@
+Two %w in one format, one a sentinel, one a *strconv.NumError built by the local
+digits helper. Expected 3 entries with the same fmt.Errorf wrap line: doc.ErrSyntax
+[fmt.Errorf], strconv.ErrSyntax and strconv.ErrRange [*strconv.NumError.Unwrap, fmt.Errorf].
+-- args --
+parse/parse.go:@field
+-- stdout --
+$WORK/parse/parse.go:56:16-21: Error Set of example.com/wrapchain/parse.Field: 3 entries
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrRange
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:43:13-77: *strconv.NumError.Unwrap
+		$WORK/parse/parse.go:59:13-69: fmt.Errorf "%w: field %s: %w"
+	path (origin → target):
+		$WORK/parse/parse.go:43:60-76: in example.com/wrapchain/parse.digits
+		$WORK/parse/parse.go:57:12-23: in example.com/wrapchain/parse.Field, call to example.com/wrapchain/parse.digits
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrSyntax
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:48:14-79: *strconv.NumError.Unwrap
+		$WORK/parse/parse.go:59:13-69: fmt.Errorf "%w: field %s: %w"
+	path (origin → target):
+		$WORK/parse/parse.go:48:61-78: in example.com/wrapchain/parse.digits
+		$WORK/parse/parse.go:57:12-23: in example.com/wrapchain/parse.Field, call to example.com/wrapchain/parse.digits
+$WORK/doc/doc.go:18:2-11: sentinel example.com/wrapchain/doc.ErrSyntax
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:59:13-69: fmt.Errorf "%w: field %s: %w"
+	path (origin → target):
+		$WORK/parse/parse.go:59:44-57: in example.com/wrapchain/parse.Field

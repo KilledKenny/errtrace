@@ -1,0 +1,10 @@
+Declaration Target of a helper that forwards format and args to fmt.Errorf.
+Expected: no concrete origin; an Unresolved entry (dynamic-format or
+depends-on-caller) because both the format and the operands come from the caller.
+-- args --
+xerr/helpers.go:@annotatef
+-- stdout --
+$WORK/xerr/helpers.go:7:20-29: Error Set of example.com/wrapchain/xerr.Annotatef: 1 entries, 1 unresolved
+$WORK/xerr/helpers.go:8:9-36: unresolved(dynamic-format): format of fmt.Errorf comes from parameter format of example.com/wrapchain/xerr.Annotatef
+	path (origin → target):
+		$WORK/xerr/helpers.go:8:9-36: in example.com/wrapchain/xerr.Annotatef

@@ -1,0 +1,7 @@
+Named results with a bare return; the aliased sentinel is compared with == and replaced by nil.
+Drain can only return io.EOF (via engine.ErrEOF), which the guard `err == engine.ErrEOF` clears.
+Expect: 0 entries.
+-- args --
+repo/repo.go:@tail
+-- stdout --
+$WORK/repo/repo.go:152:25-29: Error Set of (*example.com/kvstore/repo.Repo).Tail: 0 entries

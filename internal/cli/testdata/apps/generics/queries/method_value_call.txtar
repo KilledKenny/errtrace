@@ -1,0 +1,10 @@
+Call through a bound method value get := c.Get of *Cache[UserID,Name].
+Expect one entry, ErrNotFound.
+-- args --
+caching.go:@methodval
+-- stdout --
+$WORK/caching.go:52:23-30: Error Set of call to get in example.com/generics.nameOf: 1 entries
+$WORK/errs/errs.go:12:2-13: sentinel example.com/generics/errs.ErrNotFound
+	path (origin → target):
+		$WORK/cache/cache.go:33:16-32: in (*example.com/generics/cache.Cache[example.com/generics/validate.UserID, example.com/generics/validate.Name]).Get
+		$WORK/caching.go:52:23-30: in example.com/generics.nameOf, call to (*example.com/generics/cache.Cache[example.com/generics/validate.UserID, example.com/generics/validate.Name]).Get

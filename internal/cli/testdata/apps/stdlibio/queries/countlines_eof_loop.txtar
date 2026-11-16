@@ -1,0 +1,20 @@
+The io.EOF loop idiom: "if err == io.EOF { break }" then "return n, nil"; other
+errors are wrapped with "source: line %d: %w". A sentinel io.EOF must NOT be in the
+set. What remains is bufio's Unresolved(memory) field load under the fmt.Errorf
+wrap, marked "possibly handled" by the comparison with io.EOF (unresolved value).
+-- args --
+source/source.go:@countlines
+-- stdout --
+$WORK/source/source.go:164:21-31: Error Set of example.com/stdlibio/source.CountLines: 1 entries, 1 unresolved, 1 possibly handled
+$GOROOT/src/bufio/bufio.go:*: unresolved(memory): load of field err of *bufio.Reader
+	wrap chain (origin → target):
+		$WORK/source/source.go:173:14-57: fmt.Errorf "source: line %d: %w"
+	possibly handled:
+		$GOROOT/src/bufio/bufio.go:*: comparison with bufio.ErrBufferFull: unresolved value
+		$WORK/source/source.go:169:6-19: comparison with io.EOF: unresolved value
+	path (origin → target):
+		$GOROOT/src/bufio/bufio.go:*: in (*bufio.Reader).readErr
+		$GOROOT/src/bufio/bufio.go:*: in (*bufio.Reader).ReadSlice, call to (*bufio.Reader).readErr
+		$GOROOT/src/bufio/bufio.go:*: in (*bufio.Reader).collectFragments, call to (*bufio.Reader).ReadSlice
+		$GOROOT/src/bufio/bufio.go:*: in (*bufio.Reader).ReadString, call to (*bufio.Reader).collectFragments
+		$WORK/source/source.go:168:13-32: in example.com/stdlibio/source.CountLines, call to (*bufio.Reader).ReadString

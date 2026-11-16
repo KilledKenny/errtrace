@@ -1,0 +1,25 @@
+SUSPECTED BUG: Slurp has a named result err that a deferred closure
+overwrites with fmt.Errorf("source: close: %w", cerr). Expected: os.Open origins under
+"source: open: %w", io.ReadAll/(*os.File).Read origins under "source: read: %w", sentinel
+source.ErrEmpty, and the (*os.File).Close origins under "source: close: %w" (plan S08).
+Actual: none of these origins or wraps; only Unresolved(memory) "load of escaping
+variable err" entries, one of them with the placeholder span "-" instead of a site.
+-- args --
+source/source.go:@slurp
+-- stdout --
+$WORK/source/source.go:100:16-21: Error Set of example.com/stdlibio/source.Slurp: 5 entries, 5 unresolved
+-: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		-: in example.com/stdlibio/source.Slurp
+$WORK/source/source.go:103:3-3: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/source/source.go:103:3-3: in example.com/stdlibio/source.Slurp
+$WORK/source/source.go:112:3-3: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/source/source.go:112:3-3: in example.com/stdlibio/source.Slurp
+$WORK/source/source.go:115:3-3: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/source/source.go:115:3-3: in example.com/stdlibio/source.Slurp
+$WORK/source/source.go:117:2-2: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/source/source.go:117:2-2: in example.com/stdlibio/source.Slurp

@@ -1,0 +1,9 @@
+Position on Ping in the method value "ping := s.Ping" (no call).
+Negative: exit 2, "no function declaration or call at position", empty stdout.
+-- args --
+cmd/ingest/main.go:@mval
+-- stdout --
+-- stderr --
+errtrace: $WORK/cmd/ingest/main.go:61:21: no function declaration or call at position
+-- exit --
+2

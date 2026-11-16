@@ -1,0 +1,15 @@
+Call-site Target on the dynamic call opt(d) of a range variable.
+Expected: ErrBadLimit and opaque "dispatch: empty name" without the
+"dispatch.New: %w" wrap (the wrap happens after the call); no ErrNoCert.
+-- args --
+dispatch/dispatch.go:@opt_call
+-- stdout --
+$WORK/dispatch/dispatch.go:82:26-32: Error Set of call to opt in example.com/plugins/dispatch.New: 2 entries
+$WORK/dispatch/dispatch.go:14:2-13: sentinel example.com/plugins/dispatch.ErrBadLimit
+	path (origin → target):
+		$WORK/dispatch/dispatch.go:44:11-22: in example.com/plugins/dispatch.WithLimit$1
+		$WORK/dispatch/dispatch.go:82:26-32: in example.com/plugins/dispatch.New, call to example.com/plugins/dispatch.WithLimit$1 (dynamic function value of type example.com/plugins/dispatch.Option: 3 of 3 candidates)
+$WORK/dispatch/dispatch.go:54:11-45: opaque errors.New "dispatch: empty name"
+	path (origin → target):
+		$WORK/dispatch/dispatch.go:54:11-45: in example.com/plugins/dispatch.WithName$1
+		$WORK/dispatch/dispatch.go:82:26-32: in example.com/plugins/dispatch.New, call to example.com/plugins/dispatch.WithName$1 (dynamic function value of type example.com/plugins/dispatch.Option: 3 of 3 candidates)

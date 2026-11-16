@@ -1,0 +1,17 @@
+SUSPECTED BUG: the concrete drivers.Status entry has the zero-width span
+89:3-3 (the return keyword) instead of the expression that builds it,
+Status(503) at 89:26-37. Otherwise as expected.
+-fanout=1 on a Target without any dynamic call: nothing to group.
+Gateway.Send returns Status(503) (a type that is both fmt.Stringer and
+error) and the sentinel ErrBusy (declared as error, holding a Status).
+Expected: concrete drivers.Status and sentinel drivers.ErrBusy, ungrouped.
+-- args --
+-fanout=1 drivers/extra.go:@gw_send
+-- stdout --
+$WORK/drivers/extra.go:87:30-34: Error Set of (example.com/plugins/drivers.Gateway).Send: 2 entries
+$WORK/drivers/extra.go:82:5-12: sentinel example.com/plugins/drivers.ErrBusy
+	path (origin → target):
+		$WORK/drivers/extra.go:92:10-17: in (example.com/plugins/drivers.Gateway).Send
+$WORK/drivers/extra.go:89:3-3: concrete example.com/plugins/drivers.Status
+	path (origin → target):
+		$WORK/drivers/extra.go:89:3-3: in (example.com/plugins/drivers.Gateway).Send

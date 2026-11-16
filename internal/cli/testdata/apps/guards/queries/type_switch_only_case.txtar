@@ -1,0 +1,11 @@
+Type switch that returns err only in case *CodeError; everything else becomes nil.
+Expect exactly 1 entry: the bare *CodeError (code 500). The *CodeError inside *OpError (top-level type
+*OpError) and ErrDeclined must NOT appear.
+-- args --
+processor/as.go:@typeSwitchOnly
+-- stdout --
+$WORK/processor/as.go:131:25-42: Error Set of example.com/guards/processor.CaptureTypeSwitch: 1 entries
+$WORK/gateway/gateway.go:73:10-51: concrete *example.com/guards/payerr.CodeError
+	path (origin → target):
+		$WORK/gateway/gateway.go:73:10-51: in example.com/guards/gateway.Capture
+		$WORK/processor/as.go:132:9-27: in example.com/guards/processor.CaptureTypeSwitch, call to example.com/guards/gateway.Capture

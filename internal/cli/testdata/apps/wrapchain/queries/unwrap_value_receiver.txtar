@@ -1,0 +1,11 @@
+Wrapper with value-receiver Unwrap, returned by value. Expected 1 entry:
+doc.ErrEmpty with the chain xerr.FieldError.Unwrap.
+-- args --
+transform/transform.go:@field
+-- stdout --
+$WORK/transform/transform.go:36:16-21: Error Set of example.com/wrapchain/transform.Field: 1 entries
+$WORK/doc/doc.go:17:2-10: sentinel example.com/wrapchain/doc.ErrEmpty
+	wrap chain (origin → target):
+		$WORK/transform/transform.go:38:10-59: example.com/wrapchain/xerr.FieldError.Unwrap
+	path (origin → target):
+		$WORK/transform/transform.go:38:46-58: in example.com/wrapchain/transform.Field

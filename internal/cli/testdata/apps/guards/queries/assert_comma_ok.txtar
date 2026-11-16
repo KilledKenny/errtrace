@@ -1,0 +1,22 @@
+if _, ok := err.(*CodeError); ok { return nil }; return err.
+Expect 4 entries: ErrDeclined, ErrTimeout, ValidationError, opaque. *CodeError must NOT appear.
+-- args --
+processor/as.go:@commaOk
+-- stdout --
+$WORK/processor/as.go:75:18-31: Error Set of example.com/guards/processor.ChargeCommaOk: 4 entries
+$WORK/payerr/payerr.go:8:2-13: sentinel example.com/guards/payerr.ErrDeclined
+	path (origin → target):
+		$WORK/gateway/gateway.go:18:10-28: in example.com/guards/gateway.Charge
+		$WORK/processor/as.go:76:9-26: in example.com/guards/processor.ChargeCommaOk, call to example.com/guards/gateway.Charge
+$WORK/payerr/payerr.go:9:2-12: sentinel example.com/guards/payerr.ErrTimeout
+	path (origin → target):
+		$WORK/gateway/gateway.go:20:10-27: in example.com/guards/gateway.Charge
+		$WORK/processor/as.go:76:9-26: in example.com/guards/processor.ChargeCommaOk, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:24:10-51: concrete example.com/guards/payerr.ValidationError
+	path (origin → target):
+		$WORK/gateway/gateway.go:24:10-51: in example.com/guards/gateway.Charge
+		$WORK/processor/as.go:76:9-26: in example.com/guards/processor.ChargeCommaOk, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:26:9-35: opaque errors.New "gateway down"
+	path (origin → target):
+		$WORK/gateway/gateway.go:26:9-35: in example.com/guards/gateway.Charge
+		$WORK/processor/as.go:76:9-26: in example.com/guards/processor.ChargeCommaOk, call to example.com/guards/gateway.Charge

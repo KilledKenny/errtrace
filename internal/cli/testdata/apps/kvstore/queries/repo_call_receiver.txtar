@@ -1,0 +1,9 @@
+Negative: position on the receiver expression (field eng) of a method call instead of the method name.
+A call-site Target must be on the callee name or its '('. Expect: exit 2, 'no function declaration or call at position'.
+-- args --
+repo/repo.go:@recv
+-- stdout --
+-- stderr --
+errtrace: $WORK/repo/repo.go:55:23: no function declaration or call at position
+-- exit --
+2

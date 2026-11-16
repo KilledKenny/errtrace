@@ -1,0 +1,11 @@
+Function returned from a function and called through a local variable;
+the closure has mutable captured state. Expected: dispatch.ErrRateLimited
+via closure Limit$1.
+-- args --
+dispatch/funcs.go:@limited
+-- stdout --
+$WORK/dispatch/funcs.go:66:18-25: Error Set of example.com/plugins/dispatch.Limited: 1 entries
+$WORK/dispatch/funcs.go:11:5-19: sentinel example.com/plugins/dispatch.ErrRateLimited
+	path (origin → target):
+		$WORK/dispatch/funcs.go:59:11-25: in example.com/plugins/dispatch.Limit$1
+		$WORK/dispatch/funcs.go:68:9-17: in example.com/plugins/dispatch.Limited, call to example.com/plugins/dispatch.Limit$1 (dynamic function value of type func(example.com/plugins/core.Event) error: 1 of 1 candidates)

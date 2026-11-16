@@ -1,0 +1,9 @@
+Negative: Target inside a non-Go (assembly) file of a package.
+Expect: exit 2 with a diagnostic; no crash.
+-- args --
+engine/stub.s:1:1
+-- stdout --
+-- stderr --
+errtrace: $WORK/engine/stub.s: file is not in any loaded package
+-- exit --
+2

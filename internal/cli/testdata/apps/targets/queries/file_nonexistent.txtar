@@ -1,0 +1,9 @@
+A Go file that does not exist, in an existing package directory.
+Negative: exit 2 with a message naming the missing file.
+-- args --
+internal/store/missing.go:3:1
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/store/missing.go: file is not in any loaded package
+-- exit --
+2

@@ -1,0 +1,9 @@
+Call site of a function declared without a body (body pushed by go:linkname from engine/internal/sys).
+Expect: 1 entry, unresolved(no-body). sys.errShortWrite is not expected: linkname is not followed.
+-- args --
+engine/engine.go:@fsync
+-- stdout --
+$WORK/engine/engine.go:111:19-34: Error Set of call to fsync in (*example.com/kvstore/engine.Engine).Put: 1 entries, 1 unresolved
+$WORK/engine/engine.go:111:19-34: unresolved(no-body): example.com/kvstore/engine.fsync has no body
+	path (origin → target):
+		$WORK/engine/engine.go:111:19-34: in (*example.com/kvstore/engine.Engine).Put

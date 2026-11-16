@@ -1,0 +1,9 @@
+Declaration target on disk.Validate, whose only result is the concrete type *DiskError.
+Expected: accepted as an error result; 1 entry, concrete type *disk.DiskError from the composite literal. No sentinel.
+-- args --
+internal/store/disk/disk.go:@validate
+-- stdout --
+$WORK/internal/store/disk/disk.go:21:19-27: Error Set of example.com/targets/internal/store/disk.Validate: 1 entries
+$WORK/internal/store/disk/disk.go:23:10-48: concrete *example.com/targets/internal/store/disk.DiskError
+	path (origin → target):
+		$WORK/internal/store/disk/disk.go:23:10-48: in example.com/targets/internal/store/disk.Validate

@@ -1,0 +1,13 @@
+Declaration of Lift[E error]: its only error is the parameter e (instances Lift[*TypedErr[int]] and Lift[error]).
+Expect a concrete *TypedErr[int] at the E-to-error conversion and unresolved(depends-on-caller) for parameter e of
+Lift[error]; never an empty set.
+-- args --
+errs/errs.go:@lift
+-- stdout --
+$WORK/errs/errs.go:66:15-19: Error Set of example.com/generics/errs.Lift: 2 entries, 1 unresolved
+$WORK/errs/errs.go:66:49-50: concrete *example.com/generics/errs.TypedErr[int]
+	path (origin → target):
+		$WORK/errs/errs.go:66:49-50: in example.com/generics/errs.Lift[*example.com/generics/errs.TypedErr[int]]
+$WORK/errs/errs.go:66:49-50: unresolved(depends-on-caller): parameter e (error)
+	path (origin → target):
+		$WORK/errs/errs.go:66:49-50: in example.com/generics/errs.Lift[error]

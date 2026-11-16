@@ -1,0 +1,14 @@
+8 Candidates, 7 entries, -fanout=7. Expected: one group of 7 entries whose
+header says 8 candidates.
+-- args --
+-fanout=7 dispatch/fanout.go:@quiet
+-- stdout --
+$WORK/dispatch/fanout.go:25:16-25: Error Set of example.com/plugins/dispatch.SendQuiet: 7 entries
+$WORK/dispatch/fanout.go:25:70-79: group of 7 entries via dynamic call to (example.com/plugins/core.Driver).Send (8 candidates) in example.com/plugins/dispatch.SendQuiet
+	$WORK/drivers/drivers.go:13:2-10: sentinel example.com/plugins/drivers.ErrEmail (candidate (example.com/plugins/drivers.Email).Send)
+	$WORK/drivers/drivers.go:14:2-8: sentinel example.com/plugins/drivers.ErrSMS (candidate (*example.com/plugins/drivers.SMS).Send)
+	$WORK/drivers/drivers.go:15:2-10: sentinel example.com/plugins/drivers.ErrSlack (candidate (example.com/plugins/drivers.Slack).Send)
+	$WORK/drivers/drivers.go:16:2-10: sentinel example.com/plugins/drivers.ErrPager (candidate (example.com/plugins/drivers.Pager).Send)
+	$WORK/drivers/drivers.go:17:2-9: sentinel example.com/plugins/drivers.ErrFile (candidate (example.com/plugins/drivers.File).Send)
+	$WORK/drivers/drivers.go:62:10-31: concrete *example.com/plugins/drivers.HTTPError (candidate (*example.com/plugins/drivers.Webhook).Send)
+	$WORK/drivers/drivers.go:72:10-47: opaque errors.New "push: negative priority" (candidate (example.com/plugins/drivers.Push).Send)

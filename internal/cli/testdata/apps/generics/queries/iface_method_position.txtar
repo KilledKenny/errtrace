@@ -1,0 +1,9 @@
+Negative: the position is on the method of the constraint interface Validator, which has no body.
+Expect exit 2 (not a function declaration or call).
+-- args --
+validate/validate.go:@ifacemethod
+-- stdout --
+-- stderr --
+errtrace: $WORK/validate/validate.go:14:18: interface method has no body; query a call site
+-- exit --
+2

@@ -1,0 +1,13 @@
+SUSPECTED BUG: Root returns the package variable rootErr, which is nil
+at init and assigned at run time inside a sync.Once callback (ErrNoRoot, or
+filepath.Abs's error). It is not a Sentinel in the glossary sense. Expected: an
+Unresolved(memory) for the global load, or the entry marked "[mutable global: assigned
+at ...]" (plan S10), so the reader knows walk.ErrNoRoot / os.Getwd errors are hidden.
+Actual: a plain "sentinel example.com/stdlibio/walk.rootErr" with no mark.
+-- args --
+walk/walk.go:@root
+-- stdout --
+$WORK/walk/walk.go:64:15-19: Error Set of example.com/stdlibio/walk.Root: 1 entries
+$WORK/walk/walk.go:59:2-9: sentinel example.com/stdlibio/walk.rootErr
+	path (origin → target):
+		$WORK/walk/walk.go:72:18-25: in example.com/stdlibio/walk.Root

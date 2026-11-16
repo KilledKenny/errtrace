@@ -1,0 +1,10 @@
+Dynamic call with NO Candidates: core.Auditor has no implementation and
+the field is never set. Expected: a single unresolved(no-candidates) entry
+(the nil return adds nothing).
+-- args --
+dispatch/dispatch.go:@audit
+-- stdout --
+$WORK/dispatch/dispatch.go:120:32-37: Error Set of (*example.com/plugins/dispatch.Dispatcher).Audit: 1 entries, 1 unresolved
+$WORK/dispatch/dispatch.go:124:9-27: unresolved(no-candidates): dynamic call to (example.com/plugins/core.Auditor).Audit
+	path (origin → target):
+		$WORK/dispatch/dispatch.go:124:9-27: in (*example.com/plugins/dispatch.Dispatcher).Audit

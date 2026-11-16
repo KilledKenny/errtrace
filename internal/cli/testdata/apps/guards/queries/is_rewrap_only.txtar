@@ -1,0 +1,13 @@
+Only errors matching Is(ErrTimeout) are returned, re-wrapped; everything else becomes nil.
+Expect exactly 1 entry: ErrTimeout with chain (*OpError).Unwrap then fmt.Errorf "fatal: %w".
+-- args --
+processor/is.go:@rewrap
+-- stdout --
+$WORK/processor/is.go:106:17-29: Error Set of example.com/guards/processor.LookupRewrap: 1 entries
+$WORK/payerr/payerr.go:9:2-12: sentinel example.com/guards/payerr.ErrTimeout
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:38:10-63: *example.com/guards/payerr.OpError.Unwrap
+		$WORK/processor/is.go:109:10-38: fmt.Errorf "fatal: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:38:45-62: in example.com/guards/gateway.Lookup
+		$WORK/processor/is.go:107:9-26: in example.com/guards/processor.LookupRewrap, call to example.com/guards/gateway.Lookup

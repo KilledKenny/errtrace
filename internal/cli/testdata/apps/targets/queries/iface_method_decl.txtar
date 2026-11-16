@@ -1,0 +1,9 @@
+Position on the method name Read inside the Backend interface type.
+Negative: exit 2, "interface method has no body; query a call site".
+-- args --
+internal/store/store.go:@iface_read
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/store/store.go:18:17: interface method has no body; query a call site
+-- exit --
+2

@@ -1,0 +1,9 @@
+Declaration target on (Store).Hits, which returns int.
+Negative: exit 2, "... has no error result".
+-- args --
+internal/store/store.go:@hits
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/store/store.go:57:25: (example.com/targets/internal/store.Store).Hits has no error result
+-- exit --
+2

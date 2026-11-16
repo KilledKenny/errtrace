@@ -1,0 +1,6 @@
+The default-build flush only returns nil: the header with "0 entries" and nothing
+else, exit 0. (Reachable from main through source.Save, so no warning.)
+-- args --
+source/flush_default.go:@flush
+-- stdout --
+$WORK/source/flush_default.go:8:16-21: Error Set of example.com/stdlibio/source.flush: 0 entries

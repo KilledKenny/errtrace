@@ -1,0 +1,19 @@
+SUSPECTED BUG (low/medium confidence): one sentinel value is listed twice under two names.
+repo.ErrNotFound is `var ErrNotFound = kverr.ErrNotFound`; Has returns the alias on one path and Engine.Get's kverr.ErrNotFound on the other.
+Expected 2 entries: engine.ErrClosed and ONE not-found entry (kverr.ErrNotFound, possibly 'via repo.ErrNotFound'). Actual: 3 entries, repo.ErrNotFound and kverr.ErrNotFound as unrelated sentinels
+(although guards do treat them as one value, see api_hfind_decl).
+-- args --
+repo/repo.go:@has
+-- stdout --
+$WORK/repo/repo.go:137:24-27: Error Set of (*example.com/kvstore/repo.Repo).Has: 3 entries
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	path (origin → target):
+		$WORK/engine/engine.go:68:15-24: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:141:12-34: in (*example.com/kvstore/repo.Repo).Has, call to (*example.com/kvstore/engine.Engine).Get
+$WORK/kverr/kverr.go:10:5-16: sentinel example.com/kvstore/kverr.ErrNotFound
+	path (origin → target):
+		$WORK/engine/engine.go:72:15-32: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:141:12-34: in (*example.com/kvstore/repo.Repo).Has, call to (*example.com/kvstore/engine.Engine).Get
+$WORK/repo/repo.go:13:5-16: sentinel example.com/kvstore/repo.ErrNotFound
+	path (origin → target):
+		$WORK/repo/repo.go:139:10-21: in (*example.com/kvstore/repo.Repo).Has

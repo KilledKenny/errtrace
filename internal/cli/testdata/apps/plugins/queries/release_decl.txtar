@@ -1,0 +1,11 @@
+Interface-to-interface type assertion d.(io.Closer) narrows the
+Candidates: Release is given an Email (no Close method) and a *Conn.
+Expected: only drivers.ErrConnClosed, 1 of 1 candidates; no ErrSpoolBusy.
+-- args --
+dispatch/dispatch.go:@release
+-- stdout --
+$WORK/dispatch/dispatch.go:238:18-25: Error Set of example.com/plugins/dispatch.Release: 1 entries
+$WORK/drivers/extra.go:16:2-15: sentinel example.com/plugins/drivers.ErrConnClosed
+	path (origin → target):
+		$WORK/drivers/extra.go:69:10-23: in (*example.com/plugins/drivers.Conn).Close
+		$WORK/dispatch/dispatch.go:240:10-19: in example.com/plugins/dispatch.Release, call to (*example.com/plugins/drivers.Conn).Close (dynamic (io.Closer).Close: 1 of 1 candidates)

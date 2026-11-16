@@ -1,0 +1,9 @@
+Offset equal to the file size (EOF, one past the final newline).
+Negative: accepted as a position, but no target; must not crash.
+-- args --
+internal/platform/platform.go:#180
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/platform/platform.go:8:3: no function declaration or call at position
+-- exit --
+2

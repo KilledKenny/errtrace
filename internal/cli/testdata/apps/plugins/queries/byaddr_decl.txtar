@@ -1,0 +1,11 @@
+Capture by address: collect(&last, d, e) stores the error of a dynamic
+call through the pointer. Under Go semantics the set is drivers.ErrFile.
+By design (e2e dynamic/freevar_addr_passed) a variable whose address is
+passed on is unresolved(memory): expected exactly that one entry.
+-- args --
+dispatch/funcs.go:@byaddr
+-- stdout --
+$WORK/dispatch/funcs.go:47:17-23: Error Set of example.com/plugins/dispatch.ByAddr: 1 entries, 1 unresolved
+$WORK/dispatch/funcs.go:50:9-13: unresolved(memory): load of escaping variable last
+	path (origin → target):
+		$WORK/dispatch/funcs.go:50:9-13: in example.com/plugins/dispatch.ByAddr

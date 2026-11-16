@@ -1,0 +1,34 @@
+Call site in a function with a deferred wrapper: the call-site Error Set is that of the call, not of the function.
+Expect Store's 4 entries under *kverr.OpError.Unwrap, WITHOUT the deferred "put %s: %w" wrap.
+-- args --
+service/service.go:@store_call
+-- stdout --
+$WORK/service/service.go:77:9-54: Error Set of call to s.repo.Store in (*example.com/kvstore/service.Service).Put: 4 entries, 1 unresolved
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:56:10-57: *example.com/kvstore/kverr.OpError.Unwrap
+	path (origin → target):
+		$WORK/engine/engine.go:101:10-19: in (*example.com/kvstore/engine.Engine).Put
+		$WORK/repo/repo.go:55:12-48: in (*example.com/kvstore/repo.Repo).Store, call to (*example.com/kvstore/engine.Engine).Put
+		$WORK/service/service.go:77:9-54: in (*example.com/kvstore/service.Service).Put, call to (*example.com/kvstore/repo.Repo).Store
+$WORK/kverr/kverr.go:33:5-13: sentinel example.com/kvstore/kverr.ErrQuota
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:56:10-57: *example.com/kvstore/kverr.OpError.Unwrap
+	path (origin → target):
+		$WORK/engine/engine.go:107:10-24: in (*example.com/kvstore/engine.Engine).Put
+		$WORK/repo/repo.go:55:12-48: in (*example.com/kvstore/repo.Repo).Store, call to (*example.com/kvstore/engine.Engine).Put
+		$WORK/service/service.go:77:9-54: in (*example.com/kvstore/service.Service).Put, call to (*example.com/kvstore/repo.Repo).Store
+$WORK/engine/engine.go:104:3-3: concrete example.com/kvstore/kverr.Code
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:56:10-57: *example.com/kvstore/kverr.OpError.Unwrap
+	path (origin → target):
+		$WORK/engine/engine.go:104:3-3: in (*example.com/kvstore/engine.Engine).Put
+		$WORK/repo/repo.go:55:12-48: in (*example.com/kvstore/repo.Repo).Store, call to (*example.com/kvstore/engine.Engine).Put
+		$WORK/service/service.go:77:9-54: in (*example.com/kvstore/service.Service).Put, call to (*example.com/kvstore/repo.Repo).Store
+$WORK/engine/engine.go:111:19-34: unresolved(no-body): example.com/kvstore/engine.fsync has no body
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:56:10-57: *example.com/kvstore/kverr.OpError.Unwrap
+	path (origin → target):
+		$WORK/engine/engine.go:111:19-34: in (*example.com/kvstore/engine.Engine).Put
+		$WORK/repo/repo.go:55:12-48: in (*example.com/kvstore/repo.Repo).Store, call to (*example.com/kvstore/engine.Engine).Put
+		$WORK/service/service.go:77:9-54: in (*example.com/kvstore/service.Service).Put, call to (*example.com/kvstore/repo.Repo).Store

@@ -1,0 +1,86 @@
+Composite pattern: (*Group).Handle calls m.Handle on members that are
+Leafs or Groups (recursion through the interface). Expected: ErrFile and
+ErrQueue, each with wrap chains of "%s: %w" of length 1, 2, 3 and a
+truncated one; nothing else.
+-- args --
+-chain-depth=3 tree/tree.go:@group_handle
+-- stdout --
+$WORK/tree/tree.go:28:34-40: Error Set of (*example.com/plugins/tree.Group).Handle: 8 entries
+$WORK/drivers/drivers.go:17:2-9: sentinel example.com/plugins/drivers.ErrFile
+	wrap chain (origin → target):
+		$WORK/tree/tree.go:31:11-45: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/drivers/drivers.go:92:10-17: in (example.com/plugins/drivers.File).Send
+		$WORK/tree/tree.go:13:67-83: in (example.com/plugins/tree.Leaf).Handle, call to (example.com/plugins/drivers.File).Send (dynamic (example.com/plugins/core.Driver).Send: 2 of 2 candidates)
+		$WORK/tree/tree.go:30:13-24: in (*example.com/plugins/tree.Group).Handle, call to (example.com/plugins/tree.Leaf).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+$WORK/drivers/drivers.go:17:2-9: sentinel example.com/plugins/drivers.ErrFile
+	wrap chain (origin → target):
+		$WORK/tree/tree.go:31:11-45: fmt.Errorf "%s: %w"
+		$WORK/tree/tree.go:31:11-45: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/drivers/drivers.go:92:10-17: in (example.com/plugins/drivers.File).Send
+		$WORK/tree/tree.go:13:67-83: in (example.com/plugins/tree.Leaf).Handle, call to (example.com/plugins/drivers.File).Send (dynamic (example.com/plugins/core.Driver).Send: 2 of 2 candidates)
+		$WORK/tree/tree.go:30:13-24: in (*example.com/plugins/tree.Group).Handle, call to (example.com/plugins/tree.Leaf).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/tree/tree.go:30:13-24: in (*example.com/plugins/tree.Group).Handle, call to (*example.com/plugins/tree.Group).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+$WORK/drivers/drivers.go:17:2-9: sentinel example.com/plugins/drivers.ErrFile
+	wrap chain (origin → target):
+		$WORK/tree/tree.go:31:11-45: fmt.Errorf "%s: %w"
+		$WORK/tree/tree.go:31:11-45: fmt.Errorf "%s: %w"
+		$WORK/tree/tree.go:31:11-45: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/drivers/drivers.go:92:10-17: in (example.com/plugins/drivers.File).Send
+		$WORK/tree/tree.go:13:67-83: in (example.com/plugins/tree.Leaf).Handle, call to (example.com/plugins/drivers.File).Send (dynamic (example.com/plugins/core.Driver).Send: 2 of 2 candidates)
+		$WORK/tree/tree.go:30:13-24: in (*example.com/plugins/tree.Group).Handle, call to (example.com/plugins/tree.Leaf).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/tree/tree.go:30:13-24: in (*example.com/plugins/tree.Group).Handle, call to (*example.com/plugins/tree.Group).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/tree/tree.go:30:13-24: in (*example.com/plugins/tree.Group).Handle, call to (*example.com/plugins/tree.Group).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+$WORK/drivers/drivers.go:17:2-9: sentinel example.com/plugins/drivers.ErrFile [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/tree/tree.go:31:11-45: fmt.Errorf "%s: %w"
+		$WORK/tree/tree.go:31:11-45: fmt.Errorf "%s: %w"
+		$WORK/tree/tree.go:31:11-45: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/drivers/drivers.go:92:10-17: in (example.com/plugins/drivers.File).Send
+		$WORK/tree/tree.go:13:67-83: in (example.com/plugins/tree.Leaf).Handle, call to (example.com/plugins/drivers.File).Send (dynamic (example.com/plugins/core.Driver).Send: 2 of 2 candidates)
+		$WORK/tree/tree.go:30:13-24: in (*example.com/plugins/tree.Group).Handle, call to (example.com/plugins/tree.Leaf).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/tree/tree.go:30:13-24: in (*example.com/plugins/tree.Group).Handle, call to (*example.com/plugins/tree.Group).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/tree/tree.go:30:13-24: in (*example.com/plugins/tree.Group).Handle, call to (*example.com/plugins/tree.Group).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/tree/tree.go:30:13-24: in (*example.com/plugins/tree.Group).Handle, call to (*example.com/plugins/tree.Group).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+$WORK/drivers/drivers.go:18:2-10: sentinel example.com/plugins/drivers.ErrQueue
+	wrap chain (origin → target):
+		$WORK/tree/tree.go:31:11-45: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/drivers/drivers.go:102:10-18: in (example.com/plugins/drivers.Queue).Send
+		$WORK/tree/tree.go:13:67-83: in (example.com/plugins/tree.Leaf).Handle, call to (example.com/plugins/drivers.Queue).Send (dynamic (example.com/plugins/core.Driver).Send: 2 of 2 candidates)
+		$WORK/tree/tree.go:30:13-24: in (*example.com/plugins/tree.Group).Handle, call to (example.com/plugins/tree.Leaf).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+$WORK/drivers/drivers.go:18:2-10: sentinel example.com/plugins/drivers.ErrQueue
+	wrap chain (origin → target):
+		$WORK/tree/tree.go:31:11-45: fmt.Errorf "%s: %w"
+		$WORK/tree/tree.go:31:11-45: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/drivers/drivers.go:102:10-18: in (example.com/plugins/drivers.Queue).Send
+		$WORK/tree/tree.go:13:67-83: in (example.com/plugins/tree.Leaf).Handle, call to (example.com/plugins/drivers.Queue).Send (dynamic (example.com/plugins/core.Driver).Send: 2 of 2 candidates)
+		$WORK/tree/tree.go:30:13-24: in (*example.com/plugins/tree.Group).Handle, call to (example.com/plugins/tree.Leaf).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/tree/tree.go:30:13-24: in (*example.com/plugins/tree.Group).Handle, call to (*example.com/plugins/tree.Group).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+$WORK/drivers/drivers.go:18:2-10: sentinel example.com/plugins/drivers.ErrQueue
+	wrap chain (origin → target):
+		$WORK/tree/tree.go:31:11-45: fmt.Errorf "%s: %w"
+		$WORK/tree/tree.go:31:11-45: fmt.Errorf "%s: %w"
+		$WORK/tree/tree.go:31:11-45: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/drivers/drivers.go:102:10-18: in (example.com/plugins/drivers.Queue).Send
+		$WORK/tree/tree.go:13:67-83: in (example.com/plugins/tree.Leaf).Handle, call to (example.com/plugins/drivers.Queue).Send (dynamic (example.com/plugins/core.Driver).Send: 2 of 2 candidates)
+		$WORK/tree/tree.go:30:13-24: in (*example.com/plugins/tree.Group).Handle, call to (example.com/plugins/tree.Leaf).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/tree/tree.go:30:13-24: in (*example.com/plugins/tree.Group).Handle, call to (*example.com/plugins/tree.Group).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/tree/tree.go:30:13-24: in (*example.com/plugins/tree.Group).Handle, call to (*example.com/plugins/tree.Group).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+$WORK/drivers/drivers.go:18:2-10: sentinel example.com/plugins/drivers.ErrQueue [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/tree/tree.go:31:11-45: fmt.Errorf "%s: %w"
+		$WORK/tree/tree.go:31:11-45: fmt.Errorf "%s: %w"
+		$WORK/tree/tree.go:31:11-45: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/drivers/drivers.go:102:10-18: in (example.com/plugins/drivers.Queue).Send
+		$WORK/tree/tree.go:13:67-83: in (example.com/plugins/tree.Leaf).Handle, call to (example.com/plugins/drivers.Queue).Send (dynamic (example.com/plugins/core.Driver).Send: 2 of 2 candidates)
+		$WORK/tree/tree.go:30:13-24: in (*example.com/plugins/tree.Group).Handle, call to (example.com/plugins/tree.Leaf).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/tree/tree.go:30:13-24: in (*example.com/plugins/tree.Group).Handle, call to (*example.com/plugins/tree.Group).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/tree/tree.go:30:13-24: in (*example.com/plugins/tree.Group).Handle, call to (*example.com/plugins/tree.Group).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/tree/tree.go:30:13-24: in (*example.com/plugins/tree.Group).Handle, call to (*example.com/plugins/tree.Group).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)

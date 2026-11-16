@@ -1,0 +1,18 @@
+SUSPECTED BUG: expected core.ErrDropped (from flush) and
+dispatch.ErrSpoolBusy (assigned by the deferred closure from the dynamic
+d.closer.Close()). Actual: no Origin at all, only two unresolved(memory)
+"load of escaping variable err", one of them with the position-less span
+"-" (also in its path hop). Deferred changes are plan step S08 (not built
+yet), but ErrDropped is lost and "-" is not a usable span.
+Deferred closure making a dynamic call (io.Closer field, one local
+implementation) and assigning the named result.
+-- args --
+dispatch/dispatch.go:@close
+-- stdout --
+$WORK/dispatch/dispatch.go:159:32-37: Error Set of (*example.com/plugins/dispatch.Dispatcher).Close: 2 entries, 2 unresolved
+-: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		-: in (*example.com/plugins/dispatch.Dispatcher).Close
+$WORK/dispatch/dispatch.go:165:2-2: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/dispatch/dispatch.go:165:2-2: in (*example.com/plugins/dispatch.Dispatcher).Close

@@ -1,0 +1,7 @@
+Generic declaration with only its own package loaded: no main, so Decode has no instance at all.
+Expected: either an Error Set from the generic body (codec.ErrEmpty plus an Unresolved for the parse parameter) or a clear error saying there is no instantiation; never an empty "0 entries" set and never a crash.
+-- args --
+-p ./internal/codec internal/codec/codec.go:@decode
+-- stdout --
+$WORK/internal/codec/codec.go:29:17-23: Error Set of example.com/targets/internal/codec.Decode: 1 entries, 1 unresolved
+$WORK/internal/codec/codec.go:29:17-23: unresolved(no-instances): generic function example.com/targets/internal/codec.Decode has no instances in the loaded program

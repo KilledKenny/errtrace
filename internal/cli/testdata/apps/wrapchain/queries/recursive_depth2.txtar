@@ -1,0 +1,33 @@
+Recursive function wrapping its own result once per level. Expected:
+doc.ErrCycle bare, with 1 and with 2 "include %d: %w" links, plus a
+[chain truncated] entry; the run terminates.
+-- args --
+-chain-depth=2 transform/transform.go:@include
+-- stdout --
+$WORK/transform/transform.go:145:18-25: Error Set of example.com/wrapchain/transform.Include: 4 entries
+$WORK/doc/doc.go:21:2-10: sentinel example.com/wrapchain/doc.ErrCycle
+	path (origin → target):
+		$WORK/transform/transform.go:147:10-22: in example.com/wrapchain/transform.Include
+$WORK/doc/doc.go:21:2-10: sentinel example.com/wrapchain/doc.ErrCycle
+	wrap chain (origin → target):
+		$WORK/transform/transform.go:150:10-50: fmt.Errorf "include %d: %w"
+	path (origin → target):
+		$WORK/transform/transform.go:147:10-22: in example.com/wrapchain/transform.Include
+		$WORK/transform/transform.go:149:12-31: in example.com/wrapchain/transform.Include, call to example.com/wrapchain/transform.Include
+$WORK/doc/doc.go:21:2-10: sentinel example.com/wrapchain/doc.ErrCycle
+	wrap chain (origin → target):
+		$WORK/transform/transform.go:150:10-50: fmt.Errorf "include %d: %w"
+		$WORK/transform/transform.go:150:10-50: fmt.Errorf "include %d: %w"
+	path (origin → target):
+		$WORK/transform/transform.go:147:10-22: in example.com/wrapchain/transform.Include
+		$WORK/transform/transform.go:149:12-31: in example.com/wrapchain/transform.Include, call to example.com/wrapchain/transform.Include
+		$WORK/transform/transform.go:149:12-31: in example.com/wrapchain/transform.Include, call to example.com/wrapchain/transform.Include
+$WORK/doc/doc.go:21:2-10: sentinel example.com/wrapchain/doc.ErrCycle [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/transform/transform.go:150:10-50: fmt.Errorf "include %d: %w"
+		$WORK/transform/transform.go:150:10-50: fmt.Errorf "include %d: %w"
+	path (origin → target):
+		$WORK/transform/transform.go:147:10-22: in example.com/wrapchain/transform.Include
+		$WORK/transform/transform.go:149:12-31: in example.com/wrapchain/transform.Include, call to example.com/wrapchain/transform.Include
+		$WORK/transform/transform.go:149:12-31: in example.com/wrapchain/transform.Include, call to example.com/wrapchain/transform.Include
+		$WORK/transform/transform.go:149:12-31: in example.com/wrapchain/transform.Include, call to example.com/wrapchain/transform.Include

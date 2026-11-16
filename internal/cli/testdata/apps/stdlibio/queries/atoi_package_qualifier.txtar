@@ -1,0 +1,10 @@
+Negative: the position is on the package qualifier "strconv" of strconv.Atoi(s), not
+on the callee name or the "(". The documented call-site positions are the callee
+identifier / Sel or Lparen, so this is rejected with exit 2 and no stdout.
+-- args --
+config/config.go:@atoi
+-- stdout --
+-- stderr --
+errtrace: $WORK/config/config.go:29:21: no function declaration or call at position
+-- exit --
+2

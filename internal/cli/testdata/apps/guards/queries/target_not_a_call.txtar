@@ -1,0 +1,9 @@
+Negative: the position is an identifier inside an if condition, neither a declaration name nor a call.
+Expect exit 2 and a "no function declaration or call at position" style message; empty stdout.
+-- args --
+cmd/guards/main.go:@mainIf
+-- stdout --
+-- stderr --
+errtrace: $WORK/cmd/guards/main.go:99:16: no function declaration or call at position
+-- exit --
+2

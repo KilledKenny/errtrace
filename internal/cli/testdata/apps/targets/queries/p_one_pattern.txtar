@@ -1,0 +1,22 @@
+-p with one pattern: only cmd/ingest and its dependencies.
+Expected: store.ErrClosed wrapped "fetch", disk.ErrNoEntry wrapped "get" then "fetch".
+Must NOT contain store.ErrNotFound: (*mem).Read is only reachable from cmd/report, which is not loaded.
+-- args --
+-p ./cmd/ingest cmd/ingest/main.go:@fetch
+-- stdout --
+$WORK/cmd/ingest/main.go:101:16-21: Error Set of example.com/targets/cmd/ingest.fetch: 2 entries
+$WORK/internal/store/disk/disk.go:7:5-15: sentinel example.com/targets/internal/store/disk.ErrNoEntry
+	wrap chain (origin → target):
+		$WORK/internal/store/store.go:51:30-79: fmt.Errorf "get %q: %w"
+		$WORK/cmd/ingest/main.go:104:15-51: fmt.Errorf "fetch %s: %w"
+	path (origin → target):
+		$WORK/internal/store/disk/disk.go:40:15-25: in (*example.com/targets/internal/store/disk.Disk).Read
+		$WORK/internal/store/store.go:49:14-43: in (*example.com/targets/internal/store.Store).Get, call to (*example.com/targets/internal/store/disk.Disk).Read (dynamic (example.com/targets/internal/store.Backend).Read: 1 of 1 candidates)
+		$WORK/cmd/ingest/main.go:102:24-82: in example.com/targets/cmd/ingest.fetch, call to (*example.com/targets/internal/store.Store).Get
+$WORK/internal/store/store.go:12:2-11: sentinel example.com/targets/internal/store.ErrClosed
+	wrap chain (origin → target):
+		$WORK/cmd/ingest/main.go:104:15-51: fmt.Errorf "fetch %s: %w"
+	path (origin → target):
+		$WORK/internal/store/store.go:28:10-19: in (*example.com/targets/internal/store.base).Check
+		$WORK/internal/store/store.go:45:12-34: in (*example.com/targets/internal/store.Store).Get, call to (*example.com/targets/internal/store.base).Check
+		$WORK/cmd/ingest/main.go:102:24-82: in example.com/targets/cmd/ingest.fetch, call to (*example.com/targets/internal/store.Store).Get

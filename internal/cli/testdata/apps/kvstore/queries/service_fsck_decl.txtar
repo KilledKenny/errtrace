@@ -1,0 +1,38 @@
+SUSPECTED BUG: dead-branch origins reach a Target 4 packages up (see engine_verify_decl).
+A call result passed directly as the argument of a wrapping helper.
+Expected: 1 entry, concrete kverr.Code with chain fmt.Errorf "%s: %w", no depends-on-caller. Actual: also kverr.ErrCorrupt and engine.errTorn (dead code in verify).
+-- args --
+service/service.go:@fsck
+-- stdout --
+$WORK/service/service.go:192:28-32: Error Set of (*example.com/kvstore/service.Service).Fsck: 3 entries
+$WORK/engine/engine.go:24:2-9: sentinel example.com/kvstore/engine.errTorn
+	wrap chain (origin → target):
+		$WORK/service/service.go:135:9-38: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/engine/engine.go:82:10-17: in (*example.com/kvstore/engine.Engine).verify
+		$WORK/engine/engine.go:131:12-25: in (*example.com/kvstore/engine.Engine).Check, call to (*example.com/kvstore/engine.Engine).verify
+		$WORK/repo/repo.go:146:48-72: in (*example.com/kvstore/repo.Repo).Fsck, call to (*example.com/kvstore/engine.Engine).Check
+		$WORK/service/service.go:193:26-42: in (*example.com/kvstore/service.Service).Fsck, call to (*example.com/kvstore/repo.Repo).Fsck
+		$WORK/service/service.go:132:5-8: in example.com/kvstore/service.annotate
+		$WORK/service/service.go:193:9-43: in (*example.com/kvstore/service.Service).Fsck, call to example.com/kvstore/service.annotate
+$WORK/kverr/kverr.go:71:5-15: sentinel example.com/kvstore/kverr.ErrCorrupt
+	wrap chain (origin → target):
+		$WORK/service/service.go:135:9-38: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/engine/engine.go:93:10-26: in (*example.com/kvstore/engine.Engine).deepVerify
+		$WORK/engine/engine.go:79:10-41: in (*example.com/kvstore/engine.Engine).verify, call to (*example.com/kvstore/engine.Engine).deepVerify
+		$WORK/engine/engine.go:131:12-25: in (*example.com/kvstore/engine.Engine).Check, call to (*example.com/kvstore/engine.Engine).verify
+		$WORK/repo/repo.go:146:48-72: in (*example.com/kvstore/repo.Repo).Fsck, call to (*example.com/kvstore/engine.Engine).Check
+		$WORK/service/service.go:193:26-42: in (*example.com/kvstore/service.Service).Fsck, call to (*example.com/kvstore/repo.Repo).Fsck
+		$WORK/service/service.go:132:5-8: in example.com/kvstore/service.annotate
+		$WORK/service/service.go:193:9-43: in (*example.com/kvstore/service.Service).Fsck, call to example.com/kvstore/service.annotate
+$WORK/engine/engine.go:85:3-3: concrete example.com/kvstore/kverr.Code
+	wrap chain (origin → target):
+		$WORK/service/service.go:135:9-38: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/engine/engine.go:85:3-3: in (*example.com/kvstore/engine.Engine).verify
+		$WORK/engine/engine.go:131:12-25: in (*example.com/kvstore/engine.Engine).Check, call to (*example.com/kvstore/engine.Engine).verify
+		$WORK/repo/repo.go:146:48-72: in (*example.com/kvstore/repo.Repo).Fsck, call to (*example.com/kvstore/engine.Engine).Check
+		$WORK/service/service.go:193:26-42: in (*example.com/kvstore/service.Service).Fsck, call to (*example.com/kvstore/repo.Repo).Fsck
+		$WORK/service/service.go:132:5-8: in example.com/kvstore/service.annotate
+		$WORK/service/service.go:193:9-43: in (*example.com/kvstore/service.Service).Fsck, call to example.com/kvstore/service.annotate

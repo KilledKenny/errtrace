@@ -1,0 +1,9 @@
+Position on "s" of the inner argument call s.Ping() (selector X).
+Negative by the X-vs-Sel rule: no target; in particular the outer annotate call must not be picked.
+-- args --
+cmd/ingest/main.go:@inner
+-- stdout --
+-- stderr --
+errtrace: $WORK/cmd/ingest/main.go:97:43: no function declaration or call at position
+-- exit --
+2

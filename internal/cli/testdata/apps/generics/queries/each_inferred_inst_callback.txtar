@@ -1,0 +1,19 @@
+SUSPECTED BUG: path only - the hop through the generic instance is collapsed (see check_explicit_call); the Error Set itself is as expected.
+An inferred generic instantiation (validate.Check, T=UserID from Each's parameter type) passed as callback.
+Expect ErrNegative and ErrEmpty wrapped by "each[%d]: %w"; *TypedErr[string] must not appear.
+-- args --
+pipeline.go:@eachid
+-- stdout --
+$WORK/pipeline.go:93:9-49: Error Set of call to seq.Each in example.com/generics.validateIDs: 2 entries
+$WORK/errs/errs.go:13:2-10: sentinel example.com/generics/errs.ErrEmpty
+	wrap chain (origin → target):
+		$WORK/seq/seq.go:54:11-45: fmt.Errorf "each[%d]: %w"
+	path (origin → target):
+		$WORK/validate/validate.go:25:10-23: in (example.com/generics/validate.UserID).Validate
+		$WORK/pipeline.go:93:9-49: in example.com/generics.validateIDs, call to (example.com/generics/validate.UserID).Validate (dynamic function value f: 1 of 1 candidates)
+$WORK/errs/errs.go:14:2-13: sentinel example.com/generics/errs.ErrNegative
+	wrap chain (origin → target):
+		$WORK/seq/seq.go:54:11-45: fmt.Errorf "each[%d]: %w"
+	path (origin → target):
+		$WORK/validate/validate.go:22:10-26: in (example.com/generics/validate.UserID).Validate
+		$WORK/pipeline.go:93:9-49: in example.com/generics.validateIDs, call to (example.com/generics/validate.UserID).Validate (dynamic function value f: 1 of 1 candidates)

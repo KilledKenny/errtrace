@@ -1,0 +1,8 @@
+Call-site Target on xerr.WithOp("noop", nil). Expected 0 entries.
+-- args --
+transform/transform.go:@nilcall
+-- stdout --
+$WORK/transform/transform.go:27:21-57: Error Set of call to xerr.WithOp in example.com/wrapchain/transform.Noop: 0 entries
+-- stderr --
+-- exit --
+0

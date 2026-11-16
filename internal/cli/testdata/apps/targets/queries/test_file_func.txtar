@@ -1,0 +1,9 @@
+Declaration target in an in-package _test.go file (helper seed, package store).
+Ideal: Error Set {store.ErrClosed from (*mem).Write, *disk.DiskError from (*Disk).Write}. The tool loads without tests, so a clear "file is not in any loaded package" error (exit 2) is the documented-scope outcome.
+-- args --
+internal/store/store_test.go:@seed
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/store/store_test.go: file is not in any loaded package
+-- exit --
+2

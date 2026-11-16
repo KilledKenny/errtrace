@@ -1,0 +1,12 @@
+Error result after a non-error interface result; the Wrap puts %w first.
+Expected: core.ErrNoRoute wrapped by "%w: %s"; nothing from the handlers
+(Lookup returns one, it does not call it).
+-- args --
+registry/registry.go:@lookup
+-- stdout --
+$WORK/registry/registry.go:59:17-23: Error Set of example.com/plugins/registry.Lookup: 1 entries
+$WORK/core/core.go:15:2-12: sentinel example.com/plugins/core.ErrNoRoute
+	wrap chain (origin → target):
+		$WORK/registry/registry.go:62:15-58: fmt.Errorf "%w: %s"
+	path (origin → target):
+		$WORK/registry/registry.go:62:36-51: in example.com/plugins/registry.Lookup

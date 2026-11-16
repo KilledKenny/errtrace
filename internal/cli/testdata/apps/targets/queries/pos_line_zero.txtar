@@ -1,0 +1,9 @@
+Line 0.
+Negative: exit 2, "line must be at least 1, got 0". Not a usage error (no usage text).
+-- args --
+internal/platform/platform.go:0:1
+-- stdout --
+-- stderr --
+errtrace: invalid position "internal/platform/platform.go:0:1": line must be at least 1, got 0
+-- exit --
+2

@@ -1,0 +1,16 @@
+Call-site target on Decode in the explicit instantiation codec.Decode[string](raw, toText).
+Expected: codec.ErrEmpty, and codec.ErrSyntax wrapped "decode: %w" via toText only (no codec.ParseInt path: that is the int instance).
+-- args --
+cmd/ingest/main.go:@decode_call
+-- stdout --
+$WORK/cmd/ingest/main.go:81:15-99: Error Set of call to codec.Decode[string] in example.com/targets/cmd/ingest.ingest: 2 entries
+$WORK/internal/codec/codec.go:12:2-10: sentinel example.com/targets/internal/codec.ErrEmpty
+	path (origin → target):
+		$WORK/internal/codec/codec.go:32:16-24: in example.com/targets/internal/codec.Decode[string]
+		$WORK/cmd/ingest/main.go:81:15-99: in example.com/targets/cmd/ingest.ingest, call to example.com/targets/internal/codec.Decode[string]
+$WORK/internal/codec/codec.go:13:2-11: sentinel example.com/targets/internal/codec.ErrSyntax
+	wrap chain (origin → target):
+		$WORK/internal/codec/codec.go:36:16-45: fmt.Errorf "decode: %w"
+	path (origin → target):
+		$WORK/cmd/ingest/main.go:111:14-29: in example.com/targets/cmd/ingest.toText
+		$WORK/cmd/ingest/main.go:81:15-99: in example.com/targets/cmd/ingest.ingest, call to example.com/targets/cmd/ingest.toText (dynamic function value parse: 1 of 1 candidates)

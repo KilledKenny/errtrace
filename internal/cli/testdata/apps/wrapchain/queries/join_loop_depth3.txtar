@@ -1,0 +1,28 @@
+A loop accumulating err = errors.Join(err, fmt.Errorf("line %d: %w", ...)).
+Expected: doc.ErrTooLong under fmt.Errorf then 1 and 2 errors.Join links, plus a
+[chain truncated] entry (the innermost links, here the fmt.Errorf, are the ones cut
+at depth 3). Never bare; the run terminates.
+-- args --
+-chain-depth=3 validate/validate.go:@lines
+-- stdout --
+$WORK/validate/validate.go:82:16-21: Error Set of example.com/wrapchain/validate.Lines: 3 entries
+$WORK/doc/doc.go:19:2-12: sentinel example.com/wrapchain/doc.ErrTooLong [chain truncated]
+	wrap chain (origin → target):
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+	path (origin → target):
+		$WORK/validate/validate.go:86:56-70: in example.com/wrapchain/validate.Lines
+$WORK/doc/doc.go:19:2-12: sentinel example.com/wrapchain/doc.ErrTooLong
+	wrap chain (origin → target):
+		$WORK/validate/validate.go:86:27-71: fmt.Errorf "line %d: %w"
+		$WORK/validate/validate.go:86:10-72: errors.Join
+	path (origin → target):
+		$WORK/validate/validate.go:86:56-70: in example.com/wrapchain/validate.Lines
+$WORK/doc/doc.go:19:2-12: sentinel example.com/wrapchain/doc.ErrTooLong
+	wrap chain (origin → target):
+		$WORK/validate/validate.go:86:27-71: fmt.Errorf "line %d: %w"
+		$WORK/validate/validate.go:86:10-72: errors.Join
+		$WORK/validate/validate.go:86:10-72: errors.Join
+	path (origin → target):
+		$WORK/validate/validate.go:86:56-70: in example.com/wrapchain/validate.Lines

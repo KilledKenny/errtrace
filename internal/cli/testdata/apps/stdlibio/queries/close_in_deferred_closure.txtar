@@ -1,0 +1,85 @@
+Call-site Target f.Close() inside the deferred closure of Slurp; the enclosing
+function is the closure (Slurp$1). Expected the (*os.File).Close set: os.ErrInvalid
+(nil receiver), os.ErrClosed and errno values under *fs.PathError.Unwrap; no
+fmt.Errorf "source: close: %w" wrap (that happens after the call).
+-- args --
+source/source.go:@close
+-- stdout --
+$WORK/source/source.go:106:14-33: Error Set of call to f.Close in example.com/stdlibio/source.Slurp$1: 8 entries
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Close, call to internal/poll.errClosing
+		$GOROOT/src/os/file_unix.go:*: in (*os.file).close, call to (*internal/poll.FD).Close
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Close, call to (*os.file).close
+		$WORK/source/source.go:106:14-33: in example.com/stdlibio/source.Slurp$1, call to (*os.File).Close
+$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid
+	path (origin → target):
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Close
+		$WORK/source/source.go:106:14-33: in example.com/stdlibio/source.Slurp$1, call to (*os.File).Close
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/os/file_unix.go:*: in (*os.file).close
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Close, call to (*os.file).close
+		$WORK/source/source.go:106:14-33: in example.com/stdlibio/source.Slurp$1, call to (*os.File).Close
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Close, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unixjs.go:*: in (*internal/poll.SysFile).destroy, call to syscall.Close (dynamic function value internal/poll.CloseFunc: 1 of 1 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).destroy, call to (*internal/poll.SysFile).destroy
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).decref, call to (*internal/poll.FD).destroy
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Close, call to (*internal/poll.FD).decref
+		$GOROOT/src/os/file_unix.go:*: in (*os.file).close, call to (*internal/poll.FD).Close
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Close, call to (*os.file).close
+		$WORK/source/source.go:106:14-33: in example.com/stdlibio/source.Slurp$1, call to (*os.File).Close
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Close, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unixjs.go:*: in (*internal/poll.SysFile).destroy, call to syscall.Close (dynamic function value internal/poll.CloseFunc: 1 of 1 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).destroy, call to (*internal/poll.SysFile).destroy
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).decref, call to (*internal/poll.FD).destroy
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Close, call to (*internal/poll.FD).decref
+		$GOROOT/src/os/file_unix.go:*: in (*os.file).close, call to (*internal/poll.FD).Close
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Close, call to (*os.file).close
+		$WORK/source/source.go:106:14-33: in example.com/stdlibio/source.Slurp$1, call to (*os.File).Close
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Close, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unixjs.go:*: in (*internal/poll.SysFile).destroy, call to syscall.Close (dynamic function value internal/poll.CloseFunc: 1 of 1 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).destroy, call to (*internal/poll.SysFile).destroy
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).decref, call to (*internal/poll.FD).destroy
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Close, call to (*internal/poll.FD).decref
+		$GOROOT/src/os/file_unix.go:*: in (*os.file).close, call to (*internal/poll.FD).Close
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Close, call to (*os.file).close
+		$WORK/source/source.go:106:14-33: in example.com/stdlibio/source.Slurp$1, call to (*os.File).Close
+$GOROOT/src/os/file_unix.go:*: concrete syscall.Errno
+	path (origin → target):
+		$GOROOT/src/os/file_unix.go:*: in (*os.file).close
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Close, call to (*os.file).close
+		$WORK/source/source.go:106:14-33: in example.com/stdlibio/source.Slurp$1, call to (*os.File).Close
+$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Close, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unixjs.go:*: in (*internal/poll.SysFile).destroy, call to syscall.Close (dynamic function value internal/poll.CloseFunc: 1 of 1 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).destroy, call to (*internal/poll.SysFile).destroy
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).decref, call to (*internal/poll.FD).destroy
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Close, call to (*internal/poll.FD).decref
+		$GOROOT/src/os/file_unix.go:*: in (*os.file).close, call to (*internal/poll.FD).Close
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Close, call to (*os.file).close
+		$WORK/source/source.go:106:14-33: in example.com/stdlibio/source.Slurp$1, call to (*os.File).Close

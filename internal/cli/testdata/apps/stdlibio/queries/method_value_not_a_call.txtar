@@ -1,0 +1,10 @@
+Negative: the position is on the method value stage.Err inside the slice literal;
+it is neither a declaration nor a call. Expected exit 2, "no function declaration
+or call at position".
+-- args --
+main.go:@methodvalue
+-- stdout --
+-- stderr --
+errtrace: $WORK/main.go:176:25: no function declaration or call at position
+-- exit --
+2

@@ -1,0 +1,11 @@
+An unknown tag plus an empty list element plus fast.
+Expected: unknown tags are harmless; same output as tags_change_callee (ErrFastDisabled).
+-- args --
+-tags nosuchtag,,fast cmd/report/main.go:@probe_call
+-- stdout --
+$WORK/cmd/report/main.go:21:12-43: Error Set of call to platform.Probe in example.com/targets/cmd/report.run: 1 entries
+$WORK/internal/platform/limits_fast.go:8:5-20: sentinel example.com/targets/internal/platform.ErrFastDisabled
+	path (origin → target):
+		$WORK/internal/platform/limits_fast.go:12:12-27: in example.com/targets/internal/platform.MaxBatch
+		$WORK/internal/platform/platform.go:6:12-22: in example.com/targets/internal/platform.Probe, call to example.com/targets/internal/platform.MaxBatch
+		$WORK/cmd/report/main.go:21:12-43: in example.com/targets/cmd/report.run, call to example.com/targets/internal/platform.Probe

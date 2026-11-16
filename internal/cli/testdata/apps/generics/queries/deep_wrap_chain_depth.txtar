@@ -1,0 +1,13 @@
+SUSPECTED BUG: as deep_wrap_decl, ErrStop is missing behind "Unwrap not modelled", so nothing is truncated.
+Same Target with -chain-depth=2: the 3-link chain does not fit.
+Expect ErrStop marked [chain truncated] with at most 2 links shown.
+-- args --
+-chain-depth=2 failures.go:@deepwrap
+-- stdout --
+$WORK/failures.go:110:19-27: Error Set of example.com/generics.deepWrap: 1 entries, 1 unresolved
+$WORK/errs/errs.go:52:9-40: unresolved(memory): *example.com/generics/errs.Wrapped[int].Unwrap not modelled
+	wrap chain (origin → target):
+		$WORK/errs/errs.go:52:9-40: *example.com/generics/errs.Wrapped[int].Unwrap
+	path (origin → target):
+		$WORK/errs/errs.go:52:9-40: in example.com/generics/errs.Wrap[int]
+		$WORK/failures.go:111:9-77: in example.com/generics.deepWrap, call to example.com/generics/errs.Wrap[int]

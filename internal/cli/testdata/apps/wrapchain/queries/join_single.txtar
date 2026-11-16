@@ -1,0 +1,12 @@
+errors.Join with one operand still wraps. Expected 1 entry: concrete
+*xerr.LimitError with the chain errors.Join.
+-- args --
+validate/validate.go:@single
+-- stdout --
+$WORK/validate/validate.go:39:17-23: Error Set of example.com/wrapchain/validate.Single: 1 entries
+$WORK/validate/validate.go:28:10-45: concrete *example.com/wrapchain/xerr.LimitError
+	wrap chain (origin → target):
+		$WORK/validate/validate.go:40:9-36: errors.Join
+	path (origin → target):
+		$WORK/validate/validate.go:28:10-45: in example.com/wrapchain/validate.checkLength
+		$WORK/validate/validate.go:40:21-35: in example.com/wrapchain/validate.Single, call to example.com/wrapchain/validate.checkLength

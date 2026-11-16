@@ -1,0 +1,9 @@
+Negative: the Target is the guard helper isNotFound, which returns bool and has no error result.
+Expect a clear diagnostic that the function has no error result (exit 2 or an empty Error Set), not a crash.
+-- args --
+processor/helper.go:@isNotFoundDecl
+-- stdout --
+-- stderr --
+errtrace: $WORK/processor/helper.go:17:25: example.com/guards/processor.isNotFound has no error result
+-- exit --
+2

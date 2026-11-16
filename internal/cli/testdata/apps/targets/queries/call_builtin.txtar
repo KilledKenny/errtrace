@@ -1,0 +1,9 @@
+Position on the builtin call len(args).
+Negative: exit 2, "not a call to a function".
+-- args --
+cmd/ingest/main.go:@builtin
+-- stdout --
+-- stderr --
+errtrace: $WORK/cmd/ingest/main.go:41:17: not a call to a function
+-- exit --
+2

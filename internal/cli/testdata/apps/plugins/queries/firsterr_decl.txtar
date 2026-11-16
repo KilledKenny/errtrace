@@ -1,0 +1,13 @@
+A result-less callback writes a captured variable; inside it a dynamic
+call on a captured interface parameter. Under Go semantics the set is
+drivers.ErrSlack wrapped by "slack %q: %w" then "batch: %w". By design
+(e2e dynamic/freevar_other_closure_store) a captured variable written by
+a closure is reported as unresolved(memory): expected exactly that one
+entry and no wrong Origin.
+-- args --
+dispatch/funcs.go:@firsterr
+-- stdout --
+$WORK/dispatch/funcs.go:30:19-29: Error Set of example.com/plugins/dispatch.FirstError: 1 entries, 1 unresolved
+$WORK/dispatch/funcs.go:37:9-14: unresolved(memory): load of escaping variable first
+	path (origin → target):
+		$WORK/dispatch/funcs.go:37:9-14: in example.com/plugins/dispatch.FirstError

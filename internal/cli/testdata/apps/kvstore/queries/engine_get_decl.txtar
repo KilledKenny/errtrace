@@ -1,0 +1,12 @@
+Method with (value, error) results and two early returns.
+Expect: sentinel engine.ErrClosed (initialised, then reassigned in init only) and sentinel kverr.ErrNotFound; nothing else.
+-- args --
+engine/engine.go:@get
+-- stdout --
+$WORK/engine/engine.go:66:26-29: Error Set of (*example.com/kvstore/engine.Engine).Get: 2 entries
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	path (origin → target):
+		$WORK/engine/engine.go:68:15-24: in (*example.com/kvstore/engine.Engine).Get
+$WORK/kverr/kverr.go:10:5-16: sentinel example.com/kvstore/kverr.ErrNotFound
+	path (origin → target):
+		$WORK/engine/engine.go:72:15-32: in (*example.com/kvstore/engine.Engine).Get

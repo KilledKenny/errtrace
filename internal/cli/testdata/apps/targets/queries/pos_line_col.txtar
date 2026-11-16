@@ -1,0 +1,11 @@
+Literal LINE:COL on the name Probe (5:6).
+Expected: 1 entry, sentinel platform.ErrNoLimit via MaxBatch (limits_default.go).
+Parity set: pos_line_col, pos_offset, pos_range, pos_line_col_offset, pos_dot_slash, pos_dotdot must have identical stdout (compared by hand; each query is a separate archive).
+-- args --
+internal/platform/platform.go:5:6
+-- stdout --
+$WORK/internal/platform/platform.go:5:6-11: Error Set of example.com/targets/internal/platform.Probe: 1 entries
+$WORK/internal/platform/limits_default.go:8:5-15: sentinel example.com/targets/internal/platform.ErrNoLimit
+	path (origin → target):
+		$WORK/internal/platform/limits_default.go:12:12-22: in example.com/targets/internal/platform.MaxBatch
+		$WORK/internal/platform/platform.go:6:12-22: in example.com/targets/internal/platform.Probe, call to example.com/targets/internal/platform.MaxBatch

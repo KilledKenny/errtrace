@@ -1,0 +1,12 @@
+Declaration Target of the helper Wrapf(err, format, args...). Expected 1
+unresolved(depends-on-caller) entry for parameter err with the chain
+fmt.Errorf "%s: %w"; the Sprintf'ed message is not a dynamic format.
+-- args --
+xerr/helpers.go:@wrapf
+-- stdout --
+$WORK/xerr/helpers.go:17:16-21: Error Set of example.com/wrapchain/xerr.Wrapf: 1 entries, 1 unresolved
+$WORK/xerr/helpers.go:18:5-8: unresolved(depends-on-caller): parameter err (error)
+	wrap chain (origin → target):
+		$WORK/xerr/helpers.go:21:9-64: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/xerr/helpers.go:18:5-8: in example.com/wrapchain/xerr.Wrapf

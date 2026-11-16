@@ -1,0 +1,14 @@
+SUSPECTED BUG: both origins are missing; the set holds only two unresolved(memory) entries "load of escaping variable "
+with an empty variable name and zero-width spans, one of them on the plain `return nil`.
+Range-over-func directly in the Target: for _, err := range seq.Parse(src, parsePort) { return err }.
+Expect ErrEmpty and *TypedErr[string] (Op "port") from parsePort.
+-- args --
+pipeline.go:@firstbad
+-- stdout --
+$WORK/pipeline.go:102:19-27: Error Set of example.com/generics.firstBad: 2 entries, 2 unresolved
+$WORK/pipeline.go:105:4-4: unresolved(memory): load of escaping variable 
+	path (origin → target):
+		$WORK/pipeline.go:105:4-4: in example.com/generics.firstBad
+$WORK/pipeline.go:108:2-2: unresolved(memory): load of escaping variable 
+	path (origin → target):
+		$WORK/pipeline.go:108:2-2: in example.com/generics.firstBad

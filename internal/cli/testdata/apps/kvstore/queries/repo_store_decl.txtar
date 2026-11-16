@@ -1,0 +1,30 @@
+Concrete pointer-receiver wrapper type with Unwrap built around a callee's error.
+Expect Put's 4 entries (ErrClosed, ErrQuota, concrete Code, unresolved no-body), each with the chain *kverr.OpError.Unwrap.
+-- args --
+repo/repo.go:@store
+-- stdout --
+$WORK/repo/repo.go:54:26-31: Error Set of (*example.com/kvstore/repo.Repo).Store: 4 entries, 1 unresolved
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:56:10-57: *example.com/kvstore/kverr.OpError.Unwrap
+	path (origin → target):
+		$WORK/engine/engine.go:101:10-19: in (*example.com/kvstore/engine.Engine).Put
+		$WORK/repo/repo.go:55:12-48: in (*example.com/kvstore/repo.Repo).Store, call to (*example.com/kvstore/engine.Engine).Put
+$WORK/kverr/kverr.go:33:5-13: sentinel example.com/kvstore/kverr.ErrQuota
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:56:10-57: *example.com/kvstore/kverr.OpError.Unwrap
+	path (origin → target):
+		$WORK/engine/engine.go:107:10-24: in (*example.com/kvstore/engine.Engine).Put
+		$WORK/repo/repo.go:55:12-48: in (*example.com/kvstore/repo.Repo).Store, call to (*example.com/kvstore/engine.Engine).Put
+$WORK/engine/engine.go:104:3-3: concrete example.com/kvstore/kverr.Code
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:56:10-57: *example.com/kvstore/kverr.OpError.Unwrap
+	path (origin → target):
+		$WORK/engine/engine.go:104:3-3: in (*example.com/kvstore/engine.Engine).Put
+		$WORK/repo/repo.go:55:12-48: in (*example.com/kvstore/repo.Repo).Store, call to (*example.com/kvstore/engine.Engine).Put
+$WORK/engine/engine.go:111:19-34: unresolved(no-body): example.com/kvstore/engine.fsync has no body
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:56:10-57: *example.com/kvstore/kverr.OpError.Unwrap
+	path (origin → target):
+		$WORK/engine/engine.go:111:19-34: in (*example.com/kvstore/engine.Engine).Put
+		$WORK/repo/repo.go:55:12-48: in (*example.com/kvstore/repo.Repo).Store, call to (*example.com/kvstore/engine.Engine).Put

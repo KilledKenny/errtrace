@@ -1,0 +1,11 @@
+Error passed in through a parameter, nil-checked, wrapped and returned.
+Expect: 1 entry unresolved(depends-on-caller) for parameter err, with chain fmt.Errorf "%s: %w".
+-- args --
+service/service.go:@annotate
+-- stdout --
+$WORK/service/service.go:131:19-27: Error Set of example.com/kvstore/service.annotate: 1 entries, 1 unresolved
+$WORK/service/service.go:132:5-8: unresolved(depends-on-caller): parameter err (error)
+	wrap chain (origin → target):
+		$WORK/service/service.go:135:9-38: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/service/service.go:132:5-8: in example.com/kvstore/service.annotate

@@ -1,0 +1,17 @@
+Closure capturing a variable that is reassigned after the closure is
+created and before it runs. Expected: both core.ErrDropped and
+core.ErrEmptyBody.
+-- args --
+dispatch/funcs.go:@lazy
+-- stdout --
+$WORK/dispatch/funcs.go:14:15-19: Error Set of example.com/plugins/dispatch.Lazy: 2 entries
+$WORK/core/core.go:16:2-12: sentinel example.com/plugins/core.ErrDropped
+	path (origin → target):
+		$WORK/dispatch/funcs.go:15:9-24: in example.com/plugins/dispatch.Lazy
+		$WORK/dispatch/funcs.go:16:34-37: in example.com/plugins/dispatch.Lazy$1
+		$WORK/dispatch/funcs.go:20:9-17: in example.com/plugins/dispatch.Lazy, call to example.com/plugins/dispatch.Lazy$1
+$WORK/core/core.go:17:2-14: sentinel example.com/plugins/core.ErrEmptyBody
+	path (origin → target):
+		$WORK/dispatch/funcs.go:18:9-26: in example.com/plugins/dispatch.Lazy
+		$WORK/dispatch/funcs.go:16:34-37: in example.com/plugins/dispatch.Lazy$1
+		$WORK/dispatch/funcs.go:20:9-17: in example.com/plugins/dispatch.Lazy, call to example.com/plugins/dispatch.Lazy$1

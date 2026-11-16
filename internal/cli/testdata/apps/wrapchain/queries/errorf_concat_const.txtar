@@ -1,0 +1,12 @@
+Format is a concatenation of two constants (prefixCell + ": %w"), folded at
+compile time. Expected 1 entry: doc.ErrEmpty wrapped by fmt.Errorf "cell %s: %w";
+no unresolved(dynamic-format).
+-- args --
+parse/parse.go:@cell
+-- stdout --
+$WORK/parse/parse.go:76:15-19: Error Set of example.com/wrapchain/parse.Cell: 1 entries
+$WORK/doc/doc.go:17:2-10: sentinel example.com/wrapchain/doc.ErrEmpty
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:78:10-49: fmt.Errorf "cell %s: %w"
+	path (origin → target):
+		$WORK/parse/parse.go:78:36-48: in example.com/wrapchain/parse.Cell

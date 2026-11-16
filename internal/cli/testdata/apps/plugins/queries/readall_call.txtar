@@ -1,0 +1,12 @@
+Call-site Target on a stdlib function that calls back into local code
+(io.ReadAll -> r.Read). Expected: tmpl.ErrTemplate without the "tmpl: %w"
+wrap; io.EOF filtered inside ReadAll.
+-- args --
+tmpl/tmpl.go:@readall
+-- stdout --
+$WORK/tmpl/tmpl.go:35:12-37: Error Set of call to io.ReadAll in example.com/plugins/tmpl.Load: 1 entries
+$WORK/tmpl/tmpl.go:12:5-16: sentinel example.com/plugins/tmpl.ErrTemplate
+	path (origin → target):
+		$WORK/tmpl/tmpl.go:23:13-24: in (*example.com/plugins/tmpl.Source).Read
+		$GOROOT/src/io/io.go:*: in io.ReadAll, call to (*example.com/plugins/tmpl.Source).Read (dynamic (io.Reader).Read: 2 of 2 candidates)
+		$WORK/tmpl/tmpl.go:35:12-37: in example.com/plugins/tmpl.Load, call to io.ReadAll

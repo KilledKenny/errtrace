@@ -1,0 +1,13 @@
+if errors.As(err, &limitErr) { return wrap(err) } where *xerr.QuotaError has an As
+method that fills a **LimitError. Expected 1 entry: concrete *xerr.QuotaError with
+the chain fmt.Errorf "limit %d: %w". doc.ErrDisk must NOT appear.
+-- args --
+transform/transform.go:@overlimit
+-- stdout --
+$WORK/transform/transform.go:135:20-29: Error Set of example.com/wrapchain/transform.OverLimit: 1 entries
+$WORK/transform/transform.go:126:10-56: concrete *example.com/wrapchain/xerr.QuotaError
+	wrap chain (origin → target):
+		$WORK/transform/transform.go:139:10-49: fmt.Errorf "limit %d: %w"
+	path (origin → target):
+		$WORK/transform/transform.go:126:10-56: in example.com/wrapchain/transform.quota
+		$WORK/transform/transform.go:136:9-17: in example.com/wrapchain/transform.OverLimit, call to example.com/wrapchain/transform.quota

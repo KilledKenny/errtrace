@@ -1,0 +1,15 @@
+Direct r.Read on an io.Reader with a local and a stdlib implementation.
+Expected: tmpl.ErrTemplate and io.EOF (from both (*Source).Read and
+(*strings.Reader).Read), 2 candidates.
+-- args --
+tmpl/tmpl.go:@header
+-- stdout --
+$WORK/tmpl/tmpl.go:43:17-23: Error Set of example.com/plugins/tmpl.Header: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF [+1 more paths]
+	path (origin → target):
+		$WORK/tmpl/tmpl.go:26:13-19: in (*example.com/plugins/tmpl.Source).Read
+		$WORK/tmpl/tmpl.go:45:12-26: in example.com/plugins/tmpl.Header, call to (*example.com/plugins/tmpl.Source).Read (dynamic (io.Reader).Read: 2 of 2 candidates)
+$WORK/tmpl/tmpl.go:12:5-16: sentinel example.com/plugins/tmpl.ErrTemplate
+	path (origin → target):
+		$WORK/tmpl/tmpl.go:23:13-24: in (*example.com/plugins/tmpl.Source).Read
+		$WORK/tmpl/tmpl.go:45:12-26: in example.com/plugins/tmpl.Header, call to (*example.com/plugins/tmpl.Source).Read (dynamic (io.Reader).Read: 2 of 2 candidates)

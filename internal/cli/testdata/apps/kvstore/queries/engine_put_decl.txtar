@@ -1,0 +1,19 @@
+Phi/merge of several origins over early returns plus a body-less callee.
+Expect: sentinel engine.ErrClosed, sentinel kverr.ErrQuota (var of custom int type Code), concrete kverr.Code (inline constant),
+and unresolved(no-body) for fsync. Not: ErrCorrupt, errTorn (dead branches of verify).
+-- args --
+engine/engine.go:@put
+-- stdout --
+$WORK/engine/engine.go:99:26-29: Error Set of (*example.com/kvstore/engine.Engine).Put: 4 entries, 1 unresolved
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	path (origin → target):
+		$WORK/engine/engine.go:101:10-19: in (*example.com/kvstore/engine.Engine).Put
+$WORK/kverr/kverr.go:33:5-13: sentinel example.com/kvstore/kverr.ErrQuota
+	path (origin → target):
+		$WORK/engine/engine.go:107:10-24: in (*example.com/kvstore/engine.Engine).Put
+$WORK/engine/engine.go:104:3-3: concrete example.com/kvstore/kverr.Code
+	path (origin → target):
+		$WORK/engine/engine.go:104:3-3: in (*example.com/kvstore/engine.Engine).Put
+$WORK/engine/engine.go:111:19-34: unresolved(no-body): example.com/kvstore/engine.fsync has no body
+	path (origin → target):
+		$WORK/engine/engine.go:111:19-34: in (*example.com/kvstore/engine.Engine).Put

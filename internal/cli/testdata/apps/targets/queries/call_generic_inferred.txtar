@@ -1,0 +1,16 @@
+Call-site target codec.Decode(raw, codec.ParseInt) with an inferred type argument, in cmd/report.
+Expected: codec.ErrEmpty, and codec.ErrSyntax wrapped "decode: %w" via codec.ParseInt only (not via cmd/ingest toText).
+-- args --
+cmd/report/main.go:@decode_inferred
+-- stdout --
+$WORK/cmd/report/main.go:36:12-65: Error Set of call to codec.Decode in example.com/targets/cmd/report.run: 2 entries
+$WORK/internal/codec/codec.go:12:2-10: sentinel example.com/targets/internal/codec.ErrEmpty
+	path (origin → target):
+		$WORK/internal/codec/codec.go:32:16-24: in example.com/targets/internal/codec.Decode[int]
+		$WORK/cmd/report/main.go:36:12-65: in example.com/targets/cmd/report.run, call to example.com/targets/internal/codec.Decode[int]
+$WORK/internal/codec/codec.go:13:2-11: sentinel example.com/targets/internal/codec.ErrSyntax
+	wrap chain (origin → target):
+		$WORK/internal/codec/codec.go:36:16-45: fmt.Errorf "decode: %w"
+	path (origin → target):
+		$WORK/internal/codec/codec.go:54:14-23: in example.com/targets/internal/codec.ParseInt
+		$WORK/cmd/report/main.go:36:12-65: in example.com/targets/cmd/report.run, call to example.com/targets/internal/codec.ParseInt (dynamic function value parse: 1 of 1 candidates)

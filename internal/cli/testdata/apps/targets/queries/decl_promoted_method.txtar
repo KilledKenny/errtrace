@@ -1,0 +1,9 @@
+Declaration target on (*base).Check, the method promoted into Store.
+Expected: 1 entry, sentinel store.ErrClosed.
+-- args --
+internal/store/store.go:@check
+-- stdout --
+$WORK/internal/store/store.go:26:26-31: Error Set of (*example.com/targets/internal/store.base).Check: 1 entries
+$WORK/internal/store/store.go:12:2-11: sentinel example.com/targets/internal/store.ErrClosed
+	path (origin → target):
+		$WORK/internal/store/store.go:28:10-19: in (*example.com/targets/internal/store.base).Check

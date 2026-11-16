@@ -1,0 +1,17 @@
+Format built at run time ("section "+name+": %w"). Expected: one
+unresolved(dynamic-format) entry at the fmt.Errorf call, with doc.ErrEmpty kept as
+a possible wrap under it (or as its own entry); never a silent empty set.
+-- args --
+parse/parse.go:@section
+-- stdout --
+$WORK/parse/parse.go:148:18-25: Error Set of example.com/wrapchain/parse.Section: 2 entries, 1 unresolved
+$WORK/doc/doc.go:17:2-10: sentinel example.com/wrapchain/doc.ErrEmpty
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:150:10-58: fmt.Errorf with dynamic format
+	path (origin → target):
+		$WORK/parse/parse.go:150:45-57: in example.com/wrapchain/parse.Section
+$WORK/parse/parse.go:150:10-58: unresolved(dynamic-format): format of fmt.Errorf is not a constant
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:150:10-58: fmt.Errorf with dynamic format
+	path (origin → target):
+		$WORK/parse/parse.go:150:10-58: in example.com/wrapchain/parse.Section

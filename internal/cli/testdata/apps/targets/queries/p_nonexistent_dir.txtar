@@ -1,0 +1,9 @@
+-p naming a directory that does not exist.
+Negative: exit 2 with the go list error for ./cmd/missing.
+-- args --
+-p ./cmd/missing internal/platform/platform.go:5:6
+-- stdout --
+-- stderr --
+errtrace: -: stat $WORK/cmd/missing: directory not found
+-- exit --
+2

@@ -1,0 +1,12 @@
+Call-site Target on a deferred dynamic call (stdlib interface io.Closer
+implemented locally by *spool), pointing at the method name. Expected:
+dispatch.ErrSpoolBusy, 1 of 1 candidates. (*drivers.Conn).Close must be
+absent: it never flows into the closer field.
+-- args --
+dispatch/dispatch.go:@defer_close
+-- stdout --
+$WORK/dispatch/dispatch.go:170:23-55: Error Set of call to d.closer.Close in (*example.com/plugins/dispatch.Dispatcher).Shutdown: 1 entries
+$WORK/dispatch/dispatch.go:16:2-14: sentinel example.com/plugins/dispatch.ErrSpoolBusy
+	path (origin → target):
+		$WORK/dispatch/dispatch.go:145:10-22: in (*example.com/plugins/dispatch.spool).Close
+		$WORK/dispatch/dispatch.go:170:23-55: in (*example.com/plugins/dispatch.Dispatcher).Shutdown, call to (*example.com/plugins/dispatch.spool).Close (dynamic (io.Closer).Close: 1 of 1 candidates)

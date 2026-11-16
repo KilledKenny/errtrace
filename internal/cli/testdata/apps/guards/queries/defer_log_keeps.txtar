@@ -1,0 +1,14 @@
+SUSPECTED BUG: as defer_clear_named. The deferred closure only reads err (logs on err == ErrDeclined) and
+never assigns it, so nothing is filtered.
+Expected 2 entries: ErrDeclined and ErrInternal from gateway.Void. Actual: 2 unresolved(memory) entries (one
+without a position) and no origins.
+-- args --
+processor/flow.go:@deferLog
+-- stdout --
+$WORK/processor/flow.go:35:19-36: Error Set of example.com/guards/processor.SettleDeferredLog: 2 entries, 2 unresolved
+-: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		-: in example.com/guards/processor.SettleDeferredLog
+$WORK/processor/flow.go:41:2-2: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/processor/flow.go:41:2-2: in example.com/guards/processor.SettleDeferredLog

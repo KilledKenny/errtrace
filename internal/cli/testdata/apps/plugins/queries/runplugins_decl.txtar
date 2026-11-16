@@ -1,0 +1,15 @@
+Slice of core.Plugin (interface embedding Named and Handler) built by a
+type assertion h.(core.Plugin) and sorted with a local sort.Interface.
+Only auditHandler has a Name method. Expected: ErrAuditFull wrapped by
+"plugin %s: %w"; ErrMetricsDown and ErrPager absent (their types are not
+Plugins), ErrOrphan absent.
+-- args --
+registry/registry.go:@runplugins
+-- stdout --
+$WORK/registry/registry.go:115:21-31: Error Set of example.com/plugins/registry.RunPlugins: 1 entries
+$WORK/registry/registry.go:13:2-14: sentinel example.com/plugins/registry.ErrAuditFull
+	wrap chain (origin → target):
+		$WORK/registry/registry.go:118:11-67: fmt.Errorf "plugin %s: %w"
+	path (origin → target):
+		$WORK/registry/registry.go:22:10-22: in (example.com/plugins/registry.auditHandler).Handle
+		$WORK/registry/registry.go:117:13-24: in example.com/plugins/registry.RunPlugins, call to (example.com/plugins/registry.auditHandler).Handle (dynamic (example.com/plugins/core.Plugin).Handle: 1 of 1 candidates)

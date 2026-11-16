@@ -1,0 +1,11 @@
+Declaration of Drop[E error] (single instance Drop[*TypedErr[int]]): returns its parameter unless errors.As matches E.
+Expect unresolved(depends-on-caller) for parameter err, marked possibly handled by the errors.As on the type parameter.
+-- args --
+errs/errs.go:@drop
+-- stdout --
+$WORK/errs/errs.go:76:15-19: Error Set of example.com/generics/errs.Drop: 1 entries, 1 unresolved, 1 possibly handled
+$WORK/errs/errs.go:78:15-18: unresolved(depends-on-caller): parameter err (error)
+	possibly handled:
+		$WORK/errs/errs.go:78:5-23: errors.As to *example.com/generics/errs.TypedErr[int]: unresolved value
+	path (origin → target):
+		$WORK/errs/errs.go:78:15-18: in example.com/generics/errs.Drop[*example.com/generics/errs.TypedErr[int]]

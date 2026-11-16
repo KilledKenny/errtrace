@@ -1,0 +1,12 @@
+errors.Is(err, fsx.ErrNotExist) on a local PathError-shaped wrapper.
+Expect 1 entry: fsx.ErrPermission with the (*PathError).Unwrap chain. ErrNotExist must NOT appear.
+-- args --
+processor/receipts.go:@fsIs
+-- stdout --
+$WORK/processor/receipts.go:13:15-26: Error Set of example.com/guards/processor.OpenReceipt: 1 entries
+$WORK/fsx/fsx.go:12:2-15: sentinel example.com/guards/fsx.ErrPermission
+	wrap chain (origin → target):
+		$WORK/fsx/fsx.go:35:10-64: *example.com/guards/fsx.PathError.Unwrap
+	path (origin → target):
+		$WORK/fsx/fsx.go:35:50-63: in example.com/guards/fsx.Open
+		$WORK/processor/receipts.go:14:9-23: in example.com/guards/processor.OpenReceipt, call to example.com/guards/fsx.Open

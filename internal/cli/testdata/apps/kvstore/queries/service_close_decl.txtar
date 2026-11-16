@@ -1,0 +1,13 @@
+SUSPECTED BUG (known gap? plan S08): deferred closure that unconditionally overwrites the named result.
+Expected: only Flush/Compact's errors, sentinel engine.errTorn and sentinel engine.ErrClosed; service.errGaveUp (the `return errGaveUp` operand) is always overwritten and must NOT appear.
+Actual: 2 x unresolved(memory) 'load of escaping variable err', no origins, one entry without a position ('-:').
+-- args --
+service/service.go:@close
+-- stdout --
+$WORK/service/service.go:82:29-34: Error Set of (*example.com/kvstore/service.Service).Close: 2 entries, 2 unresolved
+-: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		-: in (*example.com/kvstore/service.Service).Close
+$WORK/service/service.go:86:2-2: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/service/service.go:86:2-2: in (*example.com/kvstore/service.Service).Close

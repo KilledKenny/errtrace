@@ -1,0 +1,23 @@
+SUSPECTED BUG: every instance yields unresolved(memory) "*Wrapped[C].Unwrap not modelled" instead of a Wrap of
+parameter err (unresolved(depends-on-caller) under a *Wrapped[C].Unwrap chain), see deep_wrap_decl.
+Declaration of the generic wrapper Wrap[C] (instances for int, string and UserID contexts).
+Expect parameter-derived entries each carrying a *Wrapped[C].Unwrap wrap chain.
+-- args --
+errs/errs.go:@wrap
+-- stdout --
+$WORK/errs/errs.go:48:15-19: Error Set of example.com/generics/errs.Wrap: 3 entries, 3 unresolved
+$WORK/errs/errs.go:52:9-40: unresolved(memory): *example.com/generics/errs.Wrapped[example.com/generics/validate.UserID].Unwrap not modelled
+	wrap chain (origin → target):
+		$WORK/errs/errs.go:52:9-40: *example.com/generics/errs.Wrapped[example.com/generics/validate.UserID].Unwrap
+	path (origin → target):
+		$WORK/errs/errs.go:52:9-40: in example.com/generics/errs.Wrap[example.com/generics/validate.UserID]
+$WORK/errs/errs.go:52:9-40: unresolved(memory): *example.com/generics/errs.Wrapped[int].Unwrap not modelled
+	wrap chain (origin → target):
+		$WORK/errs/errs.go:52:9-40: *example.com/generics/errs.Wrapped[int].Unwrap
+	path (origin → target):
+		$WORK/errs/errs.go:52:9-40: in example.com/generics/errs.Wrap[int]
+$WORK/errs/errs.go:52:9-40: unresolved(memory): *example.com/generics/errs.Wrapped[string].Unwrap not modelled
+	wrap chain (origin → target):
+		$WORK/errs/errs.go:52:9-40: *example.com/generics/errs.Wrapped[string].Unwrap
+	path (origin → target):
+		$WORK/errs/errs.go:52:9-40: in example.com/generics/errs.Wrap[string]

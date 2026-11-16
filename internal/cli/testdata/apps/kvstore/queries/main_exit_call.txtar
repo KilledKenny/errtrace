@@ -1,0 +1,9 @@
+Negative: call to os.Exit, a stdlib function without results.
+Expect: 0 entries or a diagnostic; no origins.
+-- args --
+cmd/kvstore/main.go:@exit_call
+-- stdout --
+-- stderr --
+errtrace: $WORK/cmd/kvstore/main.go:19:20: os.Exit has no error result
+-- exit --
+2

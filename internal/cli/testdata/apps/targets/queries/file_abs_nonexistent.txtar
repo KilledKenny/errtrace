@@ -1,0 +1,9 @@
+Absolute path to a file that does not exist (absolute paths are used as given, not joined to the cwd).
+Negative: exit 2; the message must show the absolute path unchanged.
+-- args --
+/nonexistent/errtrace-targets/main.go:1:1
+-- stdout --
+-- stderr --
+errtrace: /nonexistent/errtrace-targets/main.go: file is not in any loaded package
+-- exit --
+2

@@ -1,0 +1,14 @@
+Comparison against a local error value (first := Void(1)), not a sentinel: nothing can be removed for sure.
+Expect 2 entries: ErrDeclined and ErrInternal (possibly handled marks are acceptable).
+-- args --
+processor/eq.go:@localCompare
+-- stdout --
+$WORK/processor/eq.go:123:23-40: Error Set of example.com/guards/processor.ChargeSameAsFirst: 2 entries
+$WORK/payerr/payerr.go:8:2-13: sentinel example.com/guards/payerr.ErrDeclined
+	path (origin → target):
+		$WORK/gateway/gateway.go:59:10-28: in example.com/guards/gateway.Void
+		$WORK/processor/eq.go:125:9-24: in example.com/guards/processor.ChargeSameAsFirst, call to example.com/guards/gateway.Void
+$WORK/payerr/payerr.go:12:2-13: sentinel example.com/guards/payerr.ErrInternal
+	path (origin → target):
+		$WORK/gateway/gateway.go:62:10-28: in example.com/guards/gateway.Void
+		$WORK/processor/eq.go:125:9-24: in example.com/guards/processor.ChargeSameAsFirst, call to example.com/guards/gateway.Void

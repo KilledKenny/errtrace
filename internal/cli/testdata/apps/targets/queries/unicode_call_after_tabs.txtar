@@ -1,0 +1,10 @@
+Call-site target Größe(raw) on a line that starts with two tabs and a comment with multi-byte runes.
+Expected: 1 entry codec.ErrEmpty; all columns on line 13 are byte columns (tabs count 1).
+-- args --
+internal/codec/unicode.go:@uni_call
+-- stdout --
+$WORK/internal/codec/unicode.go:13:51-63: Error Set of call to Größe in example.com/targets/internal/codec.Länge: 1 entries
+$WORK/internal/codec/codec.go:12:2-10: sentinel example.com/targets/internal/codec.ErrEmpty
+	path (origin → target):
+		$WORK/internal/codec/unicode.go:6:13-21: in example.com/targets/internal/codec.Größe
+		$WORK/internal/codec/unicode.go:13:51-63: in example.com/targets/internal/codec.Länge, call to example.com/targets/internal/codec.Größe

@@ -1,0 +1,16 @@
+Declaration query on a filter func(err error) error that drops Is(ErrNotFound) / == ErrDeclined and wraps the rest.
+A parameter at the top of a declaration query is documented to become unresolved(depends-on-caller): expect
+one such entry carrying the "classified: %w" chain and marked possibly handled by both guards (the callers'
+arguments are only substituted in call-site queries, see param_guard_call_*).
+-- args --
+processor/helper.go:@classify
+-- stdout --
+$WORK/processor/helper.go:44:19-27: Error Set of example.com/guards/processor.Classify: 1 entries, 1 unresolved, 1 possibly handled
+$WORK/processor/helper.go:45:5-8: unresolved(depends-on-caller): parameter err (error)
+	wrap chain (origin → target):
+		$WORK/processor/helper.go:51:9-42: fmt.Errorf "classified: %w"
+	possibly handled:
+		$WORK/processor/helper.go:48:5-39: errors.Is with example.com/guards/payerr.ErrNotFound: unresolved value
+		$WORK/processor/helper.go:48:43-68: comparison with example.com/guards/payerr.ErrDeclined: unresolved value
+	path (origin → target):
+		$WORK/processor/helper.go:45:5-8: in example.com/guards/processor.Classify

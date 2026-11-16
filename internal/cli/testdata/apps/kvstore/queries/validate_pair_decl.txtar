@@ -1,0 +1,26 @@
+Two named error results (keyErr, valErr), the second assigned from the first result of a tuple call.
+Expect the union of both results: Key's 4 origins plus Value's concrete kverr.Code. 5 entries.
+-- args --
+validate/validate.go:@pair
+-- stdout --
+$WORK/validate/validate.go:36:15-19: Error Set of example.com/kvstore/validate.Pair: 5 entries
+$WORK/kverr/kverr.go:44:5-16: sentinel example.com/kvstore/kverr.ErrEmptyKey
+	path (origin → target):
+		$WORK/validate/validate.go:13:10-27: in example.com/kvstore/validate.Key
+		$WORK/validate/validate.go:37:11-17: in example.com/kvstore/validate.Pair, call to example.com/kvstore/validate.Key
+$WORK/validate/validate.go:16:10-68: concrete example.com/kvstore/kverr.FieldError
+	path (origin → target):
+		$WORK/validate/validate.go:16:10-68: in example.com/kvstore/validate.Key
+		$WORK/validate/validate.go:37:11-17: in example.com/kvstore/validate.Pair, call to example.com/kvstore/validate.Key
+$WORK/validate/validate.go:19:3-3: concrete example.com/kvstore/kverr.Reason
+	path (origin → target):
+		$WORK/validate/validate.go:19:3-3: in example.com/kvstore/validate.Key
+		$WORK/validate/validate.go:37:11-17: in example.com/kvstore/validate.Pair, call to example.com/kvstore/validate.Key
+$WORK/validate/validate.go:22:3-3: concrete example.com/kvstore/kverr.Code
+	path (origin → target):
+		$WORK/validate/validate.go:22:3-3: in example.com/kvstore/validate.Key
+		$WORK/validate/validate.go:37:11-17: in example.com/kvstore/validate.Pair, call to example.com/kvstore/validate.Key
+$WORK/validate/validate.go:30:10-28: concrete example.com/kvstore/kverr.Code
+	path (origin → target):
+		$WORK/validate/validate.go:30:10-28: in example.com/kvstore/validate.Value
+		$WORK/validate/validate.go:38:14-22: in example.com/kvstore/validate.Pair, call to example.com/kvstore/validate.Value

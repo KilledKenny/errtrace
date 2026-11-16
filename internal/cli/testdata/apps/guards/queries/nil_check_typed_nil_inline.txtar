@@ -1,0 +1,12 @@
+SUSPECTED BUG: typed nil not reported when it merges with a non-nil pointer. gateway.PrecheckInline does
+var ce *CodeError; if n > 10 { ce = &CodeError{...} }; return ce.
+Expected 2 entries: concrete *CodeError at the &CodeError literal and concrete *CodeError [typed nil].
+Actual: a single unmarked entry whose span is the returned identifier "ce", not the literal; no [typed nil].
+-- args --
+processor/eq.go:@nilCheckInline
+-- stdout --
+$WORK/processor/eq.go:171:25-47: Error Set of example.com/guards/processor.PrecheckInlineNilCheck: 1 entries
+$WORK/gateway/gateway.go:128:9-11: concrete *example.com/guards/payerr.CodeError
+	path (origin → target):
+		$WORK/gateway/gateway.go:128:9-11: in example.com/guards/gateway.PrecheckInline
+		$WORK/processor/eq.go:172:12-37: in example.com/guards/processor.PrecheckInlineNilCheck, call to example.com/guards/gateway.PrecheckInline

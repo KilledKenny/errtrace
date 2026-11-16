@@ -1,0 +1,9 @@
+Non-numeric line.
+Negative: exit 2, invalid position: not a number.
+-- args --
+internal/platform/platform.go:five:6
+-- stdout --
+-- stderr --
+errtrace: invalid position "internal/platform/platform.go:five:6": "five" is not a number
+-- exit --
+2

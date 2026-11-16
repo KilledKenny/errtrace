@@ -1,0 +1,9 @@
+Position on the receiver name "s" of Get: not the name nor the func keyword.
+Negative: exit 2, "no function declaration or call at position", empty stdout.
+-- args --
+internal/store/store.go:@get_recv
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/store/store.go:44:31: no function declaration or call at position
+-- exit --
+2

@@ -1,0 +1,15 @@
+SUSPECTED BUG: ErrStop is missing. The only entry is unresolved(memory) "*errs.Wrapped[int].Unwrap not modelled": the
+field-returning Unwrap of an instantiated generic type is not modelled, while the same non-generic type is
+(e2e wraps/custom_unwrap). Minimal repro: return &W[string]{Err: ErrX} with func (w *W[C]) Unwrap() error { return w.Err }.
+Two instantiations of the generic wrapper around a %w wrap.
+Expect one entry, ErrStop, with wrap chain "stop: %w", *Wrapped[string].Unwrap, *Wrapped[int].Unwrap (innermost first).
+-- args --
+failures.go:@deepwrap
+-- stdout --
+$WORK/failures.go:110:19-27: Error Set of example.com/generics.deepWrap: 1 entries, 1 unresolved
+$WORK/errs/errs.go:52:9-40: unresolved(memory): *example.com/generics/errs.Wrapped[int].Unwrap not modelled
+	wrap chain (origin → target):
+		$WORK/errs/errs.go:52:9-40: *example.com/generics/errs.Wrapped[int].Unwrap
+	path (origin → target):
+		$WORK/errs/errs.go:52:9-40: in example.com/generics/errs.Wrap[int]
+		$WORK/failures.go:111:9-77: in example.com/generics.deepWrap, call to example.com/generics/errs.Wrap[int]

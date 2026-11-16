@@ -1,0 +1,10 @@
+Type-set constraint (~int | ~int64 | ~float64): call site of Positive[int].
+Expect one entry, sentinel ErrNegative.
+-- args --
+validation.go:@posint
+-- stdout --
+$WORK/validation.go:33:12-45: Error Set of call to validate.Positive in example.com/generics.checkLimits: 1 entries
+$WORK/errs/errs.go:14:2-13: sentinel example.com/generics/errs.ErrNegative
+	path (origin → target):
+		$WORK/validate/validate.go:98:10-26: in example.com/generics/validate.Positive[int]
+		$WORK/validation.go:33:12-45: in example.com/generics.checkLimits, call to example.com/generics/validate.Positive[int]

@@ -1,0 +1,10 @@
+%w whose operand is always a nil error: fmt.Errorf still returns a non-nil
+*fmt.wrapError that wraps nothing. Expected 1 entry for it (like the opaque entry
+of errorf_non_error_operand); 0 entries would claim Footer never fails.
+-- args --
+parse/parse.go:@footer
+-- stdout --
+$WORK/parse/parse.go:115:17-23: Error Set of example.com/wrapchain/parse.Footer: 1 entries
+$WORK/parse/parse.go:118:10-50: opaque fmt.Errorf "footer %q: %w"
+	path (origin → target):
+		$WORK/parse/parse.go:118:10-50: in example.com/wrapchain/parse.Footer

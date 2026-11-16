@@ -1,0 +1,22 @@
+err != nil && !fsx.IsNotExist(err) -> return err: os.IsNotExist-shaped helper guard.
+Expect 2 entries: ErrPermission and ErrNotExist (kept, marked possibly handled by the helper call).
+-- args --
+processor/receipts.go:@fsHelper
+-- stdout --
+$WORK/processor/receipts.go:22:19-36: Error Set of example.com/guards/processor.OpenReceiptLegacy: 2 entries, 2 possibly handled
+$WORK/fsx/fsx.go:11:2-13: sentinel example.com/guards/fsx.ErrNotExist
+	wrap chain (origin → target):
+		$WORK/fsx/fsx.go:33:10-62: *example.com/guards/fsx.PathError.Unwrap
+	possibly handled:
+		$WORK/processor/receipts.go:23:43-62: guarded by call to example.com/guards/fsx.IsNotExist
+	path (origin → target):
+		$WORK/fsx/fsx.go:33:50-61: in example.com/guards/fsx.Open
+		$WORK/processor/receipts.go:23:12-26: in example.com/guards/processor.OpenReceiptLegacy, call to example.com/guards/fsx.Open
+$WORK/fsx/fsx.go:12:2-15: sentinel example.com/guards/fsx.ErrPermission
+	wrap chain (origin → target):
+		$WORK/fsx/fsx.go:35:10-64: *example.com/guards/fsx.PathError.Unwrap
+	possibly handled:
+		$WORK/processor/receipts.go:23:43-62: guarded by call to example.com/guards/fsx.IsNotExist
+	path (origin → target):
+		$WORK/fsx/fsx.go:35:50-63: in example.com/guards/fsx.Open
+		$WORK/processor/receipts.go:23:12-26: in example.com/guards/processor.OpenReceiptLegacy, call to example.com/guards/fsx.Open

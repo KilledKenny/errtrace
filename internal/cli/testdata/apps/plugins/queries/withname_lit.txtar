@@ -1,0 +1,9 @@
+Declaration Target on a closure literal (its func keyword).
+Expected: only opaque errors.New "dispatch: empty name".
+-- args --
+dispatch/dispatch.go:@withname_lit
+-- stdout --
+$WORK/dispatch/dispatch.go:52:26-30: Error Set of example.com/plugins/dispatch.WithName$1: 1 entries
+$WORK/dispatch/dispatch.go:54:11-45: opaque errors.New "dispatch: empty name"
+	path (origin → target):
+		$WORK/dispatch/dispatch.go:54:11-45: in example.com/plugins/dispatch.WithName$1

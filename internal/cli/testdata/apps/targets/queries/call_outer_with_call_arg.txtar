@@ -1,0 +1,14 @@
+Call-site target annotate(key, s.Ping()): outer call whose argument is itself a call.
+Expected: 1 entry, store.ErrClosed from Ping flowing through the err parameter, wrapped by "%s: %w" in annotate.
+-- args --
+cmd/ingest/main.go:@outer
+-- stdout --
+$WORK/cmd/ingest/main.go:97:19-52: Error Set of call to annotate in example.com/targets/cmd/ingest.ingest: 1 entries
+$WORK/internal/store/store.go:12:2-11: sentinel example.com/targets/internal/store.ErrClosed
+	wrap chain (origin → target):
+		$WORK/cmd/ingest/main.go:120:9-39: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/internal/store/store.go:62:10-19: in (example.com/targets/internal/store.Store).Ping
+		$WORK/cmd/ingest/main.go:97:43-51: in example.com/targets/cmd/ingest.ingest, call to (example.com/targets/internal/store.Store).Ping
+		$WORK/cmd/ingest/main.go:117:5-8: in example.com/targets/cmd/ingest.annotate
+		$WORK/cmd/ingest/main.go:97:19-52: in example.com/targets/cmd/ingest.ingest, call to example.com/targets/cmd/ingest.annotate

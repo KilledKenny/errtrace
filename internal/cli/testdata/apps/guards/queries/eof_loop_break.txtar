@@ -1,0 +1,10 @@
+Read loop: if err == fsx.EOF { break }; if err != nil { return err }; return nil after the loop.
+Expect exactly 1 entry: fsx.ErrShort. EOF must NOT appear.
+-- args --
+processor/receipts.go:@eofLoop
+-- stdout --
+$WORK/processor/receipts.go:30:18-30: Error Set of example.com/guards/processor.ReadReceipts: 1 entries
+$WORK/fsx/fsx.go:14:2-10: sentinel example.com/guards/fsx.ErrShort
+	path (origin → target):
+		$WORK/fsx/fsx.go:46:10-18: in example.com/guards/fsx.Read
+		$WORK/processor/receipts.go:32:10-21: in example.com/guards/processor.ReadReceipts, call to example.com/guards/fsx.Read

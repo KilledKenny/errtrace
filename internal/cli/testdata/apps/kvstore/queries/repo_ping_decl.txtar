@@ -1,0 +1,18 @@
+Method declared on an embedded struct (base), promoted to Repo.
+Expect: sentinel kverr.errInternal (through kverr.Internal), sentinel engine.ErrClosed and unresolved(memory) (through Engine.Wait).
+-- args --
+repo/repo.go:@ping
+-- stdout --
+$WORK/repo/repo.go:24:25-29: Error Set of (*example.com/kvstore/repo.base).Ping: 3 entries, 1 unresolved
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	path (origin → target):
+		$WORK/engine/engine.go:195:10-19: in (*example.com/kvstore/engine.Engine).Wait
+		$WORK/repo/repo.go:28:9-21: in (*example.com/kvstore/repo.base).Ping, call to (*example.com/kvstore/engine.Engine).Wait
+$WORK/kverr/kverr.go:18:2-13: sentinel example.com/kvstore/kverr.errInternal
+	path (origin → target):
+		$WORK/kverr/kverr.go:22:45-56: in example.com/kvstore/kverr.Internal
+		$WORK/repo/repo.go:26:10-26: in (*example.com/kvstore/repo.base).Ping, call to example.com/kvstore/kverr.Internal
+$WORK/engine/engine.go:196:14-22: unresolved(memory): channel receive in select
+	path (origin → target):
+		$WORK/engine/engine.go:196:14-22: in (*example.com/kvstore/engine.Engine).Wait
+		$WORK/repo/repo.go:28:9-21: in (*example.com/kvstore/repo.base).Ping, call to (*example.com/kvstore/engine.Engine).Wait

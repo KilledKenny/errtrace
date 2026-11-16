@@ -1,0 +1,17 @@
+Call site of (*bufio.Reader).ReadString on a reader over strings.Reader. At run
+time this can only be io.EOF, but bufio keeps the pending error in the field
+b.err: expected an Unresolved(memory) "load of field err of *bufio.Reader" (never an
+empty set).
+-- args --
+source/source.go:@readstring
+-- stdout --
+$WORK/source/source.go:159:9-43: Error Set of call to br.ReadString in example.com/stdlibio/source.FirstLine: 1 entries, 1 unresolved, 1 possibly handled
+$GOROOT/src/bufio/bufio.go:*: unresolved(memory): load of field err of *bufio.Reader
+	possibly handled:
+		$GOROOT/src/bufio/bufio.go:*: comparison with bufio.ErrBufferFull: unresolved value
+	path (origin → target):
+		$GOROOT/src/bufio/bufio.go:*: in (*bufio.Reader).readErr
+		$GOROOT/src/bufio/bufio.go:*: in (*bufio.Reader).ReadSlice, call to (*bufio.Reader).readErr
+		$GOROOT/src/bufio/bufio.go:*: in (*bufio.Reader).collectFragments, call to (*bufio.Reader).ReadSlice
+		$GOROOT/src/bufio/bufio.go:*: in (*bufio.Reader).ReadString, call to (*bufio.Reader).collectFragments
+		$WORK/source/source.go:159:9-43: in example.com/stdlibio/source.FirstLine, call to (*bufio.Reader).ReadString

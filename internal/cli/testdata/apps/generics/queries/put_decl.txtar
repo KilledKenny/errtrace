@@ -1,0 +1,18 @@
+Declaration of the generic method (*Cache[K,V]).Put. Called instances are [string,int], [UserID,User] and [string,Tag];
+[UserID,Name] exists only in a method set and is never called, so -debug=target must not list it.
+Expect ErrDuplicate, *TypedErr[string] and *TypedErr[validate.UserID].
+-- args --
+-debug=target cache/cache.go:@put
+-- stdout --
+$WORK/cache/cache.go:39:31-34: Error Set of (*example.com/generics/cache.Cache[K, V]).Put: 3 entries
+$WORK/errs/errs.go:16:2-14: sentinel example.com/generics/errs.ErrDuplicate [+2 more paths]
+	path (origin → target):
+		$WORK/cache/cache.go:41:10-27: in (*example.com/generics/cache.Cache[example.com/generics/validate.UserID, example.com/generics/model.User]).Put
+$WORK/cache/cache.go:44:10-46: concrete *example.com/generics/errs.TypedErr[example.com/generics/validate.UserID]
+	path (origin → target):
+		$WORK/cache/cache.go:44:10-46: in (*example.com/generics/cache.Cache[example.com/generics/validate.UserID, example.com/generics/model.User]).Put
+$WORK/cache/cache.go:44:10-46: concrete *example.com/generics/errs.TypedErr[string] [+1 more paths]
+	path (origin → target):
+		$WORK/cache/cache.go:44:10-46: in (*example.com/generics/cache.Cache[string, example.com/generics/model.Tag]).Put
+-- stderr --
+target: declaration (*example.com/generics/cache.Cache[K, V]).Put funcs=[(*example.com/generics/cache.Cache[example.com/generics/validate.UserID, example.com/generics/model.User]).Put (*example.com/generics/cache.Cache[string, example.com/generics/model.Tag]).Put (*example.com/generics/cache.Cache[string, int]).Put] span=$WORK/cache/cache.go:39:31-34

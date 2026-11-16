@@ -1,0 +1,10 @@
+Type parameter constrained by error: Lift[*TypedErr[int]](e) converts E to error.
+Expect one concrete *TypedErr[int], created at the argument expression.
+-- args --
+failures.go:@liftptr
+-- stdout --
+$WORK/failures.go:71:10-72: Error Set of call to errs.Lift in example.com/generics.liftBoth: 1 entries
+$WORK/errs/errs.go:66:49-50: concrete *example.com/generics/errs.TypedErr[int]
+	path (origin → target):
+		$WORK/errs/errs.go:66:49-50: in example.com/generics/errs.Lift[*example.com/generics/errs.TypedErr[int]]
+		$WORK/failures.go:71:10-72: in example.com/generics.liftBoth, call to example.com/generics/errs.Lift[*example.com/generics/errs.TypedErr[int]]

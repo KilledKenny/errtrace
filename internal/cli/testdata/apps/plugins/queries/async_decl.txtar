@@ -1,0 +1,10 @@
+The error of a dynamic call made in a goroutine comes back over a
+channel. Channel receives are out of scope: expected one
+unresolved(memory) entry and no Origins.
+-- args --
+dispatch/dispatch.go:@async
+-- stdout --
+$WORK/dispatch/dispatch.go:175:32-37: Error Set of (*example.com/plugins/dispatch.Dispatcher).Async: 1 entries, 1 unresolved
+$WORK/dispatch/dispatch.go:178:9-15: unresolved(memory): channel receive
+	path (origin → target):
+		$WORK/dispatch/dispatch.go:178:9-15: in (*example.com/plugins/dispatch.Dispatcher).Async

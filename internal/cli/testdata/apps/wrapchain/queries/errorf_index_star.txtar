@@ -1,0 +1,17 @@
+Explicit indexes with * widths: "%[2]*[1]d: %[3]w (not %[4]v)" wraps argument 3,
+and "%*d|%-12w|%+v" wraps argument 3 too (the * eats one; flags/width on %w do not
+matter). Expected 2 entries: doc.ErrEmpty and doc.ErrTooLong; doc.ErrSyntax (%v) absent.
+-- args --
+parse/parse.go:@column
+-- stdout --
+$WORK/parse/parse.go:84:17-23: Error Set of example.com/wrapchain/parse.Column: 2 entries
+$WORK/doc/doc.go:17:2-10: sentinel example.com/wrapchain/doc.ErrEmpty
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:86:10-97: fmt.Errorf "col %[2]*[1]d: %[3]w (not %[4]v)"
+	path (origin → target):
+		$WORK/parse/parse.go:86:69-81: in example.com/wrapchain/parse.Column
+$WORK/doc/doc.go:19:2-12: sentinel example.com/wrapchain/doc.ErrTooLong
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:89:10-80: fmt.Errorf "%*d|%-12w|%+v"
+	path (origin → target):
+		$WORK/parse/parse.go:89:50-64: in example.com/wrapchain/parse.Column

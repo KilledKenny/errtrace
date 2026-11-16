@@ -1,0 +1,9 @@
+A directory instead of a file.
+Negative: exit 2 with a clear message that a file position is needed.
+-- args --
+cmd/ingest
+-- stdout --
+-- stderr --
+errtrace: $WORK/cmd/ingest: file is not in any loaded package
+-- exit --
+2

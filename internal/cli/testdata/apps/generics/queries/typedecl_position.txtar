@@ -1,0 +1,9 @@
+Negative: the position is on the name of the generic type TypedErr, not on a function or call.
+Expect exit 2 with "no function declaration or call at position".
+-- args --
+errs/errs.go:@typedecl
+-- stdout --
+-- stderr --
+errtrace: $WORK/errs/errs.go:22:19: no function declaration or call at position
+-- exit --
+2

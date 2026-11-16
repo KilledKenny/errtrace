@@ -1,0 +1,12 @@
+e := &OpError{Op: ...}; e.Err = doc.ErrSyntax; return e - the wrapped field is
+stored after the literal. Expected 1 entry: doc.ErrSyntax with the chain
+*xerr.OpError.Unwrap (or at least an Unresolved under the wrapper).
+-- args --
+transform/transform.go:@late
+-- stdout --
+$WORK/transform/transform.go:52:15-19: Error Set of example.com/wrapchain/transform.Late: 1 entries
+$WORK/doc/doc.go:18:2-11: sentinel example.com/wrapchain/doc.ErrSyntax
+	wrap chain (origin → target):
+		$WORK/transform/transform.go:54:8-33: *example.com/wrapchain/xerr.OpError.Unwrap
+	path (origin → target):
+		$WORK/transform/transform.go:55:11-24: in example.com/wrapchain/transform.Late

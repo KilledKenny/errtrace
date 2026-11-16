@@ -1,0 +1,13 @@
+switch err: case ErrDeclined returns err, case ErrTimeout returns ErrInternal, default returns nil.
+Expect exactly 2 entries: ErrDeclined and ErrInternal.
+-- args --
+processor/eq.go:@valueSwitchKeep
+-- stdout --
+$WORK/processor/eq.go:77:26-42: Error Set of example.com/guards/processor.ChargeSwitchKeep: 2 entries
+$WORK/payerr/payerr.go:8:2-13: sentinel example.com/guards/payerr.ErrDeclined
+	path (origin → target):
+		$WORK/gateway/gateway.go:18:10-28: in example.com/guards/gateway.Charge
+		$WORK/processor/eq.go:78:9-26: in example.com/guards/processor.ChargeSwitchKeep, call to example.com/guards/gateway.Charge
+$WORK/payerr/payerr.go:12:2-13: sentinel example.com/guards/payerr.ErrInternal
+	path (origin → target):
+		$WORK/processor/eq.go:83:10-28: in example.com/guards/processor.ChargeSwitchKeep

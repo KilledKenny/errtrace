@@ -1,0 +1,17 @@
+Unwrap() []error wrapper built from a slice literal. Expected 2 entries:
+doc.ErrNoTitle and doc.ErrEmpty with the chain *xerr.MultiError.Unwrap (or an
+unresolved(memory) under the wrapper if the slice is not followed).
+-- args --
+transform/transform.go:@multi
+-- stdout --
+$WORK/transform/transform.go:98:16-21: Error Set of example.com/wrapchain/transform.Multi: 2 entries
+$WORK/doc/doc.go:17:2-10: sentinel example.com/wrapchain/doc.ErrEmpty
+	wrap chain (origin → target):
+		$WORK/transform/transform.go:100:10-71: *example.com/wrapchain/xerr.MultiError.Unwrap
+	path (origin → target):
+		$WORK/transform/transform.go:100:57-69: in example.com/wrapchain/transform.Multi
+$WORK/doc/doc.go:20:2-12: sentinel example.com/wrapchain/doc.ErrNoTitle
+	wrap chain (origin → target):
+		$WORK/transform/transform.go:100:10-71: *example.com/wrapchain/xerr.MultiError.Unwrap
+	path (origin → target):
+		$WORK/transform/transform.go:100:41-55: in example.com/wrapchain/transform.Multi

@@ -1,0 +1,9 @@
+-p naming a directory without Go files.
+Negative: exit 2, "no Go files in ...".
+-- args --
+-p ./assets internal/platform/platform.go:5:6
+-- stdout --
+-- stderr --
+errtrace: -: no Go files in $WORK/assets
+-- exit --
+2

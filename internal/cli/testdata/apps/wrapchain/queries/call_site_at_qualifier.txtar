@@ -1,0 +1,10 @@
+Negative: the position is on the package qualifier "xerr" of xerr.WithOp(...),
+not on the callee name. Expected (target rules): exit 2 with "no function
+declaration or call at position"; with_op_nil_call points at WithOp instead.
+-- args --
+transform/transform.go:@nilqual
+-- stdout --
+-- stderr --
+errtrace: $WORK/transform/transform.go:27:21: no function declaration or call at position
+-- exit --
+2

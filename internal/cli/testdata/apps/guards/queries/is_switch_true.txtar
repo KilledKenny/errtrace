@@ -1,0 +1,19 @@
+Tagless switch: case err == nil; case Is(ErrNotFound): nil; case Is(ErrRateLimited): ErrInternal; else err.
+Expect 3 entries: ErrInternal, ErrTimeout (OpError.Unwrap), *NetError.
+-- args --
+processor/is.go:@switchTrue
+-- stdout --
+$WORK/processor/is.go:133:21-37: Error Set of example.com/guards/processor.LookupSwitchTrue: 3 entries
+$WORK/payerr/payerr.go:9:2-12: sentinel example.com/guards/payerr.ErrTimeout
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:38:10-63: *example.com/guards/payerr.OpError.Unwrap
+	path (origin → target):
+		$WORK/gateway/gateway.go:38:45-62: in example.com/guards/gateway.Lookup
+		$WORK/processor/is.go:134:9-26: in example.com/guards/processor.LookupSwitchTrue, call to example.com/guards/gateway.Lookup
+$WORK/payerr/payerr.go:12:2-13: sentinel example.com/guards/payerr.ErrInternal
+	path (origin → target):
+		$WORK/processor/is.go:141:10-28: in example.com/guards/processor.LookupSwitchTrue
+$WORK/gateway/gateway.go:42:9-39: concrete *example.com/guards/payerr.NetError
+	path (origin → target):
+		$WORK/gateway/gateway.go:42:9-39: in example.com/guards/gateway.Lookup
+		$WORK/processor/is.go:134:9-26: in example.com/guards/processor.LookupSwitchTrue, call to example.com/guards/gateway.Lookup

@@ -1,0 +1,11 @@
+SUSPECTED BUG: path only - the hop through the generic instance is collapsed (see check_explicit_call); the Error Set itself is as expected.
+Call-site Target given by the "(" of an inferred instantiation, Check[*Email] (pointer-receiver method).
+Expect one opaque fmt.Errorf "email %q: missing @"; no sentinels.
+-- args --
+validation.go:@lparen
+-- stdout --
+$WORK/validation.go:17:23-51: Error Set of call to validate.Check in example.com/generics.checkEmail: 1 entries
+$WORK/validate/validate.go:48:10-51: opaque fmt.Errorf "email %q: missing @"
+	path (origin → target):
+		$WORK/validate/validate.go:48:10-51: in (*example.com/generics/validate.Email).Validate
+		$WORK/validation.go:17:23-51: in example.com/generics.checkEmail, call to (*example.com/generics/validate.Email).Validate

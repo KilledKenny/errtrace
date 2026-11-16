@@ -1,0 +1,17 @@
+Call-site Target annotate("trim", upper(d)): the argument is substituted.
+Expected 1 entry: doc.ErrNoTitle with the chain fmt.Errorf "%s: %w" (the Wrapf
+helper returns nil for nil); no depends-on-caller.
+-- args --
+transform/transform.go:@anncall
+-- stdout --
+$WORK/transform/transform.go:177:21-47: Error Set of call to annotate in example.com/wrapchain/transform.Trim: 1 entries
+$WORK/doc/doc.go:20:2-12: sentinel example.com/wrapchain/doc.ErrNoTitle
+	wrap chain (origin → target):
+		$WORK/xerr/helpers.go:21:9-64: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/transform/transform.go:15:10-24: in example.com/wrapchain/transform.upper
+		$WORK/transform/transform.go:177:38-46: in example.com/wrapchain/transform.Trim, call to example.com/wrapchain/transform.upper
+		$WORK/transform/transform.go:172:20-23: in example.com/wrapchain/transform.annotate
+		$WORK/xerr/helpers.go:18:5-8: in example.com/wrapchain/xerr.Wrapf
+		$WORK/transform/transform.go:172:9-41: in example.com/wrapchain/transform.annotate, call to example.com/wrapchain/xerr.Wrapf
+		$WORK/transform/transform.go:177:21-47: in example.com/wrapchain/transform.Trim, call to example.com/wrapchain/transform.annotate

@@ -1,0 +1,32 @@
+Call-site query: Classify(gateway.Lookup(n)); the callee's guard on its parameter filters the argument.
+Expect 3 entries with the "classified: %w" chain: ErrTimeout, ErrRateLimited, *NetError. No ErrNotFound and
+nothing from the other callers of Classify.
+-- args --
+processor/helper.go:@classifyLookupCall
+-- stdout --
+$WORK/processor/helper.go:56:32-59: Error Set of call to Classify in example.com/guards/processor.LookupClassified: 3 entries
+$WORK/payerr/payerr.go:9:2-12: sentinel example.com/guards/payerr.ErrTimeout
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:38:10-63: *example.com/guards/payerr.OpError.Unwrap
+		$WORK/processor/helper.go:51:9-42: fmt.Errorf "classified: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:38:45-62: in example.com/guards/gateway.Lookup
+		$WORK/processor/helper.go:56:41-58: in example.com/guards/processor.LookupClassified, call to example.com/guards/gateway.Lookup
+		$WORK/processor/helper.go:45:5-8: in example.com/guards/processor.Classify
+		$WORK/processor/helper.go:56:32-59: in example.com/guards/processor.LookupClassified, call to example.com/guards/processor.Classify
+$WORK/payerr/payerr.go:11:2-16: sentinel example.com/guards/payerr.ErrRateLimited
+	wrap chain (origin → target):
+		$WORK/processor/helper.go:51:9-42: fmt.Errorf "classified: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:40:10-31: in example.com/guards/gateway.Lookup
+		$WORK/processor/helper.go:56:41-58: in example.com/guards/processor.LookupClassified, call to example.com/guards/gateway.Lookup
+		$WORK/processor/helper.go:45:5-8: in example.com/guards/processor.Classify
+		$WORK/processor/helper.go:56:32-59: in example.com/guards/processor.LookupClassified, call to example.com/guards/processor.Classify
+$WORK/gateway/gateway.go:42:9-39: concrete *example.com/guards/payerr.NetError
+	wrap chain (origin → target):
+		$WORK/processor/helper.go:51:9-42: fmt.Errorf "classified: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:42:9-39: in example.com/guards/gateway.Lookup
+		$WORK/processor/helper.go:56:41-58: in example.com/guards/processor.LookupClassified, call to example.com/guards/gateway.Lookup
+		$WORK/processor/helper.go:45:5-8: in example.com/guards/processor.Classify
+		$WORK/processor/helper.go:56:32-59: in example.com/guards/processor.LookupClassified, call to example.com/guards/processor.Classify

@@ -1,0 +1,16 @@
+Wrap of the result of a function value (the only Candidate is export.Audit).
+Expected 1 entry: doc.ErrNoTitle with the chain fmt.Errorf "audit: %w" then
+*xerr.OpError.Unwrap.
+-- args --
+export/export.go:@runhook
+-- stdout --
+$WORK/export/export.go:72:18-25: Error Set of example.com/wrapchain/export.RunHook: 1 entries
+$WORK/doc/doc.go:20:2-12: sentinel example.com/wrapchain/doc.ErrNoTitle
+	wrap chain (origin → target):
+		$WORK/export/export.go:79:10-49: fmt.Errorf "audit: %w"
+		$WORK/xerr/helpers.go:29:9-35: *example.com/wrapchain/xerr.OpError.Unwrap
+	path (origin → target):
+		$WORK/export/export.go:79:34-48: in example.com/wrapchain/export.Audit
+		$WORK/export/export.go:73:29-33: in example.com/wrapchain/export.RunHook, call to example.com/wrapchain/export.Audit (dynamic function value h: 1 of 1 candidates)
+		$WORK/xerr/helpers.go:26:5-8: in example.com/wrapchain/xerr.WithOp
+		$WORK/export/export.go:73:9-34: in example.com/wrapchain/export.RunHook, call to example.com/wrapchain/xerr.WithOp

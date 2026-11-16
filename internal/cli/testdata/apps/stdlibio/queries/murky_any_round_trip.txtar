@@ -1,0 +1,11 @@
+Empty-interface round trip in one function: var boxed any = ErrPlugin; return
+boxed.(error). Ideal result: sentinel murky.ErrPlugin. Type assertions from any are
+not modelled, so the documented fallback is one Unresolved(memory) entry at the
+assertion; a 0-entry set would be a silent drop.
+-- args --
+murky/murky.go:@roundtrip
+-- stdout --
+$WORK/murky/murky.go:165:20-29: Error Set of example.com/stdlibio/murky.RoundTrip: 1 entries, 1 unresolved
+$WORK/murky/murky.go:167:9-22: unresolved(memory): value of TypeAssert not modelled
+	path (origin → target):
+		$WORK/murky/murky.go:167:9-22: in example.com/stdlibio/murky.RoundTrip

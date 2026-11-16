@@ -1,0 +1,11 @@
+SUSPECTED BUG: (minor, misleading message) the Target file does not exist.
+Expected: exit 2 with a message that says so (no such file or directory). Actual: exit 2
+with "nosuch/file.go: file is not in any loaded package", the same text as for an
+existing file excluded by build tags.
+-- args --
+nosuch/file.go:3:1
+-- stdout --
+-- stderr --
+errtrace: $WORK/nosuch/file.go: file is not in any loaded package
+-- exit --
+2

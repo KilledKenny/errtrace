@@ -1,0 +1,26 @@
+Debug list with a trailing comma, i.e. an empty mode (unlike -p and -tags, empty elements are not skipped).
+Negative: exit 2, invalid -debug value "".
+-- args --
+-debug=target, internal/platform/platform.go:5:6
+-- stdout --
+-- stderr --
+errtrace: invalid -debug value "" (want a comma-separated list of target,timing,summary)
+usage: errtrace [flags] <target>
+
+errtrace reports the Error Set of a Target: every Error Origin that can reach
+the Target's error result, with its Propagation Path.
+
+<target> is a position in a Go file, with byte columns:
+  file.go:LINE:COL | file.go:#OFFSET | file.go:L:C-L2:C2 (the start is used)
+
+flags:
+  -chain-depth N
+    	max Wrap Chain depth N before truncation (default 8)
+  -fanout N
+    	group entries under dynamic call sites with at least N Candidates (0 = never group) (default 8)
+  -p patterns
+    	comma-separated package patterns to load (default "./...")
+  -tags list
+    	comma-separated list of build tags
+-- exit --
+2

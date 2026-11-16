@@ -1,0 +1,9 @@
+Call-site target inside init(): codec.Register("text"), marker on the package qualifier "codec".
+The qualifier is the selector's X, not the callee identifier, so by the tool's rule this is negative (no target), like call_selector_x.
+-- args --
+cmd/ingest/main.go:@init_call
+-- stdout --
+-- stderr --
+errtrace: $WORK/cmd/ingest/main.go:28:26: no function declaration or call at position
+-- exit --
+2

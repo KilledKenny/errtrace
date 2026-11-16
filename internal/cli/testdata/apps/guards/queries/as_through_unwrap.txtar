@@ -1,0 +1,12 @@
+errors.As(&*CodeError) on gateway.Capture: CodeError bare and hidden behind *OpError.
+Expect 1 entry: ErrDeclined with the "capture: %w" chain. Both *CodeError origins must be removed.
+-- args --
+processor/as.go:@asUnwrap
+-- stdout --
+$WORK/processor/as.go:45:19-28: Error Set of example.com/guards/processor.CaptureAs: 1 entries
+$WORK/payerr/payerr.go:8:2-13: sentinel example.com/guards/payerr.ErrDeclined
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:76:10-55: fmt.Errorf "capture: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:76:36-54: in example.com/guards/gateway.Capture
+		$WORK/processor/as.go:46:9-27: in example.com/guards/processor.CaptureAs, call to example.com/guards/gateway.Capture

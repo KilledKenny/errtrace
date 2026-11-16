@@ -1,0 +1,452 @@
+Endpoint returns the sentinel config.ErrNoEndpoint unwrapped, or the url.Parse error
+under fmt.Errorf "config: endpoint: %w". url.Parse wraps everything in *url.Error, so
+every stdlib entry (url.EscapeError, url.InvalidHostError, netip parse errors, opaque
+errors.New ...) must end with the chain *net/url.Error.Unwrap -> fmt.Errorf
+"config: endpoint: %w"; ErrNoEndpoint has no chain.
+-- args --
+config/config.go:@endpoint
+-- stdout --
+$WORK/config/config.go:81:19-27: Error Set of example.com/stdlibio/config.Endpoint: 40 entries
+$WORK/config/config.go:16:5-18: sentinel example.com/stdlibio/config.ErrNoEndpoint
+	path (origin → target):
+		$WORK/config/config.go:83:15-28: in example.com/stdlibio/config.Endpoint
+$GOROOT/src/net/netip/netip.go:*: concrete net/netip.parseAddrError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: fmt.Errorf "invalid host: %w"
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.ParseAddr
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost, call to net/netip.ParseAddr
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/netip/netip.go:*: concrete net/netip.parseAddrError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: fmt.Errorf "invalid host: %w"
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.ParseAddr
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost, call to net/netip.ParseAddr
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/netip/netip.go:*: concrete net/netip.parseAddrError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: fmt.Errorf "invalid host: %w"
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv4Fields
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv4, call to net/netip.parseIPv4Fields
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.ParseAddr, call to net/netip.parseIPv4
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost, call to net/netip.ParseAddr
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/netip/netip.go:*: concrete net/netip.parseAddrError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: fmt.Errorf "invalid host: %w"
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv4Fields
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv4, call to net/netip.parseIPv4Fields
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.ParseAddr, call to net/netip.parseIPv4
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost, call to net/netip.ParseAddr
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/netip/netip.go:*: concrete net/netip.parseAddrError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: fmt.Errorf "invalid host: %w"
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv4Fields
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv4, call to net/netip.parseIPv4Fields
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.ParseAddr, call to net/netip.parseIPv4
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost, call to net/netip.ParseAddr
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/netip/netip.go:*: concrete net/netip.parseAddrError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: fmt.Errorf "invalid host: %w"
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv4Fields
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv4, call to net/netip.parseIPv4Fields
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.ParseAddr, call to net/netip.parseIPv4
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost, call to net/netip.ParseAddr
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/netip/netip.go:*: concrete net/netip.parseAddrError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: fmt.Errorf "invalid host: %w"
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv4Fields
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv4, call to net/netip.parseIPv4Fields
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.ParseAddr, call to net/netip.parseIPv4
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost, call to net/netip.ParseAddr
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/netip/netip.go:*: concrete net/netip.parseAddrError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: fmt.Errorf "invalid host: %w"
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv4Fields
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv4, call to net/netip.parseIPv4Fields
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.ParseAddr, call to net/netip.parseIPv4
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost, call to net/netip.ParseAddr
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/netip/netip.go:*: concrete net/netip.parseAddrError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: fmt.Errorf "invalid host: %w"
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv6
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.ParseAddr, call to net/netip.parseIPv6
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost, call to net/netip.ParseAddr
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/netip/netip.go:*: concrete net/netip.parseAddrError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: fmt.Errorf "invalid host: %w"
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv6
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.ParseAddr, call to net/netip.parseIPv6
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost, call to net/netip.ParseAddr
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/netip/netip.go:*: concrete net/netip.parseAddrError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: fmt.Errorf "invalid host: %w"
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv6
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.ParseAddr, call to net/netip.parseIPv6
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost, call to net/netip.ParseAddr
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/netip/netip.go:*: concrete net/netip.parseAddrError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: fmt.Errorf "invalid host: %w"
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv6
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.ParseAddr, call to net/netip.parseIPv6
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost, call to net/netip.ParseAddr
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/netip/netip.go:*: concrete net/netip.parseAddrError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: fmt.Errorf "invalid host: %w"
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv6
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.ParseAddr, call to net/netip.parseIPv6
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost, call to net/netip.ParseAddr
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/netip/netip.go:*: concrete net/netip.parseAddrError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: fmt.Errorf "invalid host: %w"
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv6
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.ParseAddr, call to net/netip.parseIPv6
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost, call to net/netip.ParseAddr
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/netip/netip.go:*: concrete net/netip.parseAddrError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: fmt.Errorf "invalid host: %w"
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv6
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.ParseAddr, call to net/netip.parseIPv6
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost, call to net/netip.ParseAddr
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/netip/netip.go:*: concrete net/netip.parseAddrError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: fmt.Errorf "invalid host: %w"
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv6
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.ParseAddr, call to net/netip.parseIPv6
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost, call to net/netip.ParseAddr
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/netip/netip.go:*: concrete net/netip.parseAddrError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: fmt.Errorf "invalid host: %w"
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv6
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.ParseAddr, call to net/netip.parseIPv6
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost, call to net/netip.ParseAddr
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/netip/netip.go:*: concrete net/netip.parseAddrError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: fmt.Errorf "invalid host: %w"
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv6
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.ParseAddr, call to net/netip.parseIPv6
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost, call to net/netip.ParseAddr
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/netip/netip.go:*: concrete net/netip.parseAddrError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: fmt.Errorf "invalid host: %w"
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv6
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.ParseAddr, call to net/netip.parseIPv6
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost, call to net/netip.ParseAddr
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/netip/netip.go:*: concrete net/netip.parseAddrError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: fmt.Errorf "invalid host: %w"
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.parseIPv6
+		$GOROOT/src/net/netip/netip.go:*: in net/netip.ParseAddr, call to net/netip.parseIPv6
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost, call to net/netip.ParseAddr
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/url/url.go:*: concrete net/url.EscapeError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/url/url.go:*: in net/url.unescape
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.unescape
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/url/url.go:*: concrete net/url.EscapeError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/url/url.go:*: in net/url.unescape
+		$GOROOT/src/net/url/url.go:*: in (*net/url.URL).setFragment, call to net/url.unescape
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to (*net/url.URL).setFragment
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/url/url.go:*: concrete net/url.EscapeError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/url/url.go:*: in net/url.unescape
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.unescape
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/url/url.go:*: concrete net/url.EscapeError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/url/url.go:*: in net/url.unescape
+		$GOROOT/src/net/url/url.go:*: in (*net/url.URL).setFragment, call to net/url.unescape
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to (*net/url.URL).setFragment
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/url/url.go:*: concrete net/url.EscapeError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/url/url.go:*: in net/url.unescape
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.unescape
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/url/url.go:*: concrete net/url.EscapeError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/url/url.go:*: in net/url.unescape
+		$GOROOT/src/net/url/url.go:*: in (*net/url.URL).setFragment, call to net/url.unescape
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to (*net/url.URL).setFragment
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/url/url.go:*: concrete net/url.InvalidHostError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/url/url.go:*: in net/url.unescape
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.unescape
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/url/url.go:*: concrete net/url.InvalidHostError
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/url/url.go:*: in net/url.unescape
+		$GOROOT/src/net/url/url.go:*: in (*net/url.URL).setFragment, call to net/url.unescape
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to (*net/url.URL).setFragment
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/url/url.go:*: opaque errors.New "missing protocol scheme"
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/url/url.go:*: in net/url.getScheme
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.getScheme
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/url/url.go:*: opaque errors.New "net/url: invalid control character in URL"
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/url/url.go:*: in net/url.parse
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/url/url.go:*: opaque errors.New "empty url"
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/url/url.go:*: in net/url.parse
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/url/url.go:*: opaque errors.New "invalid URI for request"
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/url/url.go:*: in net/url.parse
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/url/url.go:*: opaque errors.New "first path segment in URL cannot contain colon"
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/url/url.go:*: in net/url.parse
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/url/url.go:*: opaque errors.New "net/url: invalid userinfo"
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/url/url.go:*: opaque errors.New "invalid IP-literal"
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/url/url.go:*: opaque errors.New "missing ']' in host"
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/url/url.go:*: opaque fmt.Errorf "invalid port %q after host"
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/url/url.go:*: opaque errors.New "invalid IP-literal"
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse
+$GOROOT/src/net/url/url.go:*: opaque fmt.Errorf "invalid port %q after host"
+	wrap chain (origin → target):
+		$GOROOT/src/net/url/url.go:*: *net/url.Error.Unwrap
+		$WORK/config/config.go:87:15-54: fmt.Errorf "config: endpoint: %w"
+	path (origin → target):
+		$GOROOT/src/net/url/url.go:*: in net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parseAuthority, call to net/url.parseHost
+		$GOROOT/src/net/url/url.go:*: in net/url.parse, call to net/url.parseAuthority
+		$GOROOT/src/net/url/url.go:*: in net/url.Parse, call to net/url.parse
+		$WORK/config/config.go:85:12-37: in example.com/stdlibio/config.Endpoint, call to net/url.Parse

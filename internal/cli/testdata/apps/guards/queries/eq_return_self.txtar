@@ -1,0 +1,10 @@
+if err == ErrDeclined { return err }; return nil: the guarded branch returns the error itself.
+Expect exactly 1 entry: ErrDeclined. Nothing else from Charge may appear.
+-- args --
+processor/eq.go:@onlyDeclined
+-- stdout --
+$WORK/processor/eq.go:41:23-41: Error Set of example.com/guards/processor.ChargeOnlyDeclined: 1 entries
+$WORK/payerr/payerr.go:8:2-13: sentinel example.com/guards/payerr.ErrDeclined
+	path (origin → target):
+		$WORK/gateway/gateway.go:18:10-28: in example.com/guards/gateway.Charge
+		$WORK/processor/eq.go:42:9-26: in example.com/guards/processor.ChargeOnlyDeclined, call to example.com/guards/gateway.Charge

@@ -1,0 +1,27 @@
+Map of handlers filled by a package-level initialiser (audit), init()
+(metrics) and main (pagerHandler, a type from package main). Expected:
+core.ErrNoRoute wrapped by "%w: %s"; ErrAuditFull; ErrMetricsDown;
+ErrPager. ErrOrphan absent (orphanHandler is never instantiated).
+-- args --
+registry/registry.go:@dispatch
+-- stdout --
+$WORK/registry/registry.go:68:19-27: Error Set of example.com/plugins/registry.Dispatch: 4 entries
+$WORK/core/core.go:15:2-12: sentinel example.com/plugins/core.ErrNoRoute
+	wrap chain (origin → target):
+		$WORK/registry/registry.go:62:15-58: fmt.Errorf "%w: %s"
+	path (origin → target):
+		$WORK/registry/registry.go:62:36-51: in example.com/plugins/registry.Lookup
+		$WORK/registry/registry.go:69:12-24: in example.com/plugins/registry.Dispatch, call to example.com/plugins/registry.Lookup
+$WORK/drivers/drivers.go:16:2-10: sentinel example.com/plugins/drivers.ErrPager
+	path (origin → target):
+		$WORK/drivers/drivers.go:82:10-18: in (example.com/plugins/drivers.Pager).Send
+		$WORK/main.go:30:57-80: in (example.com/plugins.pagerHandler).Handle, call to (example.com/plugins/drivers.Pager).Send
+		$WORK/registry/registry.go:73:9-40: in example.com/plugins/registry.Dispatch, call to (example.com/plugins.pagerHandler).Handle (dynamic (example.com/plugins/core.Handler).Handle: 3 of 3 candidates)
+$WORK/registry/registry.go:13:2-14: sentinel example.com/plugins/registry.ErrAuditFull
+	path (origin → target):
+		$WORK/registry/registry.go:22:10-22: in (example.com/plugins/registry.auditHandler).Handle
+		$WORK/registry/registry.go:73:9-40: in example.com/plugins/registry.Dispatch, call to (example.com/plugins/registry.auditHandler).Handle (dynamic (example.com/plugins/core.Handler).Handle: 3 of 3 candidates)
+$WORK/registry/registry.go:14:2-16: sentinel example.com/plugins/registry.ErrMetricsDown
+	path (origin → target):
+		$WORK/registry/registry.go:34:10-24: in (*example.com/plugins/registry.metricsHandler).Handle
+		$WORK/registry/registry.go:73:9-40: in example.com/plugins/registry.Dispatch, call to (*example.com/plugins/registry.metricsHandler).Handle (dynamic (example.com/plugins/core.Handler).Handle: 3 of 3 candidates)

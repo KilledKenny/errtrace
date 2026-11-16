@@ -1,0 +1,7 @@
+SUSPECTED BUG: a declaration Target without a body yields '0 entries', i.e. claims the function cannot fail.
+fsync is declared without a body (implemented elsewhere via go:linkname). The call-site Query (engine_fsync_call) correctly gives unresolved(no-body).
+Expected: 1 entry unresolved(no-body) (or a diagnostic). Actual: an empty Error Set with exit 0 and no warning.
+-- args --
+engine/engine.go:@fsync_decl
+-- stdout --
+$WORK/engine/engine.go:38:21-26: Error Set of example.com/kvstore/engine.fsync: 0 entries

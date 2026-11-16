@@ -1,0 +1,16 @@
+os.Open wrapped with %w. Expected: every entry carries the chain
+*fs.PathError.Unwrap then fmt.Errorf "open document: %w". The errno behind the
+PathError goes through a captured variable in os, so by design the leaf is unresolved(memory).
+-- args --
+parse/parse.go:@open
+-- stdout --
+$WORK/parse/parse.go:31:15-19: Error Set of example.com/wrapchain/parse.Open: 1 entries, 1 unresolved
+$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/parse/parse.go:34:15-51: fmt.Errorf "open document: %w"
+	path (origin → target):
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.OpenFile, call to os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.Open, call to os.OpenFile
+		$WORK/parse/parse.go:32:12-25: in example.com/wrapchain/parse.Open, call to os.Open

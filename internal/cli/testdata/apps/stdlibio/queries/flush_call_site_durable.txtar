@@ -1,0 +1,243 @@
+Call site flush(f) inside the errors.Join arguments, with -tags durable selecting
+flush_durable.go: the (*os.File).Sync origins (os.ErrInvalid for a nil file, poll and
+errno values under *fs.PathError.Unwrap) each with the link fmt.Errorf "source: sync:
+%w". No errors.Join link: the Target is the inner call.
+-- args --
+-tags durable source/source.go:@flushcall
+-- stdout --
+$WORK/source/source.go:89:41-49: Error Set of call to flush in example.com/stdlibio/source.Save: 17 entries, 2 unresolved, 1 possibly handled
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/source/flush_durable.go:13:10-45: fmt.Errorf "source: sync: %w"
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).incref, call to internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_fsync_posix.go:*: in (*internal/poll.FD).Fsync, call to (*internal/poll.FD).incref
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*internal/poll.FD).Fsync
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*os.File).wrapErr
+		$WORK/source/flush_durable.go:12:12-20: in example.com/stdlibio/source.flush, call to (*os.File).Sync
+		$WORK/source/source.go:89:41-49: in example.com/stdlibio/source.Save, call to example.com/stdlibio/source.flush
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing
+	wrap chain (origin → target):
+		$WORK/source/flush_durable.go:13:10-45: fmt.Errorf "source: sync: %w"
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).incref, call to internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_fsync_posix.go:*: in (*internal/poll.FD).Fsync, call to (*internal/poll.FD).incref
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*internal/poll.FD).Fsync
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*os.File).wrapErr
+		$WORK/source/flush_durable.go:12:12-20: in example.com/stdlibio/source.flush, call to (*os.File).Sync
+		$WORK/source/source.go:89:41-49: in example.com/stdlibio/source.Save, call to example.com/stdlibio/source.flush
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrFileClosing
+	wrap chain (origin → target):
+		$WORK/source/flush_durable.go:13:10-45: fmt.Errorf "source: sync: %w"
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).incref, call to internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_fsync_posix.go:*: in (*internal/poll.FD).Fsync, call to (*internal/poll.FD).incref
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*internal/poll.FD).Fsync
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*os.File).wrapErr
+		$WORK/source/flush_durable.go:12:12-20: in example.com/stdlibio/source.flush, call to (*os.File).Sync
+		$WORK/source/source.go:89:41-49: in example.com/stdlibio/source.Save, call to example.com/stdlibio/source.flush
+$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid
+	wrap chain (origin → target):
+		$WORK/source/flush_durable.go:13:10-45: fmt.Errorf "source: sync: %w"
+	path (origin → target):
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).checkValid
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*os.File).checkValid
+		$WORK/source/flush_durable.go:12:12-20: in example.com/stdlibio/source.flush, call to (*os.File).Sync
+		$WORK/source/source.go:89:41-49: in example.com/stdlibio/source.Save, call to example.com/stdlibio/source.flush
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/source/flush_durable.go:13:10-45: fmt.Errorf "source: sync: %w"
+	path (origin → target):
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*os.File).wrapErr
+		$WORK/source/flush_durable.go:12:12-20: in example.com/stdlibio/source.flush, call to (*os.File).Sync
+		$WORK/source/source.go:89:41-49: in example.com/stdlibio/source.Save, call to example.com/stdlibio/source.flush
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/source/flush_durable.go:13:10-45: fmt.Errorf "source: sync: %w"
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Fstat, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Fstat$1, call to syscall.Fstat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstat$1 (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_fsync_posix.go:*: in (*internal/poll.FD).Fsync, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*internal/poll.FD).Fsync
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*os.File).wrapErr
+		$WORK/source/flush_durable.go:12:12-20: in example.com/stdlibio/source.flush, call to (*os.File).Sync
+		$WORK/source/source.go:89:41-49: in example.com/stdlibio/source.Save, call to example.com/stdlibio/source.flush
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN
+	wrap chain (origin → target):
+		$WORK/source/flush_durable.go:13:10-45: fmt.Errorf "source: sync: %w"
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Fstat, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Fstat$1, call to syscall.Fstat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstat$1 (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_fsync_posix.go:*: in (*internal/poll.FD).Fsync, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*internal/poll.FD).Fsync
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*os.File).wrapErr
+		$WORK/source/flush_durable.go:12:12-20: in example.com/stdlibio/source.flush, call to (*os.File).Sync
+		$WORK/source/source.go:89:41-49: in example.com/stdlibio/source.Save, call to example.com/stdlibio/source.flush
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/source/flush_durable.go:13:10-45: fmt.Errorf "source: sync: %w"
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Fstat, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Fstat$1, call to syscall.Fstat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstat$1 (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_fsync_posix.go:*: in (*internal/poll.FD).Fsync, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*internal/poll.FD).Fsync
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*os.File).wrapErr
+		$WORK/source/flush_durable.go:12:12-20: in example.com/stdlibio/source.flush, call to (*os.File).Sync
+		$WORK/source/source.go:89:41-49: in example.com/stdlibio/source.Save, call to example.com/stdlibio/source.flush
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL
+	wrap chain (origin → target):
+		$WORK/source/flush_durable.go:13:10-45: fmt.Errorf "source: sync: %w"
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Fstat, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Fstat$1, call to syscall.Fstat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstat$1 (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_fsync_posix.go:*: in (*internal/poll.FD).Fsync, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*internal/poll.FD).Fsync
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*os.File).wrapErr
+		$WORK/source/flush_durable.go:12:12-20: in example.com/stdlibio/source.flush, call to (*os.File).Sync
+		$WORK/source/source.go:89:41-49: in example.com/stdlibio/source.Save, call to example.com/stdlibio/source.flush
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/source/flush_durable.go:13:10-45: fmt.Errorf "source: sync: %w"
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Fstat, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Fstat$1, call to syscall.Fstat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstat$1 (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_fsync_posix.go:*: in (*internal/poll.FD).Fsync, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*internal/poll.FD).Fsync
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*os.File).wrapErr
+		$WORK/source/flush_durable.go:12:12-20: in example.com/stdlibio/source.flush, call to (*os.File).Sync
+		$WORK/source/source.go:89:41-49: in example.com/stdlibio/source.Save, call to example.com/stdlibio/source.flush
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT
+	wrap chain (origin → target):
+		$WORK/source/flush_durable.go:13:10-45: fmt.Errorf "source: sync: %w"
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Fstat, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Fstat$1, call to syscall.Fstat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstat$1 (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_fsync_posix.go:*: in (*internal/poll.FD).Fsync, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*internal/poll.FD).Fsync
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*os.File).wrapErr
+		$WORK/source/flush_durable.go:12:12-20: in example.com/stdlibio/source.flush, call to (*os.File).Sync
+		$WORK/source/source.go:89:41-49: in example.com/stdlibio/source.Save, call to example.com/stdlibio/source.flush
+$GOROOT/src/syscall/syscall.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/source/flush_durable.go:13:10-45: fmt.Errorf "source: sync: %w"
+	path (origin → target):
+		$GOROOT/src/syscall/syscall.go:*: in syscall.ByteSliceFromString
+		$GOROOT/src/syscall/syscall.go:*: in syscall.BytePtrFromString, call to syscall.ByteSliceFromString
+		$GOROOT/src/internal/syscall/unix/at_fstatat.go:*: in internal/syscall/unix.Fstatat, call to syscall.BytePtrFromString
+		$GOROOT/src/internal/poll/fstatat_unix.go:*: in (*internal/poll.FD).Fstatat$1, call to internal/syscall/unix.Fstatat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstatat$1 (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_fsync_posix.go:*: in (*internal/poll.FD).Fsync, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*internal/poll.FD).Fsync
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*os.File).wrapErr
+		$WORK/source/flush_durable.go:12:12-20: in example.com/stdlibio/source.flush, call to (*os.File).Sync
+		$WORK/source/source.go:89:41-49: in example.com/stdlibio/source.Save, call to example.com/stdlibio/source.flush
+$GOROOT/src/syscall/syscall.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$WORK/source/flush_durable.go:13:10-45: fmt.Errorf "source: sync: %w"
+	path (origin → target):
+		$GOROOT/src/syscall/syscall.go:*: in syscall.ByteSliceFromString
+		$GOROOT/src/syscall/syscall.go:*: in syscall.BytePtrFromString, call to syscall.ByteSliceFromString
+		$GOROOT/src/internal/syscall/unix/at_fstatat.go:*: in internal/syscall/unix.Fstatat, call to syscall.BytePtrFromString
+		$GOROOT/src/internal/poll/fstatat_unix.go:*: in (*internal/poll.FD).Fstatat$1, call to internal/syscall/unix.Fstatat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstatat$1 (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_fsync_posix.go:*: in (*internal/poll.FD).Fsync, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*internal/poll.FD).Fsync
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*os.File).wrapErr
+		$WORK/source/flush_durable.go:12:12-20: in example.com/stdlibio/source.flush, call to (*os.File).Sync
+		$WORK/source/source.go:89:41-49: in example.com/stdlibio/source.Save, call to example.com/stdlibio/source.flush
+$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/source/flush_durable.go:13:10-45: fmt.Errorf "source: sync: %w"
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Fstat, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Fstat$1, call to syscall.Fstat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstat$1 (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_fsync_posix.go:*: in (*internal/poll.FD).Fsync, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*internal/poll.FD).Fsync
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*os.File).wrapErr
+		$WORK/source/flush_durable.go:12:12-20: in example.com/stdlibio/source.flush, call to (*os.File).Sync
+		$WORK/source/source.go:89:41-49: in example.com/stdlibio/source.Save, call to example.com/stdlibio/source.flush
+$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$WORK/source/flush_durable.go:13:10-45: fmt.Errorf "source: sync: %w"
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Fstat, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Fstat$1, call to syscall.Fstat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstat$1 (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_fsync_posix.go:*: in (*internal/poll.FD).Fsync, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*internal/poll.FD).Fsync
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*os.File).wrapErr
+		$WORK/source/flush_durable.go:12:12-20: in example.com/stdlibio/source.flush, call to (*os.File).Sync
+		$WORK/source/source.go:89:41-49: in example.com/stdlibio/source.Save, call to example.com/stdlibio/source.flush
+$GOROOT/src/syscall/syscall_linux.go:*: unresolved(no-body): internal/runtime/syscall/linux.Syscall6 has no body
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/source/flush_durable.go:13:10-45: fmt.Errorf "source: sync: %w"
+	possibly handled:
+		$GOROOT/src/os/file.go:*: comparison with internal/poll.ErrFileClosing: unresolved value
+		$GOROOT/src/os/file.go:*: comparison with io.EOF: unresolved value
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.RawSyscall6
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Syscall6, call to syscall.RawSyscall6
+		$GOROOT/src/internal/syscall/unix/at_fstatat.go:*: in internal/syscall/unix.Fstatat, call to syscall.Syscall6
+		$GOROOT/src/internal/poll/fstatat_unix.go:*: in (*internal/poll.FD).Fstatat$1, call to internal/syscall/unix.Fstatat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstatat$1 (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_fsync_posix.go:*: in (*internal/poll.FD).Fsync, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*internal/poll.FD).Fsync
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*os.File).wrapErr
+		$WORK/source/flush_durable.go:12:12-20: in example.com/stdlibio/source.flush, call to (*os.File).Sync
+		$WORK/source/source.go:89:41-49: in example.com/stdlibio/source.Save, call to example.com/stdlibio/source.flush
+$GOROOT/src/syscall/syscall_linux.go:*: unresolved(no-body): internal/runtime/syscall/linux.Syscall6 has no body
+	wrap chain (origin → target):
+		$WORK/source/flush_durable.go:13:10-45: fmt.Errorf "source: sync: %w"
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.RawSyscall6
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Syscall6, call to syscall.RawSyscall6
+		$GOROOT/src/internal/syscall/unix/at_fstatat.go:*: in internal/syscall/unix.Fstatat, call to syscall.Syscall6
+		$GOROOT/src/internal/poll/fstatat_unix.go:*: in (*internal/poll.FD).Fstatat$1, call to internal/syscall/unix.Fstatat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstatat$1 (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_fsync_posix.go:*: in (*internal/poll.FD).Fsync, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*internal/poll.FD).Fsync
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).Sync, call to (*os.File).wrapErr
+		$WORK/source/flush_durable.go:12:12-20: in example.com/stdlibio/source.flush, call to (*os.File).Sync
+		$WORK/source/source.go:89:41-49: in example.com/stdlibio/source.Save, call to example.com/stdlibio/source.flush

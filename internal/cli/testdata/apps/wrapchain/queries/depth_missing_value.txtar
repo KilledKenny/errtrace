@@ -1,0 +1,26 @@
+-chain-depth without a value swallows the Target as its value. Expected: exit 2
+with a parse error for the flag (not "expected exactly one Target") and usage.
+-- args --
+-chain-depth export/deliver.go:@l3
+-- stdout --
+-- stderr --
+errtrace: invalid value "export/deliver.go:20:13" for flag -chain-depth: parse error
+usage: errtrace [flags] <target>
+
+errtrace reports the Error Set of a Target: every Error Origin that can reach
+the Target's error result, with its Propagation Path.
+
+<target> is a position in a Go file, with byte columns:
+  file.go:LINE:COL | file.go:#OFFSET | file.go:L:C-L2:C2 (the start is used)
+
+flags:
+  -chain-depth N
+    	max Wrap Chain depth N before truncation (default 8)
+  -fanout N
+    	group entries under dynamic call sites with at least N Candidates (0 = never group) (default 8)
+  -p patterns
+    	comma-separated package patterns to load (default "./...")
+  -tags list
+    	comma-separated list of build tags
+-- exit --
+2

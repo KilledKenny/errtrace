@@ -1,0 +1,48 @@
+Fixed variant of Move: the outer err receives the Load error or, when Load succeeded, the Store error.
+Expect: Load's ErrClosed/ErrNotFound under "repo: load %s: %w" plus Store's 4 entries under *kverr.OpError.Unwrap. 6 entries.
+-- args --
+service/service.go:@copy
+-- stdout --
+$WORK/service/service.go:121:28-32: Error Set of (*example.com/kvstore/service.Service).Copy: 6 entries, 1 unresolved
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:48:15-56: fmt.Errorf "repo: load %s: %w"
+	path (origin → target):
+		$WORK/engine/engine.go:68:15-24: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:46:12-47: in (*example.com/kvstore/repo.Repo).Load, call to (*example.com/kvstore/engine.Engine).Get
+		$WORK/service/service.go:124:14-30: in (*example.com/kvstore/service.Service).Copy, call to (*example.com/kvstore/repo.Repo).Load
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:56:10-57: *example.com/kvstore/kverr.OpError.Unwrap
+	path (origin → target):
+		$WORK/engine/engine.go:101:10-19: in (*example.com/kvstore/engine.Engine).Put
+		$WORK/repo/repo.go:55:12-48: in (*example.com/kvstore/repo.Repo).Store, call to (*example.com/kvstore/engine.Engine).Put
+		$WORK/service/service.go:125:9-29: in (*example.com/kvstore/service.Service).Copy, call to (*example.com/kvstore/repo.Repo).Store
+$WORK/kverr/kverr.go:10:5-16: sentinel example.com/kvstore/kverr.ErrNotFound
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:48:15-56: fmt.Errorf "repo: load %s: %w"
+	path (origin → target):
+		$WORK/engine/engine.go:72:15-32: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:46:12-47: in (*example.com/kvstore/repo.Repo).Load, call to (*example.com/kvstore/engine.Engine).Get
+		$WORK/service/service.go:124:14-30: in (*example.com/kvstore/service.Service).Copy, call to (*example.com/kvstore/repo.Repo).Load
+$WORK/kverr/kverr.go:33:5-13: sentinel example.com/kvstore/kverr.ErrQuota
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:56:10-57: *example.com/kvstore/kverr.OpError.Unwrap
+	path (origin → target):
+		$WORK/engine/engine.go:107:10-24: in (*example.com/kvstore/engine.Engine).Put
+		$WORK/repo/repo.go:55:12-48: in (*example.com/kvstore/repo.Repo).Store, call to (*example.com/kvstore/engine.Engine).Put
+		$WORK/service/service.go:125:9-29: in (*example.com/kvstore/service.Service).Copy, call to (*example.com/kvstore/repo.Repo).Store
+$WORK/engine/engine.go:104:3-3: concrete example.com/kvstore/kverr.Code
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:56:10-57: *example.com/kvstore/kverr.OpError.Unwrap
+	path (origin → target):
+		$WORK/engine/engine.go:104:3-3: in (*example.com/kvstore/engine.Engine).Put
+		$WORK/repo/repo.go:55:12-48: in (*example.com/kvstore/repo.Repo).Store, call to (*example.com/kvstore/engine.Engine).Put
+		$WORK/service/service.go:125:9-29: in (*example.com/kvstore/service.Service).Copy, call to (*example.com/kvstore/repo.Repo).Store
+$WORK/engine/engine.go:111:19-34: unresolved(no-body): example.com/kvstore/engine.fsync has no body
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:56:10-57: *example.com/kvstore/kverr.OpError.Unwrap
+	path (origin → target):
+		$WORK/engine/engine.go:111:19-34: in (*example.com/kvstore/engine.Engine).Put
+		$WORK/repo/repo.go:55:12-48: in (*example.com/kvstore/repo.Repo).Store, call to (*example.com/kvstore/engine.Engine).Put
+		$WORK/service/service.go:125:9-29: in (*example.com/kvstore/service.Service).Copy, call to (*example.com/kvstore/repo.Repo).Store

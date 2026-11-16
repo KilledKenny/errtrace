@@ -1,0 +1,11 @@
+A Go file inside the app tree that belongs to a nested module (tools/lintcfg has its own go.mod), i.e. outside example.com/targets.
+Negative: exit 2, the file is not part of the main module / cannot be loaded from here. ErrNoConfig must not be reported silently as if it were in the module.
+-- args --
+tools/lintcfg/cfg.go:@load
+-- stdout --
+$WORK/tools/lintcfg/cfg.go:10:15-19: Error Set of command-line-arguments.Load: 1 entries
+$WORK/tools/lintcfg/cfg.go:7:5-16: sentinel command-line-arguments.ErrNoConfig
+	path (origin → target):
+		$WORK/tools/lintcfg/cfg.go:12:10-21: in command-line-arguments.Load
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates

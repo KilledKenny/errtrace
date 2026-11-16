@@ -1,0 +1,16 @@
+SUSPECTED BUG (low confidence): a never-assigned, always-nil package variable is listed as a sentinel.
+Returns from a tagless switch with an init statement. engine.ErrIgnored is declared `ErrIgnored error` and never assigned anywhere in the program, so `return ErrIgnored` returns nil.
+Expected: 2 entries, sentinel engine.ErrClosed and sentinel kverr.ErrEmptyKey (var of custom string type Reason). Actual: 3 entries, including sentinel engine.ErrIgnored.
+-- args --
+engine/engine.go:@delete
+-- stdout --
+$WORK/engine/engine.go:115:29-35: Error Set of (*example.com/kvstore/engine.Engine).Delete: 3 entries
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	path (origin → target):
+		$WORK/engine/engine.go:118:10-19: in (*example.com/kvstore/engine.Engine).Delete
+$WORK/engine/engine.go:22:2-12: sentinel example.com/kvstore/engine.ErrIgnored
+	path (origin → target):
+		$WORK/engine/engine.go:122:10-20: in (*example.com/kvstore/engine.Engine).Delete
+$WORK/kverr/kverr.go:44:5-16: sentinel example.com/kvstore/kverr.ErrEmptyKey
+	path (origin → target):
+		$WORK/engine/engine.go:120:10-27: in (*example.com/kvstore/engine.Engine).Delete

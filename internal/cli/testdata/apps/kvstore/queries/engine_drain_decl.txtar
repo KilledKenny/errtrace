@@ -1,0 +1,10 @@
+SUSPECTED BUG (low confidence; plan S10 behaviour not present): an alias of a stdlib sentinel is reported under the alias name only.
+`var ErrEOF = io.EOF`; Drain returns ErrEOF from inside a for loop.
+Expected: sentinel io.EOF (via engine.ErrEOF). Actual: sentinel engine.ErrEOF, with no mention of io.EOF, so the reader cannot tell errors.Is(err, io.EOF) matches.
+-- args --
+engine/engine.go:@drain
+-- stdout --
+$WORK/engine/engine.go:204:28-33: Error Set of (*example.com/kvstore/engine.Engine).Drain: 1 entries
+$WORK/engine/engine.go:18:2-8: sentinel example.com/kvstore/engine.ErrEOF
+	path (origin → target):
+		$WORK/engine/engine.go:208:14-20: in (*example.com/kvstore/engine.Engine).Drain

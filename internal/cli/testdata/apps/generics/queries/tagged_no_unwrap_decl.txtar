@@ -1,0 +1,10 @@
+errs.Tag wraps the cache error in Tagged[string], a generic struct embedding error with no Unwrap.
+Expect one concrete errs.Tagged[string] (value type); ErrNotFound is hidden and must not appear as an origin.
+-- args --
+caching.go:@tag
+-- stdout --
+$WORK/caching.go:65:14-17: Error Set of example.com/generics.tag: 1 entries
+$WORK/errs/errs.go:63:50-81: concrete example.com/generics/errs.Tagged[string]
+	path (origin → target):
+		$WORK/errs/errs.go:63:50-81: in example.com/generics/errs.Tag[string]
+		$WORK/caching.go:67:10-26: in example.com/generics.tag, call to example.com/generics/errs.Tag[string]

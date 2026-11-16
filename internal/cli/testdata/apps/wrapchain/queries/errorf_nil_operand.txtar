@@ -1,0 +1,13 @@
+SUSPECTED BUG: expected 2 entries: doc.ErrSyntax wrapped by fmt.Errorf "tag: %w",
+and an entry for the path where the %w operand is a nil error (fmt.Errorf still
+returns a non-nil error; errorf_always_nil_operand shows it as opaque fmt.Errorf).
+Actual: only doc.ErrSyntax; the nil alternative of the operand is dropped silently.
+-- args --
+parse/parse.go:@tag
+-- stdout --
+$WORK/parse/parse.go:103:14-17: Error Set of example.com/wrapchain/parse.Tag: 1 entries
+$WORK/doc/doc.go:18:2-11: sentinel example.com/wrapchain/doc.ErrSyntax
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:109:10-38: fmt.Errorf "tag: %w"
+	path (origin → target):
+		$WORK/parse/parse.go:106:11-24: in example.com/wrapchain/parse.Tag

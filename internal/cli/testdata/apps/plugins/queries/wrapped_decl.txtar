@@ -1,0 +1,20 @@
+Promoted methods as Candidates: Logged embeds the core.Driver interface
+(holding a Pager), Fancy embeds struct base, Strict embeds *SMS.
+Expected: ErrPager (through the embedded interface), ErrBase, ErrSMS; 3
+Candidates. Nothing else (Logged.Driver only ever holds a Pager).
+-- args --
+dispatch/fanout.go:@wrapped
+-- stdout --
+$WORK/dispatch/fanout.go:31:18-29: Error Set of example.com/plugins/dispatch.SendWrapped: 3 entries
+$WORK/drivers/drivers.go:14:2-8: sentinel example.com/plugins/drivers.ErrSMS
+	path (origin → target):
+		$WORK/drivers/drivers.go:37:10-16: in (*example.com/plugins/drivers.SMS).Send
+		$WORK/dispatch/fanout.go:31:74-83: in example.com/plugins/dispatch.SendWrapped, call to (*example.com/plugins/drivers.SMS).Send (dynamic (example.com/plugins/core.Driver).Send: 3 of 3 candidates)
+$WORK/drivers/drivers.go:16:2-10: sentinel example.com/plugins/drivers.ErrPager
+	path (origin → target):
+		$WORK/drivers/drivers.go:82:10-18: in (example.com/plugins/drivers.Pager).Send
+		$WORK/dispatch/fanout.go:31:74-83: in example.com/plugins/dispatch.SendWrapped, call to (example.com/plugins/drivers.Pager).Send (dynamic (example.com/plugins/core.Driver).Send: 3 of 3 candidates)
+$WORK/drivers/extra.go:14:2-9: sentinel example.com/plugins/drivers.ErrBase
+	path (origin → target):
+		$WORK/drivers/extra.go:39:47-54: in (example.com/plugins/drivers.base).Send
+		$WORK/dispatch/fanout.go:31:74-83: in example.com/plugins/dispatch.SendWrapped, call to (example.com/plugins/drivers.base).Send (dynamic (example.com/plugins/core.Driver).Send: 3 of 3 candidates)

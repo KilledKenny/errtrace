@@ -1,0 +1,49 @@
+Call site of (*csv.Reader).Read before the guards: csv.ErrFieldCount (wrapped in
+*csv.ParseError) must now be present, together with ErrBareQuote, ErrQuote and
+errInvalidDelim; io.EOF may be listed if the tool sees csv returning it. No
+*RowError link.
+-- args --
+records/records.go:@csvread
+-- stdout --
+$WORK/records/records.go:38:15-35: Error Set of call to r.Read in example.com/stdlibio/records.ReadCSV: 6 entries, 1 unresolved
+$GOROOT/src/encoding/csv/reader.go:*: sentinel encoding/csv.ErrBareQuote
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/csv/reader.go:*: *encoding/csv.ParseError.Unwrap
+	path (origin → target):
+		$GOROOT/src/encoding/csv/reader.go:*: in (*encoding/csv.Reader).readRecord
+		$GOROOT/src/encoding/csv/reader.go:*: in (*encoding/csv.Reader).Read, call to (*encoding/csv.Reader).readRecord
+		$WORK/records/records.go:38:15-35: in example.com/stdlibio/records.ReadCSV, call to (*encoding/csv.Reader).Read
+$GOROOT/src/encoding/csv/reader.go:*: sentinel encoding/csv.ErrQuote
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/csv/reader.go:*: *encoding/csv.ParseError.Unwrap
+	path (origin → target):
+		$GOROOT/src/encoding/csv/reader.go:*: in (*encoding/csv.Reader).readRecord
+		$GOROOT/src/encoding/csv/reader.go:*: in (*encoding/csv.Reader).Read, call to (*encoding/csv.Reader).readRecord
+		$WORK/records/records.go:38:15-35: in example.com/stdlibio/records.ReadCSV, call to (*encoding/csv.Reader).Read
+$GOROOT/src/encoding/csv/reader.go:*: sentinel encoding/csv.ErrQuote
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/csv/reader.go:*: *encoding/csv.ParseError.Unwrap
+	path (origin → target):
+		$GOROOT/src/encoding/csv/reader.go:*: in (*encoding/csv.Reader).readRecord
+		$GOROOT/src/encoding/csv/reader.go:*: in (*encoding/csv.Reader).Read, call to (*encoding/csv.Reader).readRecord
+		$WORK/records/records.go:38:15-35: in example.com/stdlibio/records.ReadCSV, call to (*encoding/csv.Reader).Read
+$GOROOT/src/encoding/csv/reader.go:*: sentinel encoding/csv.ErrFieldCount
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/csv/reader.go:*: *encoding/csv.ParseError.Unwrap
+	path (origin → target):
+		$GOROOT/src/encoding/csv/reader.go:*: in (*encoding/csv.Reader).readRecord
+		$GOROOT/src/encoding/csv/reader.go:*: in (*encoding/csv.Reader).Read, call to (*encoding/csv.Reader).readRecord
+		$WORK/records/records.go:38:15-35: in example.com/stdlibio/records.ReadCSV, call to (*encoding/csv.Reader).Read
+$GOROOT/src/encoding/csv/reader.go:*: sentinel encoding/csv.errInvalidDelim
+	path (origin → target):
+		$GOROOT/src/encoding/csv/reader.go:*: in (*encoding/csv.Reader).readRecord
+		$GOROOT/src/encoding/csv/reader.go:*: in (*encoding/csv.Reader).Read, call to (*encoding/csv.Reader).readRecord
+		$WORK/records/records.go:38:15-35: in example.com/stdlibio/records.ReadCSV, call to (*encoding/csv.Reader).Read
+$GOROOT/src/bufio/bufio.go:*: unresolved(memory): load of field err of *bufio.Reader
+	path (origin → target):
+		$GOROOT/src/bufio/bufio.go:*: in (*bufio.Reader).readErr
+		$GOROOT/src/bufio/bufio.go:*: in (*bufio.Reader).ReadSlice, call to (*bufio.Reader).readErr
+		$GOROOT/src/encoding/csv/reader.go:*: in (*encoding/csv.Reader).readLine, call to (*bufio.Reader).ReadSlice
+		$GOROOT/src/encoding/csv/reader.go:*: in (*encoding/csv.Reader).readRecord, call to (*encoding/csv.Reader).readLine
+		$GOROOT/src/encoding/csv/reader.go:*: in (*encoding/csv.Reader).Read, call to (*encoding/csv.Reader).readRecord
+		$WORK/records/records.go:38:15-35: in example.com/stdlibio/records.ReadCSV, call to (*encoding/csv.Reader).Read

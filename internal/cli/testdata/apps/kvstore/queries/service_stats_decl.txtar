@@ -1,0 +1,6 @@
+Nil-only function: both returns have a literal nil error, although a callee error is inspected.
+Expect: 0 entries.
+-- args --
+service/service.go:@stats
+-- stdout --
+$WORK/service/service.go:200:29-34: Error Set of (*example.com/kvstore/service.Service).Stats: 0 entries

@@ -1,0 +1,9 @@
+Position on the "[" of codec.Decode[string](...).
+Negative: exit 2, "no function declaration or call at position", empty stdout.
+-- args --
+cmd/ingest/main.go:@decode_bracket
+-- stdout --
+-- stderr --
+errtrace: $WORK/cmd/ingest/main.go:81:62: no function declaration or call at position
+-- exit --
+2

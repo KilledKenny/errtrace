@@ -1,0 +1,9 @@
+Column beyond the end of the line.
+Negative: exit 2, "column 3 is out of range (line 8 has 1 bytes)".
+-- args --
+internal/platform/platform.go:8:3
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/platform/platform.go:8:3: no function declaration or call at position
+-- exit --
+2

@@ -1,0 +1,20 @@
+SUSPECTED BUG (span only): constants converted to error get a zero-width span at the `return` keyword.
+One function, four kinds of Origin. The set itself is as expected: sentinel kverr.ErrEmptyKey; concrete kverr.FieldError (struct, value receiver);
+concrete kverr.Reason (string kind, constant conversion); concrete kverr.Code (constant CodeTooLarge). 4 entries.
+Expected spans: the expressions kverr.Reason("kv: reserved key") (19:10-39) and kverr.CodeTooLarge (22:10-28). Actual: 19:3-3 and 22:3-3.
+-- args --
+validate/validate.go:@key
+-- stdout --
+$WORK/validate/validate.go:11:14-17: Error Set of example.com/kvstore/validate.Key: 4 entries
+$WORK/kverr/kverr.go:44:5-16: sentinel example.com/kvstore/kverr.ErrEmptyKey
+	path (origin → target):
+		$WORK/validate/validate.go:13:10-27: in example.com/kvstore/validate.Key
+$WORK/validate/validate.go:16:10-68: concrete example.com/kvstore/kverr.FieldError
+	path (origin → target):
+		$WORK/validate/validate.go:16:10-68: in example.com/kvstore/validate.Key
+$WORK/validate/validate.go:19:3-3: concrete example.com/kvstore/kverr.Reason
+	path (origin → target):
+		$WORK/validate/validate.go:19:3-3: in example.com/kvstore/validate.Key
+$WORK/validate/validate.go:22:3-3: concrete example.com/kvstore/kverr.Code
+	path (origin → target):
+		$WORK/validate/validate.go:22:3-3: in example.com/kvstore/validate.Key

@@ -1,0 +1,10 @@
+Recursive call site inside the recursive function itself.
+Expect: service.errGaveUp only.
+-- args --
+service/service.go:@retry_call
+-- stdout --
+$WORK/service/service.go:106:9-41: Error Set of call to s.retry in (*example.com/kvstore/service.Service).retry: 1 entries
+$WORK/service/service.go:17:5-14: sentinel example.com/kvstore/service.errGaveUp
+	path (origin → target):
+		$WORK/service/service.go:104:10-19: in (*example.com/kvstore/service.Service).retry
+		$WORK/service/service.go:106:9-41: in (*example.com/kvstore/service.Service).retry, call to (*example.com/kvstore/service.Service).retry

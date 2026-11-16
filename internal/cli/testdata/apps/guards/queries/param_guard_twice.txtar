@@ -1,0 +1,30 @@
+Classify(gateway.Charge(n)) filtered in the callee, then errors.Is(err, ErrTimeout) in the caller (through the wrap).
+Expect 3 entries with the "classified: %w" chain: *CodeError, ValidationError, opaque. No ErrDeclined, no ErrTimeout.
+-- args --
+processor/helper.go:@classifyTwice
+-- stdout --
+$WORK/processor/helper.go:67:24-45: Error Set of example.com/guards/processor.ChargeClassifiedTwice: 3 entries
+$WORK/gateway/gateway.go:22:10-63: concrete *example.com/guards/payerr.CodeError
+	wrap chain (origin → target):
+		$WORK/processor/helper.go:51:9-42: fmt.Errorf "classified: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:22:10-63: in example.com/guards/gateway.Charge
+		$WORK/processor/helper.go:68:18-35: in example.com/guards/processor.ChargeClassifiedTwice, call to example.com/guards/gateway.Charge
+		$WORK/processor/helper.go:45:5-8: in example.com/guards/processor.Classify
+		$WORK/processor/helper.go:68:9-36: in example.com/guards/processor.ChargeClassifiedTwice, call to example.com/guards/processor.Classify
+$WORK/gateway/gateway.go:24:10-51: concrete example.com/guards/payerr.ValidationError
+	wrap chain (origin → target):
+		$WORK/processor/helper.go:51:9-42: fmt.Errorf "classified: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:24:10-51: in example.com/guards/gateway.Charge
+		$WORK/processor/helper.go:68:18-35: in example.com/guards/processor.ChargeClassifiedTwice, call to example.com/guards/gateway.Charge
+		$WORK/processor/helper.go:45:5-8: in example.com/guards/processor.Classify
+		$WORK/processor/helper.go:68:9-36: in example.com/guards/processor.ChargeClassifiedTwice, call to example.com/guards/processor.Classify
+$WORK/gateway/gateway.go:26:9-35: opaque errors.New "gateway down"
+	wrap chain (origin → target):
+		$WORK/processor/helper.go:51:9-42: fmt.Errorf "classified: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:26:9-35: in example.com/guards/gateway.Charge
+		$WORK/processor/helper.go:68:18-35: in example.com/guards/processor.ChargeClassifiedTwice, call to example.com/guards/gateway.Charge
+		$WORK/processor/helper.go:45:5-8: in example.com/guards/processor.Classify
+		$WORK/processor/helper.go:68:9-36: in example.com/guards/processor.ChargeClassifiedTwice, call to example.com/guards/processor.Classify

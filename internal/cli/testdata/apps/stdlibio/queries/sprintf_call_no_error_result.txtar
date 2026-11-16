@@ -1,0 +1,9 @@
+Negative: call-site Target on fmt.Sprintf, a stdlib call without error result.
+Expected exit 2 with "fmt.Sprintf has no error result".
+-- args --
+config/config.go:@sprintf
+-- stdout --
+-- stderr --
+errtrace: $WORK/config/config.go:126:25: fmt.Sprintf has no error result
+-- exit --
+2

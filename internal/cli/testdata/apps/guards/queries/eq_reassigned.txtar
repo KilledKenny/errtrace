@@ -1,0 +1,27 @@
+err is guarded, then overwritten by gateway.Void: the old guards must not filter the new value.
+Expect 5 entries: *CodeError, ValidationError, opaque (Charge) and ErrDeclined, ErrInternal (Void only).
+ErrTimeout must NOT appear.
+-- args --
+processor/eq.go:@reassign
+-- stdout --
+$WORK/processor/eq.go:110:19-33: Error Set of example.com/guards/processor.ChargeThenVoid: 5 entries
+$WORK/payerr/payerr.go:8:2-13: sentinel example.com/guards/payerr.ErrDeclined
+	path (origin → target):
+		$WORK/gateway/gateway.go:59:10-28: in example.com/guards/gateway.Void
+		$WORK/processor/eq.go:118:8-23: in example.com/guards/processor.ChargeThenVoid, call to example.com/guards/gateway.Void
+$WORK/payerr/payerr.go:12:2-13: sentinel example.com/guards/payerr.ErrInternal
+	path (origin → target):
+		$WORK/gateway/gateway.go:62:10-28: in example.com/guards/gateway.Void
+		$WORK/processor/eq.go:118:8-23: in example.com/guards/processor.ChargeThenVoid, call to example.com/guards/gateway.Void
+$WORK/gateway/gateway.go:22:10-63: concrete *example.com/guards/payerr.CodeError
+	path (origin → target):
+		$WORK/gateway/gateway.go:22:10-63: in example.com/guards/gateway.Charge
+		$WORK/processor/eq.go:111:9-26: in example.com/guards/processor.ChargeThenVoid, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:24:10-51: concrete example.com/guards/payerr.ValidationError
+	path (origin → target):
+		$WORK/gateway/gateway.go:24:10-51: in example.com/guards/gateway.Charge
+		$WORK/processor/eq.go:111:9-26: in example.com/guards/processor.ChargeThenVoid, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:26:9-35: opaque errors.New "gateway down"
+	path (origin → target):
+		$WORK/gateway/gateway.go:26:9-35: in example.com/guards/gateway.Charge
+		$WORK/processor/eq.go:111:9-26: in example.com/guards/processor.ChargeThenVoid, call to example.com/guards/gateway.Charge

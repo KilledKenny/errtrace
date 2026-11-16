@@ -1,0 +1,9 @@
+Range whose end precedes its start.
+Negative: exit 2, "span end is before its start".
+-- args --
+internal/platform/platform.go:7:1-5:6
+-- stdout --
+-- stderr --
+errtrace: invalid position "internal/platform/platform.go:7:1-5:6": span end is before its start
+-- exit --
+2

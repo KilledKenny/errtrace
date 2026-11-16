@@ -1,0 +1,9 @@
+Position inside the body of Get on "s.hits++", which is not a call.
+Negative: exit 2, "no function declaration or call at position", empty stdout.
+-- args --
+internal/store/store.go:@get_stmt
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/store/store.go:48:15: no function declaration or call at position
+-- exit --
+2

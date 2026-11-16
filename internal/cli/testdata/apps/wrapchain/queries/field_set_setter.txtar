@@ -1,0 +1,12 @@
+The wrapped field is set through a method (SetCause). Under Go semantics:
+doc.ErrTooLong with the chain *xerr.StageError.Unwrap. By design the store through
+the method is not followed: unresolved(memory) under the *xerr.StageError.Unwrap link.
+-- args --
+transform/transform.go:@setter
+-- stdout --
+$WORK/transform/transform.go:74:17-23: Error Set of example.com/wrapchain/transform.Setter: 1 entries, 1 unresolved
+$WORK/transform/transform.go:76:8-41: unresolved(memory): field of *example.com/wrapchain/xerr.StageError may be written through an escaped pointer
+	wrap chain (origin → target):
+		$WORK/transform/transform.go:76:8-41: *example.com/wrapchain/xerr.StageError.Unwrap
+	path (origin → target):
+		$WORK/transform/transform.go:76:8-41: in example.com/wrapchain/transform.Setter

@@ -1,0 +1,25 @@
+SUSPECTED BUG: (low confidence) the 4 entries carry no possibly-handled note at all: a helper guard that returns
+(E, bool) instead of a bare bool is not recognised as a guard.
+Guard through the generic helper AsType[*TypedErr[string]] (errors.As inside the helper).
+Go semantics: only *TypedErr[int] and ErrIntRange remain. Helper guards are documented as undecidable: expect all
+4 classify origins, the string ones marked possibly handled at best.
+-- args --
+failures.go:@viaastype
+-- stdout --
+$WORK/failures.go:101:20-29: Error Set of example.com/generics.viaAsType: 4 entries
+$WORK/errs/errs.go:34:2-13: sentinel example.com/generics/errs.ErrIntRange
+	path (origin → target):
+		$WORK/failures.go:19:10-26: in example.com/generics.classify
+		$WORK/failures.go:102:9-23: in example.com/generics.viaAsType, call to example.com/generics.classify
+$WORK/errs/errs.go:35:2-13: sentinel example.com/generics/errs.ErrStrRange
+	path (origin → target):
+		$WORK/failures.go:21:10-26: in example.com/generics.classify
+		$WORK/failures.go:102:9-23: in example.com/generics.viaAsType, call to example.com/generics.classify
+$WORK/failures.go:15:10-53: concrete *example.com/generics/errs.TypedErr[int]
+	path (origin → target):
+		$WORK/failures.go:15:10-53: in example.com/generics.classify
+		$WORK/failures.go:102:9-23: in example.com/generics.viaAsType, call to example.com/generics.classify
+$WORK/failures.go:17:10-56: concrete *example.com/generics/errs.TypedErr[string]
+	path (origin → target):
+		$WORK/failures.go:17:10-56: in example.com/generics.classify
+		$WORK/failures.go:102:9-23: in example.com/generics.viaAsType, call to example.com/generics.classify

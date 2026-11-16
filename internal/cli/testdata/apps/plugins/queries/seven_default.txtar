@@ -1,0 +1,38 @@
+Exactly 7 Candidates, default -fanout (8): below the threshold.
+Expected: 7 full entries, no group: ErrEmail, ErrSMS, ErrSlack (wrapped by
+"slack %q: %w"), *HTTPError, opaque "push: negative priority", ErrPager,
+ErrFile. Not ErrQueue, ErrCarrier, ErrFax.
+-- args --
+dispatch/fanout.go:@seven
+-- stdout --
+$WORK/dispatch/fanout.go:19:16-25: Error Set of example.com/plugins/dispatch.SendSeven: 7 entries
+$WORK/drivers/drivers.go:13:2-10: sentinel example.com/plugins/drivers.ErrEmail
+	path (origin → target):
+		$WORK/drivers/drivers.go:26:10-18: in (example.com/plugins/drivers.Email).Send
+		$WORK/dispatch/fanout.go:19:70-79: in example.com/plugins/dispatch.SendSeven, call to (example.com/plugins/drivers.Email).Send (dynamic (example.com/plugins/core.Driver).Send: 7 of 7 candidates)
+$WORK/drivers/drivers.go:14:2-8: sentinel example.com/plugins/drivers.ErrSMS
+	path (origin → target):
+		$WORK/drivers/drivers.go:37:10-16: in (*example.com/plugins/drivers.SMS).Send
+		$WORK/dispatch/fanout.go:19:70-79: in example.com/plugins/dispatch.SendSeven, call to (*example.com/plugins/drivers.SMS).Send (dynamic (example.com/plugins/core.Driver).Send: 7 of 7 candidates)
+$WORK/drivers/drivers.go:15:2-10: sentinel example.com/plugins/drivers.ErrSlack
+	wrap chain (origin → target):
+		$WORK/drivers/drivers.go:47:10-55: fmt.Errorf "slack %q: %w"
+	path (origin → target):
+		$WORK/drivers/drivers.go:47:46-54: in (example.com/plugins/drivers.Slack).Send
+		$WORK/dispatch/fanout.go:19:70-79: in example.com/plugins/dispatch.SendSeven, call to (example.com/plugins/drivers.Slack).Send (dynamic (example.com/plugins/core.Driver).Send: 7 of 7 candidates)
+$WORK/drivers/drivers.go:16:2-10: sentinel example.com/plugins/drivers.ErrPager
+	path (origin → target):
+		$WORK/drivers/drivers.go:82:10-18: in (example.com/plugins/drivers.Pager).Send
+		$WORK/dispatch/fanout.go:19:70-79: in example.com/plugins/dispatch.SendSeven, call to (example.com/plugins/drivers.Pager).Send (dynamic (example.com/plugins/core.Driver).Send: 7 of 7 candidates)
+$WORK/drivers/drivers.go:17:2-9: sentinel example.com/plugins/drivers.ErrFile
+	path (origin → target):
+		$WORK/drivers/drivers.go:92:10-17: in (example.com/plugins/drivers.File).Send
+		$WORK/dispatch/fanout.go:19:70-79: in example.com/plugins/dispatch.SendSeven, call to (example.com/plugins/drivers.File).Send (dynamic (example.com/plugins/core.Driver).Send: 7 of 7 candidates)
+$WORK/drivers/drivers.go:62:10-31: concrete *example.com/plugins/drivers.HTTPError
+	path (origin → target):
+		$WORK/drivers/drivers.go:62:10-31: in (*example.com/plugins/drivers.Webhook).Send
+		$WORK/dispatch/fanout.go:19:70-79: in example.com/plugins/dispatch.SendSeven, call to (*example.com/plugins/drivers.Webhook).Send (dynamic (example.com/plugins/core.Driver).Send: 7 of 7 candidates)
+$WORK/drivers/drivers.go:72:10-47: opaque errors.New "push: negative priority"
+	path (origin → target):
+		$WORK/drivers/drivers.go:72:10-47: in (example.com/plugins/drivers.Push).Send
+		$WORK/dispatch/fanout.go:19:70-79: in example.com/plugins/dispatch.SendSeven, call to (example.com/plugins/drivers.Push).Send (dynamic (example.com/plugins/core.Driver).Send: 7 of 7 candidates)

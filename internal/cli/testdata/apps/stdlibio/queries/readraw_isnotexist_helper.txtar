@@ -1,0 +1,326 @@
+ReadRaw swallows the os.ReadFile error when the helper guard os.IsNotExist(err) holds
+and returns it unwrapped otherwise. Expected: the os/poll/syscall origins of ReadFile
+(Open, Stat, Read, Close; mostly under *fs.PathError.Unwrap), each kept and marked
+"possibly handled: guarded by call to os.IsNotExist" (a helper guard cannot be
+decided); no fmt.Errorf link, and no entry for the default document path.
+-- args --
+config/config.go:@readraw
+-- stdout --
+$WORK/config/config.go:107:18-25: Error Set of example.com/stdlibio/config.ReadRaw: 20 entries, 1 unresolved, 20 possibly handled
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing
+	possibly handled:
+		$WORK/config/config.go:109:5-23: guarded by call to os.IsNotExist
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).readLock, call to internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).readLock
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/config/config.go:108:15-45: in example.com/stdlibio/config.ReadRaw, call to os.ReadFile
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	possibly handled:
+		$WORK/config/config.go:109:5-23: guarded by call to os.IsNotExist
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).readLock, call to internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).readLock
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/config/config.go:108:15-45: in example.com/stdlibio/config.ReadRaw, call to os.ReadFile
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrFileClosing
+	possibly handled:
+		$WORK/config/config.go:109:5-23: guarded by call to os.IsNotExist
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).readLock, call to internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).readLock
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/config/config.go:108:15-45: in example.com/stdlibio/config.ReadRaw, call to os.ReadFile
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrDeadlineExceeded
+	possibly handled:
+		$WORK/config/config.go:109:5-23: guarded by call to os.IsNotExist
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepare, call to internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepareRead, call to (*internal/poll.pollDesc).prepare
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.pollDesc).prepareRead
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/config/config.go:108:15-45: in example.com/stdlibio/config.ReadRaw, call to os.ReadFile
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrDeadlineExceeded
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	possibly handled:
+		$WORK/config/config.go:109:5-23: guarded by call to os.IsNotExist
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepare, call to internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepareRead, call to (*internal/poll.pollDesc).prepare
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.pollDesc).prepareRead
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/config/config.go:108:15-45: in example.com/stdlibio/config.ReadRaw, call to os.ReadFile
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNotPollable
+	possibly handled:
+		$WORK/config/config.go:109:5-23: guarded by call to os.IsNotExist
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepare, call to internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepareRead, call to (*internal/poll.pollDesc).prepare
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.pollDesc).prepareRead
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/config/config.go:108:15-45: in example.com/stdlibio/config.ReadRaw, call to os.ReadFile
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNotPollable
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	possibly handled:
+		$WORK/config/config.go:109:5-23: guarded by call to os.IsNotExist
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepare, call to internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepareRead, call to (*internal/poll.pollDesc).prepare
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.pollDesc).prepareRead
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/config/config.go:108:15-45: in example.com/stdlibio/config.ReadRaw, call to os.ReadFile
+$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid
+	possibly handled:
+		$WORK/config/config.go:109:5-23: guarded by call to os.IsNotExist
+	path (origin → target):
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).checkValid
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).checkValid
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/config/config.go:108:15-45: in example.com/stdlibio/config.ReadRaw, call to os.ReadFile
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	possibly handled:
+		$WORK/config/config.go:109:5-23: guarded by call to os.IsNotExist
+	path (origin → target):
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/config/config.go:108:15-45: in example.com/stdlibio/config.ReadRaw, call to os.ReadFile
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN
+	possibly handled:
+		$WORK/config/config.go:109:5-23: guarded by call to os.IsNotExist
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/config/config.go:108:15-45: in example.com/stdlibio/config.ReadRaw, call to os.ReadFile
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	possibly handled:
+		$WORK/config/config.go:109:5-23: guarded by call to os.IsNotExist
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/config/config.go:108:15-45: in example.com/stdlibio/config.ReadRaw, call to os.ReadFile
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL
+	possibly handled:
+		$WORK/config/config.go:109:5-23: guarded by call to os.IsNotExist
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/config/config.go:108:15-45: in example.com/stdlibio/config.ReadRaw, call to os.ReadFile
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	possibly handled:
+		$WORK/config/config.go:109:5-23: guarded by call to os.IsNotExist
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/config/config.go:108:15-45: in example.com/stdlibio/config.ReadRaw, call to os.ReadFile
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT
+	possibly handled:
+		$WORK/config/config.go:109:5-23: guarded by call to os.IsNotExist
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/config/config.go:108:15-45: in example.com/stdlibio/config.ReadRaw, call to os.ReadFile
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	possibly handled:
+		$WORK/config/config.go:109:5-23: guarded by call to os.IsNotExist
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/config/config.go:108:15-45: in example.com/stdlibio/config.ReadRaw, call to os.ReadFile
+$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno
+	possibly handled:
+		$WORK/config/config.go:109:5-23: guarded by call to os.IsNotExist
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/config/config.go:108:15-45: in example.com/stdlibio/config.ReadRaw, call to os.ReadFile
+$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	possibly handled:
+		$WORK/config/config.go:109:5-23: guarded by call to os.IsNotExist
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/config/config.go:108:15-45: in example.com/stdlibio/config.ReadRaw, call to os.ReadFile
+$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type"
+	possibly handled:
+		$WORK/config/config.go:109:5-23: guarded by call to os.IsNotExist
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).waitRead, call to (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.pollDesc).waitRead
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/config/config.go:108:15-45: in example.com/stdlibio/config.ReadRaw, call to os.ReadFile
+$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type"
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	possibly handled:
+		$WORK/config/config.go:109:5-23: guarded by call to os.IsNotExist
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).waitRead, call to (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.pollDesc).waitRead
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/config/config.go:108:15-45: in example.com/stdlibio/config.ReadRaw, call to os.ReadFile
+$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	possibly handled:
+		$WORK/config/config.go:109:5-23: guarded by call to os.IsNotExist
+	path (origin → target):
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.OpenFile, call to os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.Open, call to os.OpenFile
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.Open
+		$WORK/config/config.go:108:15-45: in example.com/stdlibio/config.ReadRaw, call to os.ReadFile

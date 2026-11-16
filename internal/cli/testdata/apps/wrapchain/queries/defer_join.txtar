@@ -1,0 +1,14 @@
+SUSPECTED BUG: named result joined with s.Close() in a deferred closure. Expected:
+the 4 Write origins of dynamic_call_site and doc.ErrClosed of (*FileSink).Close under
+errors.Join, or (deferred writes are not modelled yet) one Unresolved with a real span.
+Actual: 2 unresolved(memory), one with no span at all ("-") and one zero-width (65:2-2).
+-- args --
+export/export.go:@flush
+-- stdout --
+$WORK/export/export.go:61:16-21: Error Set of example.com/wrapchain/export.Flush: 2 entries, 2 unresolved
+-: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		-: in example.com/wrapchain/export.Flush
+$WORK/export/export.go:65:2-2: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/export/export.go:65:2-2: in example.com/wrapchain/export.Flush

@@ -1,0 +1,9 @@
+Range with a valid start but an end line beyond EOF. The usage says only the start is used.
+Expected: either the Probe Error Set (end ignored) or a clear "span end ... out of range" error; exit 2 with that message is acceptable.
+-- args --
+internal/platform/platform.go:5:6-99:1
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/platform/platform.go: span end: line 99 is out of range (file has 8 lines)
+-- exit --
+2

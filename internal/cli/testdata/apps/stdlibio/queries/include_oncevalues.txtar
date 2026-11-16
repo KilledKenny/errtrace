@@ -1,0 +1,13 @@
+Call site of the function value returned by sync.OnceValues. The callback's error
+(fmt.Errorf "walk: self-test: %w" around filepath.ErrBadPattern) is stored in a
+captured variable inside sync and returned on every call: expected an explicit
+Unresolved(memory) inside sync/oncefunc.go rather than 0 entries; seeing the
+wrapped path/filepath.ErrBadPattern would be even better.
+-- args --
+walk/walk.go:@patterncall
+-- stdout --
+$WORK/walk/walk.go:85:25-34: Error Set of call to Pattern in example.com/stdlibio/walk.Include: 1 entries, 1 unresolved
+$GOROOT/src/sync/oncefunc.go:*: unresolved(memory): load of field r2 of *struct{f func() (string, error); once sync.Once; valid bool; p any; r1 string; r2 error}
+	path (origin → target):
+		$GOROOT/src/sync/oncefunc.go:*: in sync.OnceValues[string, error]$1
+		$WORK/walk/walk.go:85:25-34: in example.com/stdlibio/walk.Include, call to sync.OnceValues[string, error]$1 (dynamic function value example.com/stdlibio/walk.Pattern: 1 of 1 candidates)

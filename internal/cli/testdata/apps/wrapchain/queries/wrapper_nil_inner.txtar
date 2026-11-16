@@ -1,0 +1,10 @@
+&xerr.OpError{Op: "bare"}: a wrapper whose wrapped field stays nil is still a
+non-nil error. Expected 1 entry: concrete *xerr.OpError with no wrap chain;
+0 entries would claim Bare never fails.
+-- args --
+transform/transform.go:@bare
+-- stdout --
+$WORK/transform/transform.go:84:15-19: Error Set of example.com/wrapchain/transform.Bare: 1 entries
+$WORK/transform/transform.go:86:10-35: concrete *example.com/wrapchain/xerr.OpError
+	path (origin → target):
+		$WORK/transform/transform.go:86:10-35: in example.com/wrapchain/transform.Bare

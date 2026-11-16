@@ -1,0 +1,7 @@
+Declaration of a generic function that is never instantiated.
+Expect a single unresolved(no-instances) entry and exit 0.
+-- args --
+validate/validate.go:@unused
+-- stdout --
+$WORK/validate/validate.go:67:17-23: Error Set of example.com/generics/validate.Unused: 1 entries, 1 unresolved
+$WORK/validate/validate.go:67:17-23: unresolved(no-instances): generic function example.com/generics/validate.Unused has no instances in the loaded program

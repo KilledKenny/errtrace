@@ -1,0 +1,10 @@
+Call-site target s.Check() inside Get: method reached through the embedded field base.
+Expected: 1 entry, store.ErrClosed.
+-- args --
+internal/store/store.go:@embedded
+-- stdout --
+$WORK/internal/store/store.go:45:12-34: Error Set of call to s.Check in (*example.com/targets/internal/store.Store).Get: 1 entries
+$WORK/internal/store/store.go:12:2-11: sentinel example.com/targets/internal/store.ErrClosed
+	path (origin → target):
+		$WORK/internal/store/store.go:28:10-19: in (*example.com/targets/internal/store.base).Check
+		$WORK/internal/store/store.go:45:12-34: in (*example.com/targets/internal/store.Store).Get, call to (*example.com/targets/internal/store.base).Check

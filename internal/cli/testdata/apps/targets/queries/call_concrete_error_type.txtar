@@ -1,0 +1,10 @@
+Call-site target: Validate(root) inside Open, result type *DiskError.
+Expected: 1 entry, concrete type *disk.DiskError.
+-- args --
+internal/store/disk/disk.go:@validate_call
+-- stdout --
+$WORK/internal/store/disk/disk.go:30:28-42: Error Set of call to Validate in example.com/targets/internal/store/disk.Open: 1 entries
+$WORK/internal/store/disk/disk.go:23:10-48: concrete *example.com/targets/internal/store/disk.DiskError
+	path (origin → target):
+		$WORK/internal/store/disk/disk.go:23:10-48: in example.com/targets/internal/store/disk.Validate
+		$WORK/internal/store/disk/disk.go:30:28-42: in example.com/targets/internal/store/disk.Open, call to example.com/targets/internal/store/disk.Validate

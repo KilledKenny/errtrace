@@ -1,0 +1,168 @@
+Exists returns nil when errors.Is(err, fs.ErrNotExist) and otherwise wraps the
+os.Stat error with %w. A bare fs.ErrNotExist never leaves os.Stat (it is a
+*fs.PathError around a syscall.Errno, whose Is method decides), so the syscall
+origins stay, wrapped by *fs.PathError.Unwrap and fmt.Errorf "source: stat: %w", and
+marked "possibly handled" (custom Is). fs.ErrNotExist itself must not be listed.
+-fanout 0 keeps the entries ungrouped so that chains and guard marks are visible.
+-- args --
+-fanout 0 source/source.go:@exists
+-- stdout --
+$WORK/source/source.go:21:17-23: Error Set of example.com/stdlibio/source.Exists: 11 entries, 4 unresolved, 11 possibly handled
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN
+	wrap chain (origin → target):
+		$GOROOT/src/os/stat_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/source/source.go:27:17-52: fmt.Errorf "source: stat: %w"
+	possibly handled:
+		$WORK/source/source.go:23:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.unlinkat, call to syscall.errnoErr
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Unlink, call to syscall.unlinkat
+		$GOROOT/src/os/file_unix.go:*: in os.Remove$1, call to syscall.Unlink
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Remove$1 (dynamic function value fn: 10 of 10 candidates)
+		$GOROOT/src/os/stat_unix.go:*: in os.statNolog, call to os.ignoringEINTR
+		$GOROOT/src/os/stat.go:*: in os.Stat, call to os.statNolog
+		$WORK/source/source.go:22:12-25: in example.com/stdlibio/source.Exists, call to os.Stat
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL
+	wrap chain (origin → target):
+		$GOROOT/src/os/stat_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/source/source.go:27:17-52: fmt.Errorf "source: stat: %w"
+	possibly handled:
+		$WORK/source/source.go:23:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.unlinkat, call to syscall.errnoErr
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Unlink, call to syscall.unlinkat
+		$GOROOT/src/os/file_unix.go:*: in os.Remove$1, call to syscall.Unlink
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Remove$1 (dynamic function value fn: 10 of 10 candidates)
+		$GOROOT/src/os/stat_unix.go:*: in os.statNolog, call to os.ignoringEINTR
+		$GOROOT/src/os/stat.go:*: in os.Stat, call to os.statNolog
+		$WORK/source/source.go:22:12-25: in example.com/stdlibio/source.Exists, call to os.Stat
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT
+	wrap chain (origin → target):
+		$GOROOT/src/os/stat_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/source/source.go:27:17-52: fmt.Errorf "source: stat: %w"
+	possibly handled:
+		$WORK/source/source.go:23:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.unlinkat, call to syscall.errnoErr
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Unlink, call to syscall.unlinkat
+		$GOROOT/src/os/file_unix.go:*: in os.Remove$1, call to syscall.Unlink
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Remove$1 (dynamic function value fn: 10 of 10 candidates)
+		$GOROOT/src/os/stat_unix.go:*: in os.statNolog, call to os.ignoringEINTR
+		$GOROOT/src/os/stat.go:*: in os.Stat, call to os.statNolog
+		$WORK/source/source.go:22:12-25: in example.com/stdlibio/source.Exists, call to os.Stat
+$GOROOT/src/syscall/syscall.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/stat_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/source/source.go:27:17-52: fmt.Errorf "source: stat: %w"
+	possibly handled:
+		$WORK/source/source.go:23:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall.go:*: in syscall.ByteSliceFromString
+		$GOROOT/src/syscall/syscall.go:*: in syscall.BytePtrFromString, call to syscall.ByteSliceFromString
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.unlinkat, call to syscall.BytePtrFromString
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Unlink, call to syscall.unlinkat
+		$GOROOT/src/os/file_unix.go:*: in os.Remove$1, call to syscall.Unlink
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Remove$1 (dynamic function value fn: 10 of 10 candidates)
+		$GOROOT/src/os/stat_unix.go:*: in os.statNolog, call to os.ignoringEINTR
+		$GOROOT/src/os/stat.go:*: in os.Stat, call to os.statNolog
+		$WORK/source/source.go:22:12-25: in example.com/stdlibio/source.Exists, call to os.Stat
+$GOROOT/src/syscall/syscall_linux.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/stat_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/source/source.go:27:17-52: fmt.Errorf "source: stat: %w"
+	possibly handled:
+		$WORK/source/source.go:23:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Fchmodat
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Chmod, call to syscall.Fchmodat
+		$GOROOT/src/os/file_posix.go:*: in os.chmod$1, call to syscall.Chmod
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.chmod$1 (dynamic function value fn: 10 of 10 candidates)
+		$GOROOT/src/os/stat_unix.go:*: in os.statNolog, call to os.ignoringEINTR
+		$GOROOT/src/os/stat.go:*: in os.Stat, call to os.statNolog
+		$WORK/source/source.go:22:12-25: in example.com/stdlibio/source.Exists, call to os.Stat
+$GOROOT/src/syscall/syscall_linux.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/stat_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/source/source.go:27:17-52: fmt.Errorf "source: stat: %w"
+	possibly handled:
+		$WORK/source/source.go:23:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Fchmodat
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Chmod, call to syscall.Fchmodat
+		$GOROOT/src/os/file_posix.go:*: in os.chmod$1, call to syscall.Chmod
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.chmod$1 (dynamic function value fn: 10 of 10 candidates)
+		$GOROOT/src/os/stat_unix.go:*: in os.statNolog, call to os.ignoringEINTR
+		$GOROOT/src/os/stat.go:*: in os.Stat, call to os.statNolog
+		$WORK/source/source.go:22:12-25: in example.com/stdlibio/source.Exists, call to os.Stat
+$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/stat_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/source/source.go:27:17-52: fmt.Errorf "source: stat: %w"
+	possibly handled:
+		$WORK/source/source.go:23:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.unlinkat, call to syscall.errnoErr
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Unlink, call to syscall.unlinkat
+		$GOROOT/src/os/file_unix.go:*: in os.Remove$1, call to syscall.Unlink
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Remove$1 (dynamic function value fn: 10 of 10 candidates)
+		$GOROOT/src/os/stat_unix.go:*: in os.statNolog, call to os.ignoringEINTR
+		$GOROOT/src/os/stat.go:*: in os.Stat, call to os.statNolog
+		$WORK/source/source.go:22:12-25: in example.com/stdlibio/source.Exists, call to os.Stat
+$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e
+	wrap chain (origin → target):
+		$GOROOT/src/os/stat_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/source/source.go:27:17-52: fmt.Errorf "source: stat: %w"
+	possibly handled:
+		$WORK/source/source.go:23:5-35: errors.Is with io/fs.ErrNotExist: unresolved value
+	path (origin → target):
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog$1
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.openFileNolog$1 (dynamic function value fn: 10 of 10 candidates)
+		$GOROOT/src/os/stat_unix.go:*: in os.statNolog, call to os.ignoringEINTR
+		$GOROOT/src/os/stat.go:*: in os.Stat, call to os.statNolog
+		$WORK/source/source.go:22:12-25: in example.com/stdlibio/source.Exists, call to os.Stat
+$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e
+	wrap chain (origin → target):
+		$GOROOT/src/os/stat_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/source/source.go:27:17-52: fmt.Errorf "source: stat: %w"
+	possibly handled:
+		$WORK/source/source.go:23:5-35: errors.Is with io/fs.ErrNotExist: unresolved value
+	path (origin → target):
+		$GOROOT/src/os/file_unix.go:*: in os.openDirNolog
+		$GOROOT/src/os/file_unix.go:*: in os.openDirNolog$1
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.openDirNolog$1 (dynamic function value fn: 10 of 10 candidates)
+		$GOROOT/src/os/stat_unix.go:*: in os.statNolog, call to os.ignoringEINTR
+		$GOROOT/src/os/stat.go:*: in os.Stat, call to os.statNolog
+		$WORK/source/source.go:22:12-25: in example.com/stdlibio/source.Exists, call to os.Stat
+$GOROOT/src/os/root_unix.go:*: unresolved(memory): load of escaping variable e
+	wrap chain (origin → target):
+		$GOROOT/src/os/stat_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/source/source.go:27:17-52: fmt.Errorf "source: stat: %w"
+	possibly handled:
+		$WORK/source/source.go:23:5-35: errors.Is with io/fs.ErrNotExist: unresolved value
+	path (origin → target):
+		$GOROOT/src/os/root_unix.go:*: in os.readlinkat
+		$GOROOT/src/os/root_unix.go:*: in os.readlinkat$1
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.readlinkat$1 (dynamic function value fn: 10 of 10 candidates)
+		$GOROOT/src/os/stat_unix.go:*: in os.statNolog, call to os.ignoringEINTR
+		$GOROOT/src/os/stat.go:*: in os.Stat, call to os.statNolog
+		$WORK/source/source.go:22:12-25: in example.com/stdlibio/source.Exists, call to os.Stat
+$GOROOT/src/syscall/syscall_linux.go:*: unresolved(no-body): internal/runtime/syscall/linux.Syscall6 has no body
+	wrap chain (origin → target):
+		$GOROOT/src/os/stat_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/source/source.go:27:17-52: fmt.Errorf "source: stat: %w"
+	possibly handled:
+		$WORK/source/source.go:23:5-35: errors.Is with io/fs.ErrNotExist: unresolved value
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.RawSyscall6
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Syscall6, call to syscall.RawSyscall6
+		$GOROOT/src/internal/syscall/unix/waitid_linux.go:*: in internal/syscall/unix.Waitid, call to syscall.Syscall6
+		$GOROOT/src/os/pidfd_linux.go:*: in os.checkPidfd$1, call to internal/syscall/unix.Waitid
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.checkPidfd$1 (dynamic function value fn: 10 of 10 candidates)
+		$GOROOT/src/os/stat_unix.go:*: in os.statNolog, call to os.ignoringEINTR
+		$GOROOT/src/os/stat.go:*: in os.Stat, call to os.statNolog
+		$WORK/source/source.go:22:12-25: in example.com/stdlibio/source.Exists, call to os.Stat

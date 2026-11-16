@@ -1,0 +1,49 @@
+Call-site Target directly on a stdlib call. At run time strconv.ParseBool only fails
+with &NumError{Err: ErrSyntax}: sentinel strconv.ErrSyntax under
+*strconv.NumError.Unwrap must be present. With the Go 1.27 stdlib the conversion goes
+through strconv.toError, a switch over internal/strconv constants the tool does not
+decide, so ErrRange, the base/bitSize errors and a bare internal/strconv.Error are
+also listed (over-approximation, not a missing origin).
+-- args --
+config/config.go:@parsebool
+-- stdout --
+$WORK/config/config.go:64:9-43: Error Set of call to strconv.ParseBool in example.com/stdlibio/config.Strict: 5 entries
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrRange
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.rangeError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.rangeError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseBool, call to strconv.toError
+		$WORK/config/config.go:64:9-43: in example.com/stdlibio/config.Strict, call to strconv.ParseBool
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrSyntax
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.syntaxError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.syntaxError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseBool, call to strconv.toError
+		$WORK/config/config.go:64:9-43: in example.com/stdlibio/config.Strict, call to strconv.ParseBool
+$GOROOT/src/internal/strconv/atob.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atob.go:*: in internal/strconv.ParseBool
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseBool, call to internal/strconv.ParseBool
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseBool, call to strconv.toError
+		$WORK/config/config.go:64:9-43: in example.com/stdlibio/config.Strict, call to strconv.ParseBool
+$GOROOT/src/strconv/number.go:*: opaque errors.New
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.baseError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.baseError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseBool, call to strconv.toError
+		$WORK/config/config.go:64:9-43: in example.com/stdlibio/config.Strict, call to strconv.ParseBool
+$GOROOT/src/strconv/number.go:*: opaque errors.New
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.bitSizeError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.bitSizeError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseBool, call to strconv.toError
+		$WORK/config/config.go:64:9-43: in example.com/stdlibio/config.Strict, call to strconv.ParseBool

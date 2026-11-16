@@ -1,0 +1,10 @@
+Negative: the position is a method in an interface type declaration, not
+a function declaration or a call. Expected: exit 2, "no function
+declaration or call at position".
+-- args --
+core/core.go:@handle_iface
+-- stdout --
+-- stderr --
+errtrace: $WORK/core/core.go:22:19: interface method has no body; query a call site
+-- exit --
+2

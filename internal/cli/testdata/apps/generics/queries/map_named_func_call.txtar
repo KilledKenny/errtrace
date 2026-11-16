@@ -1,0 +1,15 @@
+SUSPECTED BUG: path only - the hop through the generic instance is collapsed (see check_explicit_call); the Error Set itself is as expected.
+Call site of Map[string,int] with the named function parsePort as callback.
+Expect ErrEmpty and *TypedErr[string] (Op "port"); errOdd, *TypedErr[int] and the "lengths" wraps must not appear.
+-- args --
+pipeline.go:@mapport
+-- stdout --
+$WORK/pipeline.go:32:9-44: Error Set of call to seq.Map in example.com/generics.parsePorts: 2 entries
+$WORK/errs/errs.go:13:2-10: sentinel example.com/generics/errs.ErrEmpty
+	path (origin → target):
+		$WORK/pipeline.go:18:13-26: in example.com/generics.parsePort
+		$WORK/pipeline.go:32:9-44: in example.com/generics.parsePorts, call to example.com/generics.parsePort (dynamic function value f: 1 of 1 candidates)
+$WORK/pipeline.go:23:14-56: concrete *example.com/generics/errs.TypedErr[string]
+	path (origin → target):
+		$WORK/pipeline.go:23:14-56: in example.com/generics.parsePort
+		$WORK/pipeline.go:32:9-44: in example.com/generics.parsePorts, call to example.com/generics.parsePort (dynamic function value f: 1 of 1 candidates)

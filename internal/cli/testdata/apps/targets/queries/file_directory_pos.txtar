@@ -1,0 +1,9 @@
+A package directory with a line:col.
+Negative: exit 2.
+-- args --
+internal/platform:5:6
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/platform: file is not in any loaded package
+-- exit --
+2

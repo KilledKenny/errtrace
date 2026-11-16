@@ -1,0 +1,14 @@
+Method call through the alias Scores = cache.Cache[string,int], arguments from the generic alias Pair[K,V].
+Expect ErrDuplicate and concrete *TypedErr[string] (TypedErr[K] with K=string).
+-- args --
+caching.go:@aliasput
+-- stdout --
+$WORK/caching.go:22:13-45: Error Set of call to c.Put in example.com/generics.fill: 2 entries
+$WORK/errs/errs.go:16:2-14: sentinel example.com/generics/errs.ErrDuplicate
+	path (origin → target):
+		$WORK/cache/cache.go:41:10-27: in (*example.com/generics/cache.Cache[string, int]).Put
+		$WORK/caching.go:22:13-45: in example.com/generics.fill, call to (*example.com/generics/cache.Cache[string, int]).Put
+$WORK/cache/cache.go:44:10-46: concrete *example.com/generics/errs.TypedErr[string]
+	path (origin → target):
+		$WORK/cache/cache.go:44:10-46: in (*example.com/generics/cache.Cache[string, int]).Put
+		$WORK/caching.go:22:13-45: in example.com/generics.fill, call to (*example.com/generics/cache.Cache[string, int]).Put

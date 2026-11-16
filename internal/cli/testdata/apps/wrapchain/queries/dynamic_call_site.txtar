@@ -1,0 +1,29 @@
+Call-site Target on s.Write(d). Expected the 4 origins of dynamic_wrap without
+the outer "export %s: %w" link. doc.ErrNever absent.
+-- args --
+export/export.go:@write
+-- stdout --
+$WORK/export/export.go:54:12-32: Error Set of call to s.Write in example.com/wrapchain/export.Export: 4 entries
+$WORK/doc/doc.go:22:2-9: sentinel example.com/wrapchain/doc.ErrDisk
+	wrap chain (origin → target):
+		$WORK/export/export.go:26:10-63: *example.com/wrapchain/xerr.OpError.Unwrap
+	path (origin → target):
+		$WORK/export/export.go:26:51-62: in (*example.com/wrapchain/export.FileSink).Write
+		$WORK/export/export.go:54:12-32: in example.com/wrapchain/export.Export, call to (*example.com/wrapchain/export.FileSink).Write (dynamic (example.com/wrapchain/export.Sink).Write: 2 of 2 candidates)
+$WORK/doc/doc.go:23:2-11: sentinel example.com/wrapchain/doc.ErrClosed
+	path (origin → target):
+		$WORK/export/export.go:23:10-23: in (*example.com/wrapchain/export.FileSink).Write
+		$WORK/export/export.go:54:12-32: in example.com/wrapchain/export.Export, call to (*example.com/wrapchain/export.FileSink).Write (dynamic (example.com/wrapchain/export.Sink).Write: 2 of 2 candidates)
+$WORK/doc/doc.go:24:2-10: sentinel example.com/wrapchain/doc.ErrQuota
+	wrap chain (origin → target):
+		$WORK/export/export.go:40:10-58: fmt.Errorf "upload %s: %w"
+	path (origin → target):
+		$WORK/export/export.go:40:45-57: in (example.com/wrapchain/export.NetSink).Write
+		$WORK/export/export.go:54:12-32: in example.com/wrapchain/export.Export, call to (example.com/wrapchain/export.NetSink).Write (dynamic (example.com/wrapchain/export.Sink).Write: 2 of 2 candidates)
+$WORK/export/export.go:37:10-36: concrete *example.com/wrapchain/xerr.CodeError
+	path (origin → target):
+		$WORK/export/export.go:37:10-36: in (example.com/wrapchain/export.NetSink).Write
+		$WORK/export/export.go:54:12-32: in example.com/wrapchain/export.Export, call to (example.com/wrapchain/export.NetSink).Write (dynamic (example.com/wrapchain/export.Sink).Write: 2 of 2 candidates)
+-- stderr --
+-- exit --
+0

@@ -1,0 +1,11 @@
+Target file in a package (internal/store/disk) that the -p pattern does not match and cmd/report does not import.
+Expected: the file's package is loaded anyway: 1 entry disk.ErrNoEntry, with the "not reachable from main/init" warning.
+-- args --
+-p ./cmd/report internal/store/disk/disk.go:@read
+-- stdout --
+$WORK/internal/store/disk/disk.go:37:25-29: Error Set of (*example.com/targets/internal/store/disk.Disk).Read: 1 entries
+$WORK/internal/store/disk/disk.go:7:5-15: sentinel example.com/targets/internal/store/disk.ErrNoEntry
+	path (origin → target):
+		$WORK/internal/store/disk/disk.go:40:15-25: in (*example.com/targets/internal/store/disk.Disk).Read
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates

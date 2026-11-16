@@ -1,0 +1,23 @@
+SUSPECTED BUG (precision; plan step S09 not built yet, see ops_call):
+retry(2, e, sms.Send) passes a method value of a concrete type, so only
+drivers.ErrSMS is possible. Actual: also core.ErrEmptyBody and ErrPager,
+the function values other callers pass to retry ("3 of 3 candidates").
+-- args --
+dispatch/funcs.go:@retrysms_call
+-- stdout --
+$WORK/dispatch/funcs.go:82:27-48: Error Set of call to retry in example.com/plugins/dispatch.RetrySMS: 3 entries
+$WORK/core/core.go:17:2-14: sentinel example.com/plugins/core.ErrEmptyBody
+	path (origin → target):
+		$WORK/dispatch/dispatch.go:94:10-27: in example.com/plugins/dispatch.Validate
+		$WORK/dispatch/funcs.go:73:12-17: in example.com/plugins/dispatch.retry, call to example.com/plugins/dispatch.Validate (dynamic function value fn: 3 of 3 candidates)
+		$WORK/dispatch/funcs.go:82:27-48: in example.com/plugins/dispatch.RetrySMS, call to example.com/plugins/dispatch.retry
+$WORK/drivers/drivers.go:14:2-8: sentinel example.com/plugins/drivers.ErrSMS
+	path (origin → target):
+		$WORK/drivers/drivers.go:37:10-16: in (*example.com/plugins/drivers.SMS).Send
+		$WORK/dispatch/funcs.go:73:12-17: in example.com/plugins/dispatch.retry, call to (*example.com/plugins/drivers.SMS).Send (dynamic function value fn: 3 of 3 candidates)
+		$WORK/dispatch/funcs.go:82:27-48: in example.com/plugins/dispatch.RetrySMS, call to example.com/plugins/dispatch.retry
+$WORK/drivers/drivers.go:16:2-10: sentinel example.com/plugins/drivers.ErrPager
+	path (origin → target):
+		$WORK/drivers/drivers.go:82:10-18: in (example.com/plugins/drivers.Pager).Send
+		$WORK/dispatch/funcs.go:73:12-17: in example.com/plugins/dispatch.retry, call to (example.com/plugins/drivers.Pager).Send (dynamic function value fn: 3 of 3 candidates)
+		$WORK/dispatch/funcs.go:82:27-48: in example.com/plugins/dispatch.RetrySMS, call to example.com/plugins/dispatch.retry

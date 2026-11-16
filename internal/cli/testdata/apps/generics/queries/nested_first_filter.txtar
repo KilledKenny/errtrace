@@ -1,0 +1,19 @@
+SUSPECTED BUG: path only - the hop through the generic instance is collapsed (see check_explicit_call); the Error Set itself is as expected.
+Nested generic calls First(Filter(...)): Filter's (slice, error) results are First's arguments.
+Expect ErrNegative wrapped by "filter: %w" (from the closure, through First's err parameter) and ErrEmpty from First itself.
+-- args --
+pipeline.go:@nested
+-- stdout --
+$WORK/pipeline.go:47:9-52:5: Error Set of call to seq.First in example.com/generics.firstEven: 2 entries
+$WORK/errs/errs.go:13:2-10: sentinel example.com/generics/errs.ErrEmpty
+	path (origin → target):
+		$WORK/seq/seq.go:67:16-29: in example.com/generics/seq.First[int]
+		$WORK/pipeline.go:47:9-52:5: in example.com/generics.firstEven, call to example.com/generics/seq.First[int]
+$WORK/errs/errs.go:14:2-13: sentinel example.com/generics/errs.ErrNegative
+	wrap chain (origin → target):
+		$WORK/seq/seq.go:29:16-45: fmt.Errorf "filter: %w"
+	path (origin → target):
+		$WORK/pipeline.go:49:18-34: in example.com/generics.firstEven$1
+		$WORK/pipeline.go:47:30-52:4: in example.com/generics.firstEven, call to example.com/generics.firstEven$1 (dynamic function value keep: 1 of 1 candidates)
+		$WORK/seq/seq.go:63:5-8: in example.com/generics/seq.First[int]
+		$WORK/pipeline.go:47:9-52:5: in example.com/generics.firstEven, call to example.com/generics/seq.First[int]

@@ -1,0 +1,10 @@
+Position on the call paren of the immediately invoked literal.
+Expected: call-site target with the same single origin errUsage.
+-- args --
+cmd/ingest/main.go:@iife_paren
+-- stdout --
+$WORK/cmd/ingest/main.go:85:20-90:20: Error Set of call to (func() error literal) in example.com/targets/cmd/ingest.ingest: 1 entries
+$WORK/cmd/ingest/main.go:14:5-13: sentinel example.com/targets/cmd/ingest.errUsage
+	path (origin → target):
+		$WORK/cmd/ingest/main.go:87:11-19: in example.com/targets/cmd/ingest.ingest$1
+		$WORK/cmd/ingest/main.go:85:20-90:20: in example.com/targets/cmd/ingest.ingest, call to example.com/targets/cmd/ingest.ingest$1

@@ -1,0 +1,17 @@
+if !errors.As(err, &opErr) { return err }; return nil: handles everything wrapped by *OpError.
+Expect 2 entries: the bare *CodeError (code 500) and ErrDeclined (fmt.Errorf chain). The *CodeError inside
+the *OpError must NOT appear.
+-- args --
+processor/as.go:@asWrapper
+-- stdout --
+$WORK/processor/as.go:55:20-31: Error Set of example.com/guards/processor.CaptureAsOp: 2 entries
+$WORK/payerr/payerr.go:8:2-13: sentinel example.com/guards/payerr.ErrDeclined
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:76:10-55: fmt.Errorf "capture: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:76:36-54: in example.com/guards/gateway.Capture
+		$WORK/processor/as.go:56:9-27: in example.com/guards/processor.CaptureAsOp, call to example.com/guards/gateway.Capture
+$WORK/gateway/gateway.go:73:10-51: concrete *example.com/guards/payerr.CodeError
+	path (origin → target):
+		$WORK/gateway/gateway.go:73:10-51: in example.com/guards/gateway.Capture
+		$WORK/processor/as.go:56:9-27: in example.com/guards/processor.CaptureAsOp, call to example.com/guards/gateway.Capture

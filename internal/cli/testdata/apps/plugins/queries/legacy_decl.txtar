@@ -1,0 +1,18 @@
+SUSPECTED BUG (low confidence; plan step S12 not built yet): the two
+dynamic calls are on parameters of a Target nobody calls, so the entries
+should be unresolved(depends-on-caller) naming the parameters. Actual:
+unresolved(no-candidates), a kind the plan reserves for dynamic calls that
+do not come from a parameter. The stderr warning is as expected, and no
+Origin is borrowed from other call sites.
+-- args --
+dispatch/legacy.go:@legacy
+-- stdout --
+$WORK/dispatch/legacy.go:9:17-27: Error Set of example.com/plugins/dispatch.LegacySend: 2 entries, 2 unresolved
+$WORK/dispatch/legacy.go:10:12-23: unresolved(no-candidates): dynamic call to (example.com/plugins/core.Handler).Handle
+	path (origin → target):
+		$WORK/dispatch/legacy.go:10:12-23: in example.com/plugins/dispatch.LegacySend
+$WORK/dispatch/legacy.go:13:9-18: unresolved(no-candidates): dynamic call to (example.com/plugins/core.Driver).Send
+	path (origin → target):
+		$WORK/dispatch/legacy.go:13:9-18: in example.com/plugins/dispatch.LegacySend
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates

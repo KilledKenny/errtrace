@@ -1,0 +1,9 @@
+go.mod as the target file.
+Negative: exit 2.
+-- args --
+go.mod:1:1
+-- stdout --
+-- stderr --
+errtrace: $WORK/go.mod: file is not in any loaded package
+-- exit --
+2

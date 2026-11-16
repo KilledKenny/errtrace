@@ -1,0 +1,10 @@
+"defer d.closer.Close()" discards the result. Expected: only
+core.ErrDropped; ErrSpoolBusy must NOT be in the set.
+-- args --
+dispatch/dispatch.go:@shutdown
+-- stdout --
+$WORK/dispatch/dispatch.go:169:35-43: Error Set of (*example.com/plugins/dispatch.Dispatcher).Shutdown: 1 entries
+$WORK/core/core.go:16:2-12: sentinel example.com/plugins/core.ErrDropped
+	path (origin → target):
+		$WORK/dispatch/dispatch.go:152:10-25: in (*example.com/plugins/dispatch.Dispatcher).flush
+		$WORK/dispatch/dispatch.go:171:9-18: in (*example.com/plugins/dispatch.Dispatcher).Shutdown, call to (*example.com/plugins/dispatch.Dispatcher).flush

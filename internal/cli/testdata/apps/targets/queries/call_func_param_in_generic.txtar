@@ -1,0 +1,10 @@
+Call-site target parse(raw): call to a function-typed parameter inside the generic Decode.
+Expected: codec.ErrSyntax from both toText (Decode[string]) and ParseInt (Decode[int]) as Candidates; no "decode" wrap, no ErrEmpty.
+-- args --
+internal/codec/codec.go:@parse_call
+-- stdout --
+$WORK/internal/codec/codec.go:34:27-37: Error Set of call to parse in example.com/targets/internal/codec.Decode: 1 entries
+$WORK/internal/codec/codec.go:13:2-11: sentinel example.com/targets/internal/codec.ErrSyntax [+1 more paths]
+	path (origin → target):
+		$WORK/internal/codec/codec.go:54:14-23: in example.com/targets/internal/codec.ParseInt
+		$WORK/internal/codec/codec.go:34:27-37: in example.com/targets/internal/codec.Decode[int], call to example.com/targets/internal/codec.ParseInt (dynamic function value parse: 1 of 1 candidates)

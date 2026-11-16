@@ -1,0 +1,16 @@
+Three errors that drop their cause: escaped %%w with %v of the Atoi error,
+fmt.Errorf("%s", err.Error()) and errors.New(prefix + err.Error()). Expected 3 opaque
+entries; no strconv.ErrSyntax/ErrRange, no doc.ErrTooLong, no doc.ErrSyntax.
+-- args --
+parse/parse.go:@percent
+-- stdout --
+$WORK/parse/parse.go:133:18-25: Error Set of example.com/wrapchain/parse.Percent: 3 entries
+$WORK/parse/parse.go:136:13-60: opaque fmt.Errorf "want 100%%w, got %q: %v"
+	path (origin → target):
+		$WORK/parse/parse.go:136:13-60: in example.com/wrapchain/parse.Percent
+$WORK/parse/parse.go:139:13-53: opaque fmt.Errorf "%s"
+	path (origin → target):
+		$WORK/parse/parse.go:139:13-53: in example.com/wrapchain/parse.Percent
+$WORK/parse/parse.go:142:13-60: opaque errors.New
+	path (origin → target):
+		$WORK/parse/parse.go:142:13-60: in example.com/wrapchain/parse.Percent

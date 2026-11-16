@@ -1,0 +1,15 @@
+SUSPECTED BUG (same as close_decl): expected opaque fmt.Errorf "panic: %v"
+plus what next.Handle returns (ErrPager, core.ErrDropped, ErrGaveUp, ...).
+Actual: no Origin, two unresolved(memory) entries, one with span "-".
+Closure with a deferred recover() that overwrites the named result, plus a
+dynamic call on a captured interface.
+-- args --
+-chain-depth=1 middleware/middleware.go:@recover_lit
+-- stdout --
+$WORK/middleware/middleware.go:67:43-47: Error Set of example.com/plugins/middleware.Recover$1$1: 2 entries, 2 unresolved
+-: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		-: in example.com/plugins/middleware.Recover$1$1
+$WORK/middleware/middleware.go:73:4-4: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/middleware/middleware.go:73:4-4: in example.com/plugins/middleware.Recover$1$1

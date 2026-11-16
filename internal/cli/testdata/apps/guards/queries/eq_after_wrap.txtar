@@ -1,0 +1,18 @@
+err is wrapped with fmt.Errorf before err == ErrDeclined, so the guard never matches.
+Expect 2 entries, ErrDeclined and ErrInternal, both with the wrap chain "void %d: %w".
+-- args --
+processor/eq.go:@wrapThenEq
+-- stdout --
+$WORK/processor/eq.go:133:21-37: Error Set of example.com/guards/processor.ChargeWrapThenEq: 2 entries
+$WORK/payerr/payerr.go:8:2-13: sentinel example.com/guards/payerr.ErrDeclined
+	wrap chain (origin → target):
+		$WORK/processor/eq.go:136:9-42: fmt.Errorf "void %d: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:59:10-28: in example.com/guards/gateway.Void
+		$WORK/processor/eq.go:134:9-24: in example.com/guards/processor.ChargeWrapThenEq, call to example.com/guards/gateway.Void
+$WORK/payerr/payerr.go:12:2-13: sentinel example.com/guards/payerr.ErrInternal
+	wrap chain (origin → target):
+		$WORK/processor/eq.go:136:9-42: fmt.Errorf "void %d: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:62:10-28: in example.com/guards/gateway.Void
+		$WORK/processor/eq.go:134:9-24: in example.com/guards/processor.ChargeWrapThenEq, call to example.com/guards/gateway.Void

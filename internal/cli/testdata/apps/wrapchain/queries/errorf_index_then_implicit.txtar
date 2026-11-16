@@ -1,0 +1,17 @@
+"%[2]w then %w, after %[1]v": the implicit %w follows the explicit index, so
+arguments 2 and 3 are wrapped. Expected 2 entries: doc.ErrEmpty and doc.ErrTooLong
+with the same wrap line; doc.ErrSyntax (argument 1, %v) absent.
+-- args --
+parse/parse.go:@reorder
+-- stdout --
+$WORK/parse/parse.go:95:18-25: Error Set of example.com/wrapchain/parse.Reorder: 2 entries
+$WORK/doc/doc.go:17:2-10: sentinel example.com/wrapchain/doc.ErrEmpty
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:97:10-95: fmt.Errorf "%[2]w then %w, after %[1]v"
+	path (origin → target):
+		$WORK/parse/parse.go:97:66-78: in example.com/wrapchain/parse.Reorder
+$WORK/doc/doc.go:19:2-12: sentinel example.com/wrapchain/doc.ErrTooLong
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:97:10-95: fmt.Errorf "%[2]w then %w, after %[1]v"
+	path (origin → target):
+		$WORK/parse/parse.go:97:80-94: in example.com/wrapchain/parse.Reorder

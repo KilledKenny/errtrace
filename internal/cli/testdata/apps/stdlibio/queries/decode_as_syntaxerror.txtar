@@ -1,0 +1,473 @@
+Decode keeps the json.Unmarshal error (wrapped with %w) only when errors.As finds a
+*json.SyntaxError, and otherwise replaces it by errors.New "config: malformed
+document". Expected: that opaque errors.New without chain; under the fmt.Errorf
+"config: syntax error at byte %d: %w" link only values that may contain a
+*json.SyntaxError (concrete *json.SyntaxError, wrappers around it, and Unresolved
+entries, which no guard may remove). Concrete non-SyntaxError leaves and opaque json
+errors must NOT appear directly under the fmt.Errorf link. Large because encoding/json
+is followed; Unresolved field loads of unrelated Unwrap methods come from dynamic
+Unwrap calls inside the stdlib.
+-- args --
+config/config.go:@decode
+-- stdout --
+$WORK/config/config.go:93:17-23: Error Set of example.com/stdlibio/config.Decode: 45 entries, 40 unresolved, 9 possibly handled
+$GOROOT/src/encoding/json/v2_scanner.go:*: concrete *encoding/json.SyntaxError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/encoding/json/v2_scanner.go:*: concrete *encoding/json.SyntaxError
+	wrap chain (origin → target):
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/encoding/json/v2_scanner.go:*: concrete *encoding/json.SyntaxError [typed nil]
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/encoding/json/v2_scanner.go:*: concrete *encoding/json.SyntaxError [typed nil]
+	wrap chain (origin → target):
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$WORK/config/config.go:100:15-55: opaque errors.New "config: malformed document"
+	path (origin → target):
+		$WORK/config/config.go:100:15-55: in example.com/stdlibio/config.Decode
+$GOROOT/src/cmp/cmp.go:*: unresolved(memory): load of slice or array element
+	wrap chain (origin → target):
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/cmp/cmp.go:*: in cmp.Or[error]
+		$GOROOT/src/encoding/json/v2/arshal_default.go:*: in encoding/json/v2.makeArrayArshaler$3, call to cmp.Or[error]
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to encoding/json/v2.makeArrayArshaler$3 (dynamic function value of type encoding/json/v2.unmarshaler: 19 of 19 candidates)
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/encoding/csv/reader.go:*: unresolved(memory): load of field Err of *encoding/csv.ParseError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/csv/reader.go:*: in (*encoding/csv.ParseError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/csv.ParseError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/encoding/csv/reader.go:*: unresolved(memory): load of field Err of *encoding/csv.ParseError
+	wrap chain (origin → target):
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/csv/reader.go:*: in (*encoding/csv.ParseError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/csv.ParseError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/encoding/json/internal/internal.go:*: unresolved(memory): load of field Err of *encoding/json/internal.ValueError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/internal/internal.go:*: in (*encoding/json/internal.ValueError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json/internal.ValueError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/encoding/json/internal/internal.go:*: unresolved(memory): load of field Err of *encoding/json/internal.ValueError
+	wrap chain (origin → target):
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/internal/internal.go:*: in (*encoding/json/internal.ValueError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json/internal.ValueError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/encoding/json/jsontext/decode.go:*: unresolved(memory): load of field peekErr of *encoding/json/jsontext.decodeBuffer
+	wrap chain (origin → target):
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).ReadToken
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.Decoder).ReadToken, call to (*encoding/json/jsontext.decoderState).ReadToken
+		$GOROOT/src/encoding/json/v2/arshal_default.go:*: in encoding/json/v2.makeArrayArshaler$3, call to (*encoding/json/jsontext.Decoder).ReadToken
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to encoding/json/v2.makeArrayArshaler$3 (dynamic function value of type encoding/json/v2.unmarshaler: 19 of 19 candidates)
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/encoding/json/jsontext/decode.go:*: unresolved(memory): load of field peekErr of *encoding/json/jsontext.decodeBuffer
+	wrap chain (origin → target):
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).ReadValue
+		$GOROOT/src/encoding/json/v2/arshal_default.go:*: in encoding/json/v2.makeBytesArshaler$2, call to (*encoding/json/jsontext.decoderState).ReadValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to encoding/json/v2.makeBytesArshaler$2 (dynamic function value of type encoding/json/v2.unmarshaler: 19 of 19 candidates)
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/encoding/json/jsontext/decode.go:*: unresolved(memory): load of field peekErr of *encoding/json/jsontext.decodeBuffer
+	wrap chain (origin → target):
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to (*encoding/json/jsontext.decoderState).CheckNextValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/encoding/json/jsontext/errors.go:*: unresolved(memory): load of field err of *encoding/json/jsontext.ioError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in (*encoding/json/jsontext.ioError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json/jsontext.ioError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/encoding/json/jsontext/errors.go:*: unresolved(memory): load of field err of *encoding/json/jsontext.ioError
+	wrap chain (origin → target):
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in (*encoding/json/jsontext.ioError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json/jsontext.ioError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/encoding/json/jsontext/errors.go:*: unresolved(memory): load of field error of *encoding/json/jsontext.pointerSuffixError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: *encoding/json/jsontext.SyntacticError.Unwrap
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to (*encoding/json/jsontext.decoderState).CheckNextValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/encoding/json/jsontext/errors.go:*: unresolved(memory): load of field Err of *encoding/json/jsontext.SyntacticError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in (*encoding/json/jsontext.SyntacticError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json/jsontext.SyntacticError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/encoding/json/jsontext/errors.go:*: unresolved(memory): load of field Err of *encoding/json/jsontext.SyntacticError
+	wrap chain (origin → target):
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in (*encoding/json/jsontext.SyntacticError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json/jsontext.SyntacticError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/encoding/json/v2/arshal_default.go:*: unresolved(memory): load of field Err of *encoding/json/v2.SemanticError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	possibly handled:
+		$GOROOT/src/encoding/json/v2/errors.go:*: comparison with io.EOF: unresolved value
+$GOROOT/src/encoding/json/v2/arshal_default.go:*: unresolved(memory): load of field Err of *encoding/json/v2.SemanticError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	possibly handled:
+		$GOROOT/src/encoding/json/v2/errors.go:*: comparison with io.EOF: unresolved value
+$GOROOT/src/encoding/json/v2/arshal_funcs.go:*: unresolved(no-candidates): dynamic call to function value of type func(*encoding/json/jsontext.Decoder, encoding/json/v2.addressableValue, *encoding/json/internal/jsonopts.Struct) error
+	wrap chain (origin → target):
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	possibly handled:
+		$GOROOT/src/encoding/json/v2/arshal_funcs.go:*: errors.Is with errors.ErrUnsupported: unresolved value
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2/arshal_funcs.go:*: in (*encoding/json/v2.typedArshalers[encoding/json/jsontext.Decoder]).lookup$1
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to (*encoding/json/v2.typedArshalers[encoding/json/jsontext.Decoder]).lookup$1 (dynamic function value of type encoding/json/v2.unmarshaler: 19 of 19 candidates)
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/encoding/json/v2/arshal_methods.go:*: unresolved(no-candidates): dynamic call to (encoding.TextUnmarshaler).UnmarshalText
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	possibly handled:
+		$GOROOT/src/encoding/json/v2/errors.go:*: errors.Is with errors.ErrUnsupported: unresolved value
+		$GOROOT/src/encoding/json/v2/arshal_methods.go:*: guarded by call to encoding/json/v2.isSemanticError
+		$GOROOT/src/encoding/json/v2/arshal_methods.go:*: guarded by call to (encoding/json/jsontext.export).IsIOError
+		$GOROOT/src/encoding/json/v2/arshal_methods.go:*: guarded by call to encoding/json/v2.isSyntacticError
+		$GOROOT/src/encoding/json/v2/errors.go:*: comparison with io.EOF: unresolved value
+$GOROOT/src/encoding/json/v2/arshal_methods.go:*: unresolved(no-candidates): dynamic call to (encoding.TextUnmarshaler).UnmarshalText
+	wrap chain (origin → target):
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	possibly handled:
+		$GOROOT/src/encoding/json/v2/errors.go:*: errors.Is with errors.ErrUnsupported: unresolved value
+$GOROOT/src/encoding/json/v2/arshal_methods.go:*: unresolved(no-candidates): dynamic call to (encoding/json/v2.Unmarshaler).UnmarshalJSON
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	possibly handled:
+		$GOROOT/src/encoding/json/v2/errors.go:*: errors.Is with errors.ErrUnsupported: unresolved value
+		$GOROOT/src/encoding/json/v2/errors.go:*: comparison with io.EOF: unresolved value
+$GOROOT/src/encoding/json/v2/arshal_methods.go:*: unresolved(no-candidates): dynamic call to (encoding/json/v2.Unmarshaler).UnmarshalJSON
+	wrap chain (origin → target):
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	possibly handled:
+		$GOROOT/src/encoding/json/v2/errors.go:*: errors.Is with errors.ErrUnsupported: unresolved value
+$GOROOT/src/encoding/json/v2/arshal_methods.go:*: unresolved(no-candidates): dynamic call to (encoding/json/v2.UnmarshalerFrom).UnmarshalJSONFrom
+	wrap chain (origin → target):
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	possibly handled:
+		$GOROOT/src/encoding/json/v2/arshal_methods.go:*: errors.Is with errors.ErrUnsupported: unresolved value
+$GOROOT/src/encoding/json/v2/errors.go:*: unresolved(memory): load of field Err of *encoding/json/v2.SemanticError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: in (*encoding/json/v2.SemanticError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json/v2.SemanticError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/encoding/json/v2/errors.go:*: unresolved(memory): load of field Err of *encoding/json/v2.SemanticError
+	wrap chain (origin → target):
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: in (*encoding/json/v2.SemanticError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json/v2.SemanticError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/encoding/json/v2_decode.go:*: unresolved(memory): load of field Err of *encoding/json.UnmarshalTypeError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2_decode.go:*: in (*encoding/json.UnmarshalTypeError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json.UnmarshalTypeError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/encoding/json/v2_decode.go:*: unresolved(memory): load of field Err of *encoding/json.UnmarshalTypeError
+	wrap chain (origin → target):
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2_decode.go:*: in (*encoding/json.UnmarshalTypeError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json.UnmarshalTypeError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/encoding/json/v2_encode.go:*: unresolved(memory): load of field Err of *encoding/json.MarshalerError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2_encode.go:*: in (*encoding/json.MarshalerError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json.MarshalerError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/encoding/json/v2_encode.go:*: unresolved(memory): load of field Err of *encoding/json.MarshalerError
+	wrap chain (origin → target):
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2_encode.go:*: in (*encoding/json.MarshalerError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json.MarshalerError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/encoding/json/v2_inject.go:*: unresolved(memory): load of field Err of *encoding/json/v2.SemanticError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	possibly handled:
+		$GOROOT/src/encoding/json/v2_scanner.go:*: guarded by call to (encoding/json/jsontext.export).IsIOError
+		$GOROOT/src/encoding/json/v2_scanner.go:*: type assertion to *encoding/json/jsontext.SyntacticError: unresolved value
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/fmt/errors.go:*: unresolved(memory): load of field err of *fmt.wrapError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/fmt/errors.go:*: in (*fmt.wrapError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*fmt.wrapError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/fmt/errors.go:*: unresolved(memory): load of field err of *fmt.wrapError
+	wrap chain (origin → target):
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/fmt/errors.go:*: in (*fmt.wrapError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*fmt.wrapError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/io/fs/fs.go:*: unresolved(memory): load of field Err of *io/fs.PathError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/io/fs/fs.go:*: in (*io/fs.PathError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*io/fs.PathError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/io/fs/fs.go:*: unresolved(memory): load of field Err of *io/fs.PathError
+	wrap chain (origin → target):
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/io/fs/fs.go:*: in (*io/fs.PathError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*io/fs.PathError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/net/url/url.go:*: unresolved(memory): load of field Err of *net/url.Error
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/net/url/url.go:*: in (*net/url.Error).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*net/url.Error).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/net/url/url.go:*: unresolved(memory): load of field Err of *net/url.Error
+	wrap chain (origin → target):
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/net/url/url.go:*: in (*net/url.Error).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*net/url.Error).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/os/error.go:*: unresolved(memory): load of field Err of *os.SyscallError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/os/error.go:*: in (*os.SyscallError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*os.SyscallError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/os/error.go:*: unresolved(memory): load of field Err of *os.SyscallError
+	wrap chain (origin → target):
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/os/error.go:*: in (*os.SyscallError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*os.SyscallError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/strconv/number.go:*: unresolved(memory): load of field Err of *strconv.NumError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in (*strconv.NumError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*strconv.NumError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$GOROOT/src/strconv/number.go:*: unresolved(memory): load of field Err of *strconv.NumError
+	wrap chain (origin → target):
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in (*strconv.NumError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*strconv.NumError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$WORK/records/records.go:24:44-49: unresolved(memory): load of field Err of *example.com/stdlibio/records.RowError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$WORK/records/records.go:24:44-49: in (*example.com/stdlibio/records.RowError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*example.com/stdlibio/records.RowError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal
+$WORK/records/records.go:24:44-49: unresolved(memory): load of field Err of *example.com/stdlibio/records.RowError
+	wrap chain (origin → target):
+		$WORK/config/config.go:98:16-81: fmt.Errorf "config: syntax error at byte %d: %w"
+	path (origin → target):
+		$WORK/records/records.go:24:44-49: in (*example.com/stdlibio/records.RowError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*example.com/stdlibio/records.RowError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_decode.go:*: in encoding/json.Unmarshal, call to encoding/json/v2.Unmarshal
+		$WORK/config/config.go:95:12-50: in example.com/stdlibio/config.Decode, call to encoding/json.Unmarshal

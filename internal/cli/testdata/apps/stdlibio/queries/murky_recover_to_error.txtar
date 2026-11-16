@@ -1,0 +1,16 @@
+SUSPECTED BUG: Guarded converts a panic into its named result inside a
+deferred closure: err = r.(error) or err = fmt.Errorf("murky: panic: %v", r). Expected
+(plan S08/S10): opaque fmt.Errorf "murky: panic: %v" plus Unresolved(recover) at the type
+assertion; the panicking ErrStage itself is out of scope. Actual: neither; two
+Unresolved(memory) "load of escaping variable err" entries, one of which has the
+placeholder span "-" (and "-" as its path hop) instead of a source position.
+-- args --
+murky/murky.go:@guarded
+-- stdout --
+$WORK/murky/murky.go:79:18-25: Error Set of example.com/stdlibio/murky.Guarded: 2 entries, 2 unresolved
+-: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		-: in example.com/stdlibio/murky.Guarded
+$WORK/murky/murky.go:90:2-2: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/murky/murky.go:90:2-2: in example.com/stdlibio/murky.Guarded

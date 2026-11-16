@@ -1,0 +1,23 @@
+One dynamic call site reached from four callers with different drivers.
+Expected for the declaration: the union ErrPager, ErrEmail, ErrSMS,
+ErrQueue (4 candidates).
+-- args --
+dispatch/dispatch.go:@deliver
+-- stdout --
+$WORK/dispatch/dispatch.go:187:18-25: Error Set of example.com/plugins/dispatch.deliver: 4 entries
+$WORK/drivers/drivers.go:13:2-10: sentinel example.com/plugins/drivers.ErrEmail
+	path (origin → target):
+		$WORK/drivers/drivers.go:26:10-18: in (example.com/plugins/drivers.Email).Send
+		$WORK/dispatch/dispatch.go:187:70-79: in example.com/plugins/dispatch.deliver, call to (example.com/plugins/drivers.Email).Send (dynamic (example.com/plugins/core.Driver).Send: 4 of 4 candidates)
+$WORK/drivers/drivers.go:14:2-8: sentinel example.com/plugins/drivers.ErrSMS
+	path (origin → target):
+		$WORK/drivers/drivers.go:37:10-16: in (*example.com/plugins/drivers.SMS).Send
+		$WORK/dispatch/dispatch.go:187:70-79: in example.com/plugins/dispatch.deliver, call to (*example.com/plugins/drivers.SMS).Send (dynamic (example.com/plugins/core.Driver).Send: 4 of 4 candidates)
+$WORK/drivers/drivers.go:16:2-10: sentinel example.com/plugins/drivers.ErrPager
+	path (origin → target):
+		$WORK/drivers/drivers.go:82:10-18: in (example.com/plugins/drivers.Pager).Send
+		$WORK/dispatch/dispatch.go:187:70-79: in example.com/plugins/dispatch.deliver, call to (example.com/plugins/drivers.Pager).Send (dynamic (example.com/plugins/core.Driver).Send: 4 of 4 candidates)
+$WORK/drivers/drivers.go:18:2-10: sentinel example.com/plugins/drivers.ErrQueue
+	path (origin → target):
+		$WORK/drivers/drivers.go:102:10-18: in (example.com/plugins/drivers.Queue).Send
+		$WORK/dispatch/dispatch.go:187:70-79: in example.com/plugins/dispatch.deliver, call to (example.com/plugins/drivers.Queue).Send (dynamic (example.com/plugins/core.Driver).Send: 4 of 4 candidates)

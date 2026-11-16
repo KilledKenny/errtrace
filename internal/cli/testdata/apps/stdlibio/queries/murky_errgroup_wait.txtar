@@ -1,0 +1,12 @@
+Errors from goroutines through an errgroup-like helper: Group.Go stores the first
+error in g.err under sync.Once, Wait returns the field. Expected: one
+Unresolved(memory) "load of field err of *murky.Group", reached through the call to
+(*Group).Wait; ErrWorker is not expected to be resolved.
+-- args --
+murky/murky.go:@parallel
+-- stdout --
+$WORK/murky/murky.go:136:19-27: Error Set of example.com/stdlibio/murky.Parallel: 1 entries, 1 unresolved
+$WORK/murky/murky.go:132:9-14: unresolved(memory): load of field err of *example.com/stdlibio/murky.Group
+	path (origin → target):
+		$WORK/murky/murky.go:132:9-14: in (*example.com/stdlibio/murky.Group).Wait
+		$WORK/murky/murky.go:140:9-17: in example.com/stdlibio/murky.Parallel, call to (*example.com/stdlibio/murky.Group).Wait

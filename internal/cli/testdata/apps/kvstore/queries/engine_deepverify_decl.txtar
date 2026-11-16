@@ -1,0 +1,10 @@
+Function only called from constant-false dead code.
+Expect: sentinel kverr.ErrCorrupt (pointer-typed sentinel *kverr.OpError), reported as a sentinel, not as a concrete type.
+Note: no 'not reachable from main/init' warning is printed although the only caller is dead code (same root cause as engine_verify_decl).
+-- args --
+engine/engine.go:@deepverify
+-- stdout --
+$WORK/engine/engine.go:91:33-43: Error Set of (*example.com/kvstore/engine.Engine).deepVerify: 1 entries
+$WORK/kverr/kverr.go:71:5-15: sentinel example.com/kvstore/kverr.ErrCorrupt
+	path (origin → target):
+		$WORK/engine/engine.go:93:10-26: in (*example.com/kvstore/engine.Engine).deepVerify

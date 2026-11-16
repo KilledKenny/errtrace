@@ -1,0 +1,9 @@
+Relative path that escapes the module through ../ and does not exist.
+Negative: exit 2.
+-- args --
+../elsewhere/main.go:1:1
+-- stdout --
+-- stderr --
+errtrace: /tmp/TestAppstargetsfile_parent_outside665794703/elsewhere/main.go: file is not in any loaded package
+-- exit --
+2

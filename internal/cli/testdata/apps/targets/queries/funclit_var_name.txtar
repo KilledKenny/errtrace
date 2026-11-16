@@ -1,0 +1,9 @@
+Position on the variable name Trim in "var Trim = func...".
+Negative: a var is not a function declaration; exit 2, no target.
+-- args --
+internal/codec/codec.go:@trim_var
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/codec/codec.go:42:18: no function declaration or call at position
+-- exit --
+2

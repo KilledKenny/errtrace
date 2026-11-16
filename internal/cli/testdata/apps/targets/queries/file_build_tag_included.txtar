@@ -1,0 +1,9 @@
+Same file with -tags fast (one tag).
+Expected: 1 entry platform.ErrFastDisabled. Must NOT contain ErrNoLimit.
+-- args --
+-tags fast internal/platform/limits_fast.go:@maxbatch
+-- stdout --
+$WORK/internal/platform/limits_fast.go:11:19-27: Error Set of example.com/targets/internal/platform.MaxBatch: 1 entries
+$WORK/internal/platform/limits_fast.go:8:5-20: sentinel example.com/targets/internal/platform.ErrFastDisabled
+	path (origin → target):
+		$WORK/internal/platform/limits_fast.go:12:12-27: in example.com/targets/internal/platform.MaxBatch

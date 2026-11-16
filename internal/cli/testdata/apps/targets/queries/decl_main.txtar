@@ -1,0 +1,9 @@
+Declaration target on func main() of cmd/ingest.
+Negative: exit 2, main has no error result.
+-- args --
+cmd/ingest/main.go:@main
+-- stdout --
+-- stderr --
+errtrace: $WORK/cmd/ingest/main.go:33:15: example.com/targets/cmd/ingest.main has no error result
+-- exit --
+2

@@ -1,0 +1,18 @@
+SUSPECTED BUG: origins from constant-false dead branches are reported (low confidence: may be an accepted over-approximation, but go/types knows both conditions are constant false).
+verify has `if paranoid {...}` (const paranoid = false) and `if false {...}`.
+Expected only: concrete kverr.Code (constant CodeTooLarge). Actual: also sentinel kverr.ErrCorrupt (via deepVerify) and sentinel engine.errTorn.
+Also: the concrete kverr.Code entry has a zero-width span at the `return` keyword (N:3-3) instead of the expression kverr.CodeTooLarge.
+-- args --
+engine/engine.go:@verify
+-- stdout --
+$WORK/engine/engine.go:77:29-35: Error Set of (*example.com/kvstore/engine.Engine).verify: 3 entries
+$WORK/engine/engine.go:24:2-9: sentinel example.com/kvstore/engine.errTorn
+	path (origin → target):
+		$WORK/engine/engine.go:82:10-17: in (*example.com/kvstore/engine.Engine).verify
+$WORK/kverr/kverr.go:71:5-15: sentinel example.com/kvstore/kverr.ErrCorrupt
+	path (origin → target):
+		$WORK/engine/engine.go:93:10-26: in (*example.com/kvstore/engine.Engine).deepVerify
+		$WORK/engine/engine.go:79:10-41: in (*example.com/kvstore/engine.Engine).verify, call to (*example.com/kvstore/engine.Engine).deepVerify
+$WORK/engine/engine.go:85:3-3: concrete example.com/kvstore/kverr.Code
+	path (origin → target):
+		$WORK/engine/engine.go:85:3-3: in (*example.com/kvstore/engine.Engine).verify

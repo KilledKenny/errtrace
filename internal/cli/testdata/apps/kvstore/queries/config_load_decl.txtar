@@ -1,0 +1,22 @@
+Named results (cfg, err), an error assigned inside an if-init in a switch in a for loop.
+Expect: opaque fmt.Errorf "config: bad limit %q: %v" and opaque errors.New "config: limit must not be zero" (from parseLimit),
+opaque fmt.Errorf "config: unknown flag %s", sentinel config.ErrNoCommand. 4 entries.
+strconv.ErrSyntax/ErrRange/*NumError must NOT appear: %v does not wrap.
+-- args --
+config/config.go:@load
+-- stdout --
+$WORK/config/config.go:23:15-19: Error Set of example.com/kvstore/config.Load: 4 entries
+$WORK/config/config.go:12:5-17: sentinel example.com/kvstore/config.ErrNoCommand
+	path (origin → target):
+		$WORK/config/config.go:39:15-27: in example.com/kvstore/config.Load
+$WORK/config/config.go:34:16-59: opaque fmt.Errorf "config: unknown flag %s"
+	path (origin → target):
+		$WORK/config/config.go:34:16-59: in example.com/kvstore/config.Load
+$WORK/config/config.go:49:13-59: opaque fmt.Errorf "config: bad limit %q: %v"
+	path (origin → target):
+		$WORK/config/config.go:49:13-59: in example.com/kvstore/config.parseLimit
+		$WORK/config/config.go:28:44-59: in example.com/kvstore/config.Load, call to example.com/kvstore/config.parseLimit
+$WORK/config/config.go:52:13-57: opaque errors.New "config: limit must not be zero"
+	path (origin → target):
+		$WORK/config/config.go:52:13-57: in example.com/kvstore/config.parseLimit
+		$WORK/config/config.go:28:44-59: in example.com/kvstore/config.Load, call to example.com/kvstore/config.parseLimit

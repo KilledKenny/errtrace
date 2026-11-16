@@ -1,0 +1,11 @@
+Call site inside an `if paranoid` block whose condition is the constant false.
+The call can never run; the callee can only return sentinel kverr.ErrCorrupt.
+Expect that 1 entry (a call-site Query answers 'what can this call produce') or a clear diagnostic; never a crash.
+-- args --
+engine/engine.go:@dead_call
+-- stdout --
+$WORK/engine/engine.go:79:10-41: Error Set of call to e.deepVerify in (*example.com/kvstore/engine.Engine).verify: 1 entries
+$WORK/kverr/kverr.go:71:5-15: sentinel example.com/kvstore/kverr.ErrCorrupt
+	path (origin → target):
+		$WORK/engine/engine.go:93:10-26: in (*example.com/kvstore/engine.Engine).deepVerify
+		$WORK/engine/engine.go:79:10-41: in (*example.com/kvstore/engine.Engine).verify, call to (*example.com/kvstore/engine.Engine).deepVerify

@@ -1,0 +1,9 @@
+Target inside the package that fails to type-check (pulled in through the target file, not -p).
+Negative: exit 2 with the type error; ErrBroken must not be reported.
+-- args --
+_broken/typeerr/typeerr.go:@broken
+-- stdout --
+-- stderr --
+errtrace: $WORK/_broken/typeerr/typeerr.go:12:14: cannot use "not a number" (untyped string constant) as int value in variable declaration
+-- exit --
+2

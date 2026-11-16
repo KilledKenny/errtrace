@@ -1,0 +1,21 @@
+Call-site Target on the errors.Join call itself. Expected the same 2 entries as
+join_nils (doc.ErrNoTitle, doc.ErrEmpty, chain errors.Join), header "call to errors.Join".
+-- args --
+validate/validate.go:@joincall
+-- stdout --
+$WORK/validate/validate.go:35:9-72: Error Set of call to errors.Join in example.com/wrapchain/validate.All: 2 entries
+$WORK/doc/doc.go:17:2-10: sentinel example.com/wrapchain/doc.ErrEmpty
+	wrap chain (origin → target):
+		$WORK/validate/validate.go:35:9-72: errors.Join
+	path (origin → target):
+		$WORK/validate/validate.go:21:10-22: in example.com/wrapchain/validate.checkBody
+		$WORK/validate/validate.go:35:59-71: in example.com/wrapchain/validate.All, call to example.com/wrapchain/validate.checkBody
+$WORK/doc/doc.go:20:2-12: sentinel example.com/wrapchain/doc.ErrNoTitle
+	wrap chain (origin → target):
+		$WORK/validate/validate.go:35:9-72: errors.Join
+	path (origin → target):
+		$WORK/validate/validate.go:14:10-24: in example.com/wrapchain/validate.checkTitle
+		$WORK/validate/validate.go:35:39-52: in example.com/wrapchain/validate.All, call to example.com/wrapchain/validate.checkTitle
+-- stderr --
+-- exit --
+0

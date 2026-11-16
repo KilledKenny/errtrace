@@ -1,0 +1,9 @@
+Only one of the two required tags.
+Negative: exit 2, audit.go is not in any loaded package.
+-- args --
+-tags audit internal/platform/audit.go:@audit
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/platform/audit.go: file is not in any loaded package
+-- exit --
+2

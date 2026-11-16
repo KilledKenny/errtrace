@@ -1,0 +1,11 @@
+Call site passing three errors through a variadic parameter.
+Go semantics: engine.ErrStale, Exists' entries or kverr.ErrConflict.
+Slices are out of scope by design, so a single unresolved(memory) entry is the expected output; an empty set or depends-on-caller would be wrong.
+-- args --
+service/service.go:@firsterr_call
+-- stdout --
+$WORK/service/service.go:174:27-98: Error Set of call to firstErr in (*example.com/kvstore/service.Service).Audit: 1 entries, 1 unresolved
+$WORK/service/service.go:140:9-12: unresolved(memory): load of slice or array element
+	path (origin → target):
+		$WORK/service/service.go:140:9-12: in example.com/kvstore/service.firstErr
+		$WORK/service/service.go:174:27-98: in (*example.com/kvstore/service.Service).Audit, call to example.com/kvstore/service.firstErr

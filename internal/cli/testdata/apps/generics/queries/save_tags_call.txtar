@@ -1,0 +1,23 @@
+SUSPECTED BUG: ErrDuplicate and *TypedErr[string] are missing, replaced by unresolved(memory)
+"*Wrapped[string].Unwrap not modelled" (see deep_wrap_decl); the SaveAll/Each/Save hops are also collapsed.
+SaveAll[string,Tag] passes the bound generic method r.Save to seq.Each.
+Expect ErrTooLong ("save: %w", "each[%d]: %w"), and ErrDuplicate and *TypedErr[string] (*Wrapped[string].Unwrap,
+"each[%d]: %w"). Nothing from User/UserID/Name.
+-- args --
+caching.go:@savetags
+-- stdout --
+$WORK/caching.go:100:9-41: Error Set of call to repo.SaveAll in example.com/generics.saveTags: 2 entries, 1 unresolved
+$WORK/errs/errs.go:15:2-12: sentinel example.com/generics/errs.ErrTooLong
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:32:10-37: fmt.Errorf "save: %w"
+		$WORK/seq/seq.go:54:11-45: fmt.Errorf "each[%d]: %w"
+	path (origin → target):
+		$WORK/model/model.go:33:10-25: in (example.com/generics/model.Tag).Validate
+		$WORK/caching.go:100:9-41: in example.com/generics.saveTags, call to (example.com/generics/model.Tag).Validate (dynamic function value f: 1 of 1 candidates)
+$WORK/errs/errs.go:52:9-40: unresolved(memory): *example.com/generics/errs.Wrapped[string].Unwrap not modelled
+	wrap chain (origin → target):
+		$WORK/errs/errs.go:52:9-40: *example.com/generics/errs.Wrapped[string].Unwrap
+		$WORK/seq/seq.go:54:11-45: fmt.Errorf "each[%d]: %w"
+	path (origin → target):
+		$WORK/errs/errs.go:52:9-40: in example.com/generics/errs.Wrap[string]
+		$WORK/caching.go:100:9-41: in example.com/generics.saveTags, call to example.com/generics/errs.Wrap[string] (dynamic function value f: 1 of 1 candidates)

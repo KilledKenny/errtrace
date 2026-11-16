@@ -1,0 +1,6 @@
+Shadowing: `if v, err := ...` declares a new err; the outer err that is returned is never assigned.
+Expect: 0 entries (the function always returns nil).
+-- args --
+service/service.go:@move
+-- stdout --
+$WORK/service/service.go:111:28-32: Error Set of (*example.com/kvstore/service.Service).Move: 0 entries

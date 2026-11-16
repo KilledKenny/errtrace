@@ -1,0 +1,13 @@
+Stop returns the stdlib sentinels directly from a tagless switch. Expected exactly 2
+entries: sentinel context.Canceled and sentinel context.DeadlineExceeded (the
+latter is a value of the unexported type context.deadlineExceededError), no chains.
+-- args --
+jobs/jobs.go:@stop
+-- stdout --
+$WORK/jobs/jobs.go:53:15-19: Error Set of example.com/stdlibio/jobs.Stop: 2 entries
+$GOROOT/src/context/context.go:*: sentinel context.Canceled
+	path (origin → target):
+		$WORK/jobs/jobs.go:60:9-25: in example.com/stdlibio/jobs.Stop
+$GOROOT/src/context/context.go:*: sentinel context.DeadlineExceeded
+	path (origin → target):
+		$WORK/jobs/jobs.go:58:10-34: in example.com/stdlibio/jobs.Stop

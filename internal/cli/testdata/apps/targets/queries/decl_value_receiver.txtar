@@ -1,0 +1,9 @@
+Declaration target: method with a value receiver, (Store).Ping.
+Expected: 1 entry, sentinel store.ErrClosed, no wrap chain.
+-- args --
+internal/store/store.go:@ping
+-- stdout --
+$WORK/internal/store/store.go:60:25-29: Error Set of (example.com/targets/internal/store.Store).Ping: 1 entries
+$WORK/internal/store/store.go:12:2-11: sentinel example.com/targets/internal/store.ErrClosed
+	path (origin → target):
+		$WORK/internal/store/store.go:62:10-19: in (example.com/targets/internal/store.Store).Ping

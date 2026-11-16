@@ -1,0 +1,23 @@
+Comma-ok assertion (ok && ce != nil) on gateway.Capture checks the top-level type only.
+The *CodeError inside *OpError and the wrapped ErrDeclined MUST stay. The bare *CodeError (a non-nil literal)
+is handled at run time; removing it is precise, keeping it (because of the extra ce != nil) is sound.
+-- args --
+processor/as.go:@commaOkWrapped
+-- stdout --
+$WORK/processor/as.go:84:25-39: Error Set of example.com/guards/processor.CaptureCommaOk: 3 entries
+$WORK/payerr/payerr.go:8:2-13: sentinel example.com/guards/payerr.ErrDeclined
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:76:10-55: fmt.Errorf "capture: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:76:36-54: in example.com/guards/gateway.Capture
+		$WORK/processor/as.go:85:9-27: in example.com/guards/processor.CaptureCommaOk, call to example.com/guards/gateway.Capture
+$WORK/gateway/gateway.go:70:46-91: concrete *example.com/guards/payerr.CodeError
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:70:10-92: *example.com/guards/payerr.OpError.Unwrap
+	path (origin → target):
+		$WORK/gateway/gateway.go:70:46-91: in example.com/guards/gateway.Capture
+		$WORK/processor/as.go:85:9-27: in example.com/guards/processor.CaptureCommaOk, call to example.com/guards/gateway.Capture
+$WORK/gateway/gateway.go:73:10-51: concrete *example.com/guards/payerr.CodeError
+	path (origin → target):
+		$WORK/gateway/gateway.go:73:10-51: in example.com/guards/gateway.Capture
+		$WORK/processor/as.go:85:9-27: in example.com/guards/processor.CaptureCommaOk, call to example.com/guards/gateway.Capture

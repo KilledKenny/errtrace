@@ -1,0 +1,14 @@
+Call site r.eng.Get(...) through a promoted field (r.base.eng).
+Expect: engine.ErrClosed and kverr.ErrNotFound without any wrap chain (the wrap happens after the call).
+-- args --
+repo/repo.go:@get_call
+-- stdout --
+$WORK/repo/repo.go:46:12-47: Error Set of call to r.eng.Get in (*example.com/kvstore/repo.Repo).Load: 2 entries
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	path (origin → target):
+		$WORK/engine/engine.go:68:15-24: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:46:12-47: in (*example.com/kvstore/repo.Repo).Load, call to (*example.com/kvstore/engine.Engine).Get
+$WORK/kverr/kverr.go:10:5-16: sentinel example.com/kvstore/kverr.ErrNotFound
+	path (origin → target):
+		$WORK/engine/engine.go:72:15-32: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:46:12-47: in (*example.com/kvstore/repo.Repo).Load, call to (*example.com/kvstore/engine.Engine).Get

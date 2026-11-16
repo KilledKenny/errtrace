@@ -1,0 +1,18 @@
+SUSPECTED BUG (low confidence): spurious 'possibly handled' note on engine.ErrClosed.
+Error result first; an errors.Is guard replaces the engine's sentinel by the repo's re-exported alias.
+Expected: 2 entries, 0 possibly handled: the not-found sentinel (shown as repo.ErrNotFound) from the guarded return and engine.ErrClosed from `return err, v`.
+Actual: ErrClosed is annotated 'may be the same value as kverr.ErrNotFound' because ErrClosed is re-assigned in its own package's init()
+(to a fresh errors.New), which can never equal kverr.ErrNotFound.
+-- args --
+repo/repo.go:@lookup
+-- stdout --
+$WORK/repo/repo.go:62:27-33: Error Set of (*example.com/kvstore/repo.Repo).Lookup: 2 entries, 1 possibly handled
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	possibly handled:
+		$WORK/repo/repo.go:68:5-38: errors.Is with example.com/kvstore/kverr.ErrNotFound: sentinel engine.ErrClosed may be the same value as kverr.ErrNotFound
+	path (origin → target):
+		$WORK/engine/engine.go:68:15-24: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:67:12-34: in (*example.com/kvstore/repo.Repo).Lookup, call to (*example.com/kvstore/engine.Engine).Get
+$WORK/repo/repo.go:13:5-16: sentinel example.com/kvstore/repo.ErrNotFound
+	path (origin → target):
+		$WORK/repo/repo.go:69:10-21: in (*example.com/kvstore/repo.Repo).Lookup

@@ -1,0 +1,29 @@
+Function-typed struct fields (Hooks.Before/After) and two interface
+fields (primary, fallback), each holding one thing. Expected: ErrEmptyBody
+wrapped by "before: %w" (Validate); *drivers.HTTPError (primary Webhook,
+when there is no fallback); sink.ErrRemote wrapped (fallback); main.errEscalate
+(After closure). Each dynamic hop 1 of 1 candidates.
+-- args --
+dispatch/dispatch.go:@disp_send
+-- stdout --
+$WORK/dispatch/dispatch.go:100:36-40: Error Set of (*example.com/plugins/dispatch.Dispatcher).Send: 4 entries
+$WORK/core/core.go:17:2-14: sentinel example.com/plugins/core.ErrEmptyBody
+	wrap chain (origin → target):
+		$WORK/dispatch/dispatch.go:103:11-40: fmt.Errorf "before: %w"
+	path (origin → target):
+		$WORK/dispatch/dispatch.go:94:10-27: in example.com/plugins/dispatch.Validate
+		$WORK/dispatch/dispatch.go:102:13-41: in (*example.com/plugins/dispatch.Dispatcher).Send, call to example.com/plugins/dispatch.Validate (dynamic function value of type func(example.com/plugins/core.Event) error: 1 of 1 candidates)
+$WORK/main.go:22:2-13: sentinel example.com/plugins.errEscalate
+	path (origin → target):
+		$WORK/main.go:126:12-23: in example.com/plugins.dispatcher$1
+		$WORK/dispatch/dispatch.go:114:10-26: in (*example.com/plugins/dispatch.Dispatcher).Send, call to example.com/plugins.dispatcher$1 (dynamic function value of type func(example.com/plugins/core.Event) error: 1 of 1 candidates)
+$WORK/sink/sink.go:12:5-14: sentinel example.com/plugins/sink.ErrRemote
+	wrap chain (origin → target):
+		$WORK/sink/sink.go:19:10-57: fmt.Errorf "remote %s: %w"
+	path (origin → target):
+		$WORK/sink/sink.go:19:47-56: in (example.com/plugins/sink.Remote).Send
+		$WORK/dispatch/dispatch.go:108:9-40: in (*example.com/plugins/dispatch.Dispatcher).Send, call to (example.com/plugins/sink.Remote).Send (dynamic (example.com/plugins/core.Driver).Send: 1 of 1 candidates)
+$WORK/drivers/drivers.go:62:10-31: concrete *example.com/plugins/drivers.HTTPError
+	path (origin → target):
+		$WORK/drivers/drivers.go:62:10-31: in (*example.com/plugins/drivers.Webhook).Send
+		$WORK/dispatch/dispatch.go:106:9-26: in (*example.com/plugins/dispatch.Dispatcher).Send, call to (*example.com/plugins/drivers.Webhook).Send (dynamic (example.com/plugins/core.Driver).Send: 1 of 1 candidates)

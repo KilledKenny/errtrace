@@ -1,0 +1,16 @@
+Declaration Target on the "func" keyword of the function literal passed to WalkDir
+(walk.Find$1). Expected 3 entries: sentinel walk.ErrTooMany, sentinel io/fs.SkipDir,
+and Unresolved(depends-on-caller) for the returned parameter err.
+-- args --
+walk/walk.go:@findfn
+-- stdout --
+$WORK/walk/walk.go:23:55-59: Error Set of example.com/stdlibio/walk.Find$1: 3 entries, 1 unresolved
+$GOROOT/src/io/fs/walk.go:*: sentinel io/fs.SkipDir
+	path (origin → target):
+		$WORK/walk/walk.go:28:11-21: in example.com/stdlibio/walk.Find$1
+$WORK/walk/walk.go:14:5-15: sentinel example.com/stdlibio/walk.ErrTooMany
+	path (origin → target):
+		$WORK/walk/walk.go:34:11-21: in example.com/stdlibio/walk.Find$1
+$WORK/walk/walk.go:24:6-9: unresolved(depends-on-caller): parameter err (error)
+	path (origin → target):
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1

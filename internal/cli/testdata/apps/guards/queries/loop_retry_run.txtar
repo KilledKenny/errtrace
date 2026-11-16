@@ -1,0 +1,49 @@
+SUSPECTED BUG: same || narrowing gap as is_or_true_branch, on a continue edge.
+Retry loop: nil -> return; Is(ErrTimeout) || Is(ErrRateLimited) -> continue; else fail fast with "job %s: %w";
+after the loop "retries exhausted: %w" wraps the last retryable error.
+Expected: ErrNotFound and *NetError ONLY with the "job %s: %w" chain, ErrTimeout and ErrRateLimited ONLY with
+the "retries exhausted" chain (4 entries). Actual: ErrNotFound and *NetError also appear with the "retries
+exhausted" chain (6 entries). The false side is right: ErrTimeout / ErrRateLimited never get "job %s: %w".
+-- args --
+runner/runner.go:@run
+-- stdout --
+$WORK/runner/runner.go:18:26-29: Error Set of (*example.com/guards/runner.Runner).Run: 6 entries
+$WORK/payerr/payerr.go:9:2-12: sentinel example.com/guards/payerr.ErrTimeout
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:38:10-63: *example.com/guards/payerr.OpError.Unwrap
+		$WORK/runner/runner.go:30:9-61: fmt.Errorf "job %s: retries exhausted: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:38:45-62: in example.com/guards/gateway.Lookup
+		$WORK/runner/runner.go:21:9-32: in (*example.com/guards/runner.Runner).Run, call to example.com/guards/gateway.Lookup
+$WORK/payerr/payerr.go:10:2-13: sentinel example.com/guards/payerr.ErrNotFound
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:36:10-60: fmt.Errorf "lookup %d: %w"
+		$WORK/runner/runner.go:28:10-43: fmt.Errorf "job %s: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:36:41-59: in example.com/guards/gateway.Lookup
+		$WORK/runner/runner.go:21:9-32: in (*example.com/guards/runner.Runner).Run, call to example.com/guards/gateway.Lookup
+$WORK/payerr/payerr.go:10:2-13: sentinel example.com/guards/payerr.ErrNotFound
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:36:10-60: fmt.Errorf "lookup %d: %w"
+		$WORK/runner/runner.go:30:9-61: fmt.Errorf "job %s: retries exhausted: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:36:41-59: in example.com/guards/gateway.Lookup
+		$WORK/runner/runner.go:21:9-32: in (*example.com/guards/runner.Runner).Run, call to example.com/guards/gateway.Lookup
+$WORK/payerr/payerr.go:11:2-16: sentinel example.com/guards/payerr.ErrRateLimited
+	wrap chain (origin → target):
+		$WORK/runner/runner.go:30:9-61: fmt.Errorf "job %s: retries exhausted: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:40:10-31: in example.com/guards/gateway.Lookup
+		$WORK/runner/runner.go:21:9-32: in (*example.com/guards/runner.Runner).Run, call to example.com/guards/gateway.Lookup
+$WORK/gateway/gateway.go:42:9-39: concrete *example.com/guards/payerr.NetError
+	wrap chain (origin → target):
+		$WORK/runner/runner.go:28:10-43: fmt.Errorf "job %s: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:42:9-39: in example.com/guards/gateway.Lookup
+		$WORK/runner/runner.go:21:9-32: in (*example.com/guards/runner.Runner).Run, call to example.com/guards/gateway.Lookup
+$WORK/gateway/gateway.go:42:9-39: concrete *example.com/guards/payerr.NetError
+	wrap chain (origin → target):
+		$WORK/runner/runner.go:30:9-61: fmt.Errorf "job %s: retries exhausted: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:42:9-39: in example.com/guards/gateway.Lookup
+		$WORK/runner/runner.go:21:9-32: in (*example.com/guards/runner.Runner).Run, call to example.com/guards/gateway.Lookup

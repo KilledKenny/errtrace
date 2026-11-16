@@ -1,0 +1,11 @@
+Call-site Target on a call through a function-typed field of a nested
+struct. Expected: only core.ErrEmptyBody (Validate is the only Before hook);
+main.errEscalate belongs to the After field and must be absent.
+-- args --
+dispatch/dispatch.go:@before
+-- stdout --
+$WORK/dispatch/dispatch.go:102:13-41: Error Set of call to d.hooks.Before in (*example.com/plugins/dispatch.Dispatcher).Send: 1 entries
+$WORK/core/core.go:17:2-14: sentinel example.com/plugins/core.ErrEmptyBody
+	path (origin → target):
+		$WORK/dispatch/dispatch.go:94:10-27: in example.com/plugins/dispatch.Validate
+		$WORK/dispatch/dispatch.go:102:13-41: in (*example.com/plugins/dispatch.Dispatcher).Send, call to example.com/plugins/dispatch.Validate (dynamic function value of type func(example.com/plugins/core.Event) error: 1 of 1 candidates)
