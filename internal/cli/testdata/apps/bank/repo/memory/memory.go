@@ -35,9 +35,9 @@ func (s *Store) /*@get*/Get(ctx context.Context, id domain.AccountID) (*domain.A
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	a, ok := s.accounts[id]
-	if !ok {
-		return nil, domain.NotFoundError[domain.AccountID]{Kind: "account", ID: id}
+	a, err := /*@lookup_call*/lookup(s.accounts, "account", id)
+	if err != nil {
+		return nil, err
 	}
 	cp := *a
 	return &cp, nil
@@ -65,10 +65,17 @@ func (s *Store) /*@append*/Append(ctx context.Context, t domain.Transfer) error 
 func (s *Store) /*@find*/FindTransfer(id domain.TransferID) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !s.seen[id] {
-		return domain.NotFoundError[domain.TransferID]{Kind: "transfer", ID: id}
+	_, err := lookup(s.seen, "transfer", id)
+	return err
+}
+
+// lookup is the map access shared by accounts and the ledger.
+func /*@lookup*/lookup[K comparable, V any](m map[K]V, kind string, id K) (V, error) {
+	v, ok := m[id]
+	if !ok {
+		return v, domain.NotFoundError[K]{Kind: kind, ID: id}
 	}
-	return nil
+	return v, nil
 }
 
 func (s *Store) /*@begin*/Begin() (repo.Tx, error) {

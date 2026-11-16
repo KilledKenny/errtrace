@@ -44,6 +44,16 @@ func /*@do*/Do(ctx context.Context, attempts int, op func() error) error {
 	return fmt.Errorf("%w after %d attempts: %w", ErrGaveUp, attempts, last)
 }
 
+// Value is Do for operations that also produce a value.
+func /*@value*/Value[T any](ctx context.Context, attempts int, op func() (T, error)) (T, error) {
+	var out T
+	err := Do(ctx, attempts, func() (err error) {
+		out, err = op()
+		return err
+	})
+	return out, err
+}
+
 // sleep waits for d or until ctx is done.
 func /*@sleep*/sleep(ctx context.Context, d time.Duration) error {
 	t := time.NewTimer(d)
