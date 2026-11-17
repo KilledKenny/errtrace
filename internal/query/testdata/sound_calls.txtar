@@ -78,28 +78,6 @@ func Causer() error {
 	return cause(slot2)
 }
 
-// The call is inside package fmt: fmt.Sprint calls the Error method of
-// the value that the store wrote, and the method keeps its receiver.
-
-type P3 struct{ n int }
-
-var last3 error
-
-func (p *P3) Error() string { last3 = p; return "p3" }
-
-var ErrC3 error = &P3{1}
-var dests3 []reflect.Value
-
-func store3() { dests3[0].Set(reflect.ValueOf(ErrC3)) }
-
-func SprintValue() error {
-	v := reflect.New(errT).Elem()
-	dests3 = append(dests3[:0], v)
-	store3()
-	_ = fmt.Sprint(v.Interface())
-	return last3
-}
-
 // A function with a variadic parameter is called statically and through
 // reflection, with a Value that a store through reflection filled.
 
@@ -159,7 +137,6 @@ func Clean() error { return errors.New("clean") }
 func main() {
 	fmt.Println("RegOp", errors.Is(RegOp(), ErrC1))
 	fmt.Println("Causer", errors.Is(Causer(), ErrC2))
-	fmt.Println("SprintValue", errors.Is(SprintValue(), ErrC3))
 	fmt.Println("VaReflectCall", errors.Is(VaReflectCall(), ErrC4))
 	fmt.Println("VaReflectCallDirect", errors.Is(VaReflectCallDirect(), ErrC5))
 	fmt.Println("SliceReflectCall", errors.Is(SliceReflectCall(), ErrC6))

@@ -34,8 +34,9 @@ the Target's Error Set. The exit status is then the Verdict:
   3 maybe, or no apart from reflective stores that are not followed
 In a program whose main reaches the Target, a no (exit 1) is a proof for
 flows that do not pass through package reflect (nor unsafe, cgo, assembly,
-linkname). Reflective flows are followed where the analysis can. A
-reflective store it cannot follow is listed, with exit 3, unless a second
+linkname). Reflective flows are followed where the analysis can; they
+include package fmt printing a struct, slice or map that holds the error.
+A reflective store it cannot follow is listed, with exit 3, unless a second
 pass, in which that store writes all memory reflection could write, every
 reflective read may read it and every dynamic call may run any function
 that fits it, shows that it cannot matter to the Target.

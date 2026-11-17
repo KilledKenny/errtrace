@@ -398,7 +398,6 @@ func TestVerdictSoundCalls(t *testing.T) {
 	runSound(t, "sound_calls.txtar", []soundCase{
 		{fn: "RegOp", subject: "is ErrC1", truth: true, wantApart: true},
 		{fn: "Causer", subject: "is ErrC2", truth: true, wantApart: true},
-		{fn: "SprintValue", subject: "is ErrC3", truth: true, wantApart: true},
 		{fn: "VaReflectCall", subject: "is ErrC4", truth: true, wantApart: true},
 		{fn: "SliceReflectCall", subject: "is ErrC6", truth: true, wantApart: true},
 		// Without a store: the argument of Value.Call reaches the
@@ -407,6 +406,17 @@ func TestVerdictSoundCalls(t *testing.T) {
 		// A recorded store, and nothing it could matter to.
 		{fn: "Clean", subject: "is ErrC1", wantNo: true},
 		{fn: "Clean", subject: "is ErrC4", wantNo: true},
+	})
+}
+
+// TestVerdictSoundSprint does the same for a call inside package fmt
+// that only a store through reflection brings its callee to: the Error
+// method of the value that fmt.Sprint is passed. The program has this
+// one case, so that nothing else leads the flooding pass to the method.
+func TestVerdictSoundSprint(t *testing.T) {
+	t.Parallel()
+	runSound(t, "sound_sprint.txtar", []soundCase{
+		{fn: "SprintValue", subject: "is ErrS1", truth: true, wantApart: true},
 	})
 }
 

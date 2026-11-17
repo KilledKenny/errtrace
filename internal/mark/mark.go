@@ -427,7 +427,11 @@
 //     of a type, or a function, that gets into a slice of interface
 //     values, an interface variable or a table of functions only by
 //     reflect.Value.Set, and is called there (op.Run() for an op that
-//     reflection registered). The store is recorded only if the value
+//     reflection registered); or a method value that reflection makes
+//     and the program calls, with no store at all
+//     (reflect.ValueOf(&T{}).MethodByName("Run").Interface().(func()
+//     error)(), where no instruction of the program takes the value of
+//     (*T).Run). The store is recorded only if the value
 //     stored carries a Mark and the pass does not follow the store: not
 //     if it follows it to its destination, nor if the value is a
 //     function, or of a type whose method returns the Subject itself.
@@ -439,9 +443,10 @@
 //     pass the assertion (fmt.Sprint(reflect.ValueOf(x)), which prints
 //     what the Value holds and calls its Error method);
 //   - the methods that package fmt calls on what an operand holds inside
-//     (fmt.Errorf("%v", s) and fmt.Sprint(s) for a struct or slice s with
-//     a marked value in it): package fmt finds the value through
-//     reflection, from an interface value (see the first point);
+//     (fmt.Errorf("%v", s) and fmt.Sprint(s) for a struct, a slice, a
+//     map or a pointer to a struct s with a marked value in it): package
+//     fmt finds the value through reflection, from an interface value
+//     (see the first point);
 //   - a method called through Value.Call or Value.Method whose result
 //     is in no memory the pass saw a store to: the []error of an
 //     Unwrap() []error of errors.Join called through reflection;
