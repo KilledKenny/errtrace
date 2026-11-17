@@ -184,7 +184,8 @@ type Value struct {
 	// Var is the variable of a Sentinel, and of a Wrap that is the value
 	// of a Sentinel (var ErrX = &W{inner: io.EOF}, or one made by
 	// fmt.Errorf with %w): such a Wrap is equal to what the Sentinel is
-	// equal to.
+	// equal to. It also marks the Later FieldRef of such a Wrap (see
+	// Later).
 	Var *types.Var
 	// Canon is the variable whose value a Sentinel's Var holds (Var
 	// itself, or io.EOF for var ErrX = io.EOF), and Fresh reports that
@@ -236,7 +237,10 @@ type Value struct {
 	// value that holds such a FieldRef alone, until the FieldRef is
 	// resolved: with no value for it, there is no such Wrap. It also
 	// marks the Unresolved values that such a FieldRef resolves to: they
-	// stand, under the Wrap, for ways the field may be written later.
+	// stand, under the Wrap, for ways the field may be written later. A
+	// Later FieldRef with Var set is that of a Sentinel's value: if the
+	// field has later writers, it resolves to one Unresolved value, not
+	// to what they store.
 	Later bool
 	// Untracked marks a custom-Unwrap Wrap that stands for a value of the
 	// wrapper type that is not a tracked value (a parameter, a load, an

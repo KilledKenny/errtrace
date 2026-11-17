@@ -618,7 +618,10 @@ func (a *analyzer) untracked(base errset.Value, src any) {
 // fmt.Errorf, errors.Join or errtrace.Wrap, the Wraps that the
 // initializer makes are added, each marked as the value of the Sentinel
 // (errset.Value.Var), so that the guards that remove the Sentinel remove
-// them. An initializer that cannot be opened so (its values depend on
+// them. What the later writers of such a literal's field store is not
+// listed there: a Sentinel is shared by the whole program, and one
+// Unresolved value says that its field is written after it was built.
+// An initializer that cannot be opened so (its values depend on
 // calls or other symbolic values of the init function) gives one such
 // Wrap holding an Unresolved value; so does, by untracked, any other
 // Sentinel whose dynamic type is known and has an Unwrap method. The
@@ -681,6 +684,16 @@ func (a *analyzer) sentinelWraps(g *ssa.Global, sv errset.Value, src any) {
 		for _, e := range errset.Flatten(a.tbl, f.Value) {
 			l := a.tbl.Get(e.Leaf)
 			closed = closed && (l.Kind.IsOrigin() || l.Kind == errset.Unresolved || (l.Kind == errset.FieldRef && l.Later))
+		}
+		if v.Later && len(v.Inner) == 1 {
+			// What the later writers of the field store is not listed
+			// under a Sentinel (see errset.Value.Later): the FieldRef
+			// carries the variable to say so.
+			ref := a.tbl.Get(v.Inner[0])
+			if ref.Kind == errset.FieldRef && ref.Later {
+				ref.Var = base.Var
+				v.Inner = []errset.ValueID{a.tbl.Intern(ref)}
+			}
 		}
 		v.Site, v.Pos, v.Var, v.Canon, v.Fresh = base.Site, base.Pos, base.Var, base.Canon, base.Fresh
 		wraps = append(wraps, a.tbl.Intern(v))

@@ -586,7 +586,7 @@ func (s *Solver) fieldValues(fn *ssa.Function, v errset.Value, site any) []subst
 	if v.Later {
 		// What a tracked value built here may be given later.
 		l := s.location(fn, v)
-		if s.feedsItself(l) {
+		if s.feedsItself(l) || (v.Var != nil && s.laterWrites(l) != nil) {
 			detail := fmt.Sprintf("field %s of %s may be written after the value is built", v.Name, types.TypeString(v.Type, nil))
 			return []subst{{
 				value:  s.tbl.Intern(errset.Value{Kind: errset.Unresolved, Site: v.Site, Pos: v.Pos, Unresolved: errset.Memory, Detail: detail, Later: true}),
@@ -1312,8 +1312,11 @@ func (s *Solver) fieldBase(v, bv errset.Value) fieldBase {
 			if !s.sameStruct(bv.Type, v.Type) {
 				return s.otherType(v, bv)
 			}
-			if bv.Untracked {
-				// Known to be of the type, but not a tracked value.
+			if bv.Untracked || bv.Var != nil {
+				// Known to be of the type, but not a tracked value; or
+				// the value of a Sentinel, which every function of the
+				// program may have written since: its field holds what
+				// the field's location holds, as for the Sentinel.
 				return baseSome
 			}
 			if path, ok := s.unwrapPath(bv.Type); ok && path[0] == v.Index && s.followsPath(v, path) {

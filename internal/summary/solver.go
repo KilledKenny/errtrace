@@ -469,7 +469,9 @@ func (c *collector) value(fn *ssa.Function, id errset.ValueID) {
 	case errset.FieldRef:
 		l := c.s.location(fn, v)
 		if v.Later {
-			if c.s.feedsItself(l) {
+			if c.s.feedsItself(l) || v.Var != nil {
+				// One Unresolved value, or nothing: no values of the
+				// later writers are read (see fieldValues).
 				return
 			}
 			l = c.s.laterWrites(l)
