@@ -457,14 +457,24 @@ func (a *analysis) closed(l loc) bool {
 // to it to itself, as far as its own function and the calls of that
 // function tell: neither the function nor a function the slice is passed
 // on to, however far, lets it escape (see passedOnEscapes); every call
-// that may run the function can run nothing else; and every such call
-// passes a fresh argument array, nil, or a slice parameter of the caller.
+// that may run the function can run nothing else, and no call through
+// reflection may run it (see reflectTarget); and every such call passes a
+// fresh argument array, nil, or a slice parameter of the caller. (A
+// function whose value reaches a call that VTA does not see it at, by a
+// store through reflection, is sealed in the first pass and not in the
+// flooding pass, whose call edges list every call that matches it.)
 // Those parameters are returned: l is closed only if they are (see
 // closed).
 func (a *analysis) sealed(l loc) (from []loc, ok bool) {
 	p := l.v.(*ssa.Parameter)
 	g := p.Parent()
 	if a.open != nil || a.passedOnEscapes(l) {
+		return nil, false
+	}
+	if a.reflectTarget(g) {
+		// A call through reflection (reflect.ValueOf(g).Call, an
+		// exported method through Value.Method) is none of the calls
+		// looked at below, and may pass a slice that is other memory.
 		return nil, false
 	}
 	idx := -1

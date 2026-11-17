@@ -396,7 +396,9 @@ func (a *analysis) reflectTarget(g *ssa.Function) bool {
 
 // reflectArgsMarked seeds the parameters of every function that a call
 // through reflection may run: a marked reflect.Value is in memory, and
-// may be an argument of Value.Call.
+// may be an argument of Value.Call. A parameter of a slice type gets the
+// Mark on its elements (its locVarargs; such a parameter is never closed,
+// see sealed, so they are read as memory of the element type too).
 func (a *analysis) reflectArgsMarked(planes tags, from ref) {
 	planes = toT(planes)
 	if a.reflectSeeded&planes == planes {
@@ -408,7 +410,17 @@ func (a *analysis) reflectArgsMarked(planes tags, from ref) {
 			continue
 		}
 		for _, p := range fn.Params {
-			a.mark(key{p, 0}, planes, reason{kind: kReflectArg, from: from, fn: fn})
+			why := reason{kind: kReflectArg, from: from, fn: fn}
+			a.mark(key{p, 0}, planes, why)
+			// The elements of a slice parameter: Value.Call makes the
+			// slice of a variadic parameter from the Values it is
+			// passed, and a Value passed for a slice parameter may be a
+			// slice that package reflect filled.
+			if l, ok := sliceParam(p); ok {
+				if st := p.Type().Underlying().(*types.Slice); a.markable(st.Elem()) {
+					a.markLoc(l, planes, why)
+				}
+			}
 		}
 	}
 }
