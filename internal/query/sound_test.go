@@ -322,5 +322,25 @@ func TestVerdictSoundMethods(t *testing.T) {
 		{fn: "IsNotOK", subject: "is ErrP2", wantNo: true},
 		{fn: "AsEq", subject: "as *T10", truth: true},
 		{fn: "AsEq", subject: "as *U10", wantNo: true},
+		// An Is method that compares a conversion of its target: to a
+		// type that carries no Mark, or to another error type.
+		{fn: "ConvInt", subject: "is ErrQ1", truth: true},
+		{fn: "ConvString", subject: "is ErrQ2", truth: true},
+		{fn: "ConvNeq", subject: "is ErrQ3", truth: true},
+		{fn: "ConvSwitch", subject: "is ErrQ4", truth: true},
+		{fn: "ConvHelper", subject: "is ErrQ5", truth: true},
+		{fn: "ConvNamed", subject: "is ErrQ6", truth: true},
+		{fn: "ConvStruct", subject: "is ErrQ7", truth: true},
+		{fn: "ConvPtr", subject: "is ErrQ8", truth: true},
+		// What still excludes: an assertion the Subject fails, and the
+		// asserted value compared with an unmarked value of its type.
+		{fn: "ConvGuarded", subject: "is ErrQ9", truth: true},
+		{fn: "ConvGuarded", subject: "is ErrP2", wantNo: true},
+		{fn: "PtrAssert", subject: "is ErrQ10", truth: true},
+		{fn: "PtrAssert", subject: "is ErrQ8", wantNo: true},
+		// A pointer the program keeps before it becomes the Sentinel.
+		{fn: "PtrKept", subject: "is ErrQ11", truth: true},
+		{fn: "PtrKeptIs", subject: "is ErrQ11", truth: true},
+		{fn: "PtrKept", subject: "is ErrQ13", wantNo: true},
 	})
 }

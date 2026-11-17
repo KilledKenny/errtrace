@@ -401,6 +401,177 @@ func (P9) As(target any) bool {
 
 func AsEq() error { return P9{} }
 
+// An Is method that converts its target to a type that carries no Mark
+// (an int, a string, a struct or pointer that is no error) or to another
+// error type, and compares that: what it is compared with says nothing
+// about the Subject. Each can answer true for its Sentinel.
+
+type QCode int
+
+func (QCode) Error() string { return "qcode" }
+
+var ErrQ1 error = QCode(1)
+
+type Q1 struct{ c int }
+
+func (Q1) Error() string     { return "q1" }
+func (f Q1) Is(t error) bool { return int(t.(QCode)) == f.c }
+
+func ConvInt() error { return Q1{1} }
+
+type QStr string
+
+func (QStr) Error() string { return "qstr" }
+
+var ErrQ2 error = QStr("x")
+
+type Q2 struct{ m string }
+
+func (Q2) Error() string     { return "q2" }
+func (g Q2) Is(t error) bool { return string(t.(QStr)) == g.m }
+
+func ConvString() error { return Q2{"x"} }
+
+var ErrQ3 error = QCode(3)
+
+type Q3 struct{ status int }
+
+func (Q3) Error() string { return "q3" }
+func (e Q3) Is(t error) bool {
+	if int(t.(QCode)) != e.status {
+		return false
+	}
+	return true
+}
+
+func ConvNeq() error { return Q3{3} }
+
+var ErrQ4 error = QCode(4)
+
+type Q4 struct{ status int }
+
+func (Q4) Error() string { return "q4" }
+func (e Q4) Is(t error) bool {
+	switch int(t.(QCode)) {
+	case e.status:
+		return true
+	}
+	return false
+}
+
+func ConvSwitch() error { return Q4{4} }
+
+var ErrQ5 error = QCode(5)
+
+type Q5 struct{ status int }
+
+func sameInt(a, b int) bool { return a == b }
+
+func (Q5) Error() string     { return "q5" }
+func (e Q5) Is(t error) bool { return sameInt(int(t.(QCode)), e.status) }
+
+func ConvHelper() error { return Q5{5} }
+
+var ErrQ6 error = QCode(6)
+
+type QCode2 int
+
+func (QCode2) Error() string { return "qcode2" }
+
+type Q6 struct{ c2 QCode2 }
+
+func (Q6) Error() string     { return "q6" }
+func (f Q6) Is(t error) bool { return QCode2(t.(QCode)) == f.c2 }
+
+func ConvNamed() error { return Q6{6} }
+
+type QS struct{ n int }
+
+func (QS) Error() string { return "qs" }
+
+type qplain struct{ n int }
+
+var ErrQ7 error = QS{7}
+
+type Q7 struct{ p qplain }
+
+func (Q7) Error() string     { return "q7" }
+func (f Q7) Is(t error) bool { return qplain(t.(QS)) == f.p }
+
+func ConvStruct() error { return Q7{qplain{7}} }
+
+type QP struct{ s string }
+
+func (*QP) Error() string { return "qp" }
+
+type qpl struct{ s string }
+
+var ErrQ8 error = &QP{"x"}
+
+type Q8 struct{ p *qpl }
+
+func (Q8) Error() string     { return "q8" }
+func (f Q8) Is(t error) bool { return (*qpl)(t.(*QP)) == f.p }
+
+func ConvPtr() error { return Q8{(*qpl)(ErrQ8.(*QP))} }
+
+// Looks at the target that still say what they look for: an assertion
+// that the Subject fails, before the conversion; and the asserted value
+// itself, compared with a pointer of its own type that carries no Mark.
+
+var ErrQ9 error = QCode(9)
+
+type Q9 struct{ c int }
+
+func (Q9) Error() string { return "q9" }
+func (f Q9) Is(t error) bool {
+	c, ok := t.(QCode)
+	if !ok {
+		return false
+	}
+	return int(c) == f.c
+}
+
+func ConvGuarded() error { return Q9{9} }
+
+var ErrQ10 error = &QP{"y"}
+
+type Q10 struct{ p *QP }
+
+func (Q10) Error() string     { return "q10" }
+func (f Q10) Is(t error) bool { return t.(*QP) == f.p }
+
+func PtrAssert() error { return Q10{ErrQ10.(*QP)} }
+
+// A pointer Sentinel whose pointer the program keeps before it becomes
+// the Sentinel: every pointer of its type may be it. A Sentinel that is
+// the only use of its allocation is that pointer alone.
+
+type QK struct{ s string }
+
+func (*QK) Error() string { return "qk" }
+
+var keptQ *QK
+
+func mkQ() error {
+	s := &QK{"x"}
+	keptQ = s
+	return s
+}
+
+var ErrQ11 = mkQ()
+
+var ErrQ13 error = &QK{"z"}
+
+func PtrKept() error { return keptQ }
+
+type Q12 struct{}
+
+func (Q12) Error() string   { return "q12" }
+func (Q12) Is(t error) bool { return t == error(keptQ) }
+
+func PtrKeptIs() error { return Q12{} }
+
 // (The Is and As methods run only if the program asks errors.Is and
 // errors.As.)
 
@@ -412,5 +583,7 @@ func main() {
 		JoinSlice(), ErrorfSlice(), WalkSlice(), EscapedSlice(), HandMulti(),
 		IsNegBranch(), IsNegBranch2(), IsSwitchDefault(), IsFlag(), IsAnd(), IsHelperNeg(), IsTypeSwitch(),
 		IsIfaceOK(), IsIfaceMethod(), AsNeg(),
-		IsEq(), IsEqAnd(), IsHelper(), IsOwnType(), IsSwitch(), IsNeqGuard(), IsNotOK(), AsEq())
+		IsEq(), IsEqAnd(), IsHelper(), IsOwnType(), IsSwitch(), IsNeqGuard(), IsNotOK(), AsEq(),
+		ConvInt(), ConvString(), ConvNeq(), ConvSwitch(), ConvHelper(), ConvNamed(), ConvStruct(), ConvPtr(),
+		ConvGuarded(), PtrAssert(), PtrKept(), PtrKeptIs(), ErrQ13)
 }

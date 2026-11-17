@@ -411,10 +411,15 @@ type analysis struct {
 	byValue bool
 	guardOK bool
 	// targets are the Is and As methods that targetMatches found to
-	// match.
-	targets map[*ssa.Function]*targetMatch
+	// match; noTargets are those it found not to, once the pass is
+	// settled (no Mark is added any more).
+	targets   map[*ssa.Function]*targetMatch
+	noTargets map[*ssa.Function]bool
+	settled   bool
 	// dynNilable are the pointer types the Sentinel's value may have
-	// while being nil.
+	// while another pointer of the type may be equal to it: it may be
+	// nil, or the program may have kept a copy of the pointer before it
+	// became the Sentinel (see typeWalk).
 	dynNilable []types.Type
 
 	markableCache map[types.Type]bool
@@ -477,6 +482,7 @@ func newAnalysis(prog *ssa.Program, res Callees, subj Subject) *analysis {
 		destIDs:        make(map[ssa.Value]uint32),
 		guards:         make(map[ssa.Value][]*ssa.BasicBlock),
 		targets:        make(map[*ssa.Function]*targetMatch),
+		noTargets:      make(map[*ssa.Function]bool),
 		markableCache:  make(map[types.Type]bool),
 		wrapperCache:   make(map[types.Type]bool),
 		typeSeedCache:  make(map[types.Type]bool),
@@ -547,6 +553,7 @@ func (a *analysis) run(ctx context.Context) error {
 		}
 		a.reflectArgs = rest
 		if !changed {
+			a.settled = true
 			return nil
 		}
 	}
@@ -1592,6 +1599,15 @@ func (a *analysis) setupSubject() {
 		w.global(h, 0)
 	}
 	a.dynTypes, a.dynUnknown, a.dynNilable = w.types, w.unknown, w.nilable
+	if w.copied {
+		// The program may hold the pointer the Sentinel is in a place
+		// no Mark comes to: every pointer of its type may be it.
+		for _, d := range w.types {
+			if _, isPtr := d.Underlying().(*types.Pointer); isPtr {
+				a.dynNilable = append(a.dynNilable, d)
+			}
+		}
+	}
 	// The Sentinel is held by value only if what its variables hold is
 	// one value that never changes: every variable of the class is only
 	// initialized, with a value that holds nothing that can change (see
@@ -1852,21 +1868,85 @@ type typeWalk struct {
 	seen    map[any]bool
 	types   []types.Type
 	unknown bool
-	// nilable are the pointer types among types whose value may be nil
-	// (it is not an allocation made for the Sentinel).
+	// nilable are the pointer types among types of which another value
+	// may be equal to the Sentinel's: the value may be nil (it is not an
+	// allocation made for the Sentinel), or the program may have kept a
+	// copy of the pointer before it became the Sentinel (see copied).
 	nilable []types.Type
+	// copied says that a value on the way from an allocation to the
+	// Sentinel's variable has another use: the pointer may be somewhere
+	// the Marks, which start at the variable, do not reach.
+	copied bool
 }
 
-// addValue adds the type of the concrete value v.
-func (w *typeWalk) addValue(v ssa.Value) {
+// addValue adds the type of the concrete value v, which the instruction
+// user makes the Sentinel's value of.
+func (w *typeWalk) addValue(v ssa.Value, user ssa.Instruction) {
 	w.add(v.Type())
 	if _, isPtr := v.Type().Underlying().(*types.Pointer); !isPtr {
 		return
 	}
-	if _, isAlloc := v.(*ssa.Alloc); isAlloc {
+	if alloc, isAlloc := v.(*ssa.Alloc); isAlloc && !allocCopied(alloc, user) {
 		return
 	}
 	w.nilable = append(w.nilable, v.Type())
+}
+
+// allocCopied reports whether the pointer to the allocation alloc may be
+// anywhere but in the value that user makes of it: it has a use other
+// than user, a load, and the stores that fill its fields and elements.
+func allocCopied(alloc *ssa.Alloc, user ssa.Instruction) bool {
+	refs := alloc.Referrers()
+	if refs == nil {
+		return false
+	}
+	for _, r := range *refs {
+		if r == user {
+			continue
+		}
+		switch x := r.(type) {
+		case *ssa.DebugRef:
+		case *ssa.Store:
+			if x.Val == ssa.Value(alloc) {
+				return true
+			}
+		case *ssa.UnOp:
+			// A load of the variable copies its value, not the pointer.
+		case *ssa.FieldAddr, *ssa.IndexAddr:
+			inner := x.(ssa.Value).Referrers()
+			if inner == nil {
+				continue
+			}
+			for _, u := range *inner {
+				switch y := u.(type) {
+				case *ssa.DebugRef, *ssa.UnOp:
+				case *ssa.Store:
+					if y.Val == x.(ssa.Value) {
+						return true
+					}
+				default:
+					return true
+				}
+			}
+		default:
+			return true
+		}
+	}
+	return false
+}
+
+// only notes whether v, a value on the way to the Sentinel's variable,
+// has a use other than user, the one that leads there.
+func (w *typeWalk) only(v ssa.Value, user ssa.Instruction) {
+	refs := v.Referrers()
+	if refs == nil {
+		return
+	}
+	for _, r := range *refs {
+		if _, dbg := r.(*ssa.DebugRef); !dbg && r != user {
+			w.copied = true
+		}
+	}
 }
 
 const maxTypeWalk = 12
@@ -1900,7 +1980,7 @@ func (w *typeWalk) global(g *ssa.Global, depth int) {
 			stores := w.a.globalStore[g]
 			nilable := len(stores) == 0 || w.a.globalEsc[g]
 			for _, st := range stores {
-				if _, isAlloc := st.Val.(*ssa.Alloc); !isAlloc {
+				if alloc, isAlloc := st.Val.(*ssa.Alloc); !isAlloc || allocCopied(alloc, st) {
 					nilable = true
 				}
 			}
@@ -1915,11 +1995,13 @@ func (w *typeWalk) global(g *ssa.Global, depth int) {
 		return
 	}
 	for _, st := range w.a.globalStore[g] {
-		w.value(st.Val, depth+1)
+		w.value(st.Val, depth+1, st)
 	}
 }
 
-func (w *typeWalk) value(v ssa.Value, depth int) {
+// value walks back from v, which the instruction user passes on towards
+// the Sentinel's variable.
+func (w *typeWalk) value(v ssa.Value, depth int, user ssa.Instruction) {
 	if depth > maxTypeWalk {
 		w.unknown = true
 		return
@@ -1934,29 +2016,36 @@ func (w *typeWalk) value(v ssa.Value, depth int) {
 			w.add(x.Type())
 		}
 	case *ssa.MakeInterface:
-		w.addValue(x.X)
+		w.only(x, user)
+		w.addValue(x.X, x)
 	case *ssa.ChangeInterface:
-		w.value(x.X, depth+1)
+		w.only(x, user)
+		w.value(x.X, depth+1, x)
 	case *ssa.ChangeType:
 		if isInterface(x.X.Type()) {
-			w.value(x.X, depth+1)
+			w.only(x, user)
+			w.value(x.X, depth+1, x)
 		} else {
-			w.addValue(x)
+			w.addValue(x, user)
 		}
 	case *ssa.Phi:
+		w.only(x, user)
 		for _, e := range x.Edges {
-			w.value(e, depth+1)
+			w.value(e, depth+1, x)
 		}
 	case *ssa.UnOp:
 		if g, ok := x.X.(*ssa.Global); ok && x.Op == token.MUL {
+			// (Every load of the variable is a seed.)
 			w.global(g, depth+1)
 			return
 		}
 		w.unknown = true
 	case *ssa.Call:
+		w.only(x, user)
 		w.results(x, 0, depth)
 	case *ssa.Extract:
 		if call, ok := x.Tuple.(*ssa.Call); ok {
+			w.only(x, user)
 			w.results(call, x.Index, depth)
 			return
 		}
@@ -1965,7 +2054,7 @@ func (w *typeWalk) value(v ssa.Value, depth int) {
 		if isInterface(v.Type()) {
 			w.unknown = true
 		} else {
-			w.addValue(v)
+			w.addValue(v, user)
 		}
 	}
 }
@@ -1981,7 +2070,7 @@ func (w *typeWalk) results(call *ssa.Call, idx, depth int) {
 			continue
 		}
 		if r, ok := b.Instrs[len(b.Instrs)-1].(*ssa.Return); ok && idx < len(r.Results) {
-			w.value(r.Results[idx], depth+1)
+			w.value(r.Results[idx], depth+1, r)
 		}
 	}
 }

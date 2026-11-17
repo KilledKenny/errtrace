@@ -122,8 +122,9 @@ func guarded(dead []*ssa.BasicBlock, v ssa.Value, r ssa.Instruction) bool {
 //   - it follows the blocks that can be entered then. A branch is not
 //     taken only where its condition is known not to hold for the
 //     Subject: the true edge of target == V (the false edge of target !=
-//     V) for a value V that carries no Mark, so that V is not the
-//     Subject; the true edge of errors.Is(V, target) or errors.As(V,
+//     V) for a value V that carries no Mark although its type can carry
+//     one (an interface, a type that can be an error), so that V is not
+//     the Subject; the true edge of errors.Is(V, target) or errors.As(V,
 //     target) for such a V; the ok edge of an assertion of the target to
 //     a type the Subject's value cannot have, and the not-ok edge of an
 //     assertion to a type it is known to have; and the same through !,
@@ -137,7 +138,12 @@ func guarded(dead []*ssa.BasicBlock, v ssa.Value, r ssa.Instruction) bool {
 // Whatever the pass does not recognize is taken to be possible: a value
 // it cannot place may be true, a call it cannot follow may return true,
 // and a comparison of something that only may be the target (a phi, the
-// value of a comma-ok assertion) excludes nothing. So a type is no
+// value of a comma-ok assertion) or that is a conversion of it to
+// another concrete type (int(target.(Code)): the int it is equal to
+// carries no Mark, and no value does for being equal to a conversion of
+// the Subject) excludes nothing. "No Mark" is a proof of difference only
+// for a value that is compared with the target itself and whose type
+// Marks exist for. So a type is no
 // wrapper only where every way to a true answer is closed by a look at
 // the target that the Subject fails.
 
@@ -145,8 +151,8 @@ func guarded(dead []*ssa.BasicBlock, v ssa.Value, r ssa.Instruction) bool {
 // method is followed through.
 const maxTargetDepth = 4
 
-// maxTargetSteps bounds the values one targetMatches looks at; beyond it
-// the method matches.
+// maxTargetSteps bounds the conditions one targetMatches looks at (in
+// the method and the helpers it follows); beyond it the method matches.
 const maxTargetSteps = 20000
 
 // targetMatch is a method that targetMatches found to match, and the
@@ -173,8 +179,15 @@ func (a *analysis) targetMatches(fn *ssa.Function) bool {
 		a.heldBy = ref{}
 		return true
 	}
+	if a.settled && a.noTargets[fn] {
+		return false
+	}
 	w := &targetWalk{a: a, busy: make(map[targetKey]bool)}
 	if !w.answers(fn, fn.Params[1], true, 0) {
+		if a.settled {
+			// The Marks are final: so is the answer.
+			a.noTargets[fn] = true
+		}
 		return false
 	}
 	a.targets[fn] = &targetMatch{by: w.by}
@@ -216,24 +229,60 @@ func (w *targetWalk) answers(fn *ssa.Function, p ssa.Value, want bool, depth int
 	defer delete(w.busy, k)
 	f := &targetFrame{w: w, fn: fn, depth: depth, alias: make(map[ssa.Value]bool), reach: make(map[*ssa.BasicBlock]bool), phis: make(map[phiKey]bool)}
 	f.aliases(p)
-	f.reach[fn.Blocks[0]] = true
+	// The blocks that can be entered: each is looked at once. An edge
+	// that cannot be taken is looked at again only if its condition
+	// asked about a block that was not reached yet (through a phi).
+	var queue []*ssa.BasicBlock
+	enter := func(b *ssa.BasicBlock) {
+		if !f.reach[b] {
+			f.reach[b] = true
+			queue = append(queue, b)
+		}
+	}
+	type edge struct {
+		b *ssa.BasicBlock
+		i int
+	}
+	var waiting []edge
+	enter(fn.Blocks[0])
 	if fn.Recover != nil {
 		// Where a recovered panic goes on: the named results.
-		f.reach[fn.Recover] = true
+		enter(fn.Recover)
 	}
-	for changed := true; changed; {
-		changed = false
-		for _, b := range fn.Blocks {
-			if !f.reach[b] {
-				continue
-			}
+	for len(queue) > 0 {
+		for len(queue) > 0 {
+			b := queue[len(queue)-1]
+			queue = queue[:len(queue)-1]
 			for i, succ := range b.Succs {
-				if !f.reach[succ] && f.feasible(b, i) {
-					f.reach[succ] = true
-					changed = true
+				if f.reach[succ] {
+					continue
+				}
+				f.unreached = false
+				if f.feasible(b, i) {
+					enter(succ)
+				} else if f.unreached {
+					waiting = append(waiting, edge{b, i})
 				}
 			}
+			if w.steps > maxTargetSteps {
+				// Too much to look at: not known.
+				return true
+			}
 		}
+		rest := waiting[:0]
+		for _, e := range waiting {
+			succ := e.b.Succs[e.i]
+			if f.reach[succ] {
+				continue
+			}
+			f.unreached = false
+			if f.feasible(e.b, e.i) {
+				enter(succ)
+			} else if f.unreached {
+				rest = append(rest, e)
+			}
+		}
+		waiting = rest
 	}
 	for _, b := range fn.Blocks {
 		if !f.reach[b] || len(b.Instrs) == 0 {
@@ -247,7 +296,7 @@ func (w *targetWalk) answers(fn *ssa.Function, p ssa.Value, want bool, depth int
 			return true
 		}
 	}
-	return false
+	return w.steps > maxTargetSteps
 }
 
 type phiKey struct {
@@ -268,14 +317,20 @@ type targetFrame struct {
 	reach map[*ssa.BasicBlock]bool
 	// phis are the phis being looked at.
 	phis map[phiKey]bool
+	// unreached is set when canBe passes over an edge of a phi because
+	// its block is not reached (it may be later).
+	unreached bool
 }
 
 // aliases collects the values that are the target p whenever they are
-// computed: its conversions between interface types and to and from a
-// named type, and its assertions that panic if they fail. A phi and the
-// value of a comma-ok assertion (which is a zero value where the
-// assertion failed) only may be the target: a comparison of one says
-// nothing about it.
+// computed: its conversions between interface types, its assertions that
+// panic if they fail, and such a value converted back to an interface. A
+// phi and the value of a comma-ok assertion (which is a zero value where
+// the assertion failed) only may be the target: a comparison of one says
+// nothing about it. Nor is a conversion of the asserted value to another
+// concrete type the target (int(t.(Code)), (*plain)(t.(*T))): it is a
+// value of a type the Subject does not have, and what it is equal to
+// carries no Mark for being so.
 func (f *targetFrame) aliases(p ssa.Value) {
 	work := []ssa.Value{p}
 	f.alias[p] = true
@@ -294,7 +349,10 @@ func (f *targetFrame) aliases(p ssa.Value) {
 			case *ssa.MakeInterface:
 				x = r
 			case *ssa.ChangeType:
-				x = r
+				// Between interface types of one underlying type.
+				if isInterface(r.X.Type()) && isInterface(r.Type()) {
+					x = r
+				}
 			case *ssa.TypeAssert:
 				if !r.CommaOk {
 					x = r
@@ -351,6 +409,7 @@ func (f *targetFrame) canBe(v ssa.Value, want bool) bool {
 		for i, e := range x.Edges {
 			pred := blk.Preds[i]
 			if !f.reach[pred] {
+				f.unreached = true
 				continue
 			}
 			taken := false
@@ -435,10 +494,15 @@ func (f *targetFrame) canBe(v ssa.Value, want bool) bool {
 	return true
 }
 
-// marked reports whether v carries a Mark, and notes it for the trace.
+// marked reports whether v, a value that is equal to the target or is
+// asked whether it holds the target, may be or hold the Subject: it
+// carries a Mark (which is noted for the trace). A value of a type that
+// Marks do not exist for (an int, a string, a struct or pointer that is
+// no error) carries none whatever it is equal to: it may.
 func (f *targetFrame) marked(v ssa.Value) bool {
 	a := f.w.a
-	if _, isTuple := v.Type().(*types.Tuple); isTuple {
+	if !a.markable(v.Type()) {
+		// (A tuple too.)
 		return true
 	}
 	if a.tagsOf(v) == 0 {

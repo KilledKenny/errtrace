@@ -34,7 +34,15 @@
 // For a Sentinel: every load of its variable, of the variable it is an
 // alias of, and of the variables it is stored to; every value stored into
 // it; and every value of a type that may be equal to its value without
-// being it (a comparable non-pointer type, a nil pointer). For a Concrete
+// being a copy of it that the Marks follow: a comparable non-pointer
+// type, a pointer type whose value may be nil, and a pointer type of
+// which the program may hold the Sentinel's own pointer elsewhere. The
+// last is so unless the Sentinel's value is a pointer to an allocation
+// whose every use, from the allocation to the store into the variable,
+// only fills it or passes it on towards the variable (var ErrX =
+// errors.New("x"), var ErrX error = &T{...}); a function that stores,
+// passes or captures the pointer before returning it (a registry) makes
+// every pointer of the type a seed. For a Concrete
 // Type: every value of that type. Such a value is marked where it is
 // converted to an interface, and where package reflect makes a value of a
 // type it is told at run time (reflect.New(t), reflect.Zero(t),
@@ -51,18 +59,26 @@
 //     cannot hold for X, and the method matches if it can then return
 //     anything but false. A condition cannot hold for X only if it is one
 //     of these, taken on the edge named: target == V (true edge) or
-//     target != V (false edge) for a V that carries no Mark;
-//     errors.Is(V, target) or errors.As(V, target) (true edge) for such a
-//     V; the ok of an assertion of the target to a type that X's value
-//     cannot have (true edge) or is known to have (false edge); and these
-//     through !, && and ||, and as the result of a static call that is
-//     passed the target (followed four calls deep). Here "the target" is
-//     the parameter, its conversions, and its assertions that panic if
-//     they fail. Everything else can be true and can be false: the false
-//     edge of target == V, a field of the receiver, a flag, a call the
-//     pass does not follow, target == nil, a comparison of a phi or of
-//     the value of a comma-ok assertion, and every comparison of the
-//     target of an As method (it is a pointer, not X);
+//     target != V (false edge) for a V that carries no Mark and is of a
+//     type that Marks exist for (an interface, a type that can be an
+//     error); errors.Is(V, target) or errors.As(V, target) (true edge)
+//     for such a V; the ok of an assertion of the target to a type that
+//     X's value cannot have (true edge) or is known to have (false
+//     edge); and these through !, && and ||, and as the result of a
+//     static call that is passed the target (followed four calls deep).
+//     Here "the target" is the parameter, its conversions between
+//     interface types, its assertions that panic if they fail, and such
+//     an asserted value converted back to an interface. Everything else
+//     can be true and can be false: the false edge of target == V, a
+//     field of the receiver, a flag, a call the pass does not follow,
+//     target == nil, a comparison of a phi or of the value of a comma-ok
+//     assertion, a comparison of the target converted to another
+//     concrete type (int(target.(Code)) == e.code, whatever the other
+//     side is: a value equal to a conversion of X is not X, and carries
+//     no Mark for it), a comparison with a constant (the pass does not
+//     evaluate them), and every comparison of the target of an As method
+//     (it is a pointer, not X). A method with more to look at than the
+//     pass is willing to (maxTargetSteps conditions) matches;
 //   - its Is or As method (the one that matters for X) is not scanned:
 //     it has no body, or it is not the method errors.Is and errors.As
 //     call (it has other parameters). Then the type wraps every X;
@@ -250,14 +266,19 @@
 //     interface in the program. Every method it scans is decided as
 //     described under Seeds: a type is no wrapper of X only where each
 //     way to a true answer is closed by a look at the target that X
-//     fails. That look trusts the Marks: a value V that carries none is
-//     not X. (An Is or As method the program never calls through
-//     errors.Is or errors.As is not scanned; its type then wraps every
-//     X.)
+//     fails. That look trusts the Marks: a value V that carries none,
+//     of a type that can carry one, is not X. (An Is or As method the
+//     program never calls through errors.Is or errors.As is not scanned;
+//     its type then wraps every X.)
 //   - Type-keyed locations and whole-type wrappers are coarse: expect a
 //     false "maybe", never a false "no".
-//   - A value stored into the Sentinel's variable by the program is followed
-//     forward from the store only, not back to its other copies.
+//   - A value stored into the Sentinel's variable by the program is
+//     followed forward from the store only. Its other copies are covered
+//     by type: a pointer the program may hold elsewhere makes every
+//     pointer of its type a seed (see Seeds). That rests on the walk back
+//     from the variable to the allocation (typeWalk): through
+//     conversions, phis and the results of static calls, twelve steps
+//     deep; where it gives up, every error type is a seed.
 //   - A value converted to another named type and back is followed only as
 //     far as its Mark goes: a type assertion to a type that is neither the
 //     Subject's nor a possible wrapper drops it.
