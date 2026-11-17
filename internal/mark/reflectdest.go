@@ -55,14 +55,47 @@ type ReflectStore struct {
 }
 
 // ReflectStores returns the stores through reflection that the Subject
-// reaches and the pass did not follow, in the order of the scan (the same
-// on every run). A Verdict of no holds only as far as none of them writes
-// the Subject where the Target reads it.
-func (r *Result) ReflectStores() []ReflectStore {
+// reaches, that the pass did not follow, and that can matter to the
+// Target functions targets, in the order of the scan (the same on every
+// run). A Verdict of no holds only as far as none of them writes the
+// Subject where the Target reads it.
+//
+// The Subject reaches a store if the stored value carries a Mark that
+// comes from the Subject: not one it has only because reflection made it
+// of a type chosen at run time (see RunWith).
+//
+// A store can matter to the Target if
+//
+//   - the function it is in can be reached from a Target function, or
+//     can reach one, over the edges of near: it runs under the Target, or
+//     around it; or
+//   - a Target function, or a scanned function reached from one, reads
+//     memory that a store through reflection can write (see
+//     readsShared): then every store counts, wherever it is, because it
+//     may have filled that memory before the Target ran.
+//
+// A store anywhere else is left out. That is a bound, not a proof: what
+// such a store writes can still come to the Target in an argument, read
+// from memory by a function that is not under the Target. Without Target
+// functions every store is listed.
+func (r *Result) ReflectStores(targets []*ssa.Function) []ReflectStore {
 	a := r.a
-	sites := make([]ssa.CallInstruction, 0, len(a.unfollowed))
-	for site := range a.unfollowed {
-		sites = append(sites, site)
+	var near map[*ssa.Function]bool
+	if len(targets) > 0 && len(r.unfollowed) > 0 {
+		var under []*ssa.Function
+		near, under = a.near(targets)
+		for _, fn := range under {
+			if a.readsShared(fn) {
+				near = nil
+				break
+			}
+		}
+	}
+	sites := make([]ssa.CallInstruction, 0, len(r.unfollowed))
+	for site := range r.unfollowed {
+		if near == nil || near[site.Parent()] {
+			sites = append(sites, site)
+		}
 	}
 	sort.Slice(sites, func(i, j int) bool { return a.siteOrd[sites[i]] < a.siteOrd[sites[j]] })
 	out := make([]ReflectStore, len(sites))
@@ -70,6 +103,162 @@ func (r *Result) ReflectStores() []ReflectStore {
 		out[i] = ReflectStore{Site: site, Fn: site.Parent()}
 	}
 	return out
+}
+
+// readsShared reports whether the scanned function fn reads a value that
+// can carry a Mark from memory that a store through reflection can
+// write: it loads one through a pointer, from a field, an element, a map
+// or a channel (anything but a local or package-level variable whose
+// address is never taken), or it calls package reflect or loads a
+// sync/atomic value.
+func (a *analysis) readsShared(fn *ssa.Function) bool {
+	if _, scanned := a.fnIndex[fn]; !scanned {
+		return false
+	}
+	for _, b := range fn.Blocks {
+		for _, instr := range b.Instrs {
+			switch x := instr.(type) {
+			case *ssa.UnOp:
+				switch x.Op {
+				case token.MUL:
+					if !a.markable(x.Type()) {
+						continue
+					}
+					locs, n := a.addrLocs(x.X)
+					if n != 1 || (locs[0].kind != locCell && locs[0].kind != locGlobal) {
+						return true
+					}
+				case token.ARROW:
+					if a.markable(x.Type()) {
+						return true
+					}
+				}
+			case *ssa.Field, *ssa.Index, *ssa.Lookup:
+				if v := x.(ssa.Value); a.markable(v.Type()) {
+					return true
+				}
+				if l, ok := x.(*ssa.Lookup); ok && l.CommaOk {
+					if tup, ok := l.Type().(*types.Tuple); ok && a.markable(tup.At(0).Type()) {
+						return true
+					}
+				}
+			case *ssa.Next:
+				if tup, ok := x.Type().(*types.Tuple); ok && !x.IsString {
+					for i := 1; i < tup.Len(); i++ {
+						if a.markable(tup.At(i).Type()) {
+							return true
+						}
+					}
+				}
+			case *ssa.Select:
+				for _, st := range x.States {
+					if et := chanElem(st.Chan.Type()); st.Dir == types.RecvOnly && et != nil && a.markable(et) {
+						return true
+					}
+				}
+			case ssa.CallInstruction:
+				switch a.model(x.Common().StaticCallee()) {
+				case modelReflect, modelAtomicLoad, modelAtomicSwap:
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// near returns the functions that the functions roots reach or that
+// reach one of them, and, of those, the ones roots reach (roots among
+// them), over the call edges of the pass: from a scanned function f to a
+// scanned function g, when
+//
+//   - an instruction of f refers to g: it calls g, makes a closure of g,
+//     or takes g as a value (g may then run under f, or under whatever f
+//     hands it to);
+//   - g is a callee of a dynamic call in f, by the Callees given to Run
+//     (see callees);
+//   - f calls through reflection (Value.Call, CallSlice, Method,
+//     MethodByName), and g is a function such a call may run (an exported
+//     method, a function whose value is taken; see reflectTarget).
+//
+// As everywhere in the pass, the bodies of the intrinsics and of package
+// reflect are not part of it: what fmt.Errorf calls (the Error and Format
+// methods of its operands) is not under the function that calls
+// fmt.Errorf.
+func (a *analysis) near(roots []*ssa.Function) (map[*ssa.Function]bool, []*ssa.Function) {
+	var reflected []*ssa.Function
+	for _, fn := range a.fns {
+		if a.reflectTarget(fn) {
+			reflected = append(reflected, fn)
+		}
+	}
+	succs := make(map[*ssa.Function][]*ssa.Function, len(a.fns))
+	preds := make(map[*ssa.Function][]*ssa.Function, len(a.fns))
+	var rands []*ssa.Value
+	for _, f := range a.fns {
+		to := make(map[*ssa.Function]bool)
+		edge := func(g *ssa.Function) {
+			if g == nil || to[g] {
+				return
+			}
+			if _, scanned := a.fnIndex[g]; !scanned {
+				return
+			}
+			to[g] = true
+			succs[f] = append(succs[f], g)
+			preds[g] = append(preds[g], f)
+		}
+		reflects := false
+		for _, b := range f.Blocks {
+			for _, instr := range b.Instrs {
+				rands = instr.Operands(rands[:0])
+				for _, r := range rands {
+					if r == nil || *r == nil {
+						continue
+					}
+					if g, ok := (*r).(*ssa.Function); ok {
+						edge(g)
+					}
+				}
+				site, ok := instr.(ssa.CallInstruction)
+				if !ok {
+					continue
+				}
+				if sc := site.Common().StaticCallee(); sc != nil {
+					reflects = reflects || reflectCall(sc)
+					continue
+				}
+				for _, g := range a.callees(site) {
+					edge(g)
+				}
+			}
+		}
+		if reflects {
+			for _, g := range reflected {
+				edge(g)
+			}
+		}
+	}
+	near := make(map[*ssa.Function]bool)
+	var under []*ssa.Function
+	for i, next := range []map[*ssa.Function][]*ssa.Function{succs, preds} {
+		done := make(map[*ssa.Function]bool)
+		stack := append([]*ssa.Function(nil), roots...)
+		for len(stack) > 0 {
+			f := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if f == nil || done[f] {
+				continue
+			}
+			done[f] = true
+			near[f] = true
+			if i == 0 {
+				under = append(under, f)
+			}
+			stack = append(stack, next[f]...)
+		}
+	}
+	return near, under
 }
 
 // reflectDest is what the walk back from the destination of a store

@@ -20,7 +20,8 @@ type Verdict int
 
 const (
 	// No: the Subject is not in the Target's Error Set: the upward pass,
-	// an upper bound, does not reach the Target's error result.
+	// an upper bound, does not reach the Target's error result. (See
+	// MembershipResult.ApartFromReflection for a No that is qualified.)
 	No Verdict = iota
 	// Yes: an entry of the Error Set is the Subject, with a Propagation
 	// Path as witness.
@@ -98,17 +99,27 @@ type MembershipResult struct {
 	// result, and TargetTrace how the Mark got there (it may be empty).
 	Reached     bool
 	TargetTrace []mark.Step
-	// ReflectStores are the stores through reflection that the Subject
-	// reaches and the upward pass did not follow, because it cannot tell
-	// where they write (see mark.Result.ReflectStores). A No or Maybe
-	// Verdict holds only as far as none of them puts the Subject where
-	// the Target reads it; they are reported with the Verdict.
+	// ReflectStores are the stores through reflection near the Target
+	// that the Subject reaches and the upward pass did not follow,
+	// because it cannot tell where they write (see
+	// mark.Result.ReflectStores). A No or Maybe Verdict holds only as
+	// far as none of them puts the Subject where the Target reads it;
+	// they are reported with the Verdict (see ApartFromReflection).
 	ReflectStores []mark.ReflectStore
 	// MarkRan reports whether the upward pass ran; MarkTime is how long
 	// it took and MarkStats what it did.
 	MarkRan   bool
 	MarkTime  time.Duration
 	MarkStats mark.Stats
+}
+
+// ApartFromReflection reports whether the Verdict is a No that does not
+// cover everything: the Subject reaches stores through reflection near
+// the Target that the upward pass did not follow (ReflectStores). Such a
+// No is no proof; the CLI prints it as "no, apart from reflection" and
+// exits as for a Maybe.
+func (m *MembershipResult) ApartFromReflection() bool {
+	return m.Verdict == No && len(m.ReflectStores) > 0
 }
 
 // Membership answers whether opts.Subject is in the Error Set of tgt. It
@@ -122,8 +133,9 @@ type MembershipResult struct {
 //   - the upward pass does not reach the Target's error result: No,
 //     whatever Unresolved entries the Error Set has (but Maybe if the
 //     program is open and an entry depends on the caller). The stores
-//     through reflection that the pass did not follow are listed in
-//     ReflectStores: the No does not cover what they write;
+//     through reflection near the Target that the pass did not follow
+//     are listed in ReflectStores: the No does not cover what they
+//     write (ApartFromReflection);
 //   - it does: Maybe, with the Carriers. The Error Set is no proof that
 //     the Subject is absent: there may be no Carrier at all.
 func Membership(ctx context.Context, prog *load.Program, tgt *target.Target, opts MembershipOptions) (*MembershipResult, error) {
@@ -157,7 +169,7 @@ func Membership(ctx context.Context, prog *load.Program, tgt *target.Target, opt
 		return nil, err
 	}
 	m.MarkRan, m.MarkTime, m.MarkStats = true, time.Since(start), marks.Stats()
-	m.ReflectStores = marks.ReflectStores()
+	m.ReflectStores = marks.ReflectStores(tgt.Funcs)
 	m.Reached, m.TargetTrace = targetMarked(marks, tgt)
 	c := carriers{marks: marks, tbl: res.Table, prog: prog.SSA, open: len(opts.Open) > 0, reached: m.Reached}
 	for _, e := range res.Entries {

@@ -37,7 +37,9 @@ const (
 	// ExitNo is returned by a Membership Query (-is, -as) whose Verdict is
 	// no; a yes Verdict returns ExitOK.
 	ExitNo = 1
-	// ExitMaybe is returned by a Membership Query whose Verdict is maybe.
+	// ExitMaybe is returned by a Membership Query whose Verdict is maybe,
+	// or is a no apart from stores through reflection near the Target
+	// that the upward pass did not follow.
 	ExitMaybe = 3
 )
 
@@ -395,7 +397,10 @@ func printUsage(w io.Writer, fs *flag.FlagSet) {
 	defer fmt.Fprintf(w, `
 With -is or -as, %[1]s answers a Membership Query: whether that error is in
 the Target's Error Set. The exit status is then the Verdict:
-  0 yes | 1 no | 3 maybe | 2 error
+  0 yes | 1 no | 2 error
+  3 maybe, or no apart from reflective stores that are not followed
+A no is a proof only for flows that do not pass through package reflect;
+reflective flows are followed where the analysis can, and otherwise not.
 An internal package counts as closed (no callers outside the loaded program)
 only when the default -p ./... is run from the root of its module.
 `, BinaryName)

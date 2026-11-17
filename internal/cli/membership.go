@@ -71,6 +71,10 @@ func runMembership(ctx context.Context, opts Options, cfg *config, prog *load.Pr
 	case query.Maybe:
 		return ExitMaybe, nil
 	}
+	if res.ApartFromReflection() {
+		// Printed as "no, apart from reflection": not a proof.
+		return ExitMaybe, nil
+	}
 	return ExitNo, nil
 }
 

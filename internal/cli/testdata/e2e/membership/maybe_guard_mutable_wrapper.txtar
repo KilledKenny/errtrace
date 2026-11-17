@@ -2,8 +2,7 @@ errors.Is said no, but the value is a wrapper whose content changes afterwards: 
 -- args --
 -is example.com/fx.ErrX a.go:@f
 -- stdout --
-$WORK/a.go:12:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: 0 entries could carry it (0 unresolved)
-	example.com/fx.ErrX may reach the target, but no entry of the Error Set shows how
+$WORK/a.go:12:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: no entry of the Error Set shows how
 	marked via (origin of example.com/fx.ErrX → target):
 		$WORK/a.go:5:5-9: Sentinel example.com/fx.ErrX
 		$WORK/a.go:18:12-16: loaded from variable example.com/fx.ErrX

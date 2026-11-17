@@ -323,7 +323,11 @@ type analysis struct {
 	typeSeeds []ssa.Value
 	// reflectMade are the results of the calls of package reflect that
 	// make a value of a type chosen at run time (see reflectMakes).
+	// madeSeeded says that seed marked them, and noMadeSeeds that it is
+	// not to (see RunWith).
 	reflectMade []key
+	madeSeeded  bool
+	noMadeSeeds bool
 	opaque      []opaqueSeed
 	varargs     map[*ssa.Alloc]*ssa.Call
 	// varargsParam maps the argument array of a static call of a
@@ -2098,11 +2102,12 @@ func (a *analysis) seed() {
 	for _, v := range a.typeSeeds {
 		a.mark(key{v, 0}, freeT, reason{kind: kSeedType, site: v.(ssa.Instruction), typ: seedOperandType(v)})
 	}
-	if a.seedsByType() {
+	if a.seedsByType() && !a.noMadeSeeds {
 		// A value that reflection makes of a type it is told at run
 		// time (reflect.New(t), reflect.Zero(t), v.Convert(t)) may be
 		// of a type every value of which is marked. No conversion to
 		// an interface shows it: Value.Interface does that.
+		a.madeSeeded = len(a.reflectMade) > 0
 		for _, k := range a.reflectMade {
 			call := k.v.(*ssa.Call)
 			a.mark(k, freeT, reason{kind: kSeedReflect, site: call, fn: call.Call.StaticCallee()})

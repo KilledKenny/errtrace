@@ -2,8 +2,7 @@ A function result of the Concrete Type converted to error: errors.As finds it ev
 -- args --
 -as *example.com/fx.E a.go:@f
 -- stdout --
-$WORK/a.go:9:12-13: *example.com/fx.E in Error Set of example.com/fx.F: maybe: 0 entries could carry it (0 unresolved)
-	*example.com/fx.E may reach the target, but no entry of the Error Set shows how
+$WORK/a.go:9:12-13: *example.com/fx.E in Error Set of example.com/fx.F: maybe: no entry of the Error Set shows how
 	marked via (origin of *example.com/fx.E → target):
 		$WORK/a.go:9:31-36: value of Concrete Type *example.com/fx.E
 -- stderr --

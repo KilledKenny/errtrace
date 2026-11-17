@@ -1,0 +1,35 @@
+A store through reflection that was not followed is not named for a Target that neither runs it (it is not in a function the Target reaches or is reached from) nor reads memory such a store can write: the Verdict is a plain no. Get, which reads the variable, names it.
+-- args --
+-is example.com/fx.ErrX a.go:@f
+-- stdout --
+$WORK/a.go:18:12-17: example.com/fx.ErrX in Error Set of example.com/fx.Other: no
+-- exit --
+1
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"reflect"
+)
+
+var ErrX = errors.New("x")
+
+var slot error
+var dest = reflect.ValueOf(&slot).Elem()
+
+func store() { dest.Set(reflect.ValueOf(ErrX)) }
+
+func Get() error { return slot }
+
+func /*@f*/Other() error { return errors.New("other") }
+
+func main() {
+	store()
+	fmt.Println(Get(), Other())
+}

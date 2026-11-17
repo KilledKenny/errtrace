@@ -2,8 +2,7 @@ A comparison does not exclude a Wrap of the Sentinel, and the Error Set (which r
 -- args --
 -is example.com/fx.ErrX a.go:@f
 -- stdout --
-$WORK/a.go:9:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: 0 entries could carry it (0 unresolved)
-	example.com/fx.ErrX may reach the target, but no entry of the Error Set shows how
+$WORK/a.go:9:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: no entry of the Error Set shows how
 	marked via (origin of example.com/fx.ErrX → target):
 		$WORK/a.go:5:5-9: Sentinel example.com/fx.ErrX
 		$WORK/a.go:7:27-31: loaded from variable example.com/fx.ErrX

@@ -23,9 +23,10 @@ type soundCase struct {
 	wantMaybe bool
 	// notFollowed: the Subject reaches the function's result only by a
 	// store through reflection whose destination the upward pass cannot
-	// tell. That is its documented limit: if the Verdict is No, it
-	// names the stores it did not follow (the "not followed" section).
-	// A Verdict that is not No is as good, or better.
+	// tell. That is its documented limit: if the Verdict is No, it is
+	// a No apart from reflection, which names the stores it did not
+	// follow (the "not followed" section) and exits as a Maybe. A
+	// Verdict that is not No is as good, or better.
 	notFollowed bool
 	// method is the type of fn's pointer receiver, if fn is a method.
 	method string
@@ -48,7 +49,7 @@ func runSound(t *testing.T, file string, cases []soundCase) {
 			if !c.truth {
 				t.Errorf("%s, %s: a notFollowed case is one the function can return", c.fn, c.subject)
 			}
-			if m.Verdict == query.No && len(m.ReflectStores) == 0 {
+			if m.Verdict == query.No && !m.ApartFromReflection() {
 				t.Errorf("%s, %s: Verdict is no and names no store through reflection that was not followed, but the function can return it", c.fn, c.subject)
 			}
 		case c.truth && m.Verdict == query.No:
@@ -233,7 +234,40 @@ func TestVerdictSoundReflect(t *testing.T) {
 		{fn: "Clean", subject: "is ErrG", wantNo: true},
 		{fn: "FreshWhole", subject: "is ErrB", wantNo: true},
 		{fn: "FreshField", subject: "is ErrC", wantNo: true},
+		// A store of a value that reflection made of a type chosen at
+		// run time is not one the Subject reaches.
+		{fn: "ReadsMemory", subject: "as *CT8", wantNo: true},
+		{fn: "ReadsMemory", subject: "is ErrE1", wantNo: true},
+		// A store that is not followed is not near a function that
+		// neither runs it nor reads memory.
+		{fn: "Clean", subject: "is ErrO", wantNo: true},
 	})
+}
+
+// TestReflectStoresNearTarget pins which stores through reflection that
+// were not followed a Verdict names: those in functions the Target
+// reaches or is reached from, and every one if the Target reads memory
+// that such a store can write. A No that names one is a No apart from
+// reflection.
+func TestReflectStoresNearTarget(t *testing.T) {
+	t.Parallel()
+	p := loadProgram(t, "sound_reflect.txtar")
+	for _, c := range []struct {
+		fn, subject string
+		stores      int
+	}{
+		// The store is in the Target.
+		{"UnknownGlobal", "is ErrO", 1},
+		// The Target reads a field: the store may have written it.
+		{"ReadsMemory", "is ErrO", 1},
+		// The Target reads nothing and does not run the store.
+		{"Clean", "is ErrO", 0},
+	} {
+		m := p.membership(t, c.fn, p.subject(t, c.subject))
+		if m.Verdict != query.No || len(m.ReflectStores) != c.stores || m.ApartFromReflection() != (c.stores > 0) {
+			t.Errorf("%s, %s: Verdict %v, %d stores not followed, apart from reflection %v; want no, %d stores", c.fn, c.subject, m.Verdict, len(m.ReflectStores), m.ApartFromReflection(), c.stores)
+		}
+	}
 }
 
 // TestVerdictSoundValues does the same for what a value holds: a

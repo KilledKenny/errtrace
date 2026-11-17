@@ -1,12 +1,12 @@
-A store through reflection whose destination the upward pass cannot tell (the Value comes out of a variable) is not followed: the Verdict stays no, and names the store.
+A store through reflection whose destination the upward pass cannot tell (the Value comes out of a variable) is not followed: the Verdict is a no apart from reflection, with the exit status of a maybe, and names the store. The store is not in a function the Target runs; it is listed because the Target reads a variable whose address is taken, which the store may have written.
 -- args --
 -is example.com/fx.ErrX a.go:@f
 -- stdout --
-$WORK/a.go:16:12-15: example.com/fx.ErrX in Error Set of example.com/fx.Get: no
+$WORK/a.go:16:12-15: example.com/fx.ErrX in Error Set of example.com/fx.Get: no, apart from reflection
 	not followed: example.com/fx.ErrX reaches 1 reflective store whose destination is unknown or only partly followed:
 		$WORK/a.go:14:16-47: in example.com/fx.store
 -- exit --
-1
+3
 -- go.mod --
 module example.com/fx
 

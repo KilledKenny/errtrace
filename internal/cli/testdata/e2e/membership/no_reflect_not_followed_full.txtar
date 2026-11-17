@@ -2,7 +2,7 @@ With -full every store through reflection that was not followed is listed.
 -- args --
 -full -is example.com/fx.ErrX a.go:@f
 -- stdout --
-$WORK/a.go:22:12-15: example.com/fx.ErrX in Error Set of example.com/fx.Get: no
+$WORK/a.go:22:12-15: example.com/fx.ErrX in Error Set of example.com/fx.Get: no, apart from reflection
 	not followed: example.com/fx.ErrX reaches 7 reflective stores whose destination is unknown or only partly followed:
 		$WORK/a.go:14:13-44: in example.com/fx.s1
 		$WORK/a.go:15:13-44: in example.com/fx.s2
@@ -12,7 +12,7 @@ $WORK/a.go:22:12-15: example.com/fx.ErrX in Error Set of example.com/fx.Get: no
 		$WORK/a.go:19:13-44: in example.com/fx.s6
 		$WORK/a.go:20:13-44: in example.com/fx.s7
 -- exit --
-1
+3
 -- go.mod --
 module example.com/fx
 

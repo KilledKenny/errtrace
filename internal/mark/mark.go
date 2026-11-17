@@ -5,6 +5,13 @@
 // Unresolved places, the upward pass is an upper bound: when it is unsure it
 // keeps the Mark, so what it does not reach cannot hold X.
 //
+// That is a proof for the ways a value travels that do not pass through
+// package reflect. Reflection is followed where the pass can (see
+// Reflection) and otherwise not: a "no" is no proof about a value that
+// goes through package reflect in a way the pass does not model. Some of
+// what it does not follow it can name (the stores listed as "not
+// followed"); the rest it cannot (see Known limits).
+//
 // # What a Mark means
 //
 // A marked value may be X itself, or an error that errors.Is (for a
@@ -251,7 +258,54 @@
 //     as far as the type asserted is concerned. Both are
 //     reported instead: Result.ReflectStores lists these stores, and the
 //     Verdict names them ("not followed"). A "no" does not cover what
-//     they write.
+//     they write: it is printed as "no, apart from reflection".
+//
+// Which stores are listed. A store through reflection is recorded if the
+// value stored carries a Mark that comes from X and the pass did not
+// follow the store (all the way). A Mark comes from X unless the value
+// has it only because package reflect made it of a type chosen at run
+// time (reflect.New(t), see Seeds): such a value is not X on its way
+// somewhere, and wherever scanned code converts it to an interface it is
+// marked by its type again. So the stores of a decoder (encoding/json,
+// fmt.Sscan) into what it allocates are not recorded for every Concrete
+// Type Subject. (The pass runs a second time without those seeds to tell
+// the two apart.) Of the recorded stores, a Verdict lists those that can
+// matter to its Target:
+//
+//   - the stores in a function that a Target function reaches, or that
+//     reaches a Target function, over the call edges of the pass (a
+//     reference to a function, the callees of a dynamic call, and from a
+//     function that calls through reflection to the functions such a
+//     call may run), through scanned functions;
+//   - every recorded store, if a Target function or a scanned function it
+//     reaches reads a value that can carry a Mark from memory a store
+//     through reflection can write: through a pointer, from a field, an
+//     element, a map or a channel (anything but a local or package-level
+//     variable whose address is never taken), or by a call of package
+//     reflect or a load of a sync/atomic value.
+//
+// A store that is neither is not listed. That is a bound and not a proof:
+// what it writes can still come to the Target in an argument, read by a
+// function the Target does not reach.
+//
+// What is not modelled at all, and so neither followed nor listed (a "no"
+// can be wrong here without saying so), for example:
+//
+//   - a method called through Value.Call or Value.Method whose result
+//     is in no memory the pass saw a store to: the []error of an
+//     Unwrap() []error of errors.Join called through reflection;
+//   - a value read out of existing memory through reflection and handed
+//     out by Value.Interface(), when it is marked only by its type (a type
+//     seed, a wrapper type) and the composite it is read from goes into
+//     reflection in another function: reflect.ValueOf(a).Field(0)
+//     .Interface() in a helper that is passed a struct with a field of
+//     the Subject's type. The conversion to an interface happens inside
+//     package reflect, where no seed is applied. So too a value of a
+//     wrapper type that reflection makes (reflect.New of a type with an
+//     Is method), and the result of a function called by Value.Call;
+//   - a typed pointer made by Value.Addr to a field of program memory
+//     (v.Field(0).Addr().Interface().(*error)) and stored through
+//     afterwards: the field is not joined with the memory of its type.
 //
 // # Known limits
 //
@@ -282,8 +336,12 @@
 //   - A value converted to another named type and back is followed only as
 //     far as its Mark goes: a type assertion to a type that is neither the
 //     Subject's nor a possible wrapper drops it.
-//   - Stores through reflection with an unknown destination are reported,
-//     not followed (see Reflection). A store through a known composite
+//   - Reflection is best effort (see Reflection): a "no" is a proof only
+//     for flows that do not pass through package reflect. Stores through
+//     reflection with an unknown destination are reported, not followed,
+//     and only those that can matter to the Target are listed; reads and
+//     calls through reflection that the pass does not model are not
+//     reported at all. A store through a known composite
 //     marks what its static type can hold; what an interface value inside
 //     it points to is only found where that value is later asserted to a
 //     composite type.
@@ -356,13 +414,17 @@ type Stats struct {
 	// Locations is how many memory locations carry a Mark.
 	Locations int
 	// ReflectStores is how many stores through reflection the Subject
-	// reaches that the pass did not follow (see Result.ReflectStores).
+	// reaches that the pass did not follow, anywhere in the program
+	// (Result.ReflectStores lists those near a Target).
 	ReflectStores int
 }
 
 // Result is the outcome of the upward pass for one Subject.
 type Result struct {
 	a *analysis
+	// unfollowed are the stores through reflection that the Subject
+	// reaches and the pass did not follow (see ReflectStores).
+	unfollowed map[ssa.CallInstruction]bool
 }
 
 // Options configures the upward pass.
@@ -401,7 +463,25 @@ func RunWith(ctx context.Context, prog *ssa.Program, res Callees, subj Subject, 
 	if err := a.run(ctx); err != nil {
 		return nil, err
 	}
-	return &Result{a: a}, nil
+	r := &Result{a: a, unfollowed: a.unfollowed}
+	if len(a.unfollowed) > 0 && a.madeSeeded {
+		// Which of those stores does the Subject itself reach? A value
+		// that is marked only because reflection made it of a type
+		// chosen at run time (it may be equal to the Subject, or have
+		// the Subject's type) is not the Subject on its way somewhere:
+		// wherever it is converted to an interface in scanned code it
+		// is marked by its type again. The stores it reaches (those of
+		// every decoder) are not reported. They are told apart by
+		// running the pass once more without those seeds.
+		b := newAnalysis(prog, res, subj)
+		b.open = a.open
+		b.noMadeSeeds = true
+		if err := b.run(ctx); err != nil {
+			return nil, err
+		}
+		r.unfollowed = b.unfollowed
+	}
+	return r, nil
 }
 
 // Marked reports whether v may hold the Subject: v carries a Mark (for a
@@ -590,7 +670,7 @@ func (r *Result) TraceType(t types.Type) []Step {
 // Stats returns the counts of the pass.
 func (r *Result) Stats() Stats {
 	a := r.a
-	st := Stats{Functions: len(a.fns), ReflectStores: len(a.unfollowed)}
+	st := Stats{Functions: len(a.fns), ReflectStores: len(r.unfollowed)}
 	fns := make(map[*ssa.Function]bool)
 	for k, in := range a.marks {
 		if in.t == 0 {

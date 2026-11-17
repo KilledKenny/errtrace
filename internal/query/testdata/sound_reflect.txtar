@@ -447,7 +447,32 @@ func NewConcrete() error {
 	return reflect.New(reflect.TypeOf(CT8{})).Interface().(error)
 }
 
-// A store that is followed leaves the other functions alone.
+// A decoder stores a value that it makes of a type chosen at run time
+// where the pass cannot tell. Such a value may be of the Subject's type,
+// but it is not the Subject on its way somewhere: the store is not one
+// the Subject reaches.
+
+var decTypes = []reflect.Type{reflect.TypeOf(0)}
+var decSlot any
+var decDest = reflect.ValueOf(&decSlot).Elem()
+
+func decode() { decDest.Set(reflect.New(decTypes[0]).Elem()) }
+
+// ReadsMemory reads memory that a store through reflection could have
+// written: the stores that are not followed count for it wherever they
+// are.
+
+type boxR struct{ err error }
+
+var heldR = &boxR{err: errors.New("r")}
+
+func ReadsMemory() error {
+	decode()
+	return heldR.err
+}
+
+// A store that is followed leaves the other functions alone, and so does
+// one that is not followed, for a function that reads no memory.
 
 func Clean() error { return errors.New("clean") }
 
@@ -456,5 +481,5 @@ func main() {
 		FreshSlice(), FreshMap(), FreshChan(), FreshParam(), KnownParam(), KnownHelper(),
 		FreshMapIter(), KnownMapIter(), KnownSeq(), FreshSeq(), LazyHeld(), DeepRead(), HeldReceiver(), FreshAwayReflect(), FreshAwayTyped(), KnownCross(), FreshEscape(), UnknownGlobal(), Clean(),
 		FreshErrStruct(), FreshErrIface(), TypeAssertGeneric(), TypeAssertStruct(), TypeAssertAddr(), BoxConcrete(),
-		EqReflectNew(), EqConvert(), NewConcrete())
+		EqReflectNew(), EqConvert(), NewConcrete(), ReadsMemory())
 }
