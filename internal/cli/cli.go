@@ -11,8 +11,10 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 
+	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/ssa"
 
 	"github.com/KilledKenny/errtrace/internal/load"
@@ -194,7 +196,7 @@ func runQuery(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) 
 			return 0, usageError{err}
 		}
 	}
-	resolver, open, err := newResolver(ctx, prog, tgt, opts.Stderr, cfg.debug["timing"])
+	resolver, open, err := newResolver(ctx, prog, tgt, opts.Stderr, cfg.debug["timing"], wholeModuleDir(opts.Dir, splitList(cfg.patterns)))
 	if err != nil {
 		return 0, err
 	}
@@ -232,12 +234,19 @@ func runQuery(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) 
 // roots, with a warning: their parameters have no callers to take
 // Candidates from. The loaded packages that are not main packages, and the
 // package of a Target the roots do not reach, are open (code that is not
-// loaded calls them): the Resolver is told so, and they are returned.
-func newResolver(ctx context.Context, prog *load.Program, tgt *target.Target, stderr io.Writer, timing bool) (*resolve.VTA, []*ssa.Package, error) {
+// loaded calls them): the Resolver is told so, and they are returned. An
+// internal package of the module rooted at moduleDir is not open (see
+// closedInternal); moduleDir is empty if the patterns do not load a whole
+// module.
+func newResolver(ctx context.Context, prog *load.Program, tgt *target.Target, stderr io.Writer, timing bool, moduleDir string) (*resolve.VTA, []*ssa.Package, error) {
 	var initial []*ssa.Package
+	closed := make(map[*ssa.Package]bool)
 	for _, p := range prog.Initial {
 		if sp := prog.SSAPackage(p); sp != nil {
 			initial = append(initial, sp)
+			if closedInternal(p, moduleDir) {
+				closed[sp] = true
+			}
 		}
 	}
 	v, err := resolve.NewVTA(ctx, prog.SSA, resolve.Roots(prog.SSA, initial))
@@ -245,13 +254,12 @@ func newResolver(ctx context.Context, prog *load.Program, tgt *target.Target, st
 		return nil, nil, err
 	}
 	// A loaded package that is not a main package is open: code that is
-	// not loaded may call it. An internal package is not: only the code
-	// around its internal directory can import it, and that code is
-	// taken to be loaded with it (load the whole module).
+	// not loaded may call it. An internal package of a module that is
+	// loaded whole is not: only that module can import it.
 	var open []*ssa.Package
 	isOpen := make(map[*ssa.Package]bool)
 	for _, p := range initial {
-		if p.Pkg.Name() != "main" && !internalPackage(p.Pkg.Path()) && !isOpen[p] {
+		if p.Pkg.Name() != "main" && !closed[p] && !isOpen[p] {
 			isOpen[p] = true
 			open = append(open, p)
 		}
@@ -296,6 +304,46 @@ func internalPackage(path string) bool {
 		strings.HasSuffix(path, "/internal") || strings.Contains(path, "/internal/")
 }
 
+// wholeModuleDir returns the directory of the module that the package
+// patterns load whole: dir, if the patterns are the default ./... alone
+// (whether dir is the root of a module is for closedInternal to check).
+// It returns "" for any other patterns.
+func wholeModuleDir(dir string, patterns []string) string {
+	if len(patterns) == 0 || (len(patterns) == 1 && patterns[0] == "./...") {
+		// (No pattern means ./... too: see load.Config.)
+		return dir
+	}
+	return ""
+}
+
+// closedInternal reports whether the loaded package p is an internal
+// package that code outside the loaded program cannot import: p is in a
+// main module whose root directory is moduleDir, the directory that the
+// pattern ./... was loaded from, so every package of the module that may
+// import p is loaded with it. With any other patterns (moduleDir is ""),
+// from a directory below the module's root, or for an internal package of
+// another module (or of the standard library), p is open like any other
+// package: what imports it may not be loaded. (Not seen: files left out by
+// build constraints, test files, and a module nested in this one whose
+// path lets it import p.)
+func closedInternal(p *packages.Package, moduleDir string) bool {
+	if moduleDir == "" || !internalPackage(p.PkgPath) || p.Module == nil || !p.Module.Main || p.Module.Dir == "" {
+		return false
+	}
+	return sameDir(p.Module.Dir, moduleDir)
+}
+
+// sameDir reports whether a and b name the same directory.
+func sameDir(a, b string) bool {
+	if ra, err := filepath.EvalSymlinks(a); err == nil {
+		a = ra
+	}
+	if rb, err := filepath.EvalSymlinks(b); err == nil {
+		b = rb
+	}
+	return filepath.Clean(a) == filepath.Clean(b)
+}
+
 // splitList splits a comma-separated flag value, dropping empty elements.
 func splitList(value string) []string {
 	var out []string
@@ -317,7 +365,7 @@ func newFlagSet() (*flag.FlagSet, *config) {
 	fs.IntVar(&cfg.fanout, "fanout", DefaultFanout, "group entries under dynamic call sites with at least `N` Candidates (0 = never group)")
 	fs.StringVar(&cfg.is, "is", "", "Membership Query: is the Sentinel `pkgpath.Name` (such as io.EOF) in the Error Set?")
 	fs.StringVar(&cfg.as, "as", "", "Membership Query: is the Concrete Type `type` (such as '*io/fs.PathError') in the Error Set?")
-	fs.BoolVar(&cfg.full, "full", false, "Membership Query: print every entry that could carry the error in full, instead of grouping those whose traces share a pivot")
+	fs.BoolVar(&cfg.full, "full", false, "Membership Query: print every entry that could carry the error in full, instead of grouping those whose traces share a pivot, and every reflective store that was not followed")
 	fs.String("debug", "", "comma-separated `list` of "+strings.Join(debugModes, ",")+" (stderr only)")
 	return fs, cfg
 }
@@ -345,6 +393,8 @@ func printUsage(w io.Writer, fs *flag.FlagSet) {
 With -is or -as, %[1]s answers a Membership Query: whether that error is in
 the Target's Error Set. The exit status is then the Verdict:
   0 yes | 1 no | 3 maybe | 2 error
+An internal package counts as closed (no callers outside the loaded program)
+only when the default -p ./... is run from the root of its module.
 `, BinaryName)
 	fmt.Fprintf(w, `usage: %[1]s [flags] <target>
 
