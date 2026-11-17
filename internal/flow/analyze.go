@@ -849,21 +849,60 @@ func followsRunDefers(fn *ssa.Function, at ssa.Instruction) bool {
 }
 
 // mayRecover reports whether a deferred call of fn may recover from a
-// panic, after which fn returns through its recover block: unless every
-// defer statement of fn calls a function or closure with a body that does
-// not call recover itself (recover has no effect when a function called
-// by the deferred function calls it).
+// panic, after which fn returns through its recover block. It says no
+// only if every deferred call that can run in fn's frame is seen and
+// cannot recover (see deferMayRecover): fn has a defer statement in its
+// own blocks, and no anonymous function of fn defers into an enclosing
+// frame (the body of a range-over-func loop defers into the frame of the
+// function the loop is in; its Defer has a DeferStack).
 func mayRecover(fn *ssa.Function) bool {
+	found := false
 	for _, b := range fn.Blocks {
 		for _, instr := range b.Instrs {
-			d, ok := instr.(*ssa.Defer)
-			if !ok {
-				continue
+			if d, ok := instr.(*ssa.Defer); ok {
+				found = true
+				if deferMayRecover(d) {
+					return true
+				}
 			}
-			callee := d.Call.StaticCallee()
-			if callee == nil || callee.Blocks == nil || callsRecover(callee) {
-				return true
+		}
+	}
+	// A recover block without a defer statement of fn's own: the deferred
+	// calls are not seen.
+	return !found || defersOutward(fn)
+}
+
+// deferMayRecover reports whether the call that d defers may recover
+// from a panic: unless it calls a function or closure of the source with
+// a body that does not call recover itself. recover has no effect when a
+// function called by the deferred function calls it, but it works through
+// the wrappers of a method value, a method expression and a promoted
+// method, which errtrace does not look through: any synthetic callee may
+// recover, as may a function value, an interface method, a function
+// without a body and a builtin (defer recover() does not recover when it
+// runs; it is counted as if it did, which only keeps values).
+func deferMayRecover(d *ssa.Defer) bool {
+	if d.Call.IsInvoke() {
+		return true
+	}
+	callee := d.Call.StaticCallee()
+	return callee == nil || callee.Synthetic != "" || callee.Blocks == nil || callsRecover(callee)
+}
+
+// defersOutward reports whether an anonymous function of fn, at any
+// depth, has a defer statement that defers into the frame of an enclosing
+// function.
+func defersOutward(fn *ssa.Function) bool {
+	for _, anon := range fn.AnonFuncs {
+		for _, b := range anon.Blocks {
+			for _, instr := range b.Instrs {
+				if d, ok := instr.(*ssa.Defer); ok && d.DeferStack != nil {
+					return true
+				}
 			}
+		}
+		if defersOutward(anon) {
+			return true
 		}
 	}
 	return false
