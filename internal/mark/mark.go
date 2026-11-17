@@ -318,10 +318,11 @@
 // package reflect that is passed a reflect.Value (or a *reflect.MapIter,
 // or a slice of them) hands out what was written: v.Interface(),
 // v.Elem(), v.Field(i), v.Index(i), v.MapIndex(k), v.Recv(),
-// it.Value(), reflect.Indirect(v). A read through reflection need not
-// read a location the pass names: the Value may be made from an
-// interface value of unknown dynamic type (a helper that takes an any),
-// or name memory that package reflect made. A call that is passed no
+// it.Value(), reflect.Indirect(v), also where such a method is called
+// through an interface or a function value. A read through reflection
+// need not read a location the pass names: the Value may be made from
+// an interface value of unknown dynamic type (a helper that takes an
+// any), or name memory that package reflect made. A call that is passed no
 // Value (reflect.ValueOf, New, MakeSlice) reads no memory; it hands out
 // what it would without the flood. The flooded locations are those
 // keyed by a type, of whatever type (the stored value is behind a

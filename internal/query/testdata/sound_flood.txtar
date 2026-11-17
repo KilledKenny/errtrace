@@ -213,6 +213,28 @@ func read10(x any) error {
 
 func AnyRead() error { return read10(cur10) }
 
+// So too where every read is a method of reflect.Value called through an
+// interface.
+
+type elem10 interface{ Elem() reflect.Value }
+type face10 interface{ Interface() any }
+
+var ErrR8 = errors.New("r8")
+
+var slot17 error
+var dests17 = []reflect.Value{reflect.ValueOf(&slot17).Elem()}
+
+func store17() { dests17[0].Set(reflect.ValueOf(ErrR8)) }
+
+func read17(x any) error {
+	var i elem10 = reflect.ValueOf(x)
+	var j face10 = i.Elem()
+	e, _ := j.Interface().(error)
+	return e
+}
+
+func DynRead() error { return read17(&slot17) }
+
 // The store writes memory that package reflect made, through a second
 // reflect.Value of it, and the function reads its own Value: by
 // Interface, by MapRange, by Recv and by Index.
@@ -337,6 +359,7 @@ func init() {
 	store7()
 	store8()
 	store10()
+	store17()
 	store16a()
 	store16b()
 }
@@ -351,7 +374,7 @@ func main() {
 		errors.Is(ArgRoute(slot6), ErrF6), errors.Is(MadeSentinel(), ErrF7), errors.As(MadeConcrete(), &ct),
 		errors.Is(AnyRead(), ErrR1), errors.Is(FreshRead(), ErrR2), errors.Is(MapRangeRead(), ErrR3),
 		errors.Is(RecvRead(), ErrR4), errors.Is(IndexRead(), ErrR5), errors.Is(StructRead(), ErrR6),
-		errors.Is(TwoStage(), ErrR7),
+		errors.Is(TwoStage(), ErrR7), errors.Is(DynRead(), ErrR8),
 		errors.Is(Direct(), ErrF2),
 		errors.Is(Clean(), ErrF1), errors.Is(QuietVar(), ErrF1), errors.Is(Clean(), ErrF7), errors.As(QuietVar(), &ct))
 }

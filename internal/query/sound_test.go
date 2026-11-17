@@ -325,9 +325,11 @@ func TestVerdictSoundFlood(t *testing.T) {
 		{fn: "MadeConcrete", subject: "as CT8", truth: true, wantApart: true},
 		// The function reads what the store wrote through reflection:
 		// from a reflect.Value made of an interface-typed parameter,
+		// also by methods of reflect.Value called through an interface,
 		// and from one of memory that package reflect made (by
 		// Interface, MapRange, Recv, Index; handed over in a struct).
 		{fn: "AnyRead", subject: "is ErrR1", truth: true, wantApart: true},
+		{fn: "DynRead", subject: "is ErrR8", truth: true, wantApart: true},
 		{fn: "FreshRead", subject: "is ErrR2", truth: true, wantApart: true},
 		{fn: "MapRangeRead", subject: "is ErrR3", truth: true, wantApart: true},
 		{fn: "RecvRead", subject: "is ErrR4", truth: true, wantApart: true},

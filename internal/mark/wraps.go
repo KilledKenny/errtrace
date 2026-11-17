@@ -131,8 +131,8 @@ func (a *analysis) indexCall(site ssa.CallInstruction) {
 				a.addReader(a.atomicLoc(res.At(0).Type()), key{call, 0})
 			}
 		case modelReflect:
-			if reflectReads(call) {
-				a.reflectReads = append(a.reflectReads, call)
+			if reflectReads(sc) {
+				a.reflectReads = append(a.reflectReads, reflectRead{call, sc})
 			}
 			res := common.Signature().Results()
 			if reflectBoxes(sc) {
@@ -174,6 +174,15 @@ func (a *analysis) indexCall(site ssa.CallInstruction) {
 						}
 					}
 				}
+			}
+		}
+	}
+	if call != nil && common.StaticCallee() == nil && a.modelReflect {
+		// A dynamic call that may run a function of package reflect
+		// (a method of reflect.Value called through an interface).
+		for _, g := range a.callees(site) {
+			if a.model(g) == modelReflect && reflectReads(g) {
+				a.reflectReads = append(a.reflectReads, reflectRead{call, g})
 			}
 		}
 	}
@@ -713,20 +722,33 @@ func (a *analysis) seedIn(t types.Type, seen map[types.Type]bool, depth int) boo
 	return false
 }
 
-// reflectReads reports whether the call of a function of package reflect
-// is passed a reflect.Value, a *reflect.MapIter or a slice of them, as
-// its receiver or an argument: what it returns may then be read from the
+// reflectRead is a call that may run the function fn of package reflect,
+// which is passed a reflect.Value (see reflectReads).
+type reflectRead struct {
+	call *ssa.Call
+	fn   *ssa.Function
+}
+
+// reflectReads reports whether the function fn of package reflect is
+// passed a reflect.Value, a *reflect.MapIter or a slice of them, as its
+// receiver or a parameter: what it returns may then be read from the
 // memory such a value names (Value.Interface, Elem, Field, Index,
-// MapIndex, Recv, reflect.Indirect, MapIter.Value). A call that is passed
-// none (reflect.ValueOf, New, Zero, MakeSlice) reads no memory: it
+// MapIndex, Recv, reflect.Indirect, MapIter.Value). A function that is
+// passed none (reflect.ValueOf, New, Zero, MakeSlice) reads no memory: it
 // returns what it is passed, or memory it made.
-func reflectReads(call *ssa.Call) bool {
-	for _, arg := range call.Call.Args {
-		t := arg.Type()
+func reflectReads(fn *ssa.Function) bool {
+	reads := func(t types.Type) bool {
 		if st, ok := t.Underlying().(*types.Slice); ok {
 			t = st.Elem()
 		}
-		if isReflectValue(t) || isReflectIter(t) {
+		return isReflectValue(t) || isReflectIter(t)
+	}
+	sig := fn.Signature
+	if recv := sig.Recv(); recv != nil && reads(recv.Type()) {
+		return true
+	}
+	for i := range sig.Params().Len() {
+		if reads(sig.Params().At(i).Type()) {
 			return true
 		}
 	}
@@ -737,8 +759,13 @@ func reflectReads(call *ssa.Call) bool {
 // returns: its results that can give back what it was passed, and the
 // memory of the elements of a slice of them.
 func (a *analysis) reflectResults(call *ssa.Call, t tags, why reason) {
+	a.reflectResultsOf(call, call.Call.StaticCallee(), t, why)
+}
+
+// reflectResultsOf is reflectResults for a call that may run the function
+// sc of package reflect.
+func (a *analysis) reflectResultsOf(call *ssa.Call, sc *ssa.Function, t tags, why reason) {
 	res := call.Call.Signature().Results()
-	sc := call.Call.StaticCallee()
 	for r := range res.Len() {
 		rt := res.At(r).Type()
 		if sc != nil && reflectGives(sc, r) {

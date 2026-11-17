@@ -389,11 +389,12 @@ type analysis struct {
 	flood    bool
 	flooded  tags
 	floodWhy reason
-	// reflectReads are the calls of package reflect in the scanned
-	// functions that are passed a reflect.Value (see reflectReads), in
-	// the order of the scan: in the flooding pass, what they hand out
-	// may be read from flooded memory (see floodLocs).
-	reflectReads []*ssa.Call
+	// reflectReads are the calls in the scanned functions that may run
+	// a function of package reflect that is passed a reflect.Value (see
+	// reflectReads), in the order of the scan: in the flooding pass,
+	// what they hand out may be read from flooded memory (see
+	// floodLocs).
+	reflectReads []reflectRead
 	// boxes are the calls of package reflect that return a composite
 	// around what they are passed (see reflectBoxes).
 	boxes map[*ssa.Call]bool
