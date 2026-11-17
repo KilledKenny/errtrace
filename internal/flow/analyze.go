@@ -254,7 +254,7 @@ func (a *analyzer) walk(v ssa.Value) {
 				if ref := a.debugRefAtUse(v); ref != nil {
 					site = ref
 				}
-				a.add(a.tbl.Intern(errset.Value{Kind: errset.Concrete, Site: site, Pos: a.at.Pos(), Type: unalias(v.Type()), TypedNil: true}), site)
+				a.add(a.tbl.Intern(errset.Value{Kind: errset.Concrete, Site: site, Pos: a.at.Pos(), Type: unalias(v.Type()), TypedNil: true, Index: a.failingCompanions(v)}), site)
 			}
 			return // no error
 		}
@@ -333,6 +333,58 @@ func (a *analyzer) walk(v ssa.Value) {
 		return
 	}
 	a.memory(v, fmt.Sprintf("value of %s not modelled", ssaOp(v)))
+}
+
+// failingCompanions returns the results that the return statement the
+// analyzer walks for gives a failing value together with its operand c, a
+// nil pointer: an error that is never nil there, or the constant false
+// (return nil, err; return nil, false), as a set with bit i for result
+// i. A caller that has checked such a result (err == nil, ok) before it
+// uses the pointer does not get this nil (see errset.GuardCompanion). The
+// set is empty if c is not an operand of that return itself (it reached
+// it through a Phi), or if the results are loaded from named results
+// after the deferred calls, which may have changed them.
+func (a *analyzer) failingCompanions(c *ssa.Const) int {
+	ret, ok := a.at.(*ssa.Return)
+	if !ok || a.pt != pointOf(ret) {
+		return 0
+	}
+	at := -1
+	for i, r := range ret.Results {
+		if r == ssa.Value(c) {
+			if at >= 0 {
+				return 0
+			}
+			at = i
+		}
+	}
+	if at < 0 {
+		return 0
+	}
+	set := 0
+	for j, r := range ret.Results {
+		if j == at || j >= 30 {
+			continue
+		}
+		switch {
+		case types.IsInterface(r.Type()) && IsErrorType(r.Type()):
+			if !a.mayBeNil(r, a.pt) {
+				set |= 1 << j
+			}
+		case isFalseConst(r):
+			set |= 1 << j
+		}
+	}
+	return set
+}
+
+// isFalseConst reports whether v is the boolean constant false.
+func isFalseConst(v ssa.Value) bool {
+	c, ok := v.(*ssa.Const)
+	if !ok || c.Value == nil || c.Value.Kind() != constant.Bool {
+		return false
+	}
+	return !constant.BoolVal(c.Value)
 }
 
 // typeAssert follows the value of the type assertion ta, x.(T), to its

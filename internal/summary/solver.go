@@ -63,6 +63,8 @@ type Solver struct {
 	roots []*ssa.Function
 	// holes caches holey.
 	holes map[errset.ValueID]bool
+	// marks caches marked.
+	marks map[errset.ValueID]bool
 	// prog is the program of the functions being solved.
 	prog *ssa.Program
 	// solving are the functions of the SCC being solved, if it is a
@@ -138,6 +140,7 @@ func NewSolver(tbl *errset.Table, res resolve.Resolver, opts flow.Options) *Solv
 		local:    make(map[*ssa.Function]*flow.LocalFacts),
 		demands:  make(map[*ssa.Function]*demand),
 		holes:    make(map[errset.ValueID]bool),
+		marks:    make(map[errset.ValueID]bool),
 		args:     make(map[argKey][]flow.Fact),
 		bindings: make(map[bindingKey]bindingFacts),
 		sums:     make(map[*ssa.Function]*Summary),

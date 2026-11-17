@@ -30,6 +30,13 @@ const (
 	// errors.As call whose target is not modelled. It never removes a
 	// value.
 	GuardHelper
+	// GuardCompanion is a check of another result of the call that gave
+	// the value, which says that the call succeeded: err == nil for an
+	// error result, ok for a bool result (e, err := find(); if err != nil
+	// { return err }; return e). It only exists where it holds, and
+	// removes the typed nil that the callee returns together with a
+	// failing value of that result (see Value.Index), and nothing else.
+	GuardCompanion
 )
 
 // Guard is one check of an error value that holds, or does not hold, on
@@ -63,6 +70,8 @@ type Guard struct {
 	// Detail names the helper of a GuardHelper ("call to
 	// example.com/fx.isRetryable"), or why it is not modelled.
 	Detail string
+	// Index is the index of the checked result of a GuardCompanion.
+	Index int
 	// Holds reports whether the check is true on the path (the error is
 	// io.EOF, errors.Is returned true, the assertion succeeded).
 	Holds bool
@@ -86,6 +95,8 @@ func (g Guard) String() string {
 		return "type assertion to " + types.TypeString(g.Type, nil)
 	case GuardHelper:
 		return g.Detail
+	case GuardCompanion:
+		return fmt.Sprintf("check of result %d of the call", g.Index)
 	}
 	return fmt.Sprintf("GuardKind(%d)", int(g.Kind))
 }
@@ -106,7 +117,7 @@ func (g Guard) key() string {
 	if g.Type != nil {
 		typ = types.TypeString(g.Type, nil)
 	}
-	return fmt.Sprintf("%d:%d:%p:%s:%s:%t", g.Kind, g.Pos, g.Var, typ, g.Detail, g.Holds)
+	return fmt.Sprintf("%d:%d:%p:%s:%s:%d:%t", g.Kind, g.Pos, g.Var, typ, g.Detail, g.Index, g.Holds)
 }
 
 func guardsKey(gs []Guard) string {

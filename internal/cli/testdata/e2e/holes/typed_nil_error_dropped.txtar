@@ -1,0 +1,54 @@
+QA5 M3, control. find2 passes the pointer of find on and drops its error: its
+own error result is nil where the pointer is nil. A caller's check of find2's
+error does not remove the typed nil. (Run time: T() != nil.)
+-- args --
+a.go:@t
+-- stdout --
+$WORK/a.go:24:12-13: Error Set of example.com/x.T: 2 entries
+$WORK/a.go:14:3-3: concrete *example.com/x.E [typed nil]
+	path (origin → target):
+		$WORK/a.go:14:3-3: in example.com/x.find
+		$WORK/a.go:20:10-18: in example.com/x.find2, call to example.com/x.find
+		$WORK/a.go:25:12-24: in example.com/x.T, call to example.com/x.find2
+$WORK/a.go:16:9-13: concrete *example.com/x.E
+	path (origin → target):
+		$WORK/a.go:16:9-13: in example.com/x.find
+		$WORK/a.go:20:10-18: in example.com/x.find2, call to example.com/x.find
+		$WORK/a.go:25:12-24: in example.com/x.T, call to example.com/x.find2
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+)
+
+type E struct{}
+
+func (*E) Error() string { return "e" }
+
+func find(ok bool) (*E, error) {
+	if !ok {
+		return nil, io.EOF
+	}
+	return &E{}, nil
+}
+
+func find2(ok bool) (*E, error) {
+	e, _ := find(ok)
+	return e, nil
+}
+
+func /*@t*/T() error {
+	e, err := find2(false)
+	if err != nil {
+		return err
+	}
+	return e
+}
+
+func main() { fmt.Println(T() != nil) }

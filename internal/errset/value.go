@@ -270,7 +270,12 @@ type Value struct {
 	// Index is the parameter index of a Param, the free variable index of
 	// a FreeVar, the result index of a CallRef, the format parameter
 	// index of an ErrorfLike, the number of a StoreRef's store in Fn, or
-	// the field index of a FieldRef.
+	// the field index of a FieldRef. For a typed nil made by a return
+	// statement that gives another result a failing value (return nil,
+	// err with a non-nil err; return nil, false), it is the set of those
+	// results, bit i for result i: the typed nil is returned only
+	// together with them (see GuardCompanion). The summaries clear it
+	// where the value is passed on by another function.
 	Index int
 	// ArgIndex is the index of the variadic operands parameter of an
 	// ErrorfLike.

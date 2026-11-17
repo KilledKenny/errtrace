@@ -107,6 +107,11 @@ func (gd *funcGuards) guardsAt(pt point) []guardUse {
 			if g.Kind == errset.GuardNil && !g.Holds && g.Type == nil {
 				continue
 			}
+			if g.Kind == errset.GuardCompanion && !g.Holds {
+				// Where the call failed, nothing is known of its
+				// other results.
+				continue
+			}
 			id := 2 * cg.id
 			if outcome {
 				id++
@@ -217,7 +222,11 @@ func recognise(cond ssa.Value, sents *Sentinels) []condGuard {
 			return nil
 		}
 		if isNilConst(y) {
-			return []condGuard{mk(x, errset.Guard{Kind: errset.GuardNil}, pos)}
+			out := []condGuard{mk(x, errset.Guard{Kind: errset.GuardNil}, pos)}
+			if IsErrorType(x.Type()) {
+				out = append(out, companions(x, pos, mk)...)
+			}
+			return out
 		}
 		if v, g := globalVar(y); v != nil {
 			return []condGuard{mk(x, sentinelGuard(errset.GuardEqual, v, sents.Info(g)), pos)}
@@ -228,6 +237,9 @@ func recognise(cond ssa.Value, sents *Sentinels) []condGuard {
 			g := mk(ta.X, errset.Guard{Kind: errset.GuardAssert, Type: unalias(ta.AssertedType)}, positive)
 			g.g.Site, g.g.Pos = ta, ta.Pos()
 			return []condGuard{g}
+		}
+		if b, ok := c.Type().Underlying().(*types.Basic); ok && b.Info()&types.IsBoolean != 0 {
+			return companions(c, positive, mk)
 		}
 	case *ssa.Call:
 		common := c.Common()
@@ -259,6 +271,33 @@ func recognise(cond ssa.Value, sents *Sentinels) []condGuard {
 		return out
 	}
 	return nil
+}
+
+// companions returns the guards that a check of tested, one result of a
+// call (err == nil, or ok itself), makes on the call's other results that
+// are pointers of an error type: where the check holds, the call
+// succeeded (see errset.GuardCompanion). positive says whether the If's
+// true branch is the one on which it holds.
+func companions(tested ssa.Value, positive bool, mk func(ssa.Value, errset.Guard, bool) condGuard) []condGuard {
+	ex, ok := stripConv(tested).(*ssa.Extract)
+	if !ok {
+		return nil
+	}
+	call, ok := ex.Tuple.(*ssa.Call)
+	if !ok || call.Referrers() == nil {
+		return nil
+	}
+	var out []condGuard
+	for _, r := range *call.Referrers() {
+		sib, ok := r.(*ssa.Extract)
+		if !ok || sib.Index == ex.Index {
+			continue
+		}
+		if _, ptr := sib.Type().Underlying().(*types.Pointer); ptr && IsErrorType(sib.Type()) {
+			out = append(out, mk(sib, errset.Guard{Kind: errset.GuardCompanion, Index: ex.Index}, positive))
+		}
+	}
+	return out
 }
 
 // sentinelGuard returns a GuardEqual or GuardIs with the Sentinel v.
@@ -485,6 +524,19 @@ func Decide(tbl *errset.Table, id errset.ValueID, g errset.Guard) (Verdict, stri
 		}
 		// No abstract value is nil (a typed nil is a non-nil interface).
 		return No, ""
+	case errset.GuardCompanion:
+		// False of the typed nil that the callee returns only with a
+		// failing value of the checked result, true of everything
+		// else the call returns.
+		switch v := tbl.Get(id); v.Kind {
+		case errset.Concrete:
+			if v.TypedNil && g.Index < 30 && v.Index&(1<<g.Index) != 0 {
+				return No, ""
+			}
+		case errset.Param, errset.FreeVar, errset.CallRef, errset.ErrorfLike, errset.Guarded, errset.StoreRef, errset.FieldRef, errset.FieldOf:
+			return Unknown, ""
+		}
+		return Yes, ""
 	case errset.GuardHelper:
 		// Not decided for any value; on a symbolic value the guard
 		// waits, so that it is applied to the values a caller gives

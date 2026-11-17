@@ -145,8 +145,52 @@ func (s *Solver) expand(fn *ssa.Function, f flow.Fact, fs *factSet, st *evalStat
 		}
 		return out
 	}) {
+		sub = s.passedOn(sub)
 		fs.add(sub.value, sub.leaves, sub.notes)
 	}
+}
+
+// passedOn returns sub, a value of a function's result, with the mark
+// cleared on every typed nil that the function did not make itself (it
+// got it from a call, a variable or a field): the mark says that the
+// function that made the typed nil returns it only together with a
+// failing value of another result (errset.Value.Index), which is not
+// true of a function that passes the typed nil on. The guards of the
+// function that got it from the call have been applied by now.
+func (s *Solver) passedOn(sub subst) subst {
+	if !s.marked(sub.value) {
+		return sub
+	}
+	out := s.mapTree(sub.value, func(id errset.ValueID, k int) []subst {
+		v := s.tbl.Get(id)
+		if v.Kind == errset.Concrete && v.TypedNil && v.Index != 0 && slices.ContainsFunc(sub.leaves[k], func(src Source) bool { return src.Kind != Local }) {
+			v.Index = 0
+			id = s.tbl.Intern(v)
+		}
+		return []subst{{value: id, leaves: [][]Source{sub.leaves[k]}}}
+	})
+	if len(out) != 1 {
+		return sub
+	}
+	out[0].notes = errset.AddNotes(slices.Clone(sub.notes), out[0].notes...)
+	return out[0]
+}
+
+// marked reports whether the value tree id has a typed nil that is
+// marked as returned with a failing result (errset.Value.Index).
+func (s *Solver) marked(id errset.ValueID) bool {
+	if m, ok := s.marks[id]; ok {
+		return m
+	}
+	v := s.tbl.Get(id)
+	m := v.Kind == errset.Concrete && v.TypedNil && v.Index != 0
+	if !v.Kind.IsLeaf() {
+		for _, in := range v.Inner {
+			m = m || s.marked(in)
+		}
+	}
+	s.marks[id] = m
+	return m
 }
 
 // captured expands the facts bound to a captured variable in creator, the

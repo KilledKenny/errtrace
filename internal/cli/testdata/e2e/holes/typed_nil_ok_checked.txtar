@@ -1,0 +1,38 @@
+QA5 M3. parse returns a nil pointer only together with false. The caller
+returns the pointer where ok is true: no typed nil.
+-- args --
+a.go:@t
+-- stdout --
+$WORK/a.go:16:12-13: Error Set of example.com/x.T: 1 entries
+$WORK/a.go:13:9-13: concrete *example.com/x.E
+	path (origin → target):
+		$WORK/a.go:13:9-13: in example.com/x.parse
+		$WORK/a.go:17:14-24: in example.com/x.T, call to example.com/x.parse
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import "fmt"
+
+type E struct{}
+
+func (*E) Error() string { return "e" }
+
+func parse(s string) (*E, bool) {
+	if s == "" {
+		return nil, false
+	}
+	return &E{}, true
+}
+
+func /*@t*/T() error {
+	if e, ok := parse("x"); ok {
+		return e
+	}
+	return nil
+}
+
+func main() { fmt.Println(T()) }

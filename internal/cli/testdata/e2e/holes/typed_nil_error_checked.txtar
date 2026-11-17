@@ -1,0 +1,47 @@
+QA5 M3. find returns a nil pointer only together with a non-nil error. The
+caller returns the pointer after it has checked that error: the typed nil of
+"return nil, io.EOF" does not reach the conversion, and is not listed.
+-- args --
+a.go:@t
+-- stdout --
+$WORK/a.go:19:12-13: Error Set of example.com/x.T: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:14:15-21: in example.com/x.find
+		$WORK/a.go:20:12-22: in example.com/x.T, call to example.com/x.find
+$WORK/a.go:16:9-13: concrete *example.com/x.E
+	path (origin → target):
+		$WORK/a.go:16:9-13: in example.com/x.find
+		$WORK/a.go:20:12-22: in example.com/x.T, call to example.com/x.find
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+)
+
+type E struct{}
+
+func (*E) Error() string { return "e" }
+
+func find(ok bool) (*E, error) {
+	if !ok {
+		return nil, io.EOF
+	}
+	return &E{}, nil
+}
+
+func /*@t*/T() error {
+	e, err := find(true)
+	if err != nil {
+		return err
+	}
+	return e
+}
+
+func main() { fmt.Println(T()) }
