@@ -23,8 +23,9 @@ type soundCase struct {
 	wantMaybe bool
 	// notFollowed: the Subject reaches the function's result only by a
 	// store through reflection whose destination the upward pass cannot
-	// tell. That is its documented limit: the Verdict is No, and it
+	// tell. That is its documented limit: if the Verdict is No, it
 	// names the stores it did not follow (the "not followed" section).
+	// A Verdict that is not No is as good, or better.
 	notFollowed bool
 	// method is the type of fn's pointer receiver, if fn is a method.
 	method string
@@ -44,8 +45,11 @@ func runSound(t *testing.T, file string, cases []soundCase) {
 		}
 		switch {
 		case c.notFollowed:
-			if m.Verdict != query.No || len(m.ReflectStores) == 0 {
-				t.Errorf("%s, %s: Verdict is %v with %d stores through reflection not followed, want no with at least one", c.fn, c.subject, m.Verdict, len(m.ReflectStores))
+			if !c.truth {
+				t.Errorf("%s, %s: a notFollowed case is one the function can return", c.fn, c.subject)
+			}
+			if m.Verdict == query.No && len(m.ReflectStores) == 0 {
+				t.Errorf("%s, %s: Verdict is no and names no store through reflection that was not followed, but the function can return it", c.fn, c.subject)
 			}
 		case c.truth && m.Verdict == query.No:
 			t.Errorf("%s, %s: Verdict is no, but the function can return it", c.fn, c.subject)
@@ -202,6 +206,21 @@ func TestVerdictSoundReflect(t *testing.T) {
 		{fn: "DeepRead", subject: "is ErrS", truth: true},
 		{fn: "HeldReceiver", subject: "is ErrU", truth: true},
 		{fn: "FreshAwayReflect", subject: "is ErrV", truth: true},
+		// Fresh memory of a struct type that is an error itself.
+		{fn: "FreshErrStruct", subject: "is ErrX1", truth: true},
+		{fn: "FreshErrIface", subject: "is ErrX2", truth: true},
+		// reflect.TypeAssert, and the pointer Value.Addr makes.
+		{fn: "TypeAssertGeneric", subject: "is ErrY1", truth: true},
+		{fn: "TypeAssertStruct", subject: "is ErrY2", truth: true},
+		{fn: "TypeAssertAddr", subject: "is ErrY3", truth: true},
+		{fn: "BoxConcrete", subject: "is ErrY4", truth: true},
+		// A value made by reflection of a type every value of which is
+		// marked.
+		{fn: "EqReflectNew", subject: "is ErrE1", truth: true},
+		{fn: "EqConvert", subject: "is ErrE2", truth: true},
+		{fn: "NewConcrete", subject: "as *CT8", truth: true},
+		{fn: "EqReflectNew", subject: "is ErrE2", wantNo: true},
+		{fn: "TypeAssertGeneric", subject: "is ErrX1", wantNo: true},
 		// The documented limit.
 		{fn: "FreshAwayTyped", subject: "is ErrW", truth: true, notFollowed: true},
 		{fn: "KnownCross", subject: "is ErrT", truth: true, notFollowed: true},
@@ -244,5 +263,64 @@ func TestVerdictSoundValues(t *testing.T) {
 		// Composites in interface values.
 		{fn: "AnyBox", subject: "is ErrBox", truth: true},
 		{fn: "OtherSlice", subject: "is ErrAny", wantNo: true},
+	})
+}
+
+// TestVerdictSoundMethods does the same for what the methods of a type
+// say: a wrapper type is judged by its own methods and not by those of a
+// type it converts to, the errors of an Unwrap() []error are found, and
+// an Is or As method that can answer true for the Subject makes its type
+// a wrapper of it, whichever side of a look at the target the answer is
+// on.
+func TestVerdictSoundMethods(t *testing.T) {
+	t.Parallel()
+	runSound(t, "sound_methods.txtar", []soundCase{
+		// Wrapper types of one conversion class.
+		{fn: "CodeIs", subject: "is ErrC1", truth: true},
+		{fn: "OtherIs", subject: "is ErrC1o", truth: true},
+		{fn: "CodeIs", subject: "is ErrC1o", wantNo: true},
+		{fn: "OtherIs", subject: "is ErrC1", wantNo: true},
+		{fn: "CodeFromOther", subject: "is ErrC1", truth: true},
+		{fn: "OtherFromCode", subject: "is ErrC1", wantNo: true},
+		{fn: "CodeUnwrap", subject: "is ErrC1u", truth: true},
+		{fn: "CodeUnwrap", subject: "is ErrC1", wantNo: true},
+		{fn: "CodeIs", subject: "is ErrC1u", wantNo: true},
+		{fn: "ArrCode", subject: "is ErrC1a", truth: true},
+		{fn: "ArrOther", subject: "is ErrC1a", wantNo: true},
+		// Unwrap() []error.
+		{fn: "JoinSlice", subject: "is ErrC2j", truth: true},
+		{fn: "ErrorfSlice", subject: "is ErrC2f", truth: true},
+		{fn: "WalkSlice", subject: "is ErrC2w", truth: true},
+		{fn: "EscapedSlice", subject: "is ErrC2e", truth: true},
+		{fn: "HandMulti", subject: "is ErrC2m", truth: true},
+		{fn: "JoinSlice", subject: "is ErrC2f", wantNo: true},
+		{fn: "ErrorfSlice", subject: "is ErrC2j", wantNo: true},
+		// Is and As methods: true on the far side of the look.
+		{fn: "IsNegBranch", subject: "is ErrN1", truth: true},
+		{fn: "IsNegBranch2", subject: "is ErrN2", truth: true},
+		{fn: "IsSwitchDefault", subject: "is ErrN3", truth: true},
+		{fn: "IsFlag", subject: "is ErrN4", truth: true},
+		{fn: "IsAnd", subject: "is ErrN5", truth: true},
+		{fn: "IsHelperNeg", subject: "is ErrN6", truth: true},
+		{fn: "IsTypeSwitch", subject: "is ErrN7", truth: true},
+		{fn: "IsIfaceOK", subject: "is ErrN8", truth: true},
+		{fn: "IsIfaceMethod", subject: "is ErrN9", truth: true},
+		{fn: "AsNeg", subject: "as *T10", truth: true},
+		// Is and As methods that say what they look for.
+		{fn: "IsEq", subject: "is ErrP1", truth: true},
+		{fn: "IsEq", subject: "is ErrP2", wantNo: true},
+		{fn: "IsEqAnd", subject: "is ErrP3", truth: true},
+		{fn: "IsEqAnd", subject: "is ErrP2", wantNo: true},
+		{fn: "IsHelper", subject: "is ErrP4", truth: true},
+		{fn: "IsHelper", subject: "is ErrP2", wantNo: true},
+		{fn: "IsOwnType", subject: "is ErrP5", truth: true},
+		{fn: "IsOwnType", subject: "is ErrP2", wantNo: true},
+		{fn: "IsSwitch", subject: "is ErrP6", truth: true},
+		{fn: "IsSwitch", subject: "is ErrP2", wantNo: true},
+		{fn: "IsNeqGuard", subject: "is ErrP7", truth: true},
+		{fn: "IsNeqGuard", subject: "is ErrP2", wantNo: true},
+		{fn: "IsNotOK", subject: "is ErrP2", wantNo: true},
+		{fn: "AsEq", subject: "as *T10", truth: true},
+		{fn: "AsEq", subject: "as *U10", wantNo: true},
 	})
 }

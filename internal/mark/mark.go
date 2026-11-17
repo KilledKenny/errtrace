@@ -35,21 +35,46 @@
 // alias of, and of the variables it is stored to; every value stored into
 // it; and every value of a type that may be equal to its value without
 // being it (a comparable non-pointer type, a nil pointer). For a Concrete
-// Type: every value of that type.
+// Type: every value of that type. Such a value is marked where it is
+// converted to an interface, and where package reflect makes a value of a
+// type it is told at run time (reflect.New(t), reflect.Zero(t),
+// v.Convert(t)), unless the pass can tell that type
+// (reflect.TypeOf(T{}), reflect.TypeFor[T]()) and no such type is in it.
 //
 // A type that can be an error is a wrapper of X, and every value of it is
 // marked, when
 //
 //   - its Unwrap method can return a marked value;
 //   - its Is method (for a Sentinel) or As method (for a Concrete Type)
-//     may report X: it compares its target with a marked value, asks
-//     errors.Is or errors.As about one, asserts the target to X's type, or
-//     passes the target where the pass cannot see what is done with it
-//     (then the type wraps every X);
+//     can answer true when its target is X. The pass runs the method with
+//     only that known: it follows every branch but those whose condition
+//     cannot hold for X, and the method matches if it can then return
+//     anything but false. A condition cannot hold for X only if it is one
+//     of these, taken on the edge named: target == V (true edge) or
+//     target != V (false edge) for a V that carries no Mark;
+//     errors.Is(V, target) or errors.As(V, target) (true edge) for such a
+//     V; the ok of an assertion of the target to a type that X's value
+//     cannot have (true edge) or is known to have (false edge); and these
+//     through !, && and ||, and as the result of a static call that is
+//     passed the target (followed four calls deep). Here "the target" is
+//     the parameter, its conversions, and its assertions that panic if
+//     they fail. Everything else can be true and can be false: the false
+//     edge of target == V, a field of the receiver, a flag, a call the
+//     pass does not follow, target == nil, a comparison of a phi or of
+//     the value of a comma-ok assertion, and every comparison of the
+//     target of an As method (it is a pointer, not X);
+//   - its Is or As method (the one that matters for X) is not scanned:
+//     it has no body, or it is not the method errors.Is and errors.As
+//     call (it has other parameters). Then the type wraps every X;
 //   - one of its Unwrap, Is or As methods is not scanned (it has no
 //     body), and it holds a marked value in a field (through structs
 //     nested by value) or in a slice, array, map, channel or pointer
 //     field.
+//
+// A type is a wrapper by its own methods. The types that conversions
+// join (type Code int, int and syscall.Errno) share memory locations,
+// not methods: each is asked for itself, and a Mark on a value goes with
+// it through a conversion to the methods of its new type.
 //
 // A marked value in a field that no Unwrap method returns and no Is or As
 // method reports does not make the type a wrapper: errors.Is and errors.As
@@ -64,7 +89,12 @@
 // call only where argument i is marked, and a result marked Free marks
 // every call. Memory is context-insensitive: a Mark stored to a location is
 // Free. The result of an Unwrap method is marked where its receiver is (a
-// receiver that wraps X is always marked).
+// receiver that wraps X is always marked). A slice that a method named
+// Unwrap returns from a marked receiver (Unwrap() []error) holds what
+// the receiver holds: the values loaded from it where it is returned are
+// marked, and if it goes anywhere else, the memory of its element type
+// is. (The operands of errors.Join and of a fmt.Errorf with several %w
+// are in no memory the pass saw a store to.)
 //
 // The callees of a call come from the Callees given to Run, less the
 // functions whose value is never taken at a call of a function value.
@@ -102,6 +132,13 @@
 // a type assertion to a composite type mark the memory of that type; an
 // error that travels in an any is not taken for a slice. Every Mark is in
 // one or more of the three planes.
+//
+// A held Mark of which more is known is boxed: the value is a pointer
+// to, or a slice of, memory that holds a marked value itself (what
+// Value.Addr and reflect.Append make of a Value that holds one). A type
+// assertion of it to a pointer or slice type marks the memory of the
+// element type, and nothing deeper: a marked value has nothing new
+// inside. Around a composite that is held, a box is held.
 //
 // # Which functions are scanned
 //
@@ -159,11 +196,13 @@
 //
 //   - a reflect.Value (and a *reflect.MapIter) carries the Mark of what it
 //     holds, and a call of package reflect gives back what it is passed:
-//     reflect.ValueOf(x), v.Elem(), v.Field(i), v.Interface(). A composite
-//     passed to it counts if it holds a marked value. What Value.Addr and
-//     reflect.Append return is a composite around what they were passed
-//     (held plane). The function that a range over Value.Seq or Seq2
-//     calls is passed what the Value holds;
+//     reflect.ValueOf(x), v.Elem(), v.Field(i), v.Interface(), and
+//     reflect.TypeAssert[T](v), whose result is what the Value holds as a
+//     T (a type assertion of it). A composite passed to it counts if it
+//     holds a marked value. What Value.Addr and reflect.Append return is
+//     a pointer to, or a slice with, what they were passed: a box around
+//     a marked value, held around a held composite. The function that a
+//     range over Value.Seq or Seq2 calls is passed what the Value holds;
 //   - calls through reflection (Value.Call, CallSlice, Method,
 //     MethodByName, and so text/template): the results, parameters and
 //     panics of the exported methods and of the functions whose value is
@@ -180,7 +219,9 @@
 //     names fresh memory (reflect.New, MakeSlice, MakeMap, MakeChan), the
 //     reflect.Value of that memory is marked, and with it what is read
 //     back from that same Value through reflection; the rest of the
-//     program is not;
+//     program is not. A read of fresh memory through its type, where it
+//     is followed, marks all that type can hold, also if the type is an
+//     error itself (a *MyErr with an error in a field);
 //   - a store through reflection whose destination the pass cannot tell
 //     (the Value comes out of memory, out of a dynamic call, through a
 //     pointer that was stored in fresh memory, across an interface value
@@ -189,7 +230,9 @@
 //     memory followed all the way if it puts the value inside a composite
 //     (a field, an element) and the Value then leaves the calls of
 //     package reflect: a read of that memory through its type
-//     (v.Interface().(*T).F) is seen only next to the store. Both are
+//     (v.Interface().(*T).F) is seen only next to the store, and one
+//     through reflect.TypeAssert[T] or a pointer made by Value.Addr only
+//     as far as the type asserted is concerned. Both are
 //     reported instead: Result.ReflectStores lists these stores, and the
 //     Verdict names them ("not followed"). A "no" does not cover what
 //     they write.
@@ -201,13 +244,16 @@
 //     contents of sync/atomic.Value and atomic.Pointer, and a function
 //     without a body (its results are marked when an argument is). An
 //     address converted to unsafe.Pointer is not followed.
-//   - An Is or As method that decides from something other than its target
-//     and the values it compares it with (a global flag, the error text)
-//     is taken at its word only where the target is compared or passed on.
-//   - An Is method that does not look at its target at all, compares it
-//     with a constant, or can return true where no branch on the target
-//     led, reports every error; so does one that hands the target to code
-//     the pass cannot see.
+//   - An Is or As method that the pass cannot see at all is the one gap
+//     of the wrapper rule: a method reached only through reflection or
+//     from code that is not loaded, whose type is never converted to an
+//     interface in the program. Every method it scans is decided as
+//     described under Seeds: a type is no wrapper of X only where each
+//     way to a true answer is closed by a look at the target that X
+//     fails. That look trusts the Marks: a value V that carries none is
+//     not X. (An Is or As method the program never calls through
+//     errors.Is or errors.As is not scanned; its type then wraps every
+//     X.)
 //   - Type-keyed locations and whole-type wrappers are coarse: expect a
 //     false "maybe", never a false "no".
 //   - A value stored into the Sentinel's variable by the program is followed

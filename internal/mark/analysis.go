@@ -13,7 +13,7 @@ import (
 )
 
 // tags are the contexts in which a Mark holds, in three planes that say
-// how the value came to hold the Subject.
+// how the value came to hold the Subject, and one more bit.
 //
 // By value (the low third): the value is the Subject itself, or an
 // immutable construction over such values (fmt.Errorf, errors.Join): what
@@ -31,6 +31,13 @@ import (
 // In each plane, bit 0 is free (true in any calling context) and bit i+1
 // is "when parameter i of the enclosing function holds the Subject" (in
 // that plane). A plane with free is just free.
+//
+// The last bit, boxed, is a held Mark of which more is known: the value
+// may be a pointer to, or a slice of, memory that holds a marked value
+// itself (what Value.Addr and reflect.Append make of a Value that holds
+// one). Asserted to a pointer or slice type, it marks the memory of the
+// element type and nothing deeper. It has no calling context: it is true
+// in any.
 type tags uint64
 
 // planeBits is the width of a plane.
@@ -42,12 +49,14 @@ const (
 	free  tags = 1
 	freeT tags = 1 << planeBits
 	freeH tags = 1 << (2 * planeBits)
+	// boxed is the boxed tag.
+	boxed tags = 1 << (3 * planeBits)
 	// planeV, planeT and planeH are the bits of the three planes.
 	planeV tags = 1<<planeBits - 1
 	planeT tags = planeV << planeBits
 	planeH tags = planeV << (2 * planeBits)
-	// anyFree is free in any plane.
-	anyFree = free | freeT | freeH
+	// anyFree is free in any plane, or boxed.
+	anyFree = free | freeT | freeH | boxed
 )
 
 // planeShifts are the positions of the planes.
@@ -74,15 +83,21 @@ func paramBits(i int) tags {
 // toT moves the by-value tags of t to the by-type plane.
 func toT(t tags) tags { return (t&planeV)<<planeBits | t&^planeV }
 
-// toH moves every tag of t to the held plane.
+// toH moves every tag of t to the held plane: a boxed Mark is held in
+// any context.
 func toH(t tags) tags {
-	return (t&planeV)<<(2*planeBits) | (t&planeT)<<planeBits | t&planeH
+	h := (t&planeV)<<(2*planeBits) | (t&planeT)<<planeBits | t&planeH
+	if t&boxed != 0 {
+		h |= freeH
+	}
+	return h
 }
 
-// planesOf returns free in every plane in which t has a tag: what a
-// location gets when a value with the tags t is stored to it.
+// planesOf returns free in every plane in which t has a tag (and boxed,
+// if t is): what a location gets when a value with the tags t is stored
+// to it.
 func planesOf(t tags) tags {
-	var p tags
+	p := t & boxed
 	for _, sh := range planeShifts {
 		if t&(planeV<<sh) != 0 {
 			p |= free << sh
@@ -92,9 +107,10 @@ func planesOf(t tags) tags {
 }
 
 // paramSeed returns the tags that parameter p of a callee gets from an
-// argument with the tags t: its Param tag in each plane t has a tag in.
+// argument with the tags t: its Param tag in each plane t has a tag in
+// (and boxed, if t is).
 func paramSeed(p int, t tags) tags {
-	var out tags
+	out := t & boxed
 	for _, sh := range planeShifts {
 		if t&(planeV<<sh) != 0 {
 			out |= paramTag(p) << sh
@@ -106,7 +122,7 @@ func paramSeed(p int, t tags) tags {
 // throughParam returns the tags a call gets from a callee result with the
 // Param(p) bits ret (see paramBits) when the argument has the tags arg:
 // the argument's tags, in the planes the result depends on the parameter
-// in.
+// in. (A boxed result is free: it marks every call, see retChanged.)
 func throughParam(ret, arg tags) tags {
 	var out tags
 	for _, sh := range planeShifts {
@@ -222,6 +238,7 @@ const (
 	kReflectRet
 	kOutside
 	kReflectFresh
+	kSeedReflect
 )
 
 // reason is the first way a Mark was found.
@@ -253,7 +270,8 @@ type locInfo struct {
 }
 
 // candidate is a possible wrapper type that the program converts to an
-// interface.
+// interface. Candidates are keyed by the type itself (typeIDs.raw), never
+// by its conversion class.
 type candidate struct {
 	typ     types.Type
 	wrapper bool
@@ -303,8 +321,11 @@ type analysis struct {
 	candByID map[int32]*candidate
 
 	typeSeeds []ssa.Value
-	opaque    []opaqueSeed
-	varargs   map[*ssa.Alloc]*ssa.Call
+	// reflectMade are the results of the calls of package reflect that
+	// make a value of a type chosen at run time (see reflectMakes).
+	reflectMade []key
+	opaque      []opaqueSeed
+	varargs     map[*ssa.Alloc]*ssa.Call
 	// varargsParam maps the argument array of a static call of a
 	// variadic function to the locVarargs of the callee's parameter;
 	// forwards are the locVarargs a function passes its own on to
@@ -389,8 +410,9 @@ type analysis struct {
 	guards  map[ssa.Value][]*ssa.BasicBlock
 	byValue bool
 	guardOK bool
-	// targets caches targetInfo.
-	targets map[*ssa.Function]*targetInfo
+	// targets are the Is and As methods that targetMatches found to
+	// match.
+	targets map[*ssa.Function]*targetMatch
 	// dynNilable are the pointer types the Sentinel's value may have
 	// while being nil.
 	dynNilable []types.Type
@@ -454,7 +476,7 @@ func newAnalysis(prog *ssa.Program, res Callees, subj Subject) *analysis {
 		dests:          make(map[destKey]*reflectDest),
 		destIDs:        make(map[ssa.Value]uint32),
 		guards:         make(map[ssa.Value][]*ssa.BasicBlock),
-		targets:        make(map[*ssa.Function]*targetInfo),
+		targets:        make(map[*ssa.Function]*targetMatch),
 		markableCache:  make(map[types.Type]bool),
 		wrapperCache:   make(map[types.Type]bool),
 		typeSeedCache:  make(map[types.Type]bool),
@@ -510,7 +532,8 @@ func (a *analysis) run(ctx context.Context) error {
 			if r.planes != 0 {
 				t |= freeT
 			}
-			if r.planes&freeH != 0 {
+			if r.planes&(freeH|boxed) != 0 {
+				// (A box in its memory: held, which says less.)
 				t |= freeH
 			}
 			if t &^= ra.done; t != 0 {
@@ -1151,9 +1174,16 @@ func (a *analysis) mark(k key, t tags, why reason) {
 		return
 	case *ssa.Call:
 		if a.boxes[x] {
-			// A pointer to what it was passed, a slice with it: what
-			// was the Subject is now held in a composite.
-			t |= toH(t)
+			// A pointer to what it was passed, a slice with it. Around
+			// a composite with the Subject somewhere inside (or around
+			// another box), it is such a composite: held. Around a
+			// value that is marked itself, it is a box: the memory it
+			// points to holds that value, and nothing deeper is new.
+			if t&(planeH|boxed) != 0 {
+				t |= toH(t)
+			} else {
+				t |= boxed
+			}
 		}
 	}
 	in := a.marks[k]
@@ -1282,11 +1312,16 @@ func (a *analysis) use(k key, delta tags, dead []*ssa.BasicBlock, r ssa.Instruct
 			}
 			if a.assertable(x.AssertedType) {
 				a.mark(key{x, 0}, delta, reason{kind: kAssert, from: from, site: x, typ: x.AssertedType})
-			} else if !a.markable(x.AssertedType) && planes&freeH != 0 {
+			}
+			if !isInterface(x.AssertedType) && planes&freeH != 0 {
 				// The interface may hold a composite (it came out of
 				// reflection, or from outside): what was marked is
-				// inside it.
+				// inside it. That goes for a composite that is an
+				// error too (a *MyErr with an error in a field),
+				// whether or not it can wrap the Subject.
 				a.markHeld(x.AssertedType, reason{kind: kAssert, from: from, site: x, typ: x.AssertedType})
+			} else if delta&boxed != 0 {
+				a.markBoxed(x.AssertedType, reason{kind: kAssert, from: from, site: x, typ: x.AssertedType})
 			}
 		case *ssa.Store:
 			if x.Val == v {
@@ -1456,7 +1491,10 @@ func (a *analysis) index() {
 					if a.typeSeed(ot) {
 						a.typeSeeds = append(a.typeSeeds, x)
 					} else if a.potentialWrapper(ot) {
-						id := a.ty.id(ot)
+						// By the type itself: the methods of a class-mate
+						// (int and syscall.Errno, for type Code int) say
+						// nothing about this type.
+						id := a.ty.raw(ot)
 						c := a.candByID[id]
 						if c == nil {
 							c = &candidate{typ: ot}
@@ -1516,8 +1554,13 @@ func (a *analysis) setupIntrinsics() {
 // when the Subject is a type of package reflect itself.)
 func (a *analysis) reflectBody(fn *ssa.Function) bool {
 	for f := fn; f != nil; f = f.Parent() {
-		if f.Pkg != nil {
-			return a.modelReflect && f.Pkg.Pkg.Path() == "reflect"
+		pkg := f.Pkg
+		if pkg == nil && f.Origin() != nil {
+			// An instance of a generic function (reflect.TypeAssert).
+			pkg = f.Origin().Pkg
+		}
+		if pkg != nil {
+			return a.modelReflect && pkg.Pkg.Path() == "reflect"
 		}
 	}
 	return false
@@ -1965,6 +2008,16 @@ func (a *analysis) seed() {
 	a.seedOpen()
 	for _, v := range a.typeSeeds {
 		a.mark(key{v, 0}, freeT, reason{kind: kSeedType, site: v.(ssa.Instruction), typ: seedOperandType(v)})
+	}
+	if a.seedsByType() {
+		// A value that reflection makes of a type it is told at run
+		// time (reflect.New(t), reflect.Zero(t), v.Convert(t)) may be
+		// of a type every value of which is marked. No conversion to
+		// an interface shows it: Value.Interface does that.
+		for _, k := range a.reflectMade {
+			call := k.v.(*ssa.Call)
+			a.mark(k, freeT, reason{kind: kSeedReflect, site: call, fn: call.Call.StaticCallee()})
+		}
 	}
 	for _, o := range a.opaque {
 		res := o.call.Call.Signature().Results()

@@ -64,6 +64,22 @@ func (a *analysis) markHeldIn(t types.Type, planes tags, why reason, seen map[ty
 	}
 }
 
+// markBoxed handles a boxed Mark (see tags) that reaches the type t, by
+// a type assertion or as the receiver of a method: if t is a pointer or
+// a slice, the memory of its element type holds a marked value.
+func (a *analysis) markBoxed(t types.Type, why reason) {
+	var elem types.Type
+	switch u := t.Underlying().(type) {
+	case *types.Pointer:
+		elem = u.Elem()
+	case *types.Slice:
+		elem = u.Elem()
+	}
+	if elem != nil && a.markable(elem) {
+		a.markLoc(a.typedLoc(elem), freeT, why)
+	}
+}
+
 // reach is what reaches found: the planes in which memory that a value
 // of a type leads to is marked, and one such location (or none, if the
 // Mark is that of a type).

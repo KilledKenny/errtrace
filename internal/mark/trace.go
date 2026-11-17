@@ -125,7 +125,7 @@ func (a *analysis) trace(cur ref) []Step {
 // Step.Wide).
 func wideStep(why reason) bool {
 	switch why.kind {
-	case kSeedType, kSeedWrapper, kSeedOpaque, kSeedCaller, kSeedOpen, kReflectArg, kReflectRet, kOutside:
+	case kSeedType, kSeedWrapper, kSeedReflect, kSeedOpaque, kSeedCaller, kSeedOpen, kReflectArg, kReflectRet, kOutside:
 		return true
 	case kLoad:
 		switch why.from.l.kind {
@@ -173,6 +173,11 @@ func (a *analysis) describe(why reason, at ref) (Step, bool) {
 		return Step{Site: site(why.site), Desc: fmt.Sprintf("value of type %s, which may equal %s", typeString(why.typ), a.subj)}, true
 	case kSeedWrapper:
 		return Step{Site: site(why.site), Desc: fmt.Sprintf("value of type %s, which may wrap %s", typeString(why.typ), a.subj)}, true
+	case kSeedReflect:
+		if a.subj.Type != nil {
+			return Step{Site: site(why.site), Desc: fmt.Sprintf("value made by %s, of a type chosen at run time: it may be of Concrete Type %s", why.fn, a.subj)}, true
+		}
+		return Step{Site: site(why.site), Desc: fmt.Sprintf("value made by %s, of a type chosen at run time: it may equal %s", why.fn, a.subj)}, true
 	case kSeedCaller:
 		name := "a parameter"
 		if p, ok := at.k.v.(*ssa.Parameter); ok {

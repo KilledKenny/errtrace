@@ -22,6 +22,8 @@ func newTypeIDs() *typeIDs {
 	return &typeIDs{fast: make(map[types.Type]int32)}
 }
 
+// raw returns the name of typ itself: equal for identical types (an alias
+// is its target), different for the two sides of a conversion.
 func (t *typeIDs) raw(typ types.Type) int32 {
 	if id, ok := t.fast[typ]; ok {
 		return id
@@ -46,7 +48,10 @@ func (t *typeIDs) find(id int32) int32 {
 	return id
 }
 
-// id returns the name of typ's class.
+// id returns the name of typ's class: the types that conversions join,
+// which share memory locations. It says nothing about the methods of
+// typ; what is asked of one type (is it a wrapper, a type seed) is keyed
+// by raw.
 func (t *typeIDs) id(typ types.Type) int32 { return t.find(t.raw(typ)) }
 
 func (t *typeIDs) union(a, b types.Type) {
@@ -212,6 +217,22 @@ func (a *analysis) typeSeed(t types.Type) bool {
 	return b
 }
 
+// seedsByType reports whether there are types every value of which is
+// marked from the start (see typeSeed): always for a Concrete Type
+// Subject; for a Sentinel, if its value may be equal to another value of
+// its type, or its type is not known.
+func (a *analysis) seedsByType() bool {
+	if a.subj.Type != nil || a.dynUnknown || len(a.dynNilable) > 0 {
+		return true
+	}
+	for _, d := range a.dynTypes {
+		if a.eqSeed(d) {
+			return true
+		}
+	}
+	return false
+}
+
 // eqSeed reports whether a value of the concrete type t may be equal to
 // the Sentinel Subject's value without being a copy of it: t is
 // comparable, is not a pointer to memory of non-zero size (two such
@@ -279,7 +300,9 @@ func (a *analysis) implicit(t types.Type) bool {
 	if !a.potentialWrapper(t) {
 		return false
 	}
-	if c := a.candByID[a.ty.id(t)]; c != nil {
+	// (By the type itself, not by its conversion class: type Code int
+	// shares its memory with int and syscall.Errno, not its methods.)
+	if c := a.candByID[a.ty.raw(t)]; c != nil {
 		return c.wrapper
 	}
 	return false

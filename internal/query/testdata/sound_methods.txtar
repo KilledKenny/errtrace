@@ -1,0 +1,416 @@
+What the methods of a type say, each case with a Sentinel and types of
+its own: a wrapper type that conversions join with other types, the
+errors that an Unwrap() []error method returns, and Is and As methods
+that answer true on the far side of a look at their target.
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- main.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"strconv"
+)
+
+// Wrapper types of integer kind. The conversions in their methods join
+// Code1, Other1, Code1u, int and uint8 into one conversion class: each
+// type is still judged by its own methods.
+
+var ErrC1 = errors.New("c1")
+var ErrC1o = errors.New("c1o")
+
+type Code1 int
+
+func (c Code1) Error() string   { return "code " + strconv.Itoa(int(c)) }
+func (c Code1) Is(t error) bool { return c == 1 && t == ErrC1 }
+
+type Other1 int
+
+func (o Other1) Error() string   { return "other " + strconv.Itoa(int(o)) }
+func (o Other1) Is(t error) bool { return o == 2 && t == ErrC1o }
+
+func CodeIs() error  { return Code1(1) }
+func OtherIs() error { return Other1(2) }
+
+// A value converted from a class-mate has the methods of its new type.
+
+func CodeFromOther() error { return Code1(Other1(1)) }
+func OtherFromCode() error { return Other1(Code1(1)) }
+
+var ErrC1u = errors.New("c1u")
+
+type Code1u uint8
+
+var causes1 = [...]error{1: ErrC1u}
+
+func (c Code1u) Error() string { return fmt.Sprintf("code %d", uint8(c)) }
+func (c Code1u) Unwrap() error { return causes1[int(c)] }
+
+func CodeUnwrap() error { return Code1u(1) }
+
+// Two types of a class of their own: the one that is no wrapper of the
+// Sentinel is not made one by the other.
+
+var ErrC1a = errors.New("c1a")
+
+type CodeA [2]int8
+
+func (CodeA) Error() string     { return "codea" }
+func (c CodeA) Is(t error) bool { return c[0] == 1 && t == ErrC1a }
+
+type OtherA [2]int8
+
+func (OtherA) Error() string { return "othera" }
+func (OtherA) Unwrap() error { return nil }
+
+func ArrCode() error  { return CodeA{1, 0} }
+func ArrOther() error { return OtherA(CodeA{1, 0}) }
+
+// The elements of what Unwrap() []error returns.
+
+type multi interface{ Unwrap() []error }
+
+var ErrC2j = errors.New("c2j")
+
+func JoinSlice() error {
+	j := errors.Join(errors.New("a"), ErrC2j)
+	u := j.(multi).Unwrap()
+	return u[1]
+}
+
+var ErrC2f = errors.New("c2f")
+
+func ErrorfSlice() error {
+	e := fmt.Errorf("%w and %w", errors.New("a"), ErrC2f)
+	return e.(multi).Unwrap()[1]
+}
+
+// A hand-written walk of the tree.
+
+var ErrC2w = errors.New("c2w")
+
+func walk(err error, f func(error)) {
+	if err == nil {
+		return
+	}
+	f(err)
+	switch x := err.(type) {
+	case interface{ Unwrap() error }:
+		walk(x.Unwrap(), f)
+	case multi:
+		for _, e := range x.Unwrap() {
+			walk(e, f)
+		}
+	}
+}
+
+func WalkSlice() error {
+	var found error
+	walk(errors.Join(errors.New("a"), fmt.Errorf("ctx: %w", ErrC2w)), func(e error) {
+		if e == ErrC2w {
+			found = e
+		}
+	})
+	return found
+}
+
+// The slice leaves the function that asked for it.
+
+var ErrC2e = errors.New("c2e")
+
+func unwrapAll(err error) []error { return err.(multi).Unwrap() }
+
+func EscapedSlice() error { return unwrapAll(errors.Join(ErrC2e))[0] }
+
+// A type of the program with such a method.
+
+var ErrC2m = errors.New("c2m")
+
+type multi2 struct{ errs []error }
+
+func (*multi2) Error() string     { return "multi2" }
+func (m *multi2) Unwrap() []error { return m.errs }
+
+func HandMulti() error {
+	var e error = &multi2{errs: []error{ErrC2m}}
+	return e.(multi).Unwrap()[0]
+}
+
+// Is methods that answer true where the target is not something else.
+
+var ErrA3 = errors.New("a3")
+var ErrB3 = errors.New("b3")
+
+var ErrN1 = errors.New("n1")
+
+type N1 struct{}
+
+func (N1) Error() string { return "n1" }
+func (N1) Is(t error) bool {
+	if t == ErrA3 {
+		return false
+	}
+	return true
+}
+
+func IsNegBranch() error { return N1{} }
+
+var ErrN2 = errors.New("n2")
+
+type N2 struct{ transient bool }
+
+func (*N2) Error() string { return "n2" }
+func (e *N2) Is(t error) bool {
+	if t != ErrA3 {
+		return e.transient
+	}
+	return false
+}
+
+func IsNegBranch2() error { return &N2{transient: true} }
+
+var ErrN3 = errors.New("n3")
+
+type N3 struct{ any bool }
+
+func (N3) Error() string { return "n3" }
+func (e N3) Is(t error) bool {
+	switch t {
+	case ErrA3:
+		return false
+	case ErrB3:
+		return true
+	default:
+		return e.any
+	}
+}
+
+func IsSwitchDefault() error { return N3{any: true} }
+
+var ErrN4 = errors.New("n4")
+
+type N4 struct{ flag, other bool }
+
+func (N4) Error() string { return "n4" }
+func (e N4) Is(t error) bool {
+	if t == ErrA3 {
+		return e.flag
+	}
+	return e.other
+}
+
+func IsFlag() error { return N4{other: true} }
+
+var ErrN5 = errors.New("n5")
+
+type N5 struct{ k int }
+
+func (N5) Error() string     { return "n5" }
+func (e N5) Is(t error) bool { return t != ErrA3 && e.k == 1 }
+
+func IsAnd() error { return N5{k: 1} }
+
+var ErrN6 = errors.New("n6")
+
+type N6 struct{}
+
+func notA3(t error) bool {
+	if t == ErrA3 {
+		return false
+	}
+	return true
+}
+
+func (N6) Error() string   { return "n6" }
+func (N6) Is(t error) bool { return notA3(t) }
+
+func IsHelperNeg() error { return N6{} }
+
+var ErrN7 = errors.New("n7")
+
+type N7 struct{}
+
+func (N7) Error() string { return "n7" }
+func (N7) Is(t error) bool {
+	switch t.(type) {
+	case N7, *N7:
+		return false
+	default:
+		return true
+	}
+}
+
+func IsTypeSwitch() error { return N7{} }
+
+// Is methods that answer by an assertion of the target to an interface.
+
+var ErrN8 = errors.New("n8")
+
+type N8 struct{}
+
+func (N8) Error() string { return "n8" }
+func (N8) Is(t error) bool {
+	_, ok := t.(interface{ Error() string })
+	return ok
+}
+
+func IsIfaceOK() error { return N8{} }
+
+type notFound interface{ NotFound() }
+
+type sent9 struct{ n int }
+
+func (*sent9) Error() string { return "sent9" }
+func (*sent9) NotFound()     {}
+
+var ErrN9 error = &sent9{n: 9}
+
+type N9 struct{}
+
+func (N9) Error() string { return "n9" }
+func (N9) Is(t error) bool {
+	_, ok := t.(notFound)
+	return ok
+}
+
+func IsIfaceMethod() error { return N9{} }
+
+// An As method that answers true where the target is not something else.
+
+type T10 struct{ n int }
+
+func (*T10) Error() string { return "t10" }
+
+type U10 struct{ n int }
+
+func (*U10) Error() string { return "u10" }
+
+type W10 struct{}
+
+func (W10) Error() string { return "w10" }
+func (W10) As(target any) bool {
+	if _, ok := target.(**U10); ok {
+		return false
+	}
+	return true
+}
+
+func AsNeg() error { return W10{} }
+
+// Is and As methods that answer true only for what they look for: they
+// make their types wrappers of that, and of nothing else.
+
+var ErrP1 = errors.New("p1")
+var ErrP2 = errors.New("p2")
+
+type P1 struct{}
+
+func (P1) Error() string   { return "p1" }
+func (P1) Is(t error) bool { return t == ErrP1 }
+
+func IsEq() error { return P1{} }
+
+var ErrP3 = errors.New("p3")
+
+type P3 struct{ on bool }
+
+func (P3) Error() string     { return "p3" }
+func (e P3) Is(t error) bool { return t == ErrP3 && e.on }
+
+func IsEqAnd() error { return P3{on: true} }
+
+var ErrP4 = errors.New("p4")
+
+type P4 struct{}
+
+func isP4(t error) bool { return t == ErrP4 }
+
+func (P4) Error() string   { return "p4" }
+func (P4) Is(t error) bool { return isP4(t) }
+
+func IsHelper() error { return P4{} }
+
+type P5 struct{ code int }
+
+func (P5) Error() string { return "p5" }
+func (e P5) Is(t error) bool {
+	o, ok := t.(P5)
+	return ok && o.code/2 == e.code/2
+}
+
+var ErrP5 error = P5{code: 4}
+
+func IsOwnType() error { return P5{code: 5} }
+
+var ErrP6 = errors.New("p6")
+
+type P6 struct{}
+
+func (P6) Error() string { return "p6" }
+func (P6) Is(t error) bool {
+	switch t {
+	case ErrP6:
+		return true
+	}
+	return false
+}
+
+func IsSwitch() error { return P6{} }
+
+var ErrP7 = errors.New("p7")
+
+type P7 struct{}
+
+func (P7) Error() string { return "p7" }
+func (P7) Is(t error) bool {
+	if t != ErrP7 {
+		return false
+	}
+	return true
+}
+
+func IsNeqGuard() error { return P7{} }
+
+// Every error has an Error method: the not-ok edge is never taken.
+
+type P8 struct{}
+
+func (P8) Error() string { return "p8" }
+func (P8) Is(t error) bool {
+	if _, ok := t.(interface{ Error() string }); !ok {
+		return true
+	}
+	return false
+}
+
+func IsNotOK() error { return P8{} }
+
+type P9 struct{}
+
+func (P9) Error() string { return "p9" }
+func (P9) As(target any) bool {
+	if p, ok := target.(**T10); ok {
+		*p = &T10{n: 9}
+		return true
+	}
+	return false
+}
+
+func AsEq() error { return P9{} }
+
+// (The Is and As methods run only if the program asks errors.Is and
+// errors.As.)
+
+func main() {
+	var t10 *T10
+	var u10 *U10
+	fmt.Println(errors.Is(IsEq(), ErrP2), errors.As(AsNeg(), &t10), errors.As(AsEq(), &u10))
+	fmt.Println(CodeIs(), OtherIs(), CodeFromOther(), OtherFromCode(), CodeUnwrap(), ArrCode(), ArrOther(),
+		JoinSlice(), ErrorfSlice(), WalkSlice(), EscapedSlice(), HandMulti(),
+		IsNegBranch(), IsNegBranch2(), IsSwitchDefault(), IsFlag(), IsAnd(), IsHelperNeg(), IsTypeSwitch(),
+		IsIfaceOK(), IsIfaceMethod(), AsNeg(),
+		IsEq(), IsEqAnd(), IsHelper(), IsOwnType(), IsSwitch(), IsNeqGuard(), IsNotOK(), AsEq())
+}

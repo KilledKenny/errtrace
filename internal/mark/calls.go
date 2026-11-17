@@ -189,11 +189,17 @@ func (a *analysis) linkArgs(k key, delta tags, site ssa.CallInstruction) {
 			}
 			if p < len(g.Params) {
 				a.mark(key{g.Params[p], 0}, paramSeed(p, delta), reason{kind: kParam, from: from, site: site, fn: g})
-				if pt := g.Params[p].Type(); delta&planeH != 0 && !a.markable(pt) {
+				if pt := g.Params[p].Type(); !isInterface(pt) && isInterface(v.Type()) {
 					// A held interface value is the receiver of a
-					// method of a composite type: as a type assertion
-					// to that type.
-					a.markHeld(pt, reason{kind: kAssert, from: from, site: site, typ: pt})
+					// method of a composite type (which may be an
+					// error type itself): as a type assertion to that
+					// type.
+					why := reason{kind: kAssert, from: from, site: site, typ: pt}
+					if delta&planeH != 0 {
+						a.markHeld(pt, why)
+					} else if delta&boxed != 0 {
+						a.markBoxed(pt, why)
+					}
 				}
 			}
 			if call == nil || p >= maxParamTag {

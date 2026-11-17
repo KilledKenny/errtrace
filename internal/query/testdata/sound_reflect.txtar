@@ -7,7 +7,7 @@ the Verdict may be "no", and then names the store.
 -- go.mod --
 module example.com/x
 
-go 1.24
+go 1.25
 -- main.go --
 package main
 
@@ -337,6 +337,116 @@ func UnknownGlobal() error {
 	return slotO
 }
 
+// Fresh memory of a struct type that is an error itself, and no wrapper:
+// read through its type, and through a method of it.
+
+var ErrX1 = errors.New("x1")
+
+type MyErr1 struct{ Inner1 error }
+
+func (*MyErr1) Error() string { return "m1" }
+
+func FreshErrStruct() error {
+	p := reflect.New(reflect.TypeOf(MyErr1{}))
+	p.Elem().Field(0).Set(reflect.ValueOf(ErrX1))
+	return p.Interface().(*MyErr1).Inner1
+}
+
+var ErrX2 = errors.New("x2")
+
+type MyErr2 struct{ Inner2 error }
+
+func (*MyErr2) Error() string  { return "m2" }
+func (m *MyErr2) Cause() error { return m.Inner2 }
+
+func FreshErrIface() error {
+	p := reflect.New(reflect.TypeOf(MyErr2{}))
+	p.Elem().Field(0).Set(reflect.ValueOf(ErrX2))
+	return p.Interface().(error).(interface{ Cause() error }).Cause()
+}
+
+// reflect.TypeAssert gives back what the Value holds.
+
+var ErrY1 = errors.New("y1")
+
+func TypeAssertGeneric() error {
+	v := reflect.ValueOf(ErrY1)
+	e, _ := reflect.TypeAssert[error](v)
+	return e
+}
+
+var ErrY2 = errors.New("y2")
+
+type SY2 struct{ EY2 error }
+
+func TypeAssertStruct() error {
+	p := reflect.New(reflect.TypeOf(SY2{}))
+	p.Elem().Field(0).Set(reflect.ValueOf(ErrY2))
+	s, _ := reflect.TypeAssert[*SY2](p)
+	return s.EY2
+}
+
+// A pointer to the variable that is the stored value, as encoding/json
+// asks for the methods of what it decodes into.
+
+var ErrY3 = errors.New("y3")
+
+type errY3 error
+
+func TypeAssertAddr() error {
+	v := reflect.New(reflect.TypeOf((*errY3)(nil)).Elem()).Elem()
+	v.Set(reflect.ValueOf(ErrY3))
+	p, _ := reflect.TypeAssert[*errY3](v.Addr())
+	return *p
+}
+
+type PY4 struct{ n int }
+
+func (*PY4) Error() string { return "py4" }
+
+var ErrY4 error = &PY4{n: 4}
+
+func keepY4(v reflect.Value) any { return v.Addr().Interface() }
+
+func BoxConcrete() error {
+	v := reflect.New(reflect.TypeOf((*PY4)(nil))).Elem()
+	v.Set(reflect.ValueOf(ErrY4))
+	return *keepY4(v).(**PY4)
+}
+
+// A value that reflection makes of a type whose values may be equal to
+// the Sentinel, or of the Concrete Type.
+
+type code6 int
+
+func (code6) Error() string { return "c6" }
+
+var ErrE1 error = code6(5)
+
+func EqReflectNew() error {
+	v := reflect.New(reflect.TypeOf(code6(0))).Elem()
+	v.SetInt(5)
+	return v.Interface().(error)
+}
+
+type code7 int
+
+func (code7) Error() string { return "c7" }
+
+var ErrE2 error = code7(7)
+
+func EqConvert() error {
+	return reflect.ValueOf(7).Convert(reflect.TypeOf(code7(0))).Interface().(error)
+}
+
+type CT8 struct{ n int }
+
+func (*CT8) Error() string { return "ct8" }
+
+func NewConcrete() error {
+	return reflect.New(reflect.TypeOf(CT8{})).Interface().(error)
+}
+
 // A store that is followed leaves the other functions alone.
 
 func Clean() error { return errors.New("clean") }
@@ -344,5 +454,7 @@ func Clean() error { return errors.New("clean") }
 func main() {
 	fmt.Println(FreshWhole(), FreshHelper(), FreshStruct(), FreshField(), FreshAddr(),
 		FreshSlice(), FreshMap(), FreshChan(), FreshParam(), KnownParam(), KnownHelper(),
-		FreshMapIter(), KnownMapIter(), KnownSeq(), FreshSeq(), LazyHeld(), DeepRead(), HeldReceiver(), FreshAwayReflect(), FreshAwayTyped(), KnownCross(), FreshEscape(), UnknownGlobal(), Clean())
+		FreshMapIter(), KnownMapIter(), KnownSeq(), FreshSeq(), LazyHeld(), DeepRead(), HeldReceiver(), FreshAwayReflect(), FreshAwayTyped(), KnownCross(), FreshEscape(), UnknownGlobal(), Clean(),
+		FreshErrStruct(), FreshErrIface(), TypeAssertGeneric(), TypeAssertStruct(), TypeAssertAddr(), BoxConcrete(),
+		EqReflectNew(), EqConvert(), NewConcrete())
 }

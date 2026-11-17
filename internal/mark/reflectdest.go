@@ -647,12 +647,13 @@ func (a *analysis) typedReads(root *ssa.Call, why reason) bool {
 			case *ssa.DebugRef:
 			case *ssa.TypeAssert:
 				// (v is an interface that Value.Interface returned.)
-				switch {
-				case isInterface(x.AssertedType):
+				if isInterface(x.AssertedType) {
 					push(x)
-				case !a.markable(x.AssertedType):
-					a.markHeld(x.AssertedType, reason{kind: kAssert, from: ref{kind: refValue, k: key{root, 0}}, site: x, typ: x.AssertedType})
+					continue
 				}
+				// A composite of that type, which may be an error
+				// itself (a *MyErr with an error in a field).
+				a.markHeld(x.AssertedType, reason{kind: kAssert, from: ref{kind: refValue, k: key{root, 0}}, site: x, typ: x.AssertedType})
 			case *ssa.Extract:
 				if _, ok := x.Tuple.(*ssa.TypeAssert); ok {
 					// The value of v.(I), or its ok.
@@ -676,9 +677,8 @@ func (a *analysis) typedReads(root *ssa.Call, why reason) bool {
 							all = false
 							continue
 						}
-						if pt := g.Params[0].Type(); !a.markable(pt) {
-							a.markHeld(pt, reason{kind: kAssert, from: ref{kind: refValue, k: key{root, 0}}, site: x, typ: pt})
-						}
+						pt := g.Params[0].Type()
+						a.markHeld(pt, reason{kind: kAssert, from: ref{kind: refValue, k: key{root, 0}}, site: x, typ: pt})
 					}
 					continue
 				}
@@ -696,6 +696,15 @@ func (a *analysis) typedReads(root *ssa.Call, why reason) bool {
 				}
 				res := x.Call.Signature().Results()
 				for i := range res.Len() {
+					if rt := res.At(i).Type(); reflectGives(sc, i) && !reflectCarrier(rt) {
+						// reflect.TypeAssert[T](v): a read through
+						// the type T that is not followed from here.
+						all = false
+						if !isInterface(rt) {
+							a.markHeld(rt, reason{kind: kAssert, from: ref{kind: refValue, k: key{root, 0}}, site: x, typ: rt})
+						}
+						continue
+					}
 					if !reflectCarrier(res.At(i).Type()) {
 						if st, ok := res.At(i).Type().Underlying().(*types.Slice); ok && reflectCarrier(st.Elem()) {
 							all = false
