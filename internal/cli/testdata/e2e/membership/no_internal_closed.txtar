@@ -1,0 +1,36 @@
+An internal package of the module that the default -p ./... loads whole is closed: only the loaded code can set its exported variable.
+-- args --
+-is io.EOF internal/store/store.go:@f
+-- stdout --
+$WORK/internal/store/store.go:6:12-15: io.EOF in Error Set of example.com/fx/internal/store.Run: no
+-- exit --
+1
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- internal/store/store.go --
+package store
+
+// Hook is set by whoever imports the package.
+var Hook func() error
+
+func /*@f*/Run() error {
+	if Hook == nil {
+		return nil
+	}
+	return Hook()
+}
+-- cmd/app/main.go --
+package main
+
+import (
+	"fmt"
+	"io"
+
+	"example.com/fx/internal/store"
+)
+
+var _ = io.EOF
+
+func main() { fmt.Println(store.Run()) }

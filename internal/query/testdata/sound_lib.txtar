@@ -1,0 +1,116 @@
+A library (no main package): code outside the loaded program calls its
+exported functions and sets its exported variables and fields, so a
+Membership Query must not answer "no" where such code can make the answer
+yes.
+-- go.mod --
+module example.com/lib
+
+go 1.24
+-- lib.go --
+package lib
+
+import (
+	"errors"
+	"io"
+)
+
+var ErrX = errors.New("x")
+
+var _ = io.EOF
+
+var hook = func() error { return nil }
+
+func SetHook() { hook = func() error { return ErrX } }
+
+func Hook() error { return hook() }
+
+func init() { _ = Hook() }
+
+func Param(e error) error { return e }
+
+var Saved error
+
+func GetSaved() error { return Saved }
+
+func Callback(f func() error) error { return f() }
+
+type S struct {
+	err error
+	Err error
+}
+
+func (s *S) SetErr(e error) { s.err = e }
+
+func GetErr(s *S) error   { return s.err }
+func GetField(s *S) error { return s.Err }
+
+func unexported(e error) error { return e }
+
+var _ = unexported
+
+func Clean() error { return errors.New("clean") }
+
+// More ways in from outside.
+
+type Store interface{ Get(k string) (string, error) }
+
+type memStore struct{}
+
+func (memStore) Get(string) (string, error) { return "", nil }
+func NewMem() Store                          { return memStore{} }
+
+func Lookup(s Store, k string) error { _, err := s.Get(k); return err }
+
+func ReadAll(r io.Reader) error { _, err := io.ReadAll(r); return err }
+
+type Client struct {
+	OnErr func() error
+	hook  func() error
+	last  error
+}
+
+func (c *Client) SetHook(h func() error) { c.hook = h }
+func (c *Client) RunHook() error         { return c.hook() }
+func (c *Client) RunOnErr() error        { return c.OnErr() }
+func (c *Client) SetLast(e error)        { c.last = e }
+func (c *Client) Last() error            { return c.last }
+
+func First(es []error) error           { return es[0] }
+func FromMap(m map[string]error) error { return m["k"] }
+func FromChan(c <-chan error) error    { return <-c }
+
+type Req struct{ Err error }
+
+func FromReq(r Req) error  { return r.Err }
+func FromPtr(r *Req) error { return r.Err }
+func FromAny(v any) error  { e, _ := v.(error); return e }
+
+func Each(fn func(yield func(error))) (out error) {
+	fn(func(e error) { out = e })
+	return
+}
+
+var Default error = errors.New("default")
+
+func GetDefault() error { return Default }
+
+type Opt func(*cfg)
+type cfg struct{ err error }
+
+func New(opts ...Opt) error {
+	c := &cfg{}
+	for _, o := range opts {
+		o(c)
+	}
+	return c.err
+}
+
+func WithErr(e error) Opt { return func(c *cfg) { c.err = e } }
+
+func Walk(visit func(path string, err error) error) error { return visit("p", nil) }
+
+// ErrOther is a Sentinel by its name: nobody is taken to assign ErrX to
+// it.
+var ErrOther = errors.New("other")
+
+func Other() error { return ErrOther }

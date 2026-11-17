@@ -1,0 +1,58 @@
+-as does not take an instance of a generic type.
+-- args --
+-as example.com/fx.G[int] a.go:@f
+-- stdout --
+-- stderr --
+errtrace: -as example.com/fx.G[int]: an instance of a generic type is not supported
+usage: errtrace [flags] <target>
+
+errtrace reports the Error Set of a Target: every Error Origin that can reach
+the Target's error result, with its Propagation Path.
+
+<target> is a position in a Go file, with byte columns:
+  file.go:LINE:COL | file.go:#OFFSET | file.go:L:C-L2:C2 (the start is used)
+
+flags:
+  -as type
+    	Membership Query: is the Concrete Type type (such as '*io/fs.PathError') in the Error Set?
+  -chain-depth N
+    	max Wrap Chain depth N before truncation (default 8)
+  -fanout N
+    	group entries under dynamic call sites with at least N Candidates (0 = never group) (default 8)
+  -full 
+    	Membership Query: print every entry that could carry the error in full, instead of grouping those whose traces share a pivot, and every listed reflective store (default false)
+  -is pkgpath.Name
+    	Membership Query: is the Sentinel pkgpath.Name (such as io.EOF) in the Error Set?
+  -p patterns
+    	comma-separated package patterns to load (default "./...")
+  -tags list
+    	comma-separated list of build tags
+
+With -is or -as, errtrace answers a Membership Query: whether that error is in
+the Target's Error Set. The exit status is then the Verdict:
+  0 yes | 1 no | 2 error
+  3 maybe, or no apart from reflective stores that are not followed
+In a program whose main reaches the Target, a no (exit 1) is a proof for
+flows that do not pass through package reflect (nor unsafe, cgo, assembly,
+linkname). Reflective flows are followed where the analysis can; they
+include package fmt printing a struct, slice or map that holds the error.
+A reflective store it cannot follow is listed, with exit 3, unless a second
+pass, in which that store writes all memory reflection could write, every
+reflective read may read it and every dynamic call may run any function
+that fits it, shows that it cannot matter to the Target.
+An internal package counts as closed (no callers outside the loaded program)
+only when the default -p ./... is run from the root of its module.
+-- exit --
+2
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+type G[T any] struct{ v T }
+
+func (G[T]) Error() string { return "g" }
+
+func /*@f*/F() error { return G[int]{} }

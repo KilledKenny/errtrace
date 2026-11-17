@@ -1,0 +1,33 @@
+A dynamic call that VTA has one Candidate for, and a second type with the
+method that no instruction of the program brings to the call (only a store
+through reflection could).
+-- go.mod --
+module example.com/wide
+
+go 1.24
+-- main.go --
+package main
+
+type Op interface{ Run() error }
+
+type okOp struct{}
+type failOp struct{}
+
+func (okOp) Run() error   { return nil }
+func (failOp) Run() error { return nil }
+
+var ops = []Op{okOp{}}
+
+// keep makes failOp a type of the program without bringing it to an Op.
+var keep any = failOp{}
+
+func runAll() error {
+	for _, op := range ops {
+		if err := op.Run(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func main() { _ = runAll() }

@@ -1,0 +1,53 @@
+With -full every store is listed, in both parts of the section.
+-- args --
+-full -is example.com/fx.ErrX a.go:@f
+-- stdout --
+$WORK/a.go:23:12-15: example.com/fx.ErrX in Error Set of example.com/fx.Get: no, apart from reflection
+	not followed: example.com/fx.ErrX reaches 4 reflective stores whose destination is unknown or only partly followed:
+		$WORK/a.go:15:13-45: in example.com/fx.s1
+		$WORK/a.go:16:13-45: in example.com/fx.s2
+		$WORK/a.go:17:13-45: in example.com/fx.s3
+		$WORK/a.go:18:13-45: in example.com/fx.s4
+	also, once those are taken to write anywhere, 2 more:
+		$WORK/a.go:20:13-46: in example.com/fx.c1
+		$WORK/a.go:21:13-46: in example.com/fx.c2
+-- exit --
+3
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"reflect"
+)
+
+var ErrX = errors.New("x")
+
+var slotA, slotB error
+var destA = reflect.ValueOf(&slotA).Elem()
+var destB = reflect.ValueOf(&slotB).Elem()
+
+func s1() { destA.Set(reflect.ValueOf(ErrX)) }
+func s2() { destA.Set(reflect.ValueOf(ErrX)) }
+func s3() { destA.Set(reflect.ValueOf(ErrX)) }
+func s4() { destA.Set(reflect.ValueOf(ErrX)) }
+
+func c1() { destB.Set(reflect.ValueOf(slotA)) }
+func c2() { destB.Set(reflect.ValueOf(slotA)) }
+
+func /*@f*/Get() error { return slotB }
+
+func main() {
+	s1()
+	s2()
+	s3()
+	s4()
+	c1()
+	c2()
+	fmt.Println(Get())
+}

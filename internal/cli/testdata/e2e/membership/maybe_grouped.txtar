@@ -1,0 +1,57 @@
+Carriers whose traces pass the same pivot are printed as one group: here the type *W, which wraps the Sentinel somewhere, so that every *W value is marked. The trace up to the pivot is printed once. A Carrier with a pivot of its own is printed in full, before the groups.
+-- args --
+-is example.com/fx.ErrX a.go:@f
+-- stdout --
+$WORK/a.go:20:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: 4 entries could carry it (0 unresolved)
+$WORK/a.go:10:37-44: group of 4 entries via: loaded from field inner of example.com/fx.W
+	marked via (origin of example.com/fx.ErrX → here):
+		$WORK/a.go:5:5-9: Sentinel example.com/fx.ErrX
+		$WORK/a.go:12:37-41: loaded from variable example.com/fx.ErrX
+		$WORK/a.go:12:30-41: stored to field inner of example.com/fx.W
+		$WORK/a.go:10:37-44: loaded from field inner of example.com/fx.W
+	$WORK/a.go:18:5-11: sentinel example.com/fx.stored
+	$WORK/a.go:14:35-50: opaque errors.New "a" under *example.com/fx.W.Unwrap
+	$WORK/a.go:15:35-50: opaque errors.New "b" under *example.com/fx.W.Unwrap
+	$WORK/a.go:16:35-50: opaque errors.New "c" under *example.com/fx.W.Unwrap
+-- exit --
+3
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import "errors"
+
+var ErrX = errors.New("x")
+
+type W struct{ inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.inner }
+
+func bad() error { return &W{inner: ErrX} }
+
+func a() error { return &W{inner: errors.New("a")} }
+func b() error { return &W{inner: errors.New("b")} }
+func c() error { return &W{inner: errors.New("c")} }
+
+var stored error
+
+func /*@f*/F(n int) error {
+	switch n {
+	case 0:
+		return a()
+	case 1:
+		return b()
+	case 2:
+		return c()
+	}
+	return stored
+}
+
+func main() {
+	stored = bad()
+	_ = errors.Is(F(0), ErrX)
+}

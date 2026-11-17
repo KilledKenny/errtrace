@@ -1,0 +1,29 @@
+An Is method that answers without looking at its target reports every error.
+-- args --
+-is io.EOF a.go:@f
+-- stdout --
+$WORK/a.go:10:12-13: io.EOF in Error Set of example.com/fx.F: maybe: 1 entry could carry it (0 unresolved)
+$WORK/a.go:10:24-24: concrete example.com/fx.Any
+	path (origin → target):
+		$WORK/a.go:10:24-24: in example.com/fx.F
+	marked via (origin of io.EOF → here):
+		-: a value of type example.com/fx.Any is or may wrap io.EOF
+-- exit --
+3
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import "io"
+
+type Any struct{}
+
+func (Any) Error() string { return "any" }
+func (Any) Is(error) bool { return true }
+
+func /*@f*/F() error { return Any{} }
+
+func main() { _, _ = F(), io.EOF }

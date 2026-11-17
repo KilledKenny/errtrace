@@ -1,0 +1,33 @@
+A comparison does not exclude a Wrap of the Sentinel, and the Error Set (which removes the Sentinel at the guard) has no entry that could carry it: the trace shows how the Mark reaches the Target.
+-- args --
+-is example.com/fx.ErrX a.go:@f
+-- stdout --
+$WORK/a.go:9:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: no entry of the Error Set shows how
+	marked via (origin of example.com/fx.ErrX → target):
+		$WORK/a.go:5:5-9: Sentinel example.com/fx.ErrX
+		$WORK/a.go:7:27-31: loaded from variable example.com/fx.ErrX
+		$WORK/a.go:10:9-14: returned by example.com/fx.src
+-- exit --
+3
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import "errors"
+
+var ErrX = errors.New("x")
+
+func src() error { return ErrX }
+
+func /*@f*/F() error {
+	err := src()
+	if err == ErrX {
+		return errors.New("z")
+	}
+	return err
+}
+
+func main() { _ = F() }

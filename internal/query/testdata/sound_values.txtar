@@ -1,0 +1,242 @@
+What a value holds, each case with a Sentinel and types of its own: a
+Sentinel whose value can change, a marked value in a field that no
+Unwrap, Is or As method of its type reports, and composites in interface
+values.
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- main.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+)
+
+// A Sentinel whose value is a wrapper: the program may change what it
+// holds after a check, so a failed errors.Is excludes nothing.
+
+type MS struct {
+	on *bool
+	_  []int
+}
+
+func (MS) Error() string { return "ms" }
+func (m MS) Is(t error) bool {
+	_, ok := t.(MS)
+	return ok && *m.on
+}
+
+var msOn bool
+var ErrMS error = MS{on: &msOn}
+
+func MutatedSentinel() error {
+	err := ErrMS
+	if errors.Is(err, ErrMS) {
+		return nil
+	}
+	msOn = true
+	return err
+}
+
+type PW struct{ inner error }
+
+func (*PW) Error() string   { return "pw" }
+func (w *PW) Unwrap() error { return w.inner }
+
+var ErrPW error = &PW{}
+
+func setPW(err error) { ErrPW.(*PW).inner = err }
+
+func GuardWrapperSentinel() error {
+	var err error = fmt.Errorf("ctx: %w", ErrPW)
+	if errors.Is(err, ErrPW) {
+		return nil
+	}
+	return err
+}
+
+// A Sentinel built over a wrapper is no more fixed than the wrapper.
+
+var ErrOver = fmt.Errorf("over: %w", ErrPW)
+
+func GuardOverWrapper() error {
+	err := ErrOver
+	if errors.Is(err, ErrOver) {
+		return nil
+	}
+	return err
+}
+
+// An ordinary Sentinel, and one built over it, are fixed: the guard holds.
+
+var ErrPlain = errors.New("plain")
+var ErrBuilt = fmt.Errorf("built: %w", ErrPlain)
+
+func source(i int) error {
+	switch i {
+	case 0:
+		return ErrPlain
+	case 1:
+		return ErrBuilt
+	}
+	return nil
+}
+
+func GuardPlain() error {
+	err := source(0)
+	if errors.Is(err, ErrPlain) {
+		return nil
+	}
+	return err
+}
+
+func GuardBuilt() error {
+	err := source(1)
+	if errors.Is(err, ErrBuilt) {
+		return nil
+	}
+	return err
+}
+
+// A Sentinel of a comparable type that holds nothing is fixed too.
+
+type code struct{ n int }
+
+func (*code) Error() string { return "code" }
+
+var ErrCode error = &code{1}
+
+func sourceCode() error { return ErrCode }
+
+func GuardCode() error {
+	err := sourceCode()
+	if errors.Is(err, ErrCode) {
+		return nil
+	}
+	return err
+}
+
+// A marked value in a field that Unwrap does not return is not found by
+// errors.Is; one that an Is method looks at is.
+
+var ErrVal = errors.New("val")
+
+type VE struct {
+	Val any
+	Err error
+}
+
+func (e *VE) Error() string { return e.Err.Error() }
+func (e *VE) Unwrap() error { return e.Err }
+
+func ValOnly() error { return &VE{Val: ErrVal, Err: errors.New("other")} }
+
+var ErrIsF = errors.New("isf")
+
+type IW struct{ val error }
+
+func (*IW) Error() string     { return "iw" }
+func (w *IW) Is(t error) bool { return errors.Is(w.val, t) }
+
+func IsField() error { return &IW{val: ErrIsF} }
+
+var ErrEq = errors.New("eq")
+
+type EW struct{ eq error }
+
+func (*EW) Error() string     { return "ew" }
+func (w *EW) Is(t error) bool { return w.eq == t }
+
+func EqField() error { return &EW{eq: ErrEq} }
+
+var ErrGet = errors.New("get")
+
+type GW struct{ val any }
+
+func (*GW) Error() string   { return "gw" }
+func (w *GW) get() error    { e, _ := w.val.(error); return e }
+func (w *GW) Unwrap() error { return w.get() }
+
+func HelperUnwrap() error { return &GW{val: ErrGet} }
+
+var ErrEmb = errors.New("emb")
+
+type inner struct{ e error }
+
+func (i *inner) Error() string { return "inner" }
+func (i *inner) Unwrap() error { return i.e }
+
+type Outer struct {
+	*inner
+	note string
+}
+
+func Promoted() error { return Outer{&inner{e: ErrEmb}, "n"} }
+
+var ErrMulti = errors.New("multi")
+
+type Multi struct{ errs []error }
+
+func (Multi) Error() string     { return "multi" }
+func (m Multi) Unwrap() []error { return m.errs }
+
+func MultiUnwrap() error { return Multi{[]error{ErrMulti}} }
+
+var ErrAsF = errors.New("asf")
+
+type AT struct{ msg string }
+
+func (*AT) Error() string { return "at" }
+
+type AW struct{ t *AT }
+
+func (*AW) Error() string { return "aw" }
+func (w *AW) As(target any) bool {
+	if p, ok := target.(**AT); ok {
+		*p = w.t
+		return true
+	}
+	return false
+}
+
+func AsField() error { return &AW{t: &AT{"x"}} }
+
+// A composite in an interface value: its memory is marked where it is
+// written, and an error in an any is not taken for a composite.
+
+var ErrBox = errors.New("box")
+
+type errBox error
+
+func AnyBox() error {
+	var x any = []errBox{ErrBox}
+	return x.([]errBox)[0]
+}
+
+var ErrAny = errors.New("any")
+
+type errAny error
+
+var sink []any
+
+func AnyHolds() error {
+	sink = append(sink, ErrAny)
+	if s, ok := sink[0].([]errAny); ok {
+		return s[0]
+	}
+	return nil
+}
+
+func OtherSlice() error {
+	s := []errAny{errors.New("z")}
+	return s[0]
+}
+
+func main() {
+	setPW(nil)
+	fmt.Println(MutatedSentinel(), GuardWrapperSentinel(), GuardOverWrapper(), GuardPlain(), GuardBuilt(), GuardCode(),
+		ValOnly(), IsField(), EqField(), HelperUnwrap(), Promoted(), MultiUnwrap(), AsField(),
+		AnyBox(), AnyHolds(), OtherSlice())
+}

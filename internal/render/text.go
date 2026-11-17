@@ -1,6 +1,8 @@
 // Package render prints an Error Set: the text form (gopls-style span lines,
 // each followed by an indented tree with the Wrap Chain and the Propagation
-// Path).
+// Path). It also prints the Verdict of a Membership Query, with the entries
+// that are the error asked about or the Carriers it could come through (see
+// Membership).
 package render
 
 import (
@@ -89,10 +91,12 @@ func Text(w io.Writer, in Input) error {
 	return err
 }
 
-// entry writes one ungrouped entry with its subtree.
-func (in Input) entry(b *strings.Builder, e errset.Entry) {
+// head returns the first line of an entry, without its newline: its span,
+// its label and its annotations.
+func (in Input) head(e errset.Entry) string {
+	var b strings.Builder
 	leaf := in.Table.Get(e.Leaf)
-	fmt.Fprintf(b, "%s: %s", in.locate(leaf.Site), Label(in.Table, e.Leaf))
+	fmt.Fprintf(&b, "%s: %s", in.locate(leaf.Site), Label(in.Table, e.Leaf))
 	if leaf.Kind == errset.Concrete && leaf.TypedNil {
 		b.WriteString(" [typed nil]")
 	}
@@ -106,8 +110,14 @@ func (in Input) entry(b *strings.Builder, e errset.Entry) {
 		fmt.Fprintf(b, " [via %s]", e.ViaLocation)
 	}
 	if e.MorePaths > 0 {
-		fmt.Fprintf(b, " [+%d more paths]", e.MorePaths)
+		fmt.Fprintf(&b, " [+%d more paths]", e.MorePaths)
 	}
+	return b.String()
+}
+
+// entry writes one ungrouped entry with its subtree.
+func (in Input) entry(b *strings.Builder, e errset.Entry) {
+	b.WriteString(in.head(e))
 	b.WriteByte('\n')
 	if len(e.Chain) > 0 {
 		b.WriteString("\twrap chain (origin → target):\n")

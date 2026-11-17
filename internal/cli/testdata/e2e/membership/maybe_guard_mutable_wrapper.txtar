@@ -1,0 +1,40 @@
+errors.Is said no, but the value is a wrapper whose content changes afterwards: the guard stops only a Mark that the value holds by being the Sentinel, not one it holds by its type.
+-- args --
+-is example.com/fx.ErrX a.go:@f
+-- stdout --
+$WORK/a.go:12:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: no entry of the Error Set shows how
+	marked via (origin of example.com/fx.ErrX → target):
+		$WORK/a.go:5:5-9: Sentinel example.com/fx.ErrX
+		$WORK/a.go:18:12-16: loaded from variable example.com/fx.ErrX
+		$WORK/a.go:18:4-9: stored to field inner of example.com/fx.W
+		$WORK/a.go:10:37-44: loaded from field inner of example.com/fx.W
+		$WORK/a.go:14:6-9: value of type *example.com/fx.W, which may wrap example.com/fx.ErrX
+-- exit --
+3
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import "errors"
+
+var ErrX = errors.New("x")
+
+type W struct{ inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.inner }
+
+func /*@f*/F() error {
+	w := &W{}
+	var err error = w
+	if errors.Is(err, ErrX) {
+		return nil
+	}
+	w.inner = ErrX
+	return err
+}
+
+func main() { _ = F() }

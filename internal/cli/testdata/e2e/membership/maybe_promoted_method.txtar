@@ -1,0 +1,42 @@
+A method promoted through an embedded pointer returns its receiver, the Sentinel: the upward pass follows the promotion wrapper.
+-- args --
+-is example.com/fx.ErrI a.go:@f
+-- stdout --
+$WORK/a.go:17:12-13: example.com/fx.ErrI in Error Set of example.com/fx.F: maybe: 1 entry could carry it (0 unresolved)
+$WORK/a.go:8:41-42: concrete *example.com/fx.Inner
+	path (origin → target):
+		$WORK/a.go:8:41-42: in (*example.com/fx.Inner).Self
+		$WORK/a.go:17:31-42: in example.com/fx.F, call to (*example.com/fx.Inner).Self (dynamic (example.com/fx.selfer).Self: 1 of 1 candidates)
+	marked via (origin of example.com/fx.ErrI → here):
+		$WORK/a.go:13:5-9: Sentinel example.com/fx.ErrI
+		$WORK/a.go:15:33-37: loaded from variable example.com/fx.ErrI
+		$WORK/a.go:15:33-46: type assertion to *example.com/fx.Inner
+		$WORK/a.go:15:33-37: stored to field Inner of example.com/fx.outer
+		$WORK/a.go:8:17-21: loaded from field Inner of example.com/fx.outer
+		$WORK/a.go:8:17-21: passed as parameter i of (*example.com/fx.Inner).Self (this caller passes it)
+-- exit --
+3
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import "errors"
+
+type Inner struct{ n int }
+
+func (i *Inner) Error() string { return "i" }
+func (i *Inner) Self() error   { return i }
+
+type selfer interface{ Self() error }
+type outer struct{ *Inner }
+
+var ErrI error = &Inner{1}
+
+func mk() selfer { return outer{ErrI.(*Inner)} }
+
+func /*@f*/F() error { return mk().Self() }
+
+func main() { _ = errors.Is(F(), ErrI) }

@@ -1,0 +1,29 @@
+An alias in -as names the type it stands for: *os.PathError is *io/fs.PathError. The load of a field is Unresolved; a *PathError is stored there, so it is a Carrier.
+-- args --
+-as *os.PathError a.go:@f
+-- stdout --
+$WORK/a.go:9:12-13: *io/fs.PathError in Error Set of example.com/fx.F: maybe: 1 entry could carry it (1 unresolved)
+$WORK/a.go:9:35-40: unresolved(memory): load of field err of *example.com/fx.S
+	path (origin → target):
+		$WORK/a.go:9:35-40: in example.com/fx.F
+	marked via (origin of *io/fs.PathError → here):
+		-: a parameter of (*example.com/fx.S).Fail: a caller outside the loaded program may pass *io/fs.PathError
+		$WORK/a.go:9:35-40: loaded from field err of example.com/fx.S
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- exit --
+3
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "os"
+
+type S struct{ err error }
+
+func (s *S) Fail(name string) { s.err = &os.PathError{Op: "open", Path: name} }
+
+func /*@f*/F(s *S) error { return s.err }

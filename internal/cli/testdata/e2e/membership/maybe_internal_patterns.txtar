@@ -1,0 +1,39 @@
+With any other -p an internal package is open like any other package: the code that may import it need not be loaded, and may set its exported variable.
+-- args --
+-p ./cmd/...,./internal/... -is io.EOF internal/store/store.go:@f
+-- stdout --
+$WORK/internal/store/store.go:6:12-15: io.EOF in Error Set of example.com/fx/internal/store.Run: maybe: 1 entry could carry it (1 unresolved)
+$WORK/internal/store/store.go:10:9-15: unresolved(no-candidates): dynamic call to function value example.com/fx/internal/store.Hook
+	path (origin → target):
+		$WORK/internal/store/store.go:10:9-15: in example.com/fx/internal/store.Run
+-- exit --
+3
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- internal/store/store.go --
+package store
+
+// Hook is set by whoever imports the package.
+var Hook func() error
+
+func /*@f*/Run() error {
+	if Hook == nil {
+		return nil
+	}
+	return Hook()
+}
+-- cmd/app/main.go --
+package main
+
+import (
+	"fmt"
+	"io"
+
+	"example.com/fx/internal/store"
+)
+
+var _ = io.EOF
+
+func main() { fmt.Println(store.Run()) }

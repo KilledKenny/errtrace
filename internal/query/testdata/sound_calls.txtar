@@ -1,0 +1,144 @@
+A whole program in which the Subject reaches a function only through a
+store through reflection that the upward pass does not follow, and then
+through a call that the store makes possible: a dynamic call whose
+receiver is a value that only the store put there (a plugin registered
+through reflection, so that the call graph of the program's own
+instructions does not have its method at the call), or a call through
+reflect.Value.Call of a function with a slice parameter. The flooding pass
+must reach each of them: a Membership Query answers "no, apart from
+reflection", never a plain "no". Without a store (the Subject is passed to
+Value.Call itself) the pass follows it. Each case has a Sentinel of its
+own. The program prints what errors.Is says of each case when it runs.
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- main.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"reflect"
+)
+
+var errT = reflect.TypeOf((*error)(nil)).Elem()
+
+// A slice of interface values, one of them set through reflection to a
+// value of a type that reaches the call in no other way.
+
+var ErrC1 = errors.New("c1")
+
+type Op interface{ Run() error }
+type okOp struct{}
+type failOp struct{ err error }
+
+func (okOp) Run() error      { return nil }
+func (f *failOp) Run() error { return f.err }
+
+var ops = []Op{okOp{}, nil}
+var dests1 = []reflect.Value{reflect.ValueOf(ops).Index(1)}
+
+func register1() { dests1[0].Set(reflect.ValueOf(&failOp{ErrC1})) }
+
+func RegOp() error {
+	register1()
+	for _, op := range ops {
+		if err := op.Run(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// A type assertion to an interface, and a call of its method.
+
+var ErrC2 = errors.New("c2")
+
+type causer interface{ Cause() error }
+type cause0 struct{}
+type cause2 struct{ err error }
+
+func (cause0) Cause() error    { return nil }
+func (c *cause2) Cause() error { return c.err }
+
+var slot2 any = cause0{}
+var dests2 []reflect.Value
+
+func put2() {
+	dests2 = append(dests2[:0], reflect.ValueOf(&slot2).Elem())
+	dests2[0].Set(reflect.ValueOf(&cause2{ErrC2}))
+}
+
+func cause(x any) error { return x.(causer).Cause() }
+
+func Causer() error {
+	_ = cause(cause0{})
+	put2()
+	return cause(slot2)
+}
+
+// A function with a variadic parameter is called statically and through
+// reflection, with a Value that a store through reflection filled.
+
+var ErrC4 = errors.New("c4")
+var out4 error
+var dests4 []reflect.Value
+
+func put4(es ...error) { out4 = es[0] }
+func store4()          { dests4[0].Set(reflect.ValueOf(ErrC4)) }
+
+func VaReflectCall() error {
+	put4(nil)
+	v := reflect.New(errT).Elem()
+	dests4 = append(dests4[:0], v)
+	store4()
+	reflect.ValueOf(put4).Call([]reflect.Value{v})
+	return out4
+}
+
+// The same without a store: the Subject is an argument of Value.Call.
+
+var ErrC5 = errors.New("c5")
+var out5 error
+
+func put5(n int, es ...error) { out5 = es[n] }
+
+func VaReflectCallDirect() error {
+	put5(0, nil)
+	reflect.ValueOf(put5).Call([]reflect.Value{reflect.ValueOf(0), reflect.ValueOf(ErrC5)})
+	return out5
+}
+
+// A slice parameter that is not variadic, reached by passing on.
+
+var ErrC6 = errors.New("c6")
+var out6 error
+var dests6 []reflect.Value
+
+func put6(es []error)  { out6 = es[0] }
+func mid6(es ...error) { put6(es) }
+func store6()          { dests6[0].Set(reflect.ValueOf(ErrC6)) }
+
+func SliceReflectCall() error {
+	mid6(nil)
+	m := reflect.MakeSlice(reflect.SliceOf(errT), 1, 1)
+	dests6 = append(dests6[:0], m.Index(0))
+	store6()
+	reflect.ValueOf(put6).Call([]reflect.Value{m})
+	return out6
+}
+
+// No recorded store can matter to a function that reads no memory and
+// makes no call.
+
+func Clean() error { return errors.New("clean") }
+
+func main() {
+	fmt.Println("RegOp", errors.Is(RegOp(), ErrC1))
+	fmt.Println("Causer", errors.Is(Causer(), ErrC2))
+	fmt.Println("VaReflectCall", errors.Is(VaReflectCall(), ErrC4))
+	fmt.Println("VaReflectCallDirect", errors.Is(VaReflectCallDirect(), ErrC5))
+	fmt.Println("SliceReflectCall", errors.Is(SliceReflectCall(), ErrC6))
+	fmt.Println("Clean", errors.Is(Clean(), ErrC1))
+}

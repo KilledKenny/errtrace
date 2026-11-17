@@ -1,0 +1,35 @@
+The same guard in a library: errors.Is(err, X) stops the Mark of X in the upward pass too, so the Target is not reached: no.
+-- args --
+-is example.com/fx.ErrX a.go:@g
+-- stdout --
+$WORK/a.go:15:12-13: example.com/fx.ErrX in Error Set of example.com/fx.G: no
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- exit --
+1
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var ErrX = errors.New("x")
+var ErrY = errors.New("y")
+
+func source(n int) error {
+	if n == 0 {
+		return ErrX
+	}
+	return ErrY
+}
+
+func /*@g*/G(n int) error {
+	err := source(n)
+	if errors.Is(err, ErrX) {
+		return nil
+	}
+	return err
+}

@@ -407,6 +407,47 @@ flags:
   errors also print the usage text. `-h` prints usage to stdout and exits 0.
   stdout carries only the result.
 
+### Membership Queries (upward pass)
+
+Added by [plan-upward-pass.md](./plan-upward-pass.md).
+
+```
+errtrace -is <pkgpath>.<Name> <target>     # is the Sentinel in the Error Set?   -is io.EOF
+errtrace -as '<type>' <target>             # is the Concrete Type?               -as '*io/fs.PathError'
+```
+
+- `-is` and `-as` are mutually exclusive. Without either, the Query and its
+  output are unchanged. The usage text lists the two flags and the exit codes.
+- The type of `-as` is written with the full package path; an alias names the
+  type it stands for (`*os.PathError` is `*io/fs.PathError`). It must be a
+  Concrete Type: not an interface, not generic, and implementing `error`.
+- X not found in the loaded program: a usage error, exit `2`.
+- Exit codes: `0` yes, `1` no, `3` maybe, `2` errors.
+- The Verdict combines the downward Query (`query.Run`, a lower bound) with the
+  upward pass (`internal/mark`, an upper bound): an entry that is X (its leaf,
+  or for `-as` any Wrap of its chain) gives yes (maybe, if every such entry is
+  possibly handled); else, if the upward pass does not mark the Target's error
+  result, no; else maybe, with the Carriers: the Unresolved entries whose
+  place is marked and the resolved entries whose leaf may hold X. There may be
+  none: the Error Set alone never proves a no. The one guard the upward pass
+  applies itself is `errors.Is(err, X)`.
+- A loaded package that is not a main package (and not an internal package),
+  and the package of a Target that main and init do not reach, is open: code
+  that is not loaded may call it. Its functions' parameters, exported
+  variables and exported fields are seeded, a dynamic call on a value that may
+  come from outside returns marked results, and an entry that depends on the
+  caller is always a Carrier.
+- Carriers whose traces share a pivot (a type-wide or location-wide step) are
+  printed as one group; `-full` prints every Carrier in full.
+- Output (`render.Membership`): `<target-span>: <X> in Error Set of <target>:
+  yes | no | maybe: <K> entries could carry it (<U> unresolved) | maybe:
+  possibly handled`, then the matching entries or the Carriers, each Carrier
+  with a `marked via (origin of <X> → here):` section. `-fanout` does not apply.
+- `-debug=timing` adds `timing: mark=<d>`; `-debug=summary` adds the counts of
+  the upward pass.
+
+---
+
 ## Output contract
 
 ### Text

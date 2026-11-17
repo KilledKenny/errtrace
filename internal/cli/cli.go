@@ -1,5 +1,6 @@
 // Package cli is the command-line front end: it parses flags and the Target
-// argument, applies the exit-code conventions and runs a Query.
+// argument, applies the exit-code conventions and runs a Query. With -is or
+// -as it runs a Membership Query instead, and the exit code is its Verdict.
 package cli
 
 import (
@@ -10,11 +11,14 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 
+	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/ssa"
 
 	"github.com/KilledKenny/errtrace/internal/load"
+	"github.com/KilledKenny/errtrace/internal/mark"
 	"github.com/KilledKenny/errtrace/internal/query"
 	"github.com/KilledKenny/errtrace/internal/render"
 	"github.com/KilledKenny/errtrace/internal/resolve"
@@ -30,6 +34,13 @@ const (
 	// ExitError is returned for usage errors, Targets that can't be resolved,
 	// package load or type errors, and internal failures.
 	ExitError = 2
+	// ExitNo is returned by a Membership Query (-is, -as) whose Verdict is
+	// no; a yes Verdict returns ExitOK.
+	ExitNo = 1
+	// ExitMaybe is returned by a Membership Query whose Verdict is maybe,
+	// or is a no apart from stores through reflection that the upward
+	// pass did not follow and that can matter to the Target.
+	ExitMaybe = 3
 )
 
 // Options is everything one Query run depends on, so that tests can run the
@@ -71,13 +82,21 @@ var debugModes = []string{"target", "timing", "summary"}
 // hiddenFlags are registered but left out of the usage text.
 var hiddenFlags = map[string]bool{"debug": true}
 
+// membershipFlags select a Membership Query.
+var membershipFlags = map[string]bool{"is": true, "as": true}
+
 // config holds the parsed flags.
 type config struct {
 	tags       string
 	patterns   string
 	chainDepth int
 	fanout     int
-	debug      map[string]bool
+	// is and as are the Subject of a Membership Query: a Sentinel
+	// (<pkgpath>.<Name>) or a Concrete Type; at most one is set.
+	is, as string
+	// full prints every Carrier of a Membership Query in full.
+	full  bool
+	debug map[string]bool
 }
 
 // usageError is an error caused by how the command was invoked; the usage
@@ -90,10 +109,10 @@ func (e usageError) Unwrap() error { return e.err }
 // Run executes one Query described by opts and returns the exit code.
 func Run(ctx context.Context, opts Options) int {
 	fs, cfg := newFlagSet()
-	err := run(ctx, opts, fs, cfg)
+	code, err := run(ctx, opts, fs, cfg)
 	switch {
 	case err == nil:
-		return ExitOK
+		return code
 	case errors.Is(err, flag.ErrHelp):
 		printUsage(opts.Stdout, fs)
 		return ExitOK
@@ -106,30 +125,58 @@ func Run(ctx context.Context, opts Options) int {
 	return ExitError
 }
 
-func run(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) error {
+// run executes the Query and returns its exit code, or an error.
+func run(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) (int, error) {
+	code, err := runQuery(ctx, opts, fs, cfg)
+	if err != nil {
+		return ExitError, err
+	}
+	return code, nil
+}
+
+func runQuery(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) (int, error) {
 	if err := fs.Parse(opts.Args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
-			return err
+			return 0, err
 		}
-		return usageError{err}
+		return 0, usageError{err}
+	}
+	membership := false
+	var empty error
+	fs.Visit(func(f *flag.Flag) {
+		if membershipFlags[f.Name] {
+			membership = true
+			if f.Value.String() == "" && empty == nil {
+				empty = fmt.Errorf("-%s needs a value", f.Name)
+			}
+		}
+	})
+	if empty != nil {
+		return 0, usageError{empty}
+	}
+	if cfg.is != "" && cfg.as != "" {
+		return 0, usageError{errors.New("-is and -as are mutually exclusive")}
+	}
+	if cfg.full && !membership {
+		return 0, usageError{errors.New("-full needs -is or -as: it prints a Membership Query in full")}
 	}
 	debug, err := parseDebug(fs.Lookup("debug").Value.String())
 	if err != nil {
-		return usageError{err}
+		return 0, usageError{err}
 	}
 	cfg.debug = debug
 	if cfg.chainDepth < 1 {
-		return usageError{fmt.Errorf("invalid -chain-depth %d (want at least 1)", cfg.chainDepth)}
+		return 0, usageError{fmt.Errorf("invalid -chain-depth %d (want at least 1)", cfg.chainDepth)}
 	}
 	if cfg.fanout < 0 {
-		return usageError{fmt.Errorf("invalid -fanout %d (want 0 or more)", cfg.fanout)}
+		return 0, usageError{fmt.Errorf("invalid -fanout %d (want 0 or more)", cfg.fanout)}
 	}
 	if fs.NArg() != 1 {
-		return usageError{fmt.Errorf("expected exactly one Target argument, got %d", fs.NArg())}
+		return 0, usageError{fmt.Errorf("expected exactly one Target argument, got %d", fs.NArg())}
 	}
 	pos, err := span.Parse(fs.Arg(0), opts.Dir)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	prog, err := load.Load(ctx, load.Config{
 		Dir:        opts.Dir,
@@ -139,18 +186,24 @@ func run(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) error
 		TargetFile: pos.File,
 	})
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if cfg.debug["timing"] {
 		fmt.Fprintf(opts.Stderr, "timing: load=%s ssa=%s\n", prog.Timing.Load, prog.Timing.SSA)
 	}
 	tgt, err := target.Resolve(prog, pos)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	resolver, err := newResolver(ctx, prog, tgt, opts.Stderr, cfg.debug["timing"])
+	var subj mark.Subject
+	if membership {
+		if subj, err = resolveSubject(prog, cfg.is, cfg.as); err != nil {
+			return 0, usageError{err}
+		}
+	}
+	resolver, open, err := newResolver(ctx, prog, tgt, opts.Stderr, cfg.debug["timing"], wholeModuleDir(opts.Dir, splitList(cfg.patterns)))
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if cfg.debug["target"] {
 		names := make([]string, len(tgt.Funcs))
@@ -160,14 +213,17 @@ func run(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) error
 		fmt.Fprintf(opts.Stderr, "target: %s %s funcs=[%s] span=%s\n",
 			tgt.Kind, tgt.Name, strings.Join(names, " "), tgt.Span)
 	}
+	if membership {
+		return runMembership(ctx, opts, cfg, prog, tgt, resolver, subj, open)
+	}
 	res, err := query.Run(ctx, prog, tgt, query.Options{ChainDepth: cfg.chainDepth, Resolver: resolver})
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if cfg.debug["summary"] {
 		fmt.Fprintf(opts.Stderr, "summary: functions=%d sccs=%d\n", res.Stats.Functions, res.Stats.SCCs)
 	}
-	return render.Text(opts.Stdout, render.Input{
+	return ExitOK, render.Text(opts.Stdout, render.Input{
 		TargetSpan: tgt.Span,
 		TargetName: tgt.Name,
 		Table:      res.Table,
@@ -181,35 +237,116 @@ func run(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) error
 // loaded program. A generic Target is narrowed to its reachable instances.
 // Target functions that are not reachable from the roots are added as
 // roots, with a warning: their parameters have no callers to take
-// Candidates from.
-func newResolver(ctx context.Context, prog *load.Program, tgt *target.Target, stderr io.Writer, timing bool) (*resolve.VTA, error) {
+// Candidates from. The loaded packages that are not main packages, and the
+// package of a Target the roots do not reach, are open (code that is not
+// loaded calls them): the Resolver is told so, and they are returned. An
+// internal package of the module rooted at moduleDir is not open (see
+// closedInternal); moduleDir is empty if the patterns do not load a whole
+// module.
+func newResolver(ctx context.Context, prog *load.Program, tgt *target.Target, stderr io.Writer, timing bool, moduleDir string) (*resolve.VTA, []*ssa.Package, error) {
 	var initial []*ssa.Package
+	closed := make(map[*ssa.Package]bool)
 	for _, p := range prog.Initial {
 		if sp := prog.SSAPackage(p); sp != nil {
 			initial = append(initial, sp)
+			if closedInternal(p, moduleDir) {
+				closed[sp] = true
+			}
 		}
 	}
 	v, err := resolve.NewVTA(ctx, prog.SSA, resolve.Roots(prog.SSA, initial))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	tgt.KeepReachable(v.Reachable)
+	// A loaded package that is not a main package is open: code that is
+	// not loaded may call it. An internal package of a module that is
+	// loaded whole is not: only that module can import it.
+	var open []*ssa.Package
+	isOpen := make(map[*ssa.Package]bool)
+	for _, p := range initial {
+		if p.Pkg.Name() != "main" && !closed[p] && !isOpen[p] {
+			isOpen[p] = true
+			open = append(open, p)
+		}
+	}
 	var unreachable []*ssa.Function
 	for _, fn := range tgt.Funcs {
 		if !v.Reachable(fn) {
 			unreachable = append(unreachable, fn)
 		}
 	}
+	// So is the package of a Target that the roots do not reach: what
+	// calls it is not loaded.
+	for _, fn := range unreachable {
+		pkg := fn.Pkg
+		for f := fn; pkg == nil && f != nil; f = f.Parent() {
+			pkg = f.Pkg
+		}
+		if pkg != nil && !isOpen[pkg] {
+			isOpen[pkg] = true
+			open = append(open, pkg)
+		}
+	}
+	if len(open) > 0 {
+		v.SetOpen()
+	}
 	if len(unreachable) > 0 {
 		fmt.Fprintf(stderr, "%s: warning: target not reachable from main/init; parameters may lack candidates\n", BinaryName)
 		if v, err = v.WithRoots(ctx, unreachable); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 	if timing {
 		fmt.Fprintf(stderr, "timing: cha=%s vta1=%s vta2=%s\n", v.Timing.CHA, v.Timing.VTA1, v.Timing.VTA2)
 	}
-	return v, nil
+	return v, open, nil
+}
+
+// internalPackage reports whether path is the import path of an internal
+// package: it has an element "internal".
+func internalPackage(path string) bool {
+	return path == "internal" || strings.HasPrefix(path, "internal/") ||
+		strings.HasSuffix(path, "/internal") || strings.Contains(path, "/internal/")
+}
+
+// wholeModuleDir returns the directory of the module that the package
+// patterns load whole: dir, if the patterns are the default ./... alone
+// (whether dir is the root of a module is for closedInternal to check).
+// It returns "" for any other patterns.
+func wholeModuleDir(dir string, patterns []string) string {
+	if len(patterns) == 0 || (len(patterns) == 1 && patterns[0] == "./...") {
+		// (No pattern means ./... too: see load.Config.)
+		return dir
+	}
+	return ""
+}
+
+// closedInternal reports whether the loaded package p is an internal
+// package that code outside the loaded program cannot import: p is in a
+// main module whose root directory is moduleDir, the directory that the
+// pattern ./... was loaded from, so every package of the module that may
+// import p is loaded with it. With any other patterns (moduleDir is ""),
+// from a directory below the module's root, or for an internal package of
+// another module (or of the standard library), p is open like any other
+// package: what imports it may not be loaded. (Not seen: files left out by
+// build constraints, test files, and a module nested in this one whose
+// path lets it import p.)
+func closedInternal(p *packages.Package, moduleDir string) bool {
+	if moduleDir == "" || !internalPackage(p.PkgPath) || p.Module == nil || !p.Module.Main || p.Module.Dir == "" {
+		return false
+	}
+	return sameDir(p.Module.Dir, moduleDir)
+}
+
+// sameDir reports whether a and b name the same directory.
+func sameDir(a, b string) bool {
+	if ra, err := filepath.EvalSymlinks(a); err == nil {
+		a = ra
+	}
+	if rb, err := filepath.EvalSymlinks(b); err == nil {
+		b = rb
+	}
+	return filepath.Clean(a) == filepath.Clean(b)
 }
 
 // splitList splits a comma-separated flag value, dropping empty elements.
@@ -231,6 +368,9 @@ func newFlagSet() (*flag.FlagSet, *config) {
 	fs.StringVar(&cfg.patterns, "p", "./...", "comma-separated package `patterns` to load")
 	fs.IntVar(&cfg.chainDepth, "chain-depth", query.DefaultChainDepth, "max Wrap Chain depth `N` before truncation")
 	fs.IntVar(&cfg.fanout, "fanout", DefaultFanout, "group entries under dynamic call sites with at least `N` Candidates (0 = never group)")
+	fs.StringVar(&cfg.is, "is", "", "Membership Query: is the Sentinel `pkgpath.Name` (such as io.EOF) in the Error Set?")
+	fs.StringVar(&cfg.as, "as", "", "Membership Query: is the Concrete Type `type` (such as '*io/fs.PathError') in the Error Set?")
+	fs.BoolVar(&cfg.full, "full", false, "Membership Query: print every entry that could carry the error in full, instead of grouping those whose traces share a pivot, and every listed reflective store")
 	fs.String("debug", "", "comma-separated `list` of "+strings.Join(debugModes, ",")+" (stderr only)")
 	return fs, cfg
 }
@@ -254,6 +394,22 @@ func parseDebug(value string) (map[string]bool, error) {
 }
 
 func printUsage(w io.Writer, fs *flag.FlagSet) {
+	defer fmt.Fprintf(w, `
+With -is or -as, %[1]s answers a Membership Query: whether that error is in
+the Target's Error Set. The exit status is then the Verdict:
+  0 yes | 1 no | 2 error
+  3 maybe, or no apart from reflective stores that are not followed
+In a program whose main reaches the Target, a no (exit 1) is a proof for
+flows that do not pass through package reflect (nor unsafe, cgo, assembly,
+linkname). Reflective flows are followed where the analysis can; they
+include package fmt printing a struct, slice or map that holds the error.
+A reflective store it cannot follow is listed, with exit 3, unless a second
+pass, in which that store writes all memory reflection could write, every
+reflective read may read it and every dynamic call may run any function
+that fits it, shows that it cannot matter to the Target.
+An internal package counts as closed (no callers outside the loaded program)
+only when the default -p ./... is run from the root of its module.
+`, BinaryName)
 	fmt.Fprintf(w, `usage: %[1]s [flags] <target>
 
 %[1]s reports the Error Set of a Target: every Error Origin that can reach

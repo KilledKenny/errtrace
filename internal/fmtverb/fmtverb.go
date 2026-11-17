@@ -13,6 +13,8 @@ type Verb struct {
 	// Verb is the verb rune ('w', 'v', 'd', ...), '%' for "%%", or
 	// utf8.RuneError when the format ends before the verb.
 	Verb rune
+	// Sharp reports the '#' flag: with %v (and %w) fmt prints Go syntax.
+	Sharp bool
 	// Arg is the 0-based index of the operand the verb formats, or -1 if
 	// it formats none ("%%", a bad index or a missing operand).
 	Arg int
@@ -51,7 +53,9 @@ func Parse(format string, numArgs int) []Verb {
 		start := i
 		i++
 		// Flags.
+		sharp := false
 		for i < end && isFlag(format[i]) {
+			sharp = sharp || format[i] == '#'
 			i++
 		}
 		// An explicit argument index.
@@ -113,7 +117,7 @@ func Parse(format string, numArgs int) []Verb {
 			verb, size = utf8.DecodeRuneInString(format[i:])
 		}
 		i += size
-		v := Verb{Verb: verb, Arg: -1, Start: start, End: i}
+		v := Verb{Verb: verb, Sharp: sharp, Arg: -1, Start: start, End: i}
 		switch {
 		case verb == '%':
 		case !goodArgNum:

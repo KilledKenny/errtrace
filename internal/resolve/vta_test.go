@@ -116,3 +116,58 @@ func TestVTAExtraRoots(t *testing.T) {
 		}
 	}
 }
+
+// TestUpperWide checks that the wide view of the upper-bound call edges
+// does not limit a dynamic call to the Candidates of VTA: it has the CHA
+// callees, for callees and callers alike, where the plain view has the
+// Candidates.
+func TestUpperWide(t *testing.T) {
+	t.Parallel()
+	l := fixture.LoadProgram(t, filepath.Join("testdata", "wide.txtar"))
+	pkg := l.SSAPackage(l.Initial[0])
+	v, err := resolve.NewVTA(t.Context(), l.SSA, resolve.Roots(l.SSA, []*ssa.Package{pkg}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls := dynamicCalls(pkg.Func("runAll"))
+	if len(calls) != 1 {
+		t.Fatalf("runAll has %d dynamic calls, want 1", len(calls))
+	}
+	site := calls[0]
+	okRun := l.SSA.LookupMethod(pkg.Type("okOp").Type(), pkg.Pkg, "Run")
+	failRun := l.SSA.LookupMethod(pkg.Type("failOp").Type(), pkg.Pkg, "Run")
+	calledAt := func(u *resolve.Upper, fn *ssa.Function) bool {
+		for _, s := range u.Callers(fn) {
+			if s == site {
+				return true
+			}
+		}
+		return false
+	}
+	u := v.Upper()
+	if got := u.Callees(site); len(got) != 1 || got[0] != okRun {
+		t.Errorf("Callees = %v, want [%v]", got, okRun)
+	}
+	if !calledAt(u, okRun) || calledAt(u, failRun) {
+		t.Errorf("Callers: okOp.Run at the call %v, failOp.Run %v; want true, false", calledAt(u, okRun), calledAt(u, failRun))
+	}
+	w := u.Wide()
+	// (CHA also has the methods of the pointer types.)
+	has := make(map[*ssa.Function]bool)
+	for _, g := range w.Callees(site) {
+		has[g] = true
+	}
+	if !has[okRun] || !has[failRun] {
+		t.Errorf("wide Callees = %v, want %v and %v among them", w.Callees(site), failRun, okRun)
+	}
+	if !calledAt(w, okRun) || !calledAt(w, failRun) {
+		t.Errorf("wide Callers: okOp.Run at the call %v, failOp.Run %v; want both", calledAt(w, okRun), calledAt(w, failRun))
+	}
+	if w.Wide() != w {
+		t.Error("the wide view of a wide view is another view")
+	}
+	// The plain view is not changed by the wide one.
+	if got := u.Callees(site); len(got) != 1 || got[0] != okRun {
+		t.Errorf("Callees after Wide = %v, want [%v]", got, okRun)
+	}
+}

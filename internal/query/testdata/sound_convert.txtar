@@ -1,0 +1,178 @@
+Conversions of a pointer Sentinel, each case with a Sentinel and types
+of its own: the Sentinel's pointer converted to a pointer type whose
+values carry no Mark, or whose Mark a type assertion drops, and
+converted back. The conversion back makes every pointer of the
+Sentinel's type a seed; a pointer type the program never converts to
+stays exact.
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- main.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+)
+
+// A pointer Sentinel converted to a pointer type that carries no Mark,
+// and back: the conversion back makes every pointer of the Sentinel's
+// type a seed.
+
+type L1 struct{ s string }
+
+func (*L1) Error() string { return "l1" }
+
+type P1 struct{ s string }
+
+var ErrL1 error = &L1{"x"}
+
+func ConvLocal() error {
+	p := (*P1)(ErrL1.(*L1))
+	return (*L1)(p)
+}
+
+// Through a field.
+
+type L2 struct{ s string }
+
+func (*L2) Error() string { return "l2" }
+
+type P2 struct{ s string }
+
+type H2 struct{ p *P2 }
+
+var ErrL2 error = &L2{"x"}
+
+var h2 = H2{(*P2)(ErrL2.(*L2))}
+
+func ConvField() error { return (*L2)(h2.p) }
+
+// A named pointer type has no methods.
+
+type L3 struct{ s string }
+
+func (*L3) Error() string { return "l3" }
+
+type sp3 *L3
+
+var ErrL3 error = &L3{"x"}
+
+func ConvNamedPtr() error {
+	p := sp3(ErrL3.(*L3))
+	return (*L3)(p)
+}
+
+// An unnamed struct type, and a Sentinel whose variable has the pointer
+// type.
+
+type L4 struct{ s string }
+
+func (*L4) Error() string { return "l4" }
+
+var ErrL4 = &L4{"x"}
+
+func ConvAnon() error {
+	p := (*struct{ s string })(ErrL4)
+	return fmt.Errorf("w: %w", (*L4)(p))
+}
+
+// The twin that strips the methods (the marshalling idiom).
+
+type L5 struct{ s string }
+
+func (*L5) Error() string { return "l5" }
+
+type twin5 L5
+
+func describe5(t *twin5) string { return t.s }
+
+var ErrL5 error = &L5{"x"}
+
+func ConvTwin() error {
+	a := (*twin5)(ErrL5.(*L5))
+	_ = describe5(a)
+	return (*L5)(a)
+}
+
+// The conversion back is in an Is method.
+
+type L6 struct{ s string }
+
+func (*L6) Error() string { return "l6" }
+
+type P6 struct{ s string }
+
+type F6 struct{ p *P6 }
+
+func (F6) Error() string     { return "f6" }
+func (f F6) Is(t error) bool { return t == error((*L6)(f.p)) }
+
+var ErrL6 error = &L6{"x"}
+
+func ConvIs() error { return F6{(*P6)(ErrL6.(*L6))} }
+
+// A twin that is an error type: the Mark goes with the pointer, until a
+// type assertion to the twin (a type the Sentinel's value cannot have)
+// drops it.
+
+type L7 struct{ s string }
+
+func (*L7) Error() string { return "l7" }
+
+type twin7 L7
+
+func (*twin7) Error() string { return "t7" }
+
+var ErrL7 error = &L7{"x"}
+
+func ConvTwinAssert() error {
+	var e error = (*twin7)(ErrL7.(*L7))
+	return (*L7)(e.(*twin7))
+}
+
+// A slice of the array the Sentinel points to, converted back.
+
+type L8 [1]int
+
+func (*L8) Error() string { return "l8" }
+
+var ErrL8 error = &L8{}
+
+func ConvSlice() error {
+	s := ErrL8.(*L8)[:]
+	return (*L8)(s)
+}
+
+// What stays exact: a pointer type the program converts from but never
+// to, and one it does not convert at all.
+
+type K1 struct{ s string }
+
+func (*K1) Error() string { return "k1" }
+
+type PK1 struct{ s string }
+
+var ErrK1 error = &K1{"x"}
+
+func ConvAway() error {
+	p := (*PK1)(ErrK1.(*K1))
+	return &K1{p.s}
+}
+
+type K2 struct{ s string }
+
+func (*K2) Error() string { return "k2" }
+
+var ErrK2 error = &K2{"x"}
+
+func ConvNone() error { return &K2{"x"} }
+
+func main() {
+	fmt.Println(
+		errors.Is(ConvLocal(), ErrL1), errors.Is(ConvField(), ErrL2), errors.Is(ConvNamedPtr(), ErrL3),
+		errors.Is(ConvAnon(), ErrL4), errors.Is(ConvTwin(), ErrL5), errors.Is(ConvIs(), ErrL6),
+		errors.Is(ConvTwinAssert(), ErrL7), errors.Is(ConvSlice(), ErrL8),
+		errors.Is(ConvAway(), ErrK1), errors.Is(ConvNone(), ErrK2))
+}

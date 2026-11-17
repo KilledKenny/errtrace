@@ -1,0 +1,29 @@
+In a library every function may run: SetHook installs a function that returns the Sentinel, although no loaded code calls SetHook. The Error Set, built from what init reaches, has no entry: the Sentinel may reach the Target, but no entry shows how.
+-- args --
+-is example.com/fx.ErrX a.go:@f
+-- stdout --
+$WORK/a.go:11:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: no entry of the Error Set shows how
+	marked via (origin of example.com/fx.ErrX → target):
+		$WORK/a.go:5:5-9: Sentinel example.com/fx.ErrX
+		$WORK/a.go:9:47-51: loaded from variable example.com/fx.ErrX
+		$WORK/a.go:11:31-37: returned by example.com/fx.SetHook$1
+-- exit --
+3
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var ErrX = errors.New("x")
+
+var hook = func() error { return nil }
+
+func SetHook() { hook = func() error { return ErrX } }
+
+func /*@f*/F() error { return hook() }
+
+func init() { _ = F() }

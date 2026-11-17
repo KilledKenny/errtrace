@@ -1,0 +1,33 @@
+A type whose Is method compares its target with the Sentinel reports it without holding it: every value of the type is marked, and the entry of the Concrete Type is a Carrier.
+-- args --
+-is example.com/fx.ErrX a.go:@f
+-- stdout --
+$WORK/a.go:12:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: 1 entry could carry it (0 unresolved)
+$WORK/a.go:12:24-24: concrete example.com/fx.E
+	path (origin → target):
+		$WORK/a.go:12:24-24: in example.com/fx.F
+	marked via (origin of example.com/fx.ErrX → here):
+		$WORK/a.go:5:5-9: Sentinel example.com/fx.ErrX
+		$WORK/a.go:10:41-45: loaded from variable example.com/fx.ErrX
+		-: a value of type example.com/fx.E is or may wrap example.com/fx.ErrX
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- exit --
+3
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import "errors"
+
+var ErrX = errors.New("x")
+
+type E struct{}
+
+func (E) Error() string   { return "e" }
+func (E) Is(t error) bool { return t == ErrX }
+
+func /*@f*/F() error { return E{} }

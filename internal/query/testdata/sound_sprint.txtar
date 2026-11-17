@@ -1,0 +1,47 @@
+A whole program in which the Subject reaches a function only through a
+store through reflection that the upward pass does not follow, and then
+through a call inside package fmt: fmt.Sprint calls the Error method of
+the value that the store wrote, and the method keeps its receiver. No
+other call of the program brings a value of that type to a call of an
+Error method, so the call graph of the program's own instructions does
+not have the method at the call inside package fmt. The flooding pass
+must reach it all the same: a Membership Query answers "no, apart from
+reflection", never a plain "no". The program is on its own: next to the
+cases of sound_calls.txtar the flooding pass reaches the function
+without the wider call edges, and the case would pin nothing. The program
+prints what errors.Is says when it runs.
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- main.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"reflect"
+)
+
+type P struct{ n int }
+
+var last error
+
+func (p *P) Error() string { last = p; return "p" }
+
+var ErrS1 error = &P{1}
+var dests []reflect.Value
+
+func store() { dests[0].Set(reflect.ValueOf(ErrS1)) }
+
+func SprintValue() error {
+	v := reflect.New(reflect.TypeOf((*error)(nil)).Elem()).Elem()
+	dests = append(dests, v)
+	store()
+	_ = fmt.Sprint(v.Interface())
+	return last
+}
+
+func main() {
+	fmt.Println("SprintValue", errors.Is(SprintValue(), ErrS1))
+}

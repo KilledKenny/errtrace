@@ -34,6 +34,13 @@ type VTA struct {
 	roots     []*ssa.Function
 	reachable map[*ssa.Function]bool
 	callees   map[ssa.CallInstruction][]*ssa.Function
+	// raw are the callees VTA found for the dynamic call sites before the
+	// synthetic wrappers were spliced out: a wrapper (of a promoted or
+	// bound method) stays the callee, as it runs. Upper uses them.
+	raw map[ssa.CallInstruction][]*ssa.Function
+	// extended reports that WithRoots added roots, or that SetOpen was
+	// called (see WholeProgram).
+	extended bool
 	// Timing is how long building the Resolver took, by phase.
 	Timing VTATiming
 }
@@ -57,7 +64,7 @@ func NewVTA(ctx context.Context, prog *ssa.Program, roots []*ssa.Function) (*VTA
 // WithRoots returns the VTA Resolver of the same program from v's roots
 // plus extra, reusing v's CHA call graph.
 func (v *VTA) WithRoots(ctx context.Context, extra []*ssa.Function) (*VTA, error) {
-	w := &VTA{prog: v.prog, cha: v.cha, Timing: VTATiming{CHA: v.Timing.CHA}}
+	w := &VTA{prog: v.prog, cha: v.cha, extended: v.extended || len(extra) > 0, Timing: VTATiming{CHA: v.Timing.CHA}}
 	roots := append(v.roots[:len(v.roots):len(v.roots)], extra...)
 	if err := w.build(ctx, roots); err != nil {
 		return nil, err
@@ -85,6 +92,25 @@ func (v *VTA) build(ctx context.Context, roots []*ssa.Function) error {
 	}
 	cg := vta.CallGraph(v.reachable, vta1)
 	v.callees = make(map[ssa.CallInstruction][]*ssa.Function)
+	v.raw = make(map[ssa.CallInstruction][]*ssa.Function)
+	for _, n := range cg.Nodes {
+		for _, e := range n.Out {
+			if e.Site == nil || e.Callee == nil || e.Callee.Func == nil || e.Site.Common().StaticCallee() != nil {
+				continue
+			}
+			dup := false
+			for _, f := range v.raw[e.Site] {
+				dup = dup || f == e.Callee.Func
+			}
+			if !dup {
+				v.raw[e.Site] = append(v.raw[e.Site], e.Callee.Func)
+			}
+		}
+	}
+	for site, fns := range v.raw {
+		sort.SliceStable(fns, func(i, j int) bool { return fns[i].String() < fns[j].String() })
+		v.raw[site] = fns
+	}
 	// DeleteSyntheticNodes drops the nodes of synthetic wrappers and
 	// with them the edges of the calls inside them, which a summary of a
 	// wrapper called statically still needs: record those first.

@@ -1,0 +1,35 @@
+A Sentinel under a %w Wrap in a callee: yes, with its Wrap Chain and Propagation Path.
+-- args --
+-is example.com/fx.ErrX a.go:@f
+-- stdout --
+$WORK/a.go:12:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: yes
+$WORK/a.go:8:5-9: sentinel example.com/fx.ErrX
+	wrap chain (origin → target):
+		$WORK/a.go:14:10-34: fmt.Errorf "f: %w"
+	path (origin → target):
+		$WORK/a.go:10:29-33: in example.com/fx.inner
+		$WORK/a.go:13:12-19: in example.com/fx.F, call to example.com/fx.inner
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrX = errors.New("x")
+
+func inner() error { return ErrX }
+
+func /*@f*/F() error {
+	if err := inner(); err != nil {
+		return fmt.Errorf("f: %w", err)
+	}
+	return nil
+}

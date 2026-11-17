@@ -1,7 +1,8 @@
 // Package resolve finds the Candidates of call sites: the functions that may
 // run where the code calls a function, statically or through an interface
 // method or a function value. Resolver hides how they are found, so that
-// the strategy can be swapped.
+// the strategy can be swapped. Upper gives the call edges as an upper bound
+// instead, for the upward pass of a Membership Query.
 package resolve
 
 import "golang.org/x/tools/go/ssa"

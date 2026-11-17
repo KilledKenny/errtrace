@@ -1,0 +1,318 @@
+Ways the Sentinel reaches a result that the upward pass must not lose: every
+exported function here can return ErrX (or an error that wraps it).
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sync"
+	"sync/atomic"
+)
+
+var ErrX = errors.New("x")
+
+// A sync/atomic value (its body uses unsafe).
+var av atomic.Value
+
+func AtomicValue() error {
+	av.Store(ErrX)
+	return av.Load().(error)
+}
+
+var ap atomic.Pointer[error]
+
+func AtomicPointer() error {
+	e := ErrX
+	ap.Store(&e)
+	return *ap.Load()
+}
+
+// The address of a field escapes and is written through.
+type S struct {
+	err error
+	arr [2]error
+	m   map[string]error
+	f   func() error
+}
+
+func set(p *error, e error) { *p = e }
+
+func FieldAddr() error {
+	var s S
+	set(&s.err, ErrX)
+	return s.err
+}
+
+func FieldArray() error {
+	var s S
+	s.arr[1] = ErrX
+	t := s
+	return t.arr[0]
+}
+
+func FieldMap() error {
+	s := S{m: map[string]error{}}
+	s.m["a"] = ErrX
+	return s.m["b"]
+}
+
+func FieldFunc() error {
+	s := S{f: func() error { return ErrX }}
+	return s.f()
+}
+
+// A struct that holds the Sentinel, boxed and unboxed.
+func Boxed() error {
+	var a any = S{err: ErrX}
+	return a.(S).err
+}
+
+func mk() S { return S{err: ErrX} }
+
+func ResultField() error { return mk().err }
+
+// Generic functions run as their instances.
+func Id[T any](v T) T { return v }
+
+type Box[T any] struct{ v T }
+
+func (b *Box[T]) Get() T { return b.v }
+
+func Generic() error { return Id(ErrX) }
+
+func GenericBox() error {
+	b := &Box[error]{v: ErrX}
+	return b.Get()
+}
+
+// Wrapper types.
+type inner struct{ err error }
+
+func (i *inner) Error() string { return "inner" }
+func (i *inner) Unwrap() error { return i.err }
+
+type outer struct{ *inner }
+
+func Promoted() error { return outer{&inner{ErrX}} }
+
+var registry = map[int]error{}
+
+type coded struct{ code int }
+
+func (c coded) Error() string { return "coded" }
+func (c coded) Unwrap() error { return registry[c.code] }
+
+func Registry() error {
+	registry[1] = ErrX
+	return coded{1}
+}
+
+type self struct{}
+
+func (s *self) Error() string { return "self" }
+func (s *self) Next() error   { return ErrX }
+
+func MethodResult() error {
+	var e error = &self{}
+	return e.(interface{ Next() error }).Next()
+}
+
+// Closures and function values.
+func maker() func() error {
+	e := ErrX
+	return func() error { return e }
+}
+
+func Returned() error { return maker()() }
+
+func Once() error {
+	var once sync.Once
+	var err error
+	once.Do(func() { err = ErrX })
+	return err
+}
+
+func Goroutine() error {
+	var err error
+	done := make(chan struct{})
+	go func() {
+		err = ErrX
+		close(done)
+	}()
+	<-done
+	return err
+}
+
+// errors.As through a helper: the target is not converted at the call.
+func as(err error, target any) bool { return errors.As(err, target) }
+
+type tempErr interface {
+	error
+	Temporary() bool
+}
+
+func AsHelper() error {
+	var te tempErr
+	if as(fmt.Errorf("a: %w", ErrX), &te) {
+		return te
+	}
+	return nil
+}
+
+// Formats and operands that are forwarded.
+func wrapf(format string, args ...any) error { return fmt.Errorf(format, args...) }
+
+func Forwarded() error { return wrapf("a: %w", ErrX) }
+
+func joinAll(errs ...error) error { return errors.Join(errs...) }
+
+func JoinForwarded() error { return joinAll(nil, ErrX) }
+
+// Channels of structs, maps keyed by errors, select sends.
+type msg struct{ err error }
+
+func ChanStruct() error {
+	c := make(chan msg, 1)
+	c <- msg{ErrX}
+	return (<-c).err
+}
+
+func MapKey() error {
+	m := map[error]bool{ErrX: true}
+	for e := range m {
+		return e
+	}
+	return nil
+}
+
+func SelectSend() error {
+	c := make(chan error, 1)
+	select {
+	case c <- ErrX:
+	default:
+	}
+	return <-c
+}
+
+// A pointer to a variable converted between pointer types.
+type myError error
+
+func PtrConvert() error {
+	var e error
+	p := (*myError)(&e)
+	*p = ErrX
+	return e
+}
+
+// The context package keeps the cause in a field and the error in an
+// atomic value.
+func Cause() error {
+	ctx, cancel := context.WithCancelCause(context.Background())
+	cancel(ErrX)
+	return context.Cause(ctx)
+}
+
+// A value stored into the Sentinel after its initialization is the
+// Sentinel from then on.
+var ErrLate error
+
+func setLate() error {
+	e := errors.New("late")
+	ErrLate = e
+	return e
+}
+
+// An interface value passed through any and a type switch.
+func Switch() error {
+	var a any = ErrX
+	switch v := a.(type) {
+	case fmt.Stringer:
+		return nil
+	case error:
+		return v
+	}
+	return nil
+}
+
+// A named result set by a deferred call through its address.
+func Deferred() (err error) {
+	defer set(&err, ErrX)
+	return nil
+}
+
+// Variadic arguments: read by index, in a loop, by a closure, passed on,
+// and kept.
+func first(args ...any) error { return args[0].(error) }
+
+func VarFirst() error { return first(1, ErrX) }
+
+func ranged(args ...any) error {
+	for _, a := range args {
+		if e, ok := a.(error); ok {
+			return e
+		}
+	}
+	return nil
+}
+
+func VarRange() error { return ranged(ErrX) }
+
+func later(args ...any) func() error {
+	return func() error { return args[0].(error) }
+}
+
+func VarClosure() error { return later(ErrX)() }
+
+func pass(args ...any) error { return first(args...) }
+
+func VarForward() error { return pass(ErrX) }
+
+var kept []any
+
+func keep(args ...any) { kept = args }
+
+func VarKept() error {
+	keep(ErrX)
+	return kept[0].(error)
+}
+
+func main() {
+	VarFirst()
+	VarRange()
+	VarClosure()
+	VarForward()
+	VarKept()
+	AtomicValue()
+	AtomicPointer()
+	FieldAddr()
+	FieldArray()
+	FieldMap()
+	FieldFunc()
+	Boxed()
+	ResultField()
+	Generic()
+	GenericBox()
+	Promoted()
+	Registry()
+	MethodResult()
+	Returned()
+	Once()
+	Goroutine()
+	AsHelper()
+	Forwarded()
+	JoinForwarded()
+	ChanStruct()
+	MapKey()
+	SelectSend()
+	PtrConvert()
+	Cause()
+	setLate()
+	Switch()
+	Deferred()
+}

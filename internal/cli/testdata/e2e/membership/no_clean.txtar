@@ -1,0 +1,30 @@
+The Error Set has no Unresolved entry and no entry is the Sentinel: no. %v does not wrap.
+-- args --
+-is io.EOF a.go:@f
+-- stdout --
+$WORK/a.go:11:12-13: io.EOF in Error Set of example.com/fx.F: no
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- exit --
+1
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package fx
+
+import (
+	"errors"
+	"fmt"
+	"io"
+)
+
+var ErrOther = errors.New("other")
+
+func /*@f*/F(n int) error {
+	if n == 0 {
+		return fmt.Errorf("f: %v", io.EOF)
+	}
+	return ErrOther
+}
