@@ -1,0 +1,9 @@
+Negative: Status(503) is a conversion to a named error type, not a call.
+Expected: exit 2, "not a call to a function", nothing on stdout.
+-- args --
+drivers/extra.go:@status_conv
+-- stdout --
+-- stderr --
+errtrace: $WORK/drivers/extra.go:90:26: not a call to a function
+-- exit --
+2

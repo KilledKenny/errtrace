@@ -1,0 +1,9 @@
+Position on the type name Backend in its type declaration.
+Negative: exit 2, "no function declaration or call at position", empty stdout.
+-- args --
+internal/store/store.go:@backend_type
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/store/store.go:17:23: no function declaration or call at position
+-- exit --
+2

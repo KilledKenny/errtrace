@@ -1,0 +1,19 @@
+A package with syntax errors explicitly included next to a healthy one, Target elsewhere.
+Negative: exit 2, the parse errors of _broken/syntaxerr are listed; no partial Error Set.
+-- args --
+-p ./cmd/report,./_broken/syntaxerr internal/platform/platform.go:5:6
+-- stdout --
+-- stderr --
+errtrace: 8 errors loading packages:
+	$WORK/_broken/syntaxerr/syntaxerr.go:8:26: missing ',' before newline in argument list
+	$WORK/_broken/syntaxerr/syntaxerr.go:9:1: expected operand, found '}'
+	$WORK/_broken/syntaxerr/syntaxerr.go:9:3: expected ')', found 'EOF'
+	$WORK/_broken/syntaxerr/syntaxerr.go:9:3: expected ';', found 'EOF'
+	$WORK/_broken/syntaxerr/syntaxerr.go:9:3: expected ';', found 'EOF'
+	$WORK/_broken/syntaxerr/syntaxerr.go:9:3: expected '}', found 'EOF'
+	$WORK/_broken/syntaxerr/syntaxerr.go:9:3: missing ',' in argument list
+	$WORK/_broken/syntaxerr/syntaxerr.go:9:1: too many arguments in call to errors.New
+	have (string, unknown type)
+	want (string)
+-- exit --
+2

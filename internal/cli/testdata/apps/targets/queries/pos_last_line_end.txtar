@@ -1,0 +1,9 @@
+Column one past the last byte of the last line (8:2, just after "}").
+Negative: accepted as a position (end of line), no target.
+-- args --
+internal/platform/platform.go:8:2
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/platform/platform.go:8:2: no function declaration or call at position
+-- exit --
+2

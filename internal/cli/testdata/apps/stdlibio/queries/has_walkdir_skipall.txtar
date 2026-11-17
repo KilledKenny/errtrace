@@ -1,0 +1,681 @@
+SUSPECTED BUG: Has passes filepath.WalkDir a callback that ignores its err argument
+and only returns nil or fs.SkipAll. WalkDir never returns an error of its own: the
+os.Lstat and os.ReadDir failures are handed to the callback (fn(root, nil, err),
+walkDirFn(path, d, err)) and only the callback's results come back, with SkipDir /
+SkipAll turned into nil. So at run time Has cannot fail at all. Expected: 0 entries
+(with Candidates narrowed to the function literal passed at this call, plan P08/S09).
+Actual: 41 entries, the same set as find_walkdir_callback: walk.ErrTooMany and all
+lstat/readdir origins, every one through walk.Find$1, the callback of the other
+WalkDir caller, which is listed as Candidate "2 of 2" of the fn parameter. fs.SkipDir
+and fs.SkipAll are correctly absent.
+-- args --
+walk/walk.go:@has
+-- stdout --
+$WORK/walk/walk.go:44:14-17: Error Set of example.com/stdlibio/walk.Has: 41 entries, 8 unresolved, 3 possibly handled
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).incref, call to internal/poll.errClosing
+		$GOROOT/src/internal/poll/fstatat_unix.go:*: in (*internal/poll.FD).Fstatat, call to (*internal/poll.FD).incref
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*internal/poll.FD).Fstatat
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*os.File).wrapErr
+		$GOROOT/src/os/statat.go:*: in (*os.File).lstatat, call to (*os.File).lstatatNolog
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*os.File).lstatat
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing
+	wrap chain (origin → target):
+		$GOROOT/src/os/dir_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).incref, call to internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_unixjs.go:*: in (*internal/poll.FD).ReadDirent, call to (*internal/poll.FD).incref
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*internal/poll.FD).ReadDirent
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).incref, call to internal/poll.errClosing
+		$GOROOT/src/internal/poll/fstatat_unix.go:*: in (*internal/poll.FD).Fstatat, call to (*internal/poll.FD).incref
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*internal/poll.FD).Fstatat
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*os.File).wrapErr
+		$GOROOT/src/os/statat.go:*: in (*os.File).lstatat, call to (*os.File).lstatatNolog
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*os.File).lstatat
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrFileClosing
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).incref, call to internal/poll.errClosing
+		$GOROOT/src/internal/poll/fstatat_unix.go:*: in (*internal/poll.FD).Fstatat, call to (*internal/poll.FD).incref
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*internal/poll.FD).Fstatat
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*os.File).wrapErr
+		$GOROOT/src/os/statat.go:*: in (*os.File).lstatat, call to (*os.File).lstatatNolog
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*os.File).lstatat
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrFileClosing
+	wrap chain (origin → target):
+		$GOROOT/src/os/dir_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).incref, call to internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_unixjs.go:*: in (*internal/poll.FD).ReadDirent, call to (*internal/poll.FD).incref
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*internal/poll.FD).ReadDirent
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrDeadlineExceeded
+	wrap chain (origin → target):
+		$GOROOT/src/os/dir_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).wait, call to internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).waitRead, call to (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_unixjs.go:*: in (*internal/poll.FD).ReadDirent, call to (*internal/poll.pollDesc).waitRead
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*internal/poll.FD).ReadDirent
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNotPollable
+	wrap chain (origin → target):
+		$GOROOT/src/os/dir_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).wait, call to internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).waitRead, call to (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_unixjs.go:*: in (*internal/poll.FD).ReadDirent, call to (*internal/poll.pollDesc).waitRead
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*internal/poll.FD).ReadDirent
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid
+	path (origin → target):
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*os.File).wrapErr
+		$GOROOT/src/os/statat.go:*: in (*os.File).lstatat, call to (*os.File).lstatatNolog
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*os.File).lstatat
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Fstat, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Fstat$1, call to syscall.Fstat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstat$1 (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fstatat_unix.go:*: in (*internal/poll.FD).Fstatat, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*internal/poll.FD).Fstatat
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*os.File).wrapErr
+		$GOROOT/src/os/statat.go:*: in (*os.File).lstatat, call to (*os.File).lstatatNolog
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*os.File).lstatat
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN
+	wrap chain (origin → target):
+		$GOROOT/src/os/dir_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_unixjs.go:*: in (*internal/poll.FD).ReadDirent, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*internal/poll.FD).ReadDirent
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Fstat, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Fstat$1, call to syscall.Fstat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstat$1 (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fstatat_unix.go:*: in (*internal/poll.FD).Fstatat, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*internal/poll.FD).Fstatat
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*os.File).wrapErr
+		$GOROOT/src/os/statat.go:*: in (*os.File).lstatat, call to (*os.File).lstatatNolog
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*os.File).lstatat
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN
+	wrap chain (origin → target):
+		$GOROOT/src/os/stat_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.unlinkat, call to syscall.errnoErr
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Unlink, call to syscall.unlinkat
+		$GOROOT/src/os/file_unix.go:*: in os.Remove$1, call to syscall.Unlink
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Remove$1 (dynamic function value fn: 10 of 10 candidates)
+		$GOROOT/src/os/stat_unix.go:*: in os.lstatNolog, call to os.ignoringEINTR
+		$GOROOT/src/os/stat.go:*: in os.Lstat, call to os.lstatNolog
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to os.Lstat
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value fn: 2 of 2 candidates)
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Fstat, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Fstat$1, call to syscall.Fstat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstat$1 (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fstatat_unix.go:*: in (*internal/poll.FD).Fstatat, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*internal/poll.FD).Fstatat
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*os.File).wrapErr
+		$GOROOT/src/os/statat.go:*: in (*os.File).lstatat, call to (*os.File).lstatatNolog
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*os.File).lstatat
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL
+	wrap chain (origin → target):
+		$GOROOT/src/os/dir_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_unixjs.go:*: in (*internal/poll.FD).ReadDirent, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*internal/poll.FD).ReadDirent
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Fstat, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Fstat$1, call to syscall.Fstat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstat$1 (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fstatat_unix.go:*: in (*internal/poll.FD).Fstatat, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*internal/poll.FD).Fstatat
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*os.File).wrapErr
+		$GOROOT/src/os/statat.go:*: in (*os.File).lstatat, call to (*os.File).lstatatNolog
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*os.File).lstatat
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL
+	wrap chain (origin → target):
+		$GOROOT/src/os/stat_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.unlinkat, call to syscall.errnoErr
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Unlink, call to syscall.unlinkat
+		$GOROOT/src/os/file_unix.go:*: in os.Remove$1, call to syscall.Unlink
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Remove$1 (dynamic function value fn: 10 of 10 candidates)
+		$GOROOT/src/os/stat_unix.go:*: in os.lstatNolog, call to os.ignoringEINTR
+		$GOROOT/src/os/stat.go:*: in os.Lstat, call to os.lstatNolog
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to os.Lstat
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value fn: 2 of 2 candidates)
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Fstat, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Fstat$1, call to syscall.Fstat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstat$1 (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fstatat_unix.go:*: in (*internal/poll.FD).Fstatat, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*internal/poll.FD).Fstatat
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*os.File).wrapErr
+		$GOROOT/src/os/statat.go:*: in (*os.File).lstatat, call to (*os.File).lstatatNolog
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*os.File).lstatat
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT
+	wrap chain (origin → target):
+		$GOROOT/src/os/dir_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_unixjs.go:*: in (*internal/poll.FD).ReadDirent, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*internal/poll.FD).ReadDirent
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Fstat, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Fstat$1, call to syscall.Fstat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstat$1 (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fstatat_unix.go:*: in (*internal/poll.FD).Fstatat, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*internal/poll.FD).Fstatat
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*os.File).wrapErr
+		$GOROOT/src/os/statat.go:*: in (*os.File).lstatat, call to (*os.File).lstatatNolog
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*os.File).lstatat
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT
+	wrap chain (origin → target):
+		$GOROOT/src/os/stat_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.unlinkat, call to syscall.errnoErr
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Unlink, call to syscall.unlinkat
+		$GOROOT/src/os/file_unix.go:*: in os.Remove$1, call to syscall.Unlink
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Remove$1 (dynamic function value fn: 10 of 10 candidates)
+		$GOROOT/src/os/stat_unix.go:*: in os.lstatNolog, call to os.ignoringEINTR
+		$GOROOT/src/os/stat.go:*: in os.Lstat, call to os.lstatNolog
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to os.Lstat
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value fn: 2 of 2 candidates)
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$WORK/walk/walk.go:14:5-15: sentinel example.com/stdlibio/walk.ErrTooMany
+	path (origin → target):
+		$WORK/walk/walk.go:34:11-21: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value fn: 2 of 2 candidates)
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall.go:*: concrete syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall.go:*: in syscall.ByteSliceFromString
+		$GOROOT/src/syscall/syscall.go:*: in syscall.BytePtrFromString, call to syscall.ByteSliceFromString
+		$GOROOT/src/internal/syscall/unix/at_fstatat.go:*: in internal/syscall/unix.Fstatat, call to syscall.BytePtrFromString
+		$GOROOT/src/internal/poll/fstatat_unix.go:*: in (*internal/poll.FD).Fstatat$1, call to internal/syscall/unix.Fstatat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstatat$1 (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fstatat_unix.go:*: in (*internal/poll.FD).Fstatat, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*internal/poll.FD).Fstatat
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*os.File).wrapErr
+		$GOROOT/src/os/statat.go:*: in (*os.File).lstatat, call to (*os.File).lstatatNolog
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*os.File).lstatat
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall.go:*: in syscall.ByteSliceFromString
+		$GOROOT/src/syscall/syscall.go:*: in syscall.BytePtrFromString, call to syscall.ByteSliceFromString
+		$GOROOT/src/internal/syscall/unix/at_fstatat.go:*: in internal/syscall/unix.Fstatat, call to syscall.BytePtrFromString
+		$GOROOT/src/internal/poll/fstatat_unix.go:*: in (*internal/poll.FD).Fstatat$1, call to internal/syscall/unix.Fstatat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstatat$1 (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fstatat_unix.go:*: in (*internal/poll.FD).Fstatat, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*internal/poll.FD).Fstatat
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*os.File).wrapErr
+		$GOROOT/src/os/statat.go:*: in (*os.File).lstatat, call to (*os.File).lstatatNolog
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*os.File).lstatat
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/stat_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall.go:*: in syscall.ByteSliceFromString
+		$GOROOT/src/syscall/syscall.go:*: in syscall.BytePtrFromString, call to syscall.ByteSliceFromString
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.unlinkat, call to syscall.BytePtrFromString
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Unlink, call to syscall.unlinkat
+		$GOROOT/src/os/file_unix.go:*: in os.Remove$1, call to syscall.Unlink
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Remove$1 (dynamic function value fn: 10 of 10 candidates)
+		$GOROOT/src/os/stat_unix.go:*: in os.lstatNolog, call to os.ignoringEINTR
+		$GOROOT/src/os/stat.go:*: in os.Lstat, call to os.lstatNolog
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to os.Lstat
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value fn: 2 of 2 candidates)
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall_linux.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/stat_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Fchmodat
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Chmod, call to syscall.Fchmodat
+		$GOROOT/src/os/file_posix.go:*: in os.chmod$1, call to syscall.Chmod
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.chmod$1 (dynamic function value fn: 10 of 10 candidates)
+		$GOROOT/src/os/stat_unix.go:*: in os.lstatNolog, call to os.ignoringEINTR
+		$GOROOT/src/os/stat.go:*: in os.Lstat, call to os.lstatNolog
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to os.Lstat
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value fn: 2 of 2 candidates)
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall_linux.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/stat_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Fchmodat
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Chmod, call to syscall.Fchmodat
+		$GOROOT/src/os/file_posix.go:*: in os.chmod$1, call to syscall.Chmod
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.chmod$1 (dynamic function value fn: 10 of 10 candidates)
+		$GOROOT/src/os/stat_unix.go:*: in os.lstatNolog, call to os.ignoringEINTR
+		$GOROOT/src/os/stat.go:*: in os.Lstat, call to os.lstatNolog
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to os.Lstat
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value fn: 2 of 2 candidates)
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Fstat, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Fstat$1, call to syscall.Fstat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstat$1 (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fstatat_unix.go:*: in (*internal/poll.FD).Fstatat, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*internal/poll.FD).Fstatat
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*os.File).wrapErr
+		$GOROOT/src/os/statat.go:*: in (*os.File).lstatat, call to (*os.File).lstatatNolog
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*os.File).lstatat
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/dir_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_unixjs.go:*: in (*internal/poll.FD).ReadDirent, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*internal/poll.FD).ReadDirent
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Fstat, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Fstat$1, call to syscall.Fstat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstat$1 (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fstatat_unix.go:*: in (*internal/poll.FD).Fstatat, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*internal/poll.FD).Fstatat
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*os.File).wrapErr
+		$GOROOT/src/os/statat.go:*: in (*os.File).lstatat, call to (*os.File).lstatatNolog
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*os.File).lstatat
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/stat_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.unlinkat, call to syscall.errnoErr
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Unlink, call to syscall.unlinkat
+		$GOROOT/src/os/file_unix.go:*: in os.Remove$1, call to syscall.Unlink
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Remove$1 (dynamic function value fn: 10 of 10 candidates)
+		$GOROOT/src/os/stat_unix.go:*: in os.lstatNolog, call to os.ignoringEINTR
+		$GOROOT/src/os/stat.go:*: in os.Lstat, call to os.lstatNolog
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to os.Lstat
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value fn: 2 of 2 candidates)
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type"
+	wrap chain (origin → target):
+		$GOROOT/src/os/dir_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).waitRead, call to (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_unixjs.go:*: in (*internal/poll.FD).ReadDirent, call to (*internal/poll.pollDesc).waitRead
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*internal/poll.FD).ReadDirent
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e
+	wrap chain (origin → target):
+		$GOROOT/src/os/stat_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog$1
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.openFileNolog$1 (dynamic function value fn: 10 of 10 candidates)
+		$GOROOT/src/os/stat_unix.go:*: in os.lstatNolog, call to os.ignoringEINTR
+		$GOROOT/src/os/stat.go:*: in os.Lstat, call to os.lstatNolog
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to os.Lstat
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value fn: 2 of 2 candidates)
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e
+	wrap chain (origin → target):
+		$GOROOT/src/os/stat_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/os/file_unix.go:*: in os.openDirNolog
+		$GOROOT/src/os/file_unix.go:*: in os.openDirNolog$1
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.openDirNolog$1 (dynamic function value fn: 10 of 10 candidates)
+		$GOROOT/src/os/stat_unix.go:*: in os.lstatNolog, call to os.ignoringEINTR
+		$GOROOT/src/os/stat.go:*: in os.Lstat, call to os.lstatNolog
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to os.Lstat
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value fn: 2 of 2 candidates)
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/os/file_unix.go:*: in os.openDirNolog
+		$GOROOT/src/os/file.go:*: in os.openDir, call to os.openDirNolog
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to os.openDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/os/root_unix.go:*: unresolved(memory): load of escaping variable e
+	wrap chain (origin → target):
+		$GOROOT/src/os/stat_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/os/root_unix.go:*: in os.readlinkat
+		$GOROOT/src/os/root_unix.go:*: in os.readlinkat$1
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.readlinkat$1 (dynamic function value fn: 10 of 10 candidates)
+		$GOROOT/src/os/stat_unix.go:*: in os.lstatNolog, call to os.ignoringEINTR
+		$GOROOT/src/os/stat.go:*: in os.Lstat, call to os.lstatNolog
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to os.Lstat
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value fn: 2 of 2 candidates)
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/os/statat.go:*: unresolved(no-candidates): dynamic call to function value os.stathook
+	possibly handled:
+		$GOROOT/src/path/filepath/path.go:*: comparison with path/filepath.SkipDir: unresolved value
+		$GOROOT/src/path/filepath/path.go:*: comparison with path/filepath.SkipAll: unresolved value
+	path (origin → target):
+		$GOROOT/src/os/statat.go:*: in (*os.File).lstatat
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*os.File).lstatat
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall_linux.go:*: unresolved(no-body): internal/runtime/syscall/linux.Syscall6 has no body
+	possibly handled:
+		$GOROOT/src/path/filepath/path.go:*: comparison with path/filepath.SkipDir: unresolved value
+		$GOROOT/src/path/filepath/path.go:*: comparison with path/filepath.SkipAll: unresolved value
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.RawSyscall6
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Syscall6, call to syscall.RawSyscall6
+		$GOROOT/src/internal/syscall/unix/at_fstatat.go:*: in internal/syscall/unix.Fstatat, call to syscall.Syscall6
+		$GOROOT/src/internal/poll/fstatat_unix.go:*: in (*internal/poll.FD).Fstatat$1, call to internal/syscall/unix.Fstatat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstatat$1 (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fstatat_unix.go:*: in (*internal/poll.FD).Fstatat, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*internal/poll.FD).Fstatat
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*os.File).wrapErr
+		$GOROOT/src/os/statat.go:*: in (*os.File).lstatat, call to (*os.File).lstatatNolog
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*os.File).lstatat
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall_linux.go:*: unresolved(no-body): internal/runtime/syscall/linux.Syscall6 has no body
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	possibly handled:
+		$GOROOT/src/os/file.go:*: comparison with internal/poll.ErrFileClosing: unresolved value
+		$GOROOT/src/os/file.go:*: comparison with io.EOF: unresolved value
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.RawSyscall6
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Syscall6, call to syscall.RawSyscall6
+		$GOROOT/src/internal/syscall/unix/at_fstatat.go:*: in internal/syscall/unix.Fstatat, call to syscall.Syscall6
+		$GOROOT/src/internal/poll/fstatat_unix.go:*: in (*internal/poll.FD).Fstatat$1, call to internal/syscall/unix.Fstatat
+		$GOROOT/src/internal/poll/fd_posix.go:*: in internal/poll.ignoringEINTR, call to (*internal/poll.FD).Fstatat$1 (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fstatat_unix.go:*: in (*internal/poll.FD).Fstatat, call to internal/poll.ignoringEINTR
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*internal/poll.FD).Fstatat
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/statat_unix.go:*: in (*os.File).lstatatNolog, call to (*os.File).wrapErr
+		$GOROOT/src/os/statat.go:*: in (*os.File).lstatat, call to (*os.File).lstatatNolog
+		$GOROOT/src/os/dir_unix.go:*: in (*os.File).readdir, call to (*os.File).lstatat
+		$GOROOT/src/os/dir.go:*: in (*os.File).ReadDir, call to (*os.File).readdir
+		$GOROOT/src/os/dir.go:*: in os.ReadDir, call to (*os.File).ReadDir
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to os.ReadDir
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.walkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value walkDirFn: 2 of 2 candidates)
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to path/filepath.walkDir
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir
+$GOROOT/src/syscall/syscall_linux.go:*: unresolved(no-body): internal/runtime/syscall/linux.Syscall6 has no body
+	wrap chain (origin → target):
+		$GOROOT/src/os/stat_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.RawSyscall6
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Syscall6, call to syscall.RawSyscall6
+		$GOROOT/src/internal/syscall/unix/waitid_linux.go:*: in internal/syscall/unix.Waitid, call to syscall.Syscall6
+		$GOROOT/src/os/pidfd_linux.go:*: in os.checkPidfd$1, call to internal/syscall/unix.Waitid
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.checkPidfd$1 (dynamic function value fn: 10 of 10 candidates)
+		$GOROOT/src/os/stat_unix.go:*: in os.lstatNolog, call to os.ignoringEINTR
+		$GOROOT/src/os/stat.go:*: in os.Lstat, call to os.lstatNolog
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to os.Lstat
+		$WORK/walk/walk.go:24:6-9: in example.com/stdlibio/walk.Find$1
+		$GOROOT/src/path/filepath/path.go:*: in path/filepath.WalkDir, call to example.com/stdlibio/walk.Find$1 (dynamic function value fn: 2 of 2 candidates)
+		$WORK/walk/walk.go:46:9-52:4: in example.com/stdlibio/walk.Has, call to path/filepath.WalkDir

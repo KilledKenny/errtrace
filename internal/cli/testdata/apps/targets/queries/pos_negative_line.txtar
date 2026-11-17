@@ -1,0 +1,9 @@
+Negative line number.
+Negative: exit 2, invalid position. "-" is the range separator, so ":-5:6" has an empty start and the message is "missing start position" rather than one about a negative line; it must not resolve to 5:6.
+-- args --
+internal/platform/platform.go:-5:6
+-- stdout --
+-- stderr --
+errtrace: invalid position "internal/platform/platform.go:-5:6": missing start position
+-- exit --
+2

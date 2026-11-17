@@ -1,0 +1,15 @@
+SUSPECTED BUG (same as service_close_decl): call site of a function whose result is overwritten in a defer.
+Expected: engine.errTorn and engine.ErrClosed; not service.errGaveUp.
+Actual: 2 x unresolved(memory), one with the span '-:' and a path hop '-: in (*service.Service).Close'.
+-- args --
+api/api.go:@close_call
+-- stdout --
+$WORK/api/api.go:115:9-37: Error Set of call to h.svc.Close in (*example.com/kvstore/api.Handler).Shutdown: 2 entries, 2 unresolved
+-: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		-: in (*example.com/kvstore/service.Service).Close
+		$WORK/api/api.go:115:9-37: in (*example.com/kvstore/api.Handler).Shutdown, call to (*example.com/kvstore/service.Service).Close
+$WORK/service/service.go:86:2-2: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/service/service.go:86:2-2: in (*example.com/kvstore/service.Service).Close
+		$WORK/api/api.go:115:9-37: in (*example.com/kvstore/api.Handler).Shutdown, call to (*example.com/kvstore/service.Service).Close

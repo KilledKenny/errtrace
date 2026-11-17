@@ -1,0 +1,192 @@
+Cross-function wraps: Line wraps Amount's and When's errors with "transfer %d: %w".
+Expect *ValidationError bare (line) and twice behind "transfer %d: %w" (from Amount), strconv.ErrSyntax behind
+NumError.Unwrap + "amount %q: %w" + "transfer %d: %w", ErrBadDate behind "%w: near %q" + "transfer %d: %w";
+no strconv.ErrRange, no *time.ParseError. (internal/strconv.Error entries: see parse_amount_decl.)
+-- args --
+parse/parse.go:@line
+-- stdout --
+$WORK/parse/parse.go:99:15-19: Error Set of example.com/bank/parse.Line: 18 entries
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrSyntax
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.syntaxError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.syntaxError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+$WORK/parse/parse.go:16:5-15: sentinel example.com/bank/parse.ErrBadDate
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:49:24-75: fmt.Errorf "%w: near %q"
+		$WORK/parse/parse.go:110:30-68: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$WORK/parse/parse.go:49:50-60: in example.com/bank/parse.When
+		$WORK/parse/parse.go:109:30-45: in example.com/bank/parse.Line, call to example.com/bank/parse.When
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+$WORK/parse/parse.go:23:14-75: concrete *example.com/bank/domain.ValidationError
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$WORK/parse/parse.go:23:14-75: in example.com/bank/parse.Amount
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+$WORK/parse/parse.go:28:13-81: concrete *example.com/bank/domain.ValidationError
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$WORK/parse/parse.go:28:13-81: in example.com/bank/parse.Amount
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+$WORK/parse/parse.go:101:29-98: concrete *example.com/bank/domain.ValidationError
+	path (origin → target):
+		$WORK/parse/parse.go:101:29-98: in example.com/bank/parse.Line
+$GOROOT/src/strconv/number.go:*: opaque errors.New
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.baseError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.baseError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+$GOROOT/src/strconv/number.go:*: opaque errors.New
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.bitSizeError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.bitSizeError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount

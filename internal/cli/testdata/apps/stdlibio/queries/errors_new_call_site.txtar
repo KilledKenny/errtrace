@@ -1,0 +1,10 @@
+Call-site Target on errors.New itself (an intrinsic, not followed into the stdlib):
+exactly 1 entry, opaque errors.New "usage: stdlibio <config> <dir>", whose span is the
+call.
+-- args --
+main.go:@usage
+-- stdout --
+$WORK/main.go:32:10-64: Error Set of call to errors.New in example.com/stdlibio.run: 1 entries
+$WORK/main.go:32:10-64: opaque errors.New "usage: stdlibio <config> <dir>"
+	path (origin → target):
+		$WORK/main.go:32:10-64: in example.com/stdlibio.run

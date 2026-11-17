@@ -1,0 +1,11 @@
+Like murky_any_round_trip, but the boxed value (fmt.Errorf "murky: boxed: %w" around
+ErrWorker) crosses box(v any) any before the comma-ok assertion. Expected: either the
+wrapped ErrWorker, or one Unresolved(memory) at the assertion; no entry for the
+"return nil" path.
+-- args --
+murky/murky.go:@boxed
+-- stdout --
+$WORK/murky/murky.go:171:16-21: Error Set of example.com/stdlibio/murky.Boxed: 1 entries, 1 unresolved
+$WORK/murky/murky.go:173:5-8: unresolved(memory): value of TypeAssert not modelled
+	path (origin → target):
+		$WORK/murky/murky.go:173:5-8: in example.com/stdlibio/murky.Boxed

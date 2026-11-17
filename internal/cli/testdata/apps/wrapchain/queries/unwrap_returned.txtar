@@ -1,0 +1,19 @@
+errors.Unwrap(Title(d)) removes the *OpError link: at run time the result is
+the bare doc.ErrNoTitle. errors.Unwrap is not an intrinsic; its body is analysed
+and ends in a field load, which is unresolved(memory) by design (fields are never
+tracked). Expected: Unresolved entries only, one per Unwrap Candidate of the
+program (*fmt.wrapError, *xerr.OpError); never an empty set, never the wrapped form.
+-- args --
+transform/transform.go:@peel
+-- stdout --
+$WORK/transform/transform.go:189:15-19: Error Set of example.com/wrapchain/transform.Peel: 2 entries, 2 unresolved
+$GOROOT/src/fmt/errors.go:*: unresolved(memory): load of field err of *fmt.wrapError
+	path (origin → target):
+		$GOROOT/src/fmt/errors.go:*: in (*fmt.wrapError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*fmt.wrapError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 2 of 2 candidates)
+		$WORK/transform/transform.go:190:9-32: in example.com/wrapchain/transform.Peel, call to errors.Unwrap
+$WORK/xerr/types.go:18:43-48: unresolved(memory): load of field Err of *example.com/wrapchain/xerr.OpError
+	path (origin → target):
+		$WORK/xerr/types.go:18:43-48: in (*example.com/wrapchain/xerr.OpError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*example.com/wrapchain/xerr.OpError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 2 of 2 candidates)
+		$WORK/transform/transform.go:190:9-32: in example.com/wrapchain/transform.Peel, call to errors.Unwrap

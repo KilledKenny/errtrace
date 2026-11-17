@@ -1,0 +1,262 @@
+SUSPECTED BUG (precision; plan step S09 not built yet): a static call of
+the adapter HandlerFunc.Handle on a closure literal can only return
+main.errQuota. Actual: every closure that is ever converted to HandlerFunc
+is a Candidate of f(e) (5 of 5), so the set also holds the middleware
+errors and wraps. With the default -chain-depth the same query prints 1093
+entries (24k lines), hence -chain-depth=1 here.
+-- args --
+-chain-depth=1 main.go:@quota_call
+-- stdout --
+$WORK/main.go:217:9-35: Error Set of call to h.Handle in example.com/plugins.quota: 28 entries, 10 unresolved
+$WORK/core/core.go:16:2-12: sentinel example.com/plugins/core.ErrDropped
+	path (origin → target):
+		$WORK/middleware/middleware.go:42:12-27: in example.com/plugins/middleware.Filter$1$1
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Filter$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+$WORK/core/core.go:16:2-12: sentinel example.com/plugins/core.ErrDropped
+	wrap chain (origin → target):
+		$WORK/middleware/middleware.go:30:12-44: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/middleware/middleware.go:42:12-27: in example.com/plugins/middleware.Filter$1$1
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Filter$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:29:14-28: in example.com/plugins/middleware.Tag$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Tag$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+$WORK/core/core.go:16:2-12: sentinel example.com/plugins/core.ErrDropped [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/middleware/middleware.go:30:12-44: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/middleware/middleware.go:42:12-27: in example.com/plugins/middleware.Filter$1$1
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Filter$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:29:14-28: in example.com/plugins/middleware.Tag$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Tag$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+$WORK/core/core.go:16:2-12: sentinel example.com/plugins/core.ErrDropped
+	wrap chain (origin → target):
+		$WORK/middleware/middleware.go:59:11-47: fmt.Errorf "%w: %w"
+	path (origin → target):
+		$WORK/middleware/middleware.go:42:12-27: in example.com/plugins/middleware.Filter$1$1
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Filter$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+$WORK/core/core.go:16:2-12: sentinel example.com/plugins/core.ErrDropped [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/middleware/middleware.go:59:11-47: fmt.Errorf "%w: %w"
+	path (origin → target):
+		$WORK/middleware/middleware.go:42:12-27: in example.com/plugins/middleware.Filter$1$1
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Filter$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+$WORK/drivers/drivers.go:16:2-10: sentinel example.com/plugins/drivers.ErrPager
+	path (origin → target):
+		$WORK/drivers/drivers.go:82:10-18: in (example.com/plugins/drivers.Pager).Send
+		$WORK/main.go:30:57-80: in (example.com/plugins.pagerHandler).Handle, call to (example.com/plugins/drivers.Pager).Send
+		$WORK/middleware/middleware.go:44:11-25: in example.com/plugins/middleware.Filter$1$1, call to (example.com/plugins.pagerHandler).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Filter$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+$WORK/drivers/drivers.go:16:2-10: sentinel example.com/plugins/drivers.ErrPager
+	wrap chain (origin → target):
+		$WORK/middleware/middleware.go:30:12-44: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/drivers/drivers.go:82:10-18: in (example.com/plugins/drivers.Pager).Send
+		$WORK/main.go:30:57-80: in (example.com/plugins.pagerHandler).Handle, call to (example.com/plugins/drivers.Pager).Send
+		$WORK/middleware/middleware.go:29:14-28: in example.com/plugins/middleware.Tag$1$1, call to (example.com/plugins.pagerHandler).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Tag$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+$WORK/drivers/drivers.go:16:2-10: sentinel example.com/plugins/drivers.ErrPager [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/middleware/middleware.go:30:12-44: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/drivers/drivers.go:82:10-18: in (example.com/plugins/drivers.Pager).Send
+		$WORK/main.go:30:57-80: in (example.com/plugins.pagerHandler).Handle, call to (example.com/plugins/drivers.Pager).Send
+		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins.pagerHandler).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:29:14-28: in example.com/plugins/middleware.Tag$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Tag$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+$WORK/drivers/drivers.go:16:2-10: sentinel example.com/plugins/drivers.ErrPager
+	wrap chain (origin → target):
+		$WORK/middleware/middleware.go:59:11-47: fmt.Errorf "%w: %w"
+	path (origin → target):
+		$WORK/drivers/drivers.go:82:10-18: in (example.com/plugins/drivers.Pager).Send
+		$WORK/main.go:30:57-80: in (example.com/plugins.pagerHandler).Handle, call to (example.com/plugins/drivers.Pager).Send
+		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins.pagerHandler).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+$WORK/drivers/drivers.go:16:2-10: sentinel example.com/plugins/drivers.ErrPager [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/middleware/middleware.go:59:11-47: fmt.Errorf "%w: %w"
+	path (origin → target):
+		$WORK/drivers/drivers.go:82:10-18: in (example.com/plugins/drivers.Pager).Send
+		$WORK/main.go:30:57-80: in (example.com/plugins.pagerHandler).Handle, call to (example.com/plugins/drivers.Pager).Send
+		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins.pagerHandler).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+$WORK/main.go:24:2-10: sentinel example.com/plugins.errQuota
+	path (origin → target):
+		$WORK/main.go:216:56-64: in example.com/plugins.quota$1
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins.quota$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+$WORK/main.go:24:2-10: sentinel example.com/plugins.errQuota
+	wrap chain (origin → target):
+		$WORK/middleware/middleware.go:30:12-44: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/main.go:216:56-64: in example.com/plugins.quota$1
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins.quota$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:29:14-28: in example.com/plugins/middleware.Tag$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Tag$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+$WORK/main.go:24:2-10: sentinel example.com/plugins.errQuota [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/middleware/middleware.go:30:12-44: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/main.go:216:56-64: in example.com/plugins.quota$1
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins.quota$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:29:14-28: in example.com/plugins/middleware.Tag$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Tag$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+$WORK/main.go:24:2-10: sentinel example.com/plugins.errQuota
+	wrap chain (origin → target):
+		$WORK/middleware/middleware.go:59:11-47: fmt.Errorf "%w: %w"
+	path (origin → target):
+		$WORK/main.go:216:56-64: in example.com/plugins.quota$1
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins.quota$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+$WORK/main.go:24:2-10: sentinel example.com/plugins.errQuota [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/middleware/middleware.go:59:11-47: fmt.Errorf "%w: %w"
+	path (origin → target):
+		$WORK/main.go:216:56-64: in example.com/plugins.quota$1
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins.quota$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+$WORK/middleware/middleware.go:12:5-14: sentinel example.com/plugins/middleware.ErrGaveUp [chain truncated]
+	wrap chain (origin → target):
+		$WORK/middleware/middleware.go:30:12-44: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/middleware/middleware.go:59:32-41: in example.com/plugins/middleware.Retry$1$1
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:29:14-28: in example.com/plugins/middleware.Tag$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Tag$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+$WORK/middleware/middleware.go:12:5-14: sentinel example.com/plugins/middleware.ErrGaveUp
+	wrap chain (origin → target):
+		$WORK/middleware/middleware.go:59:11-47: fmt.Errorf "%w: %w"
+	path (origin → target):
+		$WORK/middleware/middleware.go:59:32-41: in example.com/plugins/middleware.Retry$1$1
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+$WORK/middleware/middleware.go:12:5-14: sentinel example.com/plugins/middleware.ErrGaveUp [chain truncated]
+	wrap chain (origin → target):
+		$WORK/middleware/middleware.go:59:11-47: fmt.Errorf "%w: %w"
+	path (origin → target):
+		$WORK/middleware/middleware.go:59:32-41: in example.com/plugins/middleware.Retry$1$1
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+-: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		-: in example.com/plugins/middleware.Recover$1$1
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Recover$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+-: unresolved(memory): load of escaping variable err
+	wrap chain (origin → target):
+		$WORK/middleware/middleware.go:30:12-44: fmt.Errorf "%s: %w"
+	path (origin → target):
+		-: in example.com/plugins/middleware.Recover$1$1
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Recover$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:29:14-28: in example.com/plugins/middleware.Tag$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Tag$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+-: unresolved(memory): load of escaping variable err [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/middleware/middleware.go:30:12-44: fmt.Errorf "%s: %w"
+	path (origin → target):
+		-: in example.com/plugins/middleware.Recover$1$1
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Recover$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:29:14-28: in example.com/plugins/middleware.Tag$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Tag$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+-: unresolved(memory): load of escaping variable err
+	wrap chain (origin → target):
+		$WORK/middleware/middleware.go:59:11-47: fmt.Errorf "%w: %w"
+	path (origin → target):
+		-: in example.com/plugins/middleware.Recover$1$1
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Recover$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+-: unresolved(memory): load of escaping variable err [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/middleware/middleware.go:59:11-47: fmt.Errorf "%w: %w"
+	path (origin → target):
+		-: in example.com/plugins/middleware.Recover$1$1
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Recover$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+$WORK/middleware/middleware.go:73:4-4: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/middleware/middleware.go:73:4-4: in example.com/plugins/middleware.Recover$1$1
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Recover$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+$WORK/middleware/middleware.go:73:4-4: unresolved(memory): load of escaping variable err
+	wrap chain (origin → target):
+		$WORK/middleware/middleware.go:30:12-44: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/middleware/middleware.go:73:4-4: in example.com/plugins/middleware.Recover$1$1
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Recover$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:29:14-28: in example.com/plugins/middleware.Tag$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Tag$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+$WORK/middleware/middleware.go:73:4-4: unresolved(memory): load of escaping variable err [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/middleware/middleware.go:30:12-44: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/middleware/middleware.go:73:4-4: in example.com/plugins/middleware.Recover$1$1
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Recover$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:29:14-28: in example.com/plugins/middleware.Tag$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Tag$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+$WORK/middleware/middleware.go:73:4-4: unresolved(memory): load of escaping variable err
+	wrap chain (origin → target):
+		$WORK/middleware/middleware.go:59:11-47: fmt.Errorf "%w: %w"
+	path (origin → target):
+		$WORK/middleware/middleware.go:73:4-4: in example.com/plugins/middleware.Recover$1$1
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Recover$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle
+$WORK/middleware/middleware.go:73:4-4: unresolved(memory): load of escaping variable err [chain truncated] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/middleware/middleware.go:59:11-47: fmt.Errorf "%w: %w"
+	path (origin → target):
+		$WORK/middleware/middleware.go:73:4-4: in example.com/plugins/middleware.Recover$1$1
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Recover$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/middleware/middleware.go:55:14-28: in example.com/plugins/middleware.Retry$1$1, call to (example.com/plugins/core.HandlerFunc).Handle (dynamic (example.com/plugins/core.Handler).Handle: 2 of 2 candidates)
+		$WORK/core/core.go:29:67-71: in (example.com/plugins/core.HandlerFunc).Handle, call to example.com/plugins/middleware.Retry$1$1 (dynamic function value f: 5 of 5 candidates)
+		$WORK/main.go:217:9-35: in example.com/plugins.quota, call to (example.com/plugins/core.HandlerFunc).Handle

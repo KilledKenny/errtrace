@@ -1,0 +1,10 @@
+Negative: call-site Target on a dynamic call whose method has no error
+result (p.Name()). Expected: exit 2, "p.Name has no error result", nothing
+on stdout.
+-- args --
+registry/registry.go:@name_call
+-- stdout --
+-- stderr --
+errtrace: $WORK/registry/registry.go:118:55: p.Name has no error result
+-- exit --
+2

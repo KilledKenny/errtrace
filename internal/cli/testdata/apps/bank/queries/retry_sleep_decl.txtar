@@ -1,0 +1,14 @@
+Context cancellation: sleep returns ctx.Err() wrapped "retry: interrupted: %w"; ctx.Err is a dynamic call.
+Go semantics: context.Canceled and context.DeadlineExceeded behind the errorf. (*context.cancelCtx).Err loads the
+error from an atomic.Value field, which is out of scope, so expect 1 unresolved(memory) entry behind the errorf
+chain (1 of 1 candidates) and nothing unwrapped.
+-- args --
+retry/retry.go:@sleep
+-- stdout --
+$WORK/retry/retry.go:58:16-21: Error Set of example.com/bank/retry.sleep: 1 entries, 1 unresolved
+$GOROOT/src/context/context.go:*: unresolved(memory): value of TypeAssert not modelled
+	wrap chain (origin → target):
+		$WORK/retry/retry.go:63:10-57: fmt.Errorf "retry: interrupted: %w"
+	path (origin → target):
+		$GOROOT/src/context/context.go:*: in (*context.cancelCtx).Err
+		$WORK/retry/retry.go:63:47-56: in example.com/bank/retry.sleep, call to (*context.cancelCtx).Err (dynamic (context.Context).Err: 1 of 1 candidates)

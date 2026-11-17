@@ -1,0 +1,9 @@
+Position on the sentinel identifier ErrUnknownFormat in a return statement.
+Negative: exit 2, "no function declaration or call at position", empty stdout.
+-- args --
+internal/codec/gen.go:@format_ret
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/codec/gen.go:14:24: no function declaration or call at position
+-- exit --
+2

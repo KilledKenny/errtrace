@@ -1,0 +1,27 @@
+ce := err.(*CodeError) without comma-ok panics for every other type, so only *CodeError reaches the return.
+Precise answer: 1 entry, *CodeError. Single-value assertions are not in the documented guard table, so the
+sound fallback is all 5 Charge entries; *CodeError must be present in any case.
+-- args --
+processor/as.go:@singleAssert
+-- stdout --
+$WORK/processor/as.go:93:23-37: Error Set of example.com/guards/processor.ChargeMustCode: 5 entries
+$WORK/payerr/payerr.go:8:2-13: sentinel example.com/guards/payerr.ErrDeclined
+	path (origin → target):
+		$WORK/gateway/gateway.go:18:10-28: in example.com/guards/gateway.Charge
+		$WORK/processor/as.go:94:9-26: in example.com/guards/processor.ChargeMustCode, call to example.com/guards/gateway.Charge
+$WORK/payerr/payerr.go:9:2-12: sentinel example.com/guards/payerr.ErrTimeout
+	path (origin → target):
+		$WORK/gateway/gateway.go:20:10-27: in example.com/guards/gateway.Charge
+		$WORK/processor/as.go:94:9-26: in example.com/guards/processor.ChargeMustCode, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:22:10-63: concrete *example.com/guards/payerr.CodeError
+	path (origin → target):
+		$WORK/gateway/gateway.go:22:10-63: in example.com/guards/gateway.Charge
+		$WORK/processor/as.go:94:9-26: in example.com/guards/processor.ChargeMustCode, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:24:10-51: concrete example.com/guards/payerr.ValidationError
+	path (origin → target):
+		$WORK/gateway/gateway.go:24:10-51: in example.com/guards/gateway.Charge
+		$WORK/processor/as.go:94:9-26: in example.com/guards/processor.ChargeMustCode, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:26:9-35: opaque errors.New "gateway down"
+	path (origin → target):
+		$WORK/gateway/gateway.go:26:9-35: in example.com/guards/gateway.Charge
+		$WORK/processor/as.go:94:9-26: in example.com/guards/processor.ChargeMustCode, call to example.com/guards/gateway.Charge

@@ -1,0 +1,9 @@
+Literal position 49:2, the "defer" keyword of "defer s.Close()" in run (column 1 is the tab; no marker, so that the line's other columns stay put).
+Negative: only the callee name or the opening paren names a call, the statement keyword does not: exit 2, no target. Contrast call_defer.
+-- args --
+cmd/ingest/main.go:49:2
+-- stdout --
+-- stderr --
+errtrace: $WORK/cmd/ingest/main.go:49:2: no function declaration or call at position
+-- exit --
+2

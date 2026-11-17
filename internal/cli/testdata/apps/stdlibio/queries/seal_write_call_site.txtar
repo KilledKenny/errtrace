@@ -1,0 +1,245 @@
+Call site f.Write(trailer) on an *os.File, the first operand of Seal's errors.Join and
+the oracle for seal_join_silent_truncation. Expected: os.ErrInvalid (nil file),
+io.ErrShortWrite (File.Write), and the poll/syscall write errors, among them
+io.ErrUnexpectedEOF, poll.ErrDeadlineExceeded, poll.ErrNotPollable and the opaque
+"waiting for unsupported file type", under *fs.PathError.Unwrap, with os.ErrClosed
+replacing poll.ErrFileClosing there. No errors.Join link (the Target is the operand).
+The unwrapped copies of the poll/syscall values are the accepted over-approximation of
+(*os.File).wrapErr described in the README ("if err == nil || err == io.EOF { return
+err }" is a merge without phi, plan P07).
+-- args --
+source/source.go:@sealwrite
+-- stdout --
+$WORK/source/source.go:192:13-43: Error Set of call to f.Write in example.com/stdlibio/source.Seal: 22 entries
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).writeLock, call to internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to (*internal/poll.FD).writeLock
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/source/source.go:192:13-43: in example.com/stdlibio/source.Seal, call to (*os.File).Write
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).writeLock, call to internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to (*internal/poll.FD).writeLock
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/source/source.go:192:13-43: in example.com/stdlibio/source.Seal, call to (*os.File).Write
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrFileClosing
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).writeLock, call to internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to (*internal/poll.FD).writeLock
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/source/source.go:192:13-43: in example.com/stdlibio/source.Seal, call to (*os.File).Write
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrDeadlineExceeded
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepare, call to internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepareWrite, call to (*internal/poll.pollDesc).prepare
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to (*internal/poll.pollDesc).prepareWrite
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/source/source.go:192:13-43: in example.com/stdlibio/source.Seal, call to (*os.File).Write
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrDeadlineExceeded
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepare, call to internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepareWrite, call to (*internal/poll.pollDesc).prepare
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to (*internal/poll.pollDesc).prepareWrite
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/source/source.go:192:13-43: in example.com/stdlibio/source.Seal, call to (*os.File).Write
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNotPollable
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepare, call to internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepareWrite, call to (*internal/poll.pollDesc).prepare
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to (*internal/poll.pollDesc).prepareWrite
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/source/source.go:192:13-43: in example.com/stdlibio/source.Seal, call to (*os.File).Write
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNotPollable
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepare, call to internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepareWrite, call to (*internal/poll.pollDesc).prepare
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to (*internal/poll.pollDesc).prepareWrite
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/source/source.go:192:13-43: in example.com/stdlibio/source.Seal, call to (*os.File).Write
+$GOROOT/src/io/io.go:*: sentinel io.ErrShortWrite
+	path (origin → target):
+		$GOROOT/src/os/file.go:*: in (*os.File).Write
+		$WORK/source/source.go:192:13-43: in example.com/stdlibio/source.Seal, call to (*os.File).Write
+$GOROOT/src/io/io.go:*: sentinel io.ErrUnexpectedEOF
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/source/source.go:192:13-43: in example.com/stdlibio/source.Seal, call to (*os.File).Write
+$GOROOT/src/io/io.go:*: sentinel io.ErrUnexpectedEOF
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/source/source.go:192:13-43: in example.com/stdlibio/source.Seal, call to (*os.File).Write
+$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid
+	path (origin → target):
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).checkValid
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).checkValid
+		$WORK/source/source.go:192:13-43: in example.com/stdlibio/source.Seal, call to (*os.File).Write
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/source/source.go:192:13-43: in example.com/stdlibio/source.Seal, call to (*os.File).Write
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/source/source.go:192:13-43: in example.com/stdlibio/source.Seal, call to (*os.File).Write
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/source/source.go:192:13-43: in example.com/stdlibio/source.Seal, call to (*os.File).Write
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/source/source.go:192:13-43: in example.com/stdlibio/source.Seal, call to (*os.File).Write
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/source/source.go:192:13-43: in example.com/stdlibio/source.Seal, call to (*os.File).Write
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/source/source.go:192:13-43: in example.com/stdlibio/source.Seal, call to (*os.File).Write
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/source/source.go:192:13-43: in example.com/stdlibio/source.Seal, call to (*os.File).Write
+$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/source/source.go:192:13-43: in example.com/stdlibio/source.Seal, call to (*os.File).Write
+$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 3 of 3 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/source/source.go:192:13-43: in example.com/stdlibio/source.Seal, call to (*os.File).Write
+$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type"
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).waitWrite, call to (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to (*internal/poll.pollDesc).waitWrite
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/source/source.go:192:13-43: in example.com/stdlibio/source.Seal, call to (*os.File).Write
+$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type"
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).waitWrite, call to (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to (*internal/poll.pollDesc).waitWrite
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/source/source.go:192:13-43: in example.com/stdlibio/source.Seal, call to (*os.File).Write

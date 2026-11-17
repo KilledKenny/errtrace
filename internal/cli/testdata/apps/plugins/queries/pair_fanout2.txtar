@@ -1,0 +1,9 @@
+Same as pair_decl with "-fanout 2" (two-argument flag form): 2 entries at a
+site with 2 Candidates reach the threshold, so one group of 2.
+-- args --
+-fanout 2 dispatch/fanout.go:@pair
+-- stdout --
+$WORK/dispatch/fanout.go:13:15-23: Error Set of example.com/plugins/dispatch.SendPair: 2 entries
+$WORK/dispatch/fanout.go:13:68-93: group of 2 entries via dynamic call to (example.com/plugins/core.Driver).Send (2 candidates) in example.com/plugins/dispatch.SendPair
+	$WORK/drivers/drivers.go:13:2-10: sentinel example.com/plugins/drivers.ErrEmail (candidate (example.com/plugins/drivers.Email).Send)
+	$WORK/drivers/drivers.go:14:2-8: sentinel example.com/plugins/drivers.ErrSMS (candidate (*example.com/plugins/drivers.SMS).Send)

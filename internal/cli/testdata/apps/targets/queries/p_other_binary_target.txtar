@@ -1,0 +1,46 @@
+Target run of cmd/report while -p names only the OTHER binary, ./cmd/ingest: the Target file's package is loaded in addition and its main becomes a root too.
+Expected: 7 entries = the 6 of decl_main_pkg_report plus disk.ErrNoEntry wrapped "get %q: %w" (the Disk Backend wired by cmd/ingest is a second Candidate of s.be.Read; VTA is per program, not per binary, as in call_report_get_all_binaries). Real package name example.com/targets/cmd/report, no unreachable warning.
+-- args --
+-p ./cmd/ingest cmd/report/main.go:@run
+-- stdout --
+$WORK/cmd/report/main.go:20:14-17: Error Set of example.com/targets/cmd/report.run: 7 entries
+$WORK/internal/codec/codec.go:12:2-10: sentinel example.com/targets/internal/codec.ErrEmpty [+3 more paths]
+	path (origin → target):
+		$WORK/internal/codec/codec.go:32:16-24: in example.com/targets/internal/codec.Decode[int]
+		$WORK/cmd/report/main.go:36:12-65: in example.com/targets/cmd/report.run, call to example.com/targets/internal/codec.Decode[int]
+$WORK/internal/codec/codec.go:13:2-11: sentinel example.com/targets/internal/codec.ErrSyntax
+	wrap chain (origin → target):
+		$WORK/internal/codec/codec.go:36:16-45: fmt.Errorf "decode: %w"
+	path (origin → target):
+		$WORK/internal/codec/codec.go:54:14-23: in example.com/targets/internal/codec.ParseInt
+		$WORK/cmd/report/main.go:36:12-65: in example.com/targets/cmd/report.run, call to example.com/targets/internal/codec.ParseInt (dynamic function value parse: 1 of 1 candidates)
+$WORK/internal/codec/codec.go:14:2-18: sentinel example.com/targets/internal/codec.ErrUnknownFormat
+	path (origin → target):
+		$WORK/internal/codec/gen.go:14:24-40: in example.com/targets/internal/codec.Format
+		$WORK/cmd/report/main.go:24:12-32: in example.com/targets/cmd/report.run, call to example.com/targets/internal/codec.Format
+$WORK/internal/platform/limits_default.go:8:5-15: sentinel example.com/targets/internal/platform.ErrNoLimit
+	wrap chain (origin → target):
+		$WORK/cmd/report/main.go:22:10-39: fmt.Errorf "report: %w"
+	path (origin → target):
+		$WORK/internal/platform/limits_default.go:12:12-22: in example.com/targets/internal/platform.MaxBatch
+		$WORK/internal/platform/platform.go:6:12-22: in example.com/targets/internal/platform.Probe, call to example.com/targets/internal/platform.MaxBatch
+		$WORK/cmd/report/main.go:21:12-43: in example.com/targets/cmd/report.run, call to example.com/targets/internal/platform.Probe
+$WORK/internal/store/disk/disk.go:7:5-15: sentinel example.com/targets/internal/store/disk.ErrNoEntry
+	wrap chain (origin → target):
+		$WORK/internal/store/store.go:51:30-79: fmt.Errorf "get %q: %w"
+	path (origin → target):
+		$WORK/internal/store/disk/disk.go:40:15-25: in (*example.com/targets/internal/store/disk.Disk).Read
+		$WORK/internal/store/store.go:49:14-43: in (*example.com/targets/internal/store.Store).Get, call to (*example.com/targets/internal/store/disk.Disk).Read (dynamic (example.com/targets/internal/store.Backend).Read: 2 of 2 candidates)
+		$WORK/cmd/report/main.go:29:14-41: in example.com/targets/cmd/report.run, call to (*example.com/targets/internal/store.Store).Get
+$WORK/internal/store/store.go:11:2-13: sentinel example.com/targets/internal/store.ErrNotFound
+	wrap chain (origin → target):
+		$WORK/internal/store/store.go:51:30-79: fmt.Errorf "get %q: %w"
+	path (origin → target):
+		$WORK/internal/store/store.go:111:15-26: in (*example.com/targets/internal/store.mem).Read
+		$WORK/internal/store/store.go:49:14-43: in (*example.com/targets/internal/store.Store).Get, call to (*example.com/targets/internal/store.mem).Read (dynamic (example.com/targets/internal/store.Backend).Read: 2 of 2 candidates)
+		$WORK/cmd/report/main.go:29:14-41: in example.com/targets/cmd/report.run, call to (*example.com/targets/internal/store.Store).Get
+$WORK/internal/store/store.go:12:2-11: sentinel example.com/targets/internal/store.ErrClosed
+	path (origin → target):
+		$WORK/internal/store/store.go:28:10-19: in (*example.com/targets/internal/store.base).Check
+		$WORK/internal/store/store.go:45:12-34: in (*example.com/targets/internal/store.Store).Get, call to (*example.com/targets/internal/store.base).Check
+		$WORK/cmd/report/main.go:29:14-41: in example.com/targets/cmd/report.run, call to (*example.com/targets/internal/store.Store).Get

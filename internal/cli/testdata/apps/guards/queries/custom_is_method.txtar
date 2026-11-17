@@ -1,0 +1,17 @@
+errors.Is(err, ErrNotFound) on gateway.Quirky: *FlexError has a custom Is, *ShapeError only a custom As.
+Expect ErrNotFound removed; *FlexError kept and marked possibly handled; *ShapeError kept (errors.Is never
+calls As, so ideally without a mark).
+-- args --
+processor/is.go:@customIs
+-- stdout --
+$WORK/processor/is.go:156:19-27: Error Set of example.com/guards/processor.QuirkyIs: 2 entries, 1 possibly handled
+$WORK/gateway/gateway.go:84:10-45: concrete *example.com/guards/payerr.FlexError
+	possibly handled:
+		$WORK/processor/is.go:158:5-39: errors.Is with example.com/guards/payerr.ErrNotFound: custom Is method of *example.com/guards/payerr.FlexError
+	path (origin → target):
+		$WORK/gateway/gateway.go:84:10-45: in example.com/guards/gateway.Quirky
+		$WORK/processor/is.go:157:9-26: in example.com/guards/processor.QuirkyIs, call to example.com/guards/gateway.Quirky
+$WORK/gateway/gateway.go:87:10-37: concrete *example.com/guards/payerr.ShapeError
+	path (origin → target):
+		$WORK/gateway/gateway.go:87:10-37: in example.com/guards/gateway.Quirky
+		$WORK/processor/is.go:157:9-26: in example.com/guards/processor.QuirkyIs, call to example.com/guards/gateway.Quirky

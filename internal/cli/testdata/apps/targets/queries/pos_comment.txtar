@@ -1,0 +1,9 @@
+Position inside the doc comment of Probe (on the word Probe).
+Negative: a comment is not the declaration; exit 2, no target.
+-- args --
+internal/platform/platform.go:4:10
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/platform/platform.go:4:10: no function declaration or call at position
+-- exit --
+2

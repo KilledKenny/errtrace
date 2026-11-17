@@ -1,0 +1,19 @@
+Cleanup returns the os.Remove error unless os.IsNotExist(err). Expected: the
+os.Remove origins (syscall errno values under *fs.PathError.Unwrap), each marked
+"possibly handled" by the os.IsNotExist helper guard; nothing is wrapped by Cleanup.
+-- args --
+source/source.go:@cleanup
+-- stdout --
+$WORK/source/source.go:42:18-25: Error Set of example.com/stdlibio/source.Cleanup: 11 entries, 4 unresolved, 11 possibly handled
+$GOROOT/src/os/file_posix.go:*: group of 11 entries via dynamic call to function value fn (10 candidates) in os.ignoringEINTR
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN (candidate os.Remove$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL (candidate os.Remove$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT (candidate os.Remove$1)
+	$GOROOT/src/syscall/syscall.go:*: concrete syscall.Errno (candidate os.Remove$1)
+	$GOROOT/src/syscall/syscall_linux.go:*: concrete syscall.Errno (candidate os.chmod$1)
+	$GOROOT/src/syscall/syscall_linux.go:*: concrete syscall.Errno (candidate os.chmod$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno (candidate os.Remove$1)
+	$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e (candidate os.openFileNolog$1)
+	$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e (candidate os.openDirNolog$1)
+	$GOROOT/src/os/root_unix.go:*: unresolved(memory): load of escaping variable e (candidate os.readlinkat$1)
+	$GOROOT/src/syscall/syscall_linux.go:*: unresolved(no-body): internal/runtime/syscall/linux.Syscall6 has no body (candidate os.checkPidfd$1)

@@ -1,0 +1,49 @@
+SUSPECTED BUG (inherited from repo_stat_decl and repo_probe_decl): two bare `concrete *kverr.OpError` entries replace 5 expected ones.
+Three early-return checks; the last passes a typed-nil-prone result through two wrapping helpers (tag -> annotate).
+Expected: Alive's 3 entries (all 'possibly handled', see repo_alive_decl); Stat's ErrEmptyKey, ErrClosed, ErrNotFound under *kverr.OpError.Unwrap;
+and, under fmt.Errorf "%s: %w", repo.Probe's ErrEmptyKey (via Unwrap) and concrete *kverr.OpError [typed nil] (annotate's `err == nil` does not catch a typed nil).
+Actual: Alive's 3 entries are right; Stat contributes one bare concrete *kverr.OpError, Probe one bare concrete *kverr.OpError under "%s: %w"; no typed nil.
+Correct parts: no depends-on-caller entry, and the path of the wrapped entry goes Probe -> tag -> annotate.
+-- args --
+service/service.go:@probe
+-- stdout --
+$WORK/service/service.go:247:29-34: Error Set of (*example.com/kvstore/service.Service).Probe: 5 entries, 1 unresolved, 3 possibly handled
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	possibly handled:
+		$WORK/repo/repo.go:176:5-28: comparison with example.com/kvstore/engine.ErrClosed: engine.ErrClosed is reassigned outside its initialization
+	path (origin → target):
+		$WORK/engine/engine.go:195:10-19: in (*example.com/kvstore/engine.Engine).Wait
+		$WORK/repo/repo.go:28:9-21: in (*example.com/kvstore/repo.base).Ping, call to (*example.com/kvstore/engine.Engine).Wait
+		$WORK/repo/repo.go:175:9-17: in (*example.com/kvstore/repo.Repo).Alive, call to (*example.com/kvstore/repo.base).Ping
+		$WORK/service/service.go:248:12-26: in (*example.com/kvstore/service.Service).Probe, call to (*example.com/kvstore/repo.Repo).Alive
+$WORK/kverr/kverr.go:18:2-13: sentinel example.com/kvstore/kverr.errInternal
+	possibly handled:
+		$WORK/repo/repo.go:176:5-28: comparison with example.com/kvstore/engine.ErrClosed: sentinel kverr.errInternal may be the same value as engine.ErrClosed
+	path (origin → target):
+		$WORK/kverr/kverr.go:22:45-56: in example.com/kvstore/kverr.Internal
+		$WORK/repo/repo.go:26:10-26: in (*example.com/kvstore/repo.base).Ping, call to example.com/kvstore/kverr.Internal
+		$WORK/repo/repo.go:175:9-17: in (*example.com/kvstore/repo.Repo).Alive, call to (*example.com/kvstore/repo.base).Ping
+		$WORK/service/service.go:248:12-26: in (*example.com/kvstore/service.Service).Probe, call to (*example.com/kvstore/repo.Repo).Alive
+$WORK/kverr/kverr.go:75:5-6: concrete *example.com/kvstore/kverr.OpError
+	path (origin → target):
+		$WORK/kverr/kverr.go:75:5-6: in (*example.com/kvstore/kverr.OpError).OrNil
+		$WORK/repo/repo.go:171:57-76: in (*example.com/kvstore/repo.Repo).Stat, call to (*example.com/kvstore/kverr.OpError).OrNil
+		$WORK/service/service.go:251:12-28: in (*example.com/kvstore/service.Service).Probe, call to (*example.com/kvstore/repo.Repo).Stat
+$WORK/repo/repo.go:167:9-11: concrete *example.com/kvstore/kverr.OpError
+	wrap chain (origin → target):
+		$WORK/service/service.go:135:9-38: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/repo/repo.go:167:9-11: in (*example.com/kvstore/repo.Repo).Probe
+		$WORK/service/service.go:254:13-30: in (*example.com/kvstore/service.Service).Probe, call to (*example.com/kvstore/repo.Repo).Probe
+		$WORK/service/service.go:243:42-45: in example.com/kvstore/service.tag
+		$WORK/service/service.go:132:5-8: in example.com/kvstore/service.annotate
+		$WORK/service/service.go:243:22-46: in example.com/kvstore/service.tag, call to example.com/kvstore/service.annotate
+		$WORK/service/service.go:254:9-31: in (*example.com/kvstore/service.Service).Probe, call to example.com/kvstore/service.tag
+$WORK/engine/engine.go:196:14-22: unresolved(memory): channel receive in select
+	possibly handled:
+		$WORK/repo/repo.go:176:5-28: comparison with example.com/kvstore/engine.ErrClosed: unresolved value
+	path (origin → target):
+		$WORK/engine/engine.go:196:14-22: in (*example.com/kvstore/engine.Engine).Wait
+		$WORK/repo/repo.go:28:9-21: in (*example.com/kvstore/repo.base).Ping, call to (*example.com/kvstore/engine.Engine).Wait
+		$WORK/repo/repo.go:175:9-17: in (*example.com/kvstore/repo.Repo).Alive, call to (*example.com/kvstore/repo.base).Ping
+		$WORK/service/service.go:248:12-26: in (*example.com/kvstore/service.Service).Probe, call to (*example.com/kvstore/repo.Repo).Alive

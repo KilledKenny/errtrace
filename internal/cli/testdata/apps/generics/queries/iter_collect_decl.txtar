@@ -1,0 +1,18 @@
+SUSPECTED BUG: both origins are missing; the set holds only two unresolved(memory) entries "load of escaping variable "
+with an empty variable name (trailing space) and zero-width spans, one of them for the final plain nil return.
+Explicit Unresolved entries are allowed by the Unresolved rule; the defects are that a plain range-over-func loop is
+not followed at all (same for a non-generic iter.Seq[error]) and that the entries name nothing.
+Range-over-func: Collect ranges over the iter.Seq2[int, error] built by Parse(src, parsePort) and returns the yielded error.
+Expect ErrEmpty and *TypedErr[string] (Op "port") from parsePort.
+-- args --
+pipeline.go:@collectports
+-- stdout --
+$WORK/pipeline.go:97:23-35: Error Set of example.com/generics.collectPorts: 2 entries, 2 unresolved
+$WORK/seq/iter.go:21:4-4: unresolved(memory): load of escaping variable 
+	path (origin → target):
+		$WORK/seq/iter.go:21:4-4: in example.com/generics/seq.Collect[int]
+		$WORK/pipeline.go:98:9-47: in example.com/generics.collectPorts, call to example.com/generics/seq.Collect[int]
+$WORK/seq/iter.go:25:2-2: unresolved(memory): load of escaping variable 
+	path (origin → target):
+		$WORK/seq/iter.go:25:2-2: in example.com/generics/seq.Collect[int]
+		$WORK/pipeline.go:98:9-47: in example.com/generics.collectPorts, call to example.com/generics/seq.Collect[int]

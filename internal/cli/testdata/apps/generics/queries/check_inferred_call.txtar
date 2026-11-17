@@ -1,0 +1,15 @@
+SUSPECTED BUG: path only - the hop through the generic instance is collapsed (see check_explicit_call); the Error Set itself is as expected.
+Call site of the inferred instance Check[UserID]: must narrow to UserID.Validate.
+Expect exactly ErrNegative and ErrEmpty; no *TypedErr[string], no opaque Email error, no ErrTooLong.
+-- args --
+validation.go:@inferred
+-- stdout --
+$WORK/validation.go:7:9-40: Error Set of call to validate.Check in example.com/generics.checkInferred: 2 entries
+$WORK/errs/errs.go:13:2-10: sentinel example.com/generics/errs.ErrEmpty
+	path (origin → target):
+		$WORK/validate/validate.go:25:10-23: in (example.com/generics/validate.UserID).Validate
+		$WORK/validation.go:7:9-40: in example.com/generics.checkInferred, call to (example.com/generics/validate.UserID).Validate
+$WORK/errs/errs.go:14:2-13: sentinel example.com/generics/errs.ErrNegative
+	path (origin → target):
+		$WORK/validate/validate.go:22:10-26: in (example.com/generics/validate.UserID).Validate
+		$WORK/validation.go:7:9-40: in example.com/generics.checkInferred, call to (example.com/generics/validate.UserID).Validate

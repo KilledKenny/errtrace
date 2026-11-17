@@ -1,0 +1,13 @@
+Closure passed as a callback down into the engine and its error coming back up.
+Expect: sentinel repo.ErrTooMany with the chain fmt.Errorf "scan %q: %w" (added by Engine.Scan).
+-- args --
+repo/repo.go:@keys
+-- stdout --
+$WORK/repo/repo.go:117:25-29: Error Set of (*example.com/kvstore/repo.Repo).Keys: 1 entries
+$WORK/repo/repo.go:16:5-15: sentinel example.com/kvstore/repo.ErrTooMany
+	wrap chain (origin → target):
+		$WORK/engine/engine.go:163:10-48: fmt.Errorf "scan %q: %w"
+	path (origin → target):
+		$WORK/repo/repo.go:121:11-21: in (*example.com/kvstore/repo.Repo).Keys$1
+		$WORK/engine/engine.go:154:13-21: in (*example.com/kvstore/engine.Engine).Scan, call to (*example.com/kvstore/repo.Repo).Keys$1 (dynamic function value visit: 1 of 1 candidates)
+		$WORK/repo/repo.go:119:9-125:4: in (*example.com/kvstore/repo.Repo).Keys, call to (*example.com/kvstore/engine.Engine).Scan

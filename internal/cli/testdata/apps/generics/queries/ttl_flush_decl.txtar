@@ -1,0 +1,6 @@
+Negative: (*TTL[K,V]).Flush returns the embedded Flush error only when it is not ErrEmpty (errors.Is), and
+(*Cache).Flush returns only ErrEmpty. Expect 0 entries.
+-- args --
+cache/ttl.go:@ttlflush
+-- stdout --
+$WORK/cache/ttl.go:35:34-39: Error Set of (*example.com/generics/cache.TTL[K, V]).Flush: 0 entries

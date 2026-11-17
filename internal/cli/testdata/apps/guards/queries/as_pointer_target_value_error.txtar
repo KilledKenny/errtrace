@@ -1,0 +1,27 @@
+errors.As with a **ValidationError target while gateway.Charge returns ValidationError VALUES: a value is not
+assignable to *ValidationError, so the check never matches (must not filter).
+Expect all 5 Charge entries; the concrete ValidationError MUST stay.
+-- args --
+processor/edge.go:@asWrongTarget
+-- stdout --
+$WORK/processor/edge.go:16:24-43: Error Set of example.com/guards/processor.ChargeAsWrongTarget: 5 entries
+$WORK/payerr/payerr.go:8:2-13: sentinel example.com/guards/payerr.ErrDeclined
+	path (origin → target):
+		$WORK/gateway/gateway.go:18:10-28: in example.com/guards/gateway.Charge
+		$WORK/processor/edge.go:17:9-26: in example.com/guards/processor.ChargeAsWrongTarget, call to example.com/guards/gateway.Charge
+$WORK/payerr/payerr.go:9:2-12: sentinel example.com/guards/payerr.ErrTimeout
+	path (origin → target):
+		$WORK/gateway/gateway.go:20:10-27: in example.com/guards/gateway.Charge
+		$WORK/processor/edge.go:17:9-26: in example.com/guards/processor.ChargeAsWrongTarget, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:22:10-63: concrete *example.com/guards/payerr.CodeError
+	path (origin → target):
+		$WORK/gateway/gateway.go:22:10-63: in example.com/guards/gateway.Charge
+		$WORK/processor/edge.go:17:9-26: in example.com/guards/processor.ChargeAsWrongTarget, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:24:10-51: concrete example.com/guards/payerr.ValidationError
+	path (origin → target):
+		$WORK/gateway/gateway.go:24:10-51: in example.com/guards/gateway.Charge
+		$WORK/processor/edge.go:17:9-26: in example.com/guards/processor.ChargeAsWrongTarget, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:26:9-35: opaque errors.New "gateway down"
+	path (origin → target):
+		$WORK/gateway/gateway.go:26:9-35: in example.com/guards/gateway.Charge
+		$WORK/processor/edge.go:17:9-26: in example.com/guards/processor.ChargeAsWrongTarget, call to example.com/guards/gateway.Charge

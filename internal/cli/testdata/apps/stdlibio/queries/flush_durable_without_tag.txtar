@@ -1,0 +1,10 @@
+Negative: the Target file is excluded by its //go:build durable constraint and no
+-tags is given. Expected exit 2 with a message saying the file is not part of any
+loaded package (ideally mentioning build constraints); empty stdout.
+-- args --
+source/flush_durable.go:@flush
+-- stdout --
+-- stderr --
+errtrace: $WORK/source/flush_durable.go: file is not in any loaded package
+-- exit --
+2

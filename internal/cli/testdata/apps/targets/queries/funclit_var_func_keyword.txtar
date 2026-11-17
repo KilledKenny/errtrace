@@ -1,0 +1,9 @@
+Declaration target on the "func" keyword of the function literal assigned to the package var codec.Trim.
+Expected: 1 entry, sentinel codec.ErrEmpty; the target is named as a closure of the package initialiser.
+-- args --
+internal/codec/codec.go:@trim_lit
+-- stdout --
+$WORK/internal/codec/codec.go:42:38-42: Error Set of example.com/targets/internal/codec.init$1: 1 entries
+$WORK/internal/codec/codec.go:12:2-10: sentinel example.com/targets/internal/codec.ErrEmpty
+	path (origin → target):
+		$WORK/internal/codec/codec.go:44:15-23: in example.com/targets/internal/codec.init$1

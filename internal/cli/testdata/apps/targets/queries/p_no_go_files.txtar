@@ -1,0 +1,9 @@
+SUSPECTED BUG (low confidence, cosmetic): -p naming a directory without Go files.
+Negative: exit 2, "no Go files in ...". Expected message "errtrace: no Go files in assets"; actual has a stray "-: " position placeholder ("errtrace: -: no Go files in assets"). The same prefix appears in p_matches_nothing, p_nonexistent_dir and p_nested_module_pattern.
+-- args --
+-p ./assets internal/platform/platform.go:5:6
+-- stdout --
+-- stderr --
+errtrace: -: no Go files in $WORK/assets
+-- exit --
+2

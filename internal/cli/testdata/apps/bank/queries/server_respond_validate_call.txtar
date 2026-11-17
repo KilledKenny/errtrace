@@ -1,0 +1,6 @@
+Negative: respond(out, srv.Validate(...)). Validate only returns nil or *api.Error values, which respond prints.
+Expect 0 entries.
+-- args --
+cmd/server/main.go:@respond_validate_call
+-- stdout --
+$WORK/cmd/server/main.go:106:40-80: Error Set of call to respond in example.com/bank/cmd/server.serve: 0 entries

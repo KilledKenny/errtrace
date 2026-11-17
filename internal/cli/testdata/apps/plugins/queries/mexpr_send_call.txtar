@@ -1,0 +1,11 @@
+Call-site Target on a call through a variable holding the method
+expression (*drivers.SMS).Send. Expected: only drivers.ErrSMS (the
+declaration query mexpr_decl also has ErrEmail from the second call).
+-- args --
+dispatch/funcs.go:@mexpr_send
+-- stdout --
+$WORK/dispatch/funcs.go:99:27-50: Error Set of call to send in example.com/plugins/dispatch.ViaMethodExpr: 1 entries
+$WORK/drivers/drivers.go:14:2-8: sentinel example.com/plugins/drivers.ErrSMS
+	path (origin → target):
+		$WORK/drivers/drivers.go:37:10-16: in (*example.com/plugins/drivers.SMS).Send
+		$WORK/dispatch/funcs.go:99:27-50: in example.com/plugins/dispatch.ViaMethodExpr, call to (*example.com/plugins/drivers.SMS).Send

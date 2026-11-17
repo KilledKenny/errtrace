@@ -1,0 +1,10 @@
+Option[Name].Unwrap is a method named Unwrap on a non-error generic type (not a Wrap).
+Expect one entry, ErrEmpty, with no wrap chain.
+-- args --
+caching.go:@optunwrap
+-- stdout --
+$WORK/caching.go:80:9-33: Error Set of call to o.Unwrap in example.com/generics.firstName: 1 entries
+$WORK/errs/errs.go:13:2-10: sentinel example.com/generics/errs.ErrEmpty
+	path (origin → target):
+		$WORK/result/result.go:32:16-29: in (example.com/generics/result.Option[example.com/generics/validate.Name]).Unwrap
+		$WORK/caching.go:80:9-33: in example.com/generics.firstName, call to (example.com/generics/result.Option[example.com/generics/validate.Name]).Unwrap

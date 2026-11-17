@@ -1,0 +1,16 @@
+Call-site Target on the dynamic call d.Send itself (9 Candidates).
+Expected: the same 8 entries as the declaration query, grouped (the Target
+call is the dynamic hop nearest the Target).
+-- args --
+dispatch/fanout.go:@nine_call
+-- stdout --
+$WORK/dispatch/fanout.go:28:68-91: Error Set of call to d.Send in example.com/plugins/dispatch.SendNine: 8 entries
+$WORK/dispatch/fanout.go:28:68-91: group of 8 entries via dynamic call to (example.com/plugins/core.Driver).Send (9 candidates) in example.com/plugins/dispatch.SendNine
+	$WORK/drivers/drivers.go:13:2-10: sentinel example.com/plugins/drivers.ErrEmail (candidate (example.com/plugins/drivers.Email).Send)
+	$WORK/drivers/drivers.go:14:2-8: sentinel example.com/plugins/drivers.ErrSMS (candidate (*example.com/plugins/drivers.SMS).Send)
+	$WORK/drivers/drivers.go:15:2-10: sentinel example.com/plugins/drivers.ErrSlack (candidate (example.com/plugins/drivers.Slack).Send)
+	$WORK/drivers/drivers.go:16:2-10: sentinel example.com/plugins/drivers.ErrPager (candidate (example.com/plugins/drivers.Pager).Send)
+	$WORK/drivers/drivers.go:17:2-9: sentinel example.com/plugins/drivers.ErrFile (candidate (example.com/plugins/drivers.File).Send)
+	$WORK/drivers/drivers.go:18:2-10: sentinel example.com/plugins/drivers.ErrQueue (candidate (example.com/plugins/drivers.Queue).Send)
+	$WORK/drivers/drivers.go:62:10-31: concrete *example.com/plugins/drivers.HTTPError (candidate (*example.com/plugins/drivers.Webhook).Send)
+	$WORK/drivers/drivers.go:72:10-47: opaque errors.New "push: negative priority" (candidate (example.com/plugins/drivers.Push).Send)

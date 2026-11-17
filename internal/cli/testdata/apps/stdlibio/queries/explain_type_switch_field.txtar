@@ -1,0 +1,123 @@
+Explain type-switches on the strconv.Atoi error: for *strconv.NumError it returns the
+field e.Err, the default branch returns err. Expected: an Unresolved(memory) "load of
+field Err of *strconv.NumError" and NO entry wrapped in *strconv.NumError.Unwrap (the
+wrapper itself is never returned: ErrSyntax/ErrRange only hide behind the field). The
+default branch may contribute the bare internal/strconv.Error over-approximation of
+port_wrap_numerror, since those values are not *NumError.
+-- args --
+config/config.go:@explain
+-- stdout --
+$WORK/config/config.go:47:18-25: Error Set of example.com/stdlibio/config.Explain: 14 entries, 1 unresolved
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/config/config.go:48:12-27: in example.com/stdlibio/config.Explain, call to strconv.Atoi
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/config/config.go:48:12-27: in example.com/stdlibio/config.Explain, call to strconv.Atoi
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/config/config.go:48:12-27: in example.com/stdlibio/config.Explain, call to strconv.Atoi
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/config/config.go:48:12-27: in example.com/stdlibio/config.Explain, call to strconv.Atoi
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/config/config.go:48:12-27: in example.com/stdlibio/config.Explain, call to strconv.Atoi
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/config/config.go:48:12-27: in example.com/stdlibio/config.Explain, call to strconv.Atoi
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/config/config.go:48:12-27: in example.com/stdlibio/config.Explain, call to strconv.Atoi
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/config/config.go:48:12-27: in example.com/stdlibio/config.Explain, call to strconv.Atoi
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/config/config.go:48:12-27: in example.com/stdlibio/config.Explain, call to strconv.Atoi
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/config/config.go:48:12-27: in example.com/stdlibio/config.Explain, call to strconv.Atoi
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/config/config.go:48:12-27: in example.com/stdlibio/config.Explain, call to strconv.Atoi
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/config/config.go:48:12-27: in example.com/stdlibio/config.Explain, call to strconv.Atoi
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to internal/strconv.Atoi
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.Atoi, call to strconv.toError
+		$WORK/config/config.go:48:12-27: in example.com/stdlibio/config.Explain, call to strconv.Atoi
+$WORK/config/config.go:53:10-15: unresolved(memory): load of field Err of *strconv.NumError
+	path (origin → target):
+		$WORK/config/config.go:53:10-15: in example.com/stdlibio/config.Explain

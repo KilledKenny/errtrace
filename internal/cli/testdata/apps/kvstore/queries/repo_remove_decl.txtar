@@ -1,0 +1,19 @@
+SUSPECTED BUG (low confidence, same as engine_delete_decl): the always-nil engine.ErrIgnored is propagated across packages as a sentinel.
+One-line forwarding method.
+Expected: engine.ErrClosed and kverr.ErrEmptyKey only.
+-- args --
+repo/repo.go:@remove
+-- stdout --
+$WORK/repo/repo.go:130:27-33: Error Set of (*example.com/kvstore/repo.Repo).Remove: 3 entries
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	path (origin → target):
+		$WORK/engine/engine.go:118:10-19: in (*example.com/kvstore/engine.Engine).Delete
+		$WORK/repo/repo.go:130:61-86: in (*example.com/kvstore/repo.Repo).Remove, call to (*example.com/kvstore/engine.Engine).Delete
+$WORK/engine/engine.go:22:2-12: sentinel example.com/kvstore/engine.ErrIgnored
+	path (origin → target):
+		$WORK/engine/engine.go:122:10-20: in (*example.com/kvstore/engine.Engine).Delete
+		$WORK/repo/repo.go:130:61-86: in (*example.com/kvstore/repo.Repo).Remove, call to (*example.com/kvstore/engine.Engine).Delete
+$WORK/kverr/kverr.go:44:5-16: sentinel example.com/kvstore/kverr.ErrEmptyKey
+	path (origin → target):
+		$WORK/engine/engine.go:120:10-27: in (*example.com/kvstore/engine.Engine).Delete
+		$WORK/repo/repo.go:130:61-86: in (*example.com/kvstore/repo.Repo).Remove, call to (*example.com/kvstore/engine.Engine).Delete

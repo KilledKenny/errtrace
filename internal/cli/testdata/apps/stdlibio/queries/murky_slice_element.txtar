@@ -1,0 +1,10 @@
+Out of scope by design: field loads appended to a slice, then errs[0] is returned
+(or nil). Documented expectation: one Unresolved(memory) for the slice element load;
+no entry for the nil return.
+-- args --
+murky/murky.go:@fromslice
+-- stdout --
+$WORK/murky/murky.go:65:20-29: Error Set of example.com/stdlibio/murky.FromSlice: 1 entries, 1 unresolved
+$WORK/murky/murky.go:75:9-16: unresolved(memory): load of slice or array element
+	path (origin → target):
+		$WORK/murky/murky.go:75:9-16: in example.com/stdlibio/murky.FromSlice

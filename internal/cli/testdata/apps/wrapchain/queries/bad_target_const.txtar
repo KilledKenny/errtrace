@@ -1,0 +1,9 @@
+Negative: the position is a constant declaration, not a function or call.
+Expected: exit 2 with "no function declaration or call at position", empty stdout.
+-- args --
+doc/doc.go:@maxline
+-- stdout --
+-- stderr --
+errtrace: $WORK/doc/doc.go:29:19: no function declaration or call at position
+-- exit --
+2

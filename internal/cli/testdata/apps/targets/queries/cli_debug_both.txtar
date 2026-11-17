@@ -1,0 +1,12 @@
+Both safe debug modes, in reverse order of how they print.
+Expected: 1 entry store.ErrClosed on stdout; stderr has the target line first, then the summary line.
+-- args --
+-debug=summary,target internal/store/store.go:@ping
+-- stdout --
+$WORK/internal/store/store.go:60:25-29: Error Set of (example.com/targets/internal/store.Store).Ping: 1 entries
+$WORK/internal/store/store.go:12:2-11: sentinel example.com/targets/internal/store.ErrClosed
+	path (origin → target):
+		$WORK/internal/store/store.go:62:10-19: in (example.com/targets/internal/store.Store).Ping
+-- stderr --
+target: declaration (example.com/targets/internal/store.Store).Ping funcs=[(example.com/targets/internal/store.Store).Ping] span=$WORK/internal/store/store.go:60:25-29
+summary: functions=1 sccs=1

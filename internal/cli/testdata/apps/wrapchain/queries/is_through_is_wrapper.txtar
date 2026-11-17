@@ -1,0 +1,7 @@
+errors.Is(err, doc.ErrDisk) { return nil } where doc.ErrDisk sits under a wrapper
+that has Unwrap and an unrelated custom Is method. Is finds the sentinel through
+Unwrap whatever the Is method answers. Expected 0 entries.
+-- args --
+transform/transform.go:@durable
+-- stdout --
+$WORK/transform/transform.go:240:18-25: Error Set of example.com/wrapchain/transform.Durable: 0 entries

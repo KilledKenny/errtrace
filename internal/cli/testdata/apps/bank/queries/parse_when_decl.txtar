@@ -1,0 +1,12 @@
+errors.As guard that removes everything: time.Parse only returns *time.ParseError, which When replaces by
+"%w: near %q" around the sentinel ErrBadDate; the trailing "return err" is dead for *time.ParseError.
+Expect exactly 1 entry: sentinel parse.ErrBadDate with that errorf chain; no *time.ParseError.
+-- args --
+parse/parse.go:@when
+-- stdout --
+$WORK/parse/parse.go:44:15-19: Error Set of example.com/bank/parse.When: 1 entries
+$WORK/parse/parse.go:16:5-15: sentinel example.com/bank/parse.ErrBadDate
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:49:24-75: fmt.Errorf "%w: near %q"
+	path (origin → target):
+		$WORK/parse/parse.go:49:50-60: in example.com/bank/parse.When

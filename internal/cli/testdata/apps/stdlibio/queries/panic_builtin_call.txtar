@@ -1,0 +1,9 @@
+Negative: call-site position on the builtin panic(ErrStage). A builtin is not a
+function call with an error result: exit 2 with an explanatory message.
+-- args --
+murky/murky.go:@panic
+-- stdout --
+-- stderr --
+errtrace: $WORK/murky/murky.go:96:13: not a call to a function
+-- exit --
+2

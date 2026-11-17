@@ -1,0 +1,9 @@
+No position at all: defaults to 1:1, the first byte of the file (a comment).
+Negative: exit 2, no function declaration or call at 1:1.
+-- args --
+internal/platform/platform.go
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/platform/platform.go:1:1: no function declaration or call at position
+-- exit --
+2

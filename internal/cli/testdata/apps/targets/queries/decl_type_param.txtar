@@ -1,0 +1,9 @@
+Position on the type parameter T in Decode[T any].
+Negative: exit 2, "no function declaration or call at position", empty stdout.
+-- args --
+internal/codec/codec.go:@decode_tparam
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/codec/codec.go:29:42: no function declaration or call at position
+-- exit --
+2

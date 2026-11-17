@@ -1,0 +1,10 @@
+SUSPECTED BUG (low confidence, misleading message): a Go file that does not exist, in an existing package directory.
+Expected: exit 2 with a message saying the file does not exist.
+Actual: exit 2 with "file is not in any loaded package", the same text as for an existing file outside the patterns/build tags, which points the user at -p/-tags instead of the typo. Same for file_nonexistent_dir, file_abs_nonexistent, file_parent_outside, file_directory, file_non_go.
+-- args --
+internal/store/missing.go:3:1
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/store/missing.go: file is not in any loaded package
+-- exit --
+2

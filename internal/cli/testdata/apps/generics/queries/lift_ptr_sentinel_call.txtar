@@ -1,0 +1,14 @@
+SUSPECTED BUG: the entry is a fresh "concrete *TypedErr[int]" located at the conversion inside Lift; the sentinel identity
+of the argument is lost (errors.Is(liftRange(), errs.ErrIntRange) is true at run time). A parameter of a concrete
+pointer type converted to error in the callee is treated as a new Concrete Type origin instead of being substituted
+with the caller's argument (same cause as type_switch_generic_decl).
+Lift[*TypedErr[int]] called with the sentinel-by-instantiation ErrIntRange: the E-to-error conversion keeps the pointer.
+Expect one entry, sentinel ErrIntRange, not a fresh concrete value.
+-- args --
+handling.go:@liftrange
+-- stdout --
+$WORK/handling.go:35:9-50: Error Set of call to errs.Lift in example.com/generics.liftRange: 1 entries
+$WORK/errs/errs.go:66:49-50: concrete *example.com/generics/errs.TypedErr[int]
+	path (origin → target):
+		$WORK/errs/errs.go:66:49-50: in example.com/generics/errs.Lift[*example.com/generics/errs.TypedErr[int]]
+		$WORK/handling.go:35:9-50: in example.com/generics.liftRange, call to example.com/generics/errs.Lift[*example.com/generics/errs.TypedErr[int]]

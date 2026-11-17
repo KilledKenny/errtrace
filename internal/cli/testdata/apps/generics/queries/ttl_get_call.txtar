@@ -1,0 +1,17 @@
+SUSPECTED BUG: path only - the hop through the generic instance is collapsed (see check_explicit_call); the Error Set itself is as expected.
+TTL[string,int].Get shadows the embedded Get and delegates to it.
+Expect ErrExpired wrapped by "ttl: %w" and bare ErrNotFound.
+-- args --
+caching.go:@ttlget
+-- stdout --
+$WORK/caching.go:46:9-28: Error Set of call to t.Get in example.com/generics.session: 2 entries
+$WORK/errs/errs.go:12:2-13: sentinel example.com/generics/errs.ErrNotFound
+	path (origin → target):
+		$WORK/cache/cache.go:33:16-32: in (*example.com/generics/cache.Cache[string, int]).Get
+		$WORK/caching.go:46:9-28: in example.com/generics.session, call to (*example.com/generics/cache.Cache[string, int]).Get
+$WORK/errs/errs.go:17:2-12: sentinel example.com/generics/errs.ErrExpired
+	wrap chain (origin → target):
+		$WORK/cache/ttl.go:29:16-54: fmt.Errorf "ttl: %w"
+	path (origin → target):
+		$WORK/cache/ttl.go:29:38-53: in (*example.com/generics/cache.TTL[string, int]).Get
+		$WORK/caching.go:46:9-28: in example.com/generics.session, call to (*example.com/generics/cache.TTL[string, int]).Get

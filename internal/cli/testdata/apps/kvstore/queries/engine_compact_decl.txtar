@@ -1,0 +1,15 @@
+goto-based retry loop: err is reassigned on every iteration and compared with == before the goto.
+Expect 2 entries: sentinel engine.ErrClosed and sentinel engine.errTorn. The guard `err == errTorn && try < 3` does not dominate the return, so errTorn stays
+(only arithmetic on `try`, which errtrace does not do, shows that it cannot actually leave the loop).
+-- args --
+engine/engine.go:@compact
+-- stdout --
+$WORK/engine/engine.go:179:30-37: Error Set of (*example.com/kvstore/engine.Engine).Compact: 2 entries
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	path (origin → target):
+		$WORK/engine/engine.go:170:10-19: in (*example.com/kvstore/engine.Engine).compactOnce
+		$WORK/engine/engine.go:183:8-26: in (*example.com/kvstore/engine.Engine).Compact, call to (*example.com/kvstore/engine.Engine).compactOnce
+$WORK/engine/engine.go:24:2-9: sentinel example.com/kvstore/engine.errTorn
+	path (origin → target):
+		$WORK/engine/engine.go:173:10-17: in (*example.com/kvstore/engine.Engine).compactOnce
+		$WORK/engine/engine.go:183:8-26: in (*example.com/kvstore/engine.Engine).Compact, call to (*example.com/kvstore/engine.Engine).compactOnce

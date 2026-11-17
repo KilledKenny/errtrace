@@ -1,0 +1,22 @@
+passThrough translates ErrInternal only when strict (strict && err == ErrInternal).
+Expect 3 entries: ErrDeclined, ErrInternal (MUST stay) and ErrDuplicate.
+-- args --
+processor/helper.go:@paramPartial
+-- stdout --
+$WORK/processor/helper.go:84:23-38: Error Set of example.com/guards/processor.VoidPassThrough: 3 entries
+$WORK/payerr/payerr.go:8:2-13: sentinel example.com/guards/payerr.ErrDeclined
+	path (origin → target):
+		$WORK/gateway/gateway.go:59:10-28: in example.com/guards/gateway.Void
+		$WORK/processor/helper.go:85:21-36: in example.com/guards/processor.VoidPassThrough, call to example.com/guards/gateway.Void
+		$WORK/processor/helper.go:77:15-18: in example.com/guards/processor.passThrough
+		$WORK/processor/helper.go:85:9-45: in example.com/guards/processor.VoidPassThrough, call to example.com/guards/processor.passThrough
+$WORK/payerr/payerr.go:12:2-13: sentinel example.com/guards/payerr.ErrInternal
+	path (origin → target):
+		$WORK/gateway/gateway.go:62:10-28: in example.com/guards/gateway.Void
+		$WORK/processor/helper.go:85:21-36: in example.com/guards/processor.VoidPassThrough, call to example.com/guards/gateway.Void
+		$WORK/processor/helper.go:77:15-18: in example.com/guards/processor.passThrough
+		$WORK/processor/helper.go:85:9-45: in example.com/guards/processor.VoidPassThrough, call to example.com/guards/processor.passThrough
+$WORK/payerr/payerr.go:13:2-14: sentinel example.com/guards/payerr.ErrDuplicate
+	path (origin → target):
+		$WORK/processor/helper.go:78:10-29: in example.com/guards/processor.passThrough
+		$WORK/processor/helper.go:85:9-45: in example.com/guards/processor.VoidPassThrough, call to example.com/guards/processor.passThrough

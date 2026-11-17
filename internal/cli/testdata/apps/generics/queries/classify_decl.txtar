@@ -1,0 +1,18 @@
+Baseline: generic error types as origins and sentinels by instantiation.
+Expect 4 entries: concrete *TypedErr[int], concrete *TypedErr[string], sentinels ErrIntRange and ErrStrRange.
+-- args --
+failures.go:@classify
+-- stdout --
+$WORK/failures.go:12:19-27: Error Set of example.com/generics.classify: 4 entries
+$WORK/errs/errs.go:34:2-13: sentinel example.com/generics/errs.ErrIntRange
+	path (origin → target):
+		$WORK/failures.go:19:10-26: in example.com/generics.classify
+$WORK/errs/errs.go:35:2-13: sentinel example.com/generics/errs.ErrStrRange
+	path (origin → target):
+		$WORK/failures.go:21:10-26: in example.com/generics.classify
+$WORK/failures.go:15:10-53: concrete *example.com/generics/errs.TypedErr[int]
+	path (origin → target):
+		$WORK/failures.go:15:10-53: in example.com/generics.classify
+$WORK/failures.go:17:10-56: concrete *example.com/generics/errs.TypedErr[string]
+	path (origin → target):
+		$WORK/failures.go:17:10-56: in example.com/generics.classify

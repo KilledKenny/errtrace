@@ -1,0 +1,15 @@
+Same generic declaration, but only cmd/report is loaded, so the only instance is Decode[int].
+Expected: codec.ErrEmpty, and codec.ErrSyntax wrapped "decode: %w" via codec.ParseInt only; no path through cmd/ingest toText.
+-- args --
+-p ./cmd/report internal/codec/codec.go:@decode
+-- stdout --
+$WORK/internal/codec/codec.go:29:17-23: Error Set of example.com/targets/internal/codec.Decode: 2 entries
+$WORK/internal/codec/codec.go:12:2-10: sentinel example.com/targets/internal/codec.ErrEmpty
+	path (origin → target):
+		$WORK/internal/codec/codec.go:32:16-24: in example.com/targets/internal/codec.Decode[int]
+$WORK/internal/codec/codec.go:13:2-11: sentinel example.com/targets/internal/codec.ErrSyntax
+	wrap chain (origin → target):
+		$WORK/internal/codec/codec.go:36:16-45: fmt.Errorf "decode: %w"
+	path (origin → target):
+		$WORK/internal/codec/codec.go:54:14-23: in example.com/targets/internal/codec.ParseInt
+		$WORK/internal/codec/codec.go:34:27-37: in example.com/targets/internal/codec.Decode[int], call to example.com/targets/internal/codec.ParseInt (dynamic function value parse: 1 of 1 candidates)

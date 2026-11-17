@@ -1,0 +1,9 @@
+Negative: line past the end of the file.
+Expect: exit 2 with a position diagnostic.
+-- args --
+engine/engine.go:9999:1
+-- stdout --
+-- stderr --
+errtrace: $WORK/engine/engine.go: line 9999 is out of range (file has 225 lines)
+-- exit --
+2

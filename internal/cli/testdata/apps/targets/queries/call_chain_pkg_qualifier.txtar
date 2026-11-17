@@ -1,0 +1,9 @@
+Chained call store.NewBatch(s).Add(...).Commit(): position on the package qualifier "store".
+Negative: exit 2, "no function declaration or call at position", empty stdout.
+-- args --
+cmd/ingest/main.go:@chain_pkg
+-- stdout --
+-- stderr --
+errtrace: $WORK/cmd/ingest/main.go:56:23: no function declaration or call at position
+-- exit --
+2

@@ -1,0 +1,36 @@
+True branch of Is(ErrTimeout) || Is(ErrRateLimited): return fmt.Errorf("retryable: %w", err); else nil.
+Run-time truth: 2 entries, ErrTimeout (OpError.Unwrap chain) and ErrRateLimited, both under "retryable: %w".
+Recorded: 4 entries - ErrNotFound and *NetError are reported too. Not flagged: guards are applied by dominance
+only (plan S07: "if neither successor dominates the return, the guard doesn't apply"), and neither check
+dominates the merged body of an ||, so this is a documented, sound over-approximation (compare is_rewrap_only,
+where a single errors.Is narrows the branch, and is_or_force for the false side). No entry may be missing.
+-- args --
+processor/is.go:@orRewrap
+-- stdout --
+$WORK/processor/is.go:165:19-33: Error Set of example.com/guards/processor.LookupOrRewrap: 4 entries
+$WORK/payerr/payerr.go:9:2-12: sentinel example.com/guards/payerr.ErrTimeout
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:38:10-63: *example.com/guards/payerr.OpError.Unwrap
+		$WORK/processor/is.go:168:10-42: fmt.Errorf "retryable: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:38:45-62: in example.com/guards/gateway.Lookup
+		$WORK/processor/is.go:166:9-26: in example.com/guards/processor.LookupOrRewrap, call to example.com/guards/gateway.Lookup
+$WORK/payerr/payerr.go:10:2-13: sentinel example.com/guards/payerr.ErrNotFound
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:36:10-60: fmt.Errorf "lookup %d: %w"
+		$WORK/processor/is.go:168:10-42: fmt.Errorf "retryable: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:36:41-59: in example.com/guards/gateway.Lookup
+		$WORK/processor/is.go:166:9-26: in example.com/guards/processor.LookupOrRewrap, call to example.com/guards/gateway.Lookup
+$WORK/payerr/payerr.go:11:2-16: sentinel example.com/guards/payerr.ErrRateLimited
+	wrap chain (origin → target):
+		$WORK/processor/is.go:168:10-42: fmt.Errorf "retryable: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:40:10-31: in example.com/guards/gateway.Lookup
+		$WORK/processor/is.go:166:9-26: in example.com/guards/processor.LookupOrRewrap, call to example.com/guards/gateway.Lookup
+$WORK/gateway/gateway.go:42:9-39: concrete *example.com/guards/payerr.NetError
+	wrap chain (origin → target):
+		$WORK/processor/is.go:168:10-42: fmt.Errorf "retryable: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:42:9-39: in example.com/guards/gateway.Lookup
+		$WORK/processor/is.go:166:9-26: in example.com/guards/processor.LookupOrRewrap, call to example.com/guards/gateway.Lookup

@@ -1,0 +1,9 @@
+Position on the package name in the package clause.
+Negative: exit 2, "no function declaration or call at position", empty stdout.
+-- args --
+internal/platform/platform.go:2:9
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/platform/platform.go:2:9: no function declaration or call at position
+-- exit --
+2

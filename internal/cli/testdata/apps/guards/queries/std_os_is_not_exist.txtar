@@ -1,0 +1,27 @@
+os.IsNotExist(err) as the guard (a helper call into the stdlib).
+Expect io.EOF and io.ErrUnexpectedEOF kept. fs.ErrNotExist in *fs.PathError is handled at run time; it is
+either removed (if os.IsNotExist is modelled) or kept and marked possibly handled.
+-- args --
+processor/receipts.go:@stdHelper
+-- stdout --
+$WORK/processor/receipts.go:53:20-37: Error Set of example.com/guards/processor.StatReceiptLegacy: 3 entries, 3 possibly handled
+$GOROOT/src/io/fs/fs.go:*: sentinel io/fs.ErrNotExist
+	wrap chain (origin → target):
+		$WORK/fsx/fsx.go:55:10-68: *io/fs.PathError.Unwrap
+	possibly handled:
+		$WORK/processor/receipts.go:55:5-23: guarded by call to os.IsNotExist
+	path (origin → target):
+		$WORK/fsx/fsx.go:55:53-67: in example.com/guards/fsx.Stat
+		$WORK/processor/receipts.go:54:9-23: in example.com/guards/processor.StatReceiptLegacy, call to example.com/guards/fsx.Stat
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	possibly handled:
+		$WORK/processor/receipts.go:55:5-23: guarded by call to os.IsNotExist
+	path (origin → target):
+		$WORK/fsx/fsx.go:57:10-16: in example.com/guards/fsx.Stat
+		$WORK/processor/receipts.go:54:9-23: in example.com/guards/processor.StatReceiptLegacy, call to example.com/guards/fsx.Stat
+$GOROOT/src/io/io.go:*: sentinel io.ErrUnexpectedEOF
+	possibly handled:
+		$WORK/processor/receipts.go:55:5-23: guarded by call to os.IsNotExist
+	path (origin → target):
+		$WORK/fsx/fsx.go:59:10-29: in example.com/guards/fsx.Stat
+		$WORK/processor/receipts.go:54:9-23: in example.com/guards/processor.StatReceiptLegacy, call to example.com/guards/fsx.Stat

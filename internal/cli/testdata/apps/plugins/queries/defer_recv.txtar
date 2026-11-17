@@ -1,0 +1,10 @@
+Negative: the position is on the receiver expression of a deferred call
+(defer d.closer.Close()), not on the callee name or its "(". Expected:
+exit 2, "no function declaration or call at position".
+-- args --
+dispatch/dispatch.go:@defer_recv
+-- stdout --
+-- stderr --
+errtrace: $WORK/dispatch/dispatch.go:170:23: no function declaration or call at position
+-- exit --
+2

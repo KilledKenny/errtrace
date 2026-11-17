@@ -1,0 +1,9 @@
+Very large column on the declaration line.
+Negative: exit 2, column out of range; the declaration on that line must not be picked.
+-- args --
+internal/platform/platform.go:5:9999
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/platform/platform.go: column 9999 is out of range (line 5 has 20 bytes)
+-- exit --
+2

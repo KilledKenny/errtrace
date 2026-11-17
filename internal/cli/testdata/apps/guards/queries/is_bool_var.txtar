@@ -1,0 +1,20 @@
+The errors.Is result is stored in a bool first: notFound := errors.Is(err, ErrNotFound); if notFound { return nil }.
+Expect 3 entries: ErrTimeout (OpError.Unwrap chain), ErrRateLimited, *NetError. ErrNotFound must NOT appear.
+-- args --
+processor/edge.go:@isBoolVar
+-- stdout --
+$WORK/processor/edge.go:35:20-32: Error Set of example.com/guards/processor.LookupIsFlag: 3 entries
+$WORK/payerr/payerr.go:9:2-12: sentinel example.com/guards/payerr.ErrTimeout
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:38:10-63: *example.com/guards/payerr.OpError.Unwrap
+	path (origin → target):
+		$WORK/gateway/gateway.go:38:45-62: in example.com/guards/gateway.Lookup
+		$WORK/processor/edge.go:36:9-26: in example.com/guards/processor.LookupIsFlag, call to example.com/guards/gateway.Lookup
+$WORK/payerr/payerr.go:11:2-16: sentinel example.com/guards/payerr.ErrRateLimited
+	path (origin → target):
+		$WORK/gateway/gateway.go:40:10-31: in example.com/guards/gateway.Lookup
+		$WORK/processor/edge.go:36:9-26: in example.com/guards/processor.LookupIsFlag, call to example.com/guards/gateway.Lookup
+$WORK/gateway/gateway.go:42:9-39: concrete *example.com/guards/payerr.NetError
+	path (origin → target):
+		$WORK/gateway/gateway.go:42:9-39: in example.com/guards/gateway.Lookup
+		$WORK/processor/edge.go:36:9-26: in example.com/guards/processor.LookupIsFlag, call to example.com/guards/gateway.Lookup

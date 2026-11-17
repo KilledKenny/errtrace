@@ -1,0 +1,18 @@
+errors.As with a **CodeError target and a *ValidationError (value type) target.
+Expect 3 entries: ErrDeclined, ErrTimeout, opaque. Neither concrete type may appear.
+-- args --
+processor/as.go:@asTargets
+-- stdout --
+$WORK/processor/as.go:11:20-28: Error Set of example.com/guards/processor.ChargeAs: 3 entries
+$WORK/payerr/payerr.go:8:2-13: sentinel example.com/guards/payerr.ErrDeclined
+	path (origin → target):
+		$WORK/gateway/gateway.go:18:10-28: in example.com/guards/gateway.Charge
+		$WORK/processor/as.go:12:9-26: in example.com/guards/processor.ChargeAs, call to example.com/guards/gateway.Charge
+$WORK/payerr/payerr.go:9:2-12: sentinel example.com/guards/payerr.ErrTimeout
+	path (origin → target):
+		$WORK/gateway/gateway.go:20:10-27: in example.com/guards/gateway.Charge
+		$WORK/processor/as.go:12:9-26: in example.com/guards/processor.ChargeAs, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:26:9-35: opaque errors.New "gateway down"
+	path (origin → target):
+		$WORK/gateway/gateway.go:26:9-35: in example.com/guards/gateway.Charge
+		$WORK/processor/as.go:12:9-26: in example.com/guards/processor.ChargeAs, call to example.com/guards/gateway.Charge

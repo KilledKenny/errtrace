@@ -1,0 +1,9 @@
+Out of scope by design: the error is looked up in a local map literal. Documented
+expectation: one Unresolved(memory) "load of map element" (ErrStage not resolved).
+-- args --
+murky/murky.go:@frommap
+-- stdout --
+$WORK/murky/murky.go:59:18-25: Error Set of example.com/stdlibio/murky.FromMap: 1 entries, 1 unresolved
+$WORK/murky/murky.go:61:9-23: unresolved(memory): load of map element
+	path (origin → target):
+		$WORK/murky/murky.go:61:9-23: in example.com/stdlibio/murky.FromMap

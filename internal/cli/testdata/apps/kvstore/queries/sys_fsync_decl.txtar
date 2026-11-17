@@ -1,0 +1,11 @@
+The linkname-pushed implementation of engine.fsync: no Go caller, so not reachable from main by calls.
+Expect: sentinel sys.errShortWrite, with the 'not reachable' warning on stderr.
+-- args --
+engine/internal/sys/sys.go:@fsync
+-- stdout --
+$WORK/engine/internal/sys/sys.go:12:16-21: Error Set of example.com/kvstore/engine/internal/sys.fsync: 1 entries
+$WORK/engine/internal/sys/sys.go:9:5-18: sentinel example.com/kvstore/engine/internal/sys.errShortWrite
+	path (origin → target):
+		$WORK/engine/internal/sys/sys.go:14:10-23: in example.com/kvstore/engine/internal/sys.fsync
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates

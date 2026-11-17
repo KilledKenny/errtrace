@@ -1,0 +1,19 @@
+Wrapped first, then joined. Expected 2 entries: doc.ErrNoTitle with the chain
+fmt.Errorf "title: %w" then errors.Join, and doc.ErrEmpty with fmt.Errorf "body: %w"
+then errors.Join. No cross-over of the two formats.
+-- args --
+validate/validate.go:@labelled
+-- stdout --
+$WORK/validate/validate.go:70:19-27: Error Set of example.com/wrapchain/validate.Labelled: 2 entries
+$WORK/doc/doc.go:17:2-10: sentinel example.com/wrapchain/doc.ErrEmpty
+	wrap chain (origin → target):
+		$WORK/validate/validate.go:76:13-49: fmt.Errorf "body: %w"
+		$WORK/validate/validate.go:78:9-39: errors.Join
+	path (origin → target):
+		$WORK/validate/validate.go:76:36-48: in example.com/wrapchain/validate.Labelled
+$WORK/doc/doc.go:20:2-12: sentinel example.com/wrapchain/doc.ErrNoTitle
+	wrap chain (origin → target):
+		$WORK/validate/validate.go:73:14-53: fmt.Errorf "title: %w"
+		$WORK/validate/validate.go:78:9-39: errors.Join
+	path (origin → target):
+		$WORK/validate/validate.go:73:38-52: in example.com/wrapchain/validate.Labelled

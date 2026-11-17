@@ -1,0 +1,89 @@
+SUSPECTED BUG (path count only, same cause as call_go): call-site target run(os.Args[1:]) inside func main (main has no error result, the call does); plain identifier callee in package main.
+Expected: the same 11 entries as decl_run_ingest (compare by hand), each path one hop longer, errUsage marked with more paths.
+Actual: same entries, but errUsage has no [+N more paths] marker at all, although decl_run_ingest shows one for the very same function.
+-- args --
+cmd/ingest/main.go:@main_call
+-- stdout --
+$WORK/cmd/ingest/main.go:34:26-42: Error Set of call to run in example.com/targets/cmd/ingest.main: 11 entries, 1 unresolved
+$WORK/cmd/ingest/main.go:14:5-13: sentinel example.com/targets/cmd/ingest.errUsage
+	path (origin → target):
+		$WORK/cmd/ingest/main.go:42:10-18: in example.com/targets/cmd/ingest.run
+		$WORK/cmd/ingest/main.go:34:26-42: in example.com/targets/cmd/ingest.main, call to example.com/targets/cmd/ingest.run
+$WORK/internal/codec/codec.go:12:2-10: sentinel example.com/targets/internal/codec.ErrEmpty
+	path (origin → target):
+		$WORK/internal/codec/codec.go:32:16-24: in example.com/targets/internal/codec.Decode[string]
+		$WORK/cmd/ingest/main.go:81:15-99: in example.com/targets/cmd/ingest.ingest, call to example.com/targets/internal/codec.Decode[string]
+		$WORK/cmd/ingest/main.go:52:13-27: in example.com/targets/cmd/ingest.run, call to example.com/targets/cmd/ingest.ingest
+		$WORK/cmd/ingest/main.go:34:26-42: in example.com/targets/cmd/ingest.main, call to example.com/targets/cmd/ingest.run
+$WORK/internal/codec/codec.go:13:2-11: sentinel example.com/targets/internal/codec.ErrSyntax
+	wrap chain (origin → target):
+		$WORK/internal/codec/codec.go:36:16-45: fmt.Errorf "decode: %w"
+	path (origin → target):
+		$WORK/cmd/ingest/main.go:111:14-29: in example.com/targets/cmd/ingest.toText
+		$WORK/cmd/ingest/main.go:81:15-99: in example.com/targets/cmd/ingest.ingest, call to example.com/targets/cmd/ingest.toText (dynamic function value parse: 1 of 1 candidates)
+		$WORK/cmd/ingest/main.go:52:13-27: in example.com/targets/cmd/ingest.run, call to example.com/targets/cmd/ingest.ingest
+		$WORK/cmd/ingest/main.go:34:26-42: in example.com/targets/cmd/ingest.main, call to example.com/targets/cmd/ingest.run
+$WORK/internal/store/disk/disk.go:7:5-15: sentinel example.com/targets/internal/store/disk.ErrNoEntry
+	wrap chain (origin → target):
+		$WORK/internal/store/store.go:51:30-79: fmt.Errorf "get %q: %w"
+		$WORK/cmd/ingest/main.go:104:15-51: fmt.Errorf "fetch %s: %w"
+	path (origin → target):
+		$WORK/internal/store/disk/disk.go:40:15-25: in (*example.com/targets/internal/store/disk.Disk).Read
+		$WORK/internal/store/store.go:49:14-43: in (*example.com/targets/internal/store.Store).Get, call to (*example.com/targets/internal/store/disk.Disk).Read (dynamic (example.com/targets/internal/store.Backend).Read: 2 of 2 candidates)
+		$WORK/cmd/ingest/main.go:102:24-82: in example.com/targets/cmd/ingest.fetch, call to (*example.com/targets/internal/store.Store).Get
+		$WORK/cmd/ingest/main.go:76:14-27: in example.com/targets/cmd/ingest.ingest, call to example.com/targets/cmd/ingest.fetch
+		$WORK/cmd/ingest/main.go:52:13-27: in example.com/targets/cmd/ingest.run, call to example.com/targets/cmd/ingest.ingest
+		$WORK/cmd/ingest/main.go:34:26-42: in example.com/targets/cmd/ingest.main, call to example.com/targets/cmd/ingest.run
+$WORK/internal/store/store.go:11:2-13: sentinel example.com/targets/internal/store.ErrNotFound
+	wrap chain (origin → target):
+		$WORK/internal/store/store.go:51:30-79: fmt.Errorf "get %q: %w"
+		$WORK/cmd/ingest/main.go:104:15-51: fmt.Errorf "fetch %s: %w"
+	path (origin → target):
+		$WORK/internal/store/store.go:111:15-26: in (*example.com/targets/internal/store.mem).Read
+		$WORK/internal/store/store.go:49:14-43: in (*example.com/targets/internal/store.Store).Get, call to (*example.com/targets/internal/store.mem).Read (dynamic (example.com/targets/internal/store.Backend).Read: 2 of 2 candidates)
+		$WORK/cmd/ingest/main.go:102:24-82: in example.com/targets/cmd/ingest.fetch, call to (*example.com/targets/internal/store.Store).Get
+		$WORK/cmd/ingest/main.go:76:14-27: in example.com/targets/cmd/ingest.ingest, call to example.com/targets/cmd/ingest.fetch
+		$WORK/cmd/ingest/main.go:52:13-27: in example.com/targets/cmd/ingest.run, call to example.com/targets/cmd/ingest.ingest
+		$WORK/cmd/ingest/main.go:34:26-42: in example.com/targets/cmd/ingest.main, call to example.com/targets/cmd/ingest.run
+$WORK/internal/store/store.go:12:2-11: sentinel example.com/targets/internal/store.ErrClosed
+	path (origin → target):
+		$WORK/internal/store/store.go:28:10-19: in (*example.com/targets/internal/store.base).Check
+		$WORK/cmd/ingest/main.go:95:10-32: in example.com/targets/cmd/ingest.ingest, call to (*example.com/targets/internal/store.base).Check
+		$WORK/cmd/ingest/main.go:52:13-27: in example.com/targets/cmd/ingest.run, call to example.com/targets/cmd/ingest.ingest
+		$WORK/cmd/ingest/main.go:34:26-42: in example.com/targets/cmd/ingest.main, call to example.com/targets/cmd/ingest.run
+$WORK/internal/store/store.go:12:2-11: sentinel example.com/targets/internal/store.ErrClosed
+	wrap chain (origin → target):
+		$WORK/cmd/ingest/main.go:104:15-51: fmt.Errorf "fetch %s: %w"
+	path (origin → target):
+		$WORK/internal/store/store.go:28:10-19: in (*example.com/targets/internal/store.base).Check
+		$WORK/internal/store/store.go:45:12-34: in (*example.com/targets/internal/store.Store).Get, call to (*example.com/targets/internal/store.base).Check
+		$WORK/cmd/ingest/main.go:102:24-82: in example.com/targets/cmd/ingest.fetch, call to (*example.com/targets/internal/store.Store).Get
+		$WORK/cmd/ingest/main.go:76:14-27: in example.com/targets/cmd/ingest.ingest, call to example.com/targets/cmd/ingest.fetch
+		$WORK/cmd/ingest/main.go:52:13-27: in example.com/targets/cmd/ingest.run, call to example.com/targets/cmd/ingest.ingest
+		$WORK/cmd/ingest/main.go:34:26-42: in example.com/targets/cmd/ingest.main, call to example.com/targets/cmd/ingest.run
+$WORK/internal/store/store.go:12:2-11: sentinel example.com/targets/internal/store.ErrClosed
+	wrap chain (origin → target):
+		$WORK/cmd/ingest/main.go:120:9-39: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/internal/store/store.go:62:10-19: in (example.com/targets/internal/store.Store).Ping
+		$WORK/cmd/ingest/main.go:97:43-65: in example.com/targets/cmd/ingest.ingest, call to (example.com/targets/internal/store.Store).Ping
+		$WORK/cmd/ingest/main.go:117:5-8: in example.com/targets/cmd/ingest.annotate
+		$WORK/cmd/ingest/main.go:97:19-66: in example.com/targets/cmd/ingest.ingest, call to example.com/targets/cmd/ingest.annotate
+		$WORK/cmd/ingest/main.go:52:13-27: in example.com/targets/cmd/ingest.run, call to example.com/targets/cmd/ingest.ingest
+		$WORK/cmd/ingest/main.go:34:26-42: in example.com/targets/cmd/ingest.main, call to example.com/targets/cmd/ingest.run
+$WORK/internal/store/store.go:13:2-15: sentinel example.com/targets/internal/store.ErrEmptyBatch
+	path (origin → target):
+		$WORK/internal/store/store.go:98:10-23: in (*example.com/targets/internal/store.Batch).Commit
+		$WORK/cmd/ingest/main.go:56:23-111: in example.com/targets/cmd/ingest.run, call to (*example.com/targets/internal/store.Batch).Commit
+		$WORK/cmd/ingest/main.go:34:26-42: in example.com/targets/cmd/ingest.main, call to example.com/targets/cmd/ingest.run
+$WORK/internal/store/disk/disk.go:23:10-48: concrete *example.com/targets/internal/store/disk.DiskError
+	path (origin → target):
+		$WORK/internal/store/disk/disk.go:23:10-48: in example.com/targets/internal/store/disk.Validate
+		$WORK/internal/store/disk/disk.go:30:28-42: in example.com/targets/internal/store/disk.Open, call to example.com/targets/internal/store/disk.Validate
+		$WORK/cmd/ingest/main.go:44:12-29: in example.com/targets/cmd/ingest.run, call to example.com/targets/internal/store/disk.Open
+		$WORK/cmd/ingest/main.go:34:26-42: in example.com/targets/cmd/ingest.main, call to example.com/targets/cmd/ingest.run
+$WORK/internal/store/store.go:100:9-14: unresolved(memory): load of field err of *example.com/targets/internal/store.Batch
+	path (origin → target):
+		$WORK/internal/store/store.go:100:9-14: in (*example.com/targets/internal/store.Batch).Commit
+		$WORK/cmd/ingest/main.go:56:23-111: in example.com/targets/cmd/ingest.run, call to (*example.com/targets/internal/store.Batch).Commit
+		$WORK/cmd/ingest/main.go:34:26-42: in example.com/targets/cmd/ingest.main, call to example.com/targets/cmd/ingest.run

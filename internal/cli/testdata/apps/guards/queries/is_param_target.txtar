@@ -1,0 +1,34 @@
+errors.Is(err, target) where target is a parameter, not a sentinel: nothing can be removed for sure.
+Expect all 4 Lookup entries kept (possibly handled marks are acceptable); no entry may disappear.
+-- args --
+processor/edge.go:@isParamTarget
+-- stdout --
+$WORK/processor/edge.go:26:24-38: Error Set of example.com/guards/processor.LookupIsTarget: 4 entries, 4 possibly handled
+$WORK/payerr/payerr.go:9:2-12: sentinel example.com/guards/payerr.ErrTimeout
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:38:10-63: *example.com/guards/payerr.OpError.Unwrap
+	possibly handled:
+		$WORK/processor/edge.go:28:5-27: errors.Is with a target that is not a sentinel
+	path (origin → target):
+		$WORK/gateway/gateway.go:38:45-62: in example.com/guards/gateway.Lookup
+		$WORK/processor/edge.go:27:9-26: in example.com/guards/processor.LookupIsTarget, call to example.com/guards/gateway.Lookup
+$WORK/payerr/payerr.go:10:2-13: sentinel example.com/guards/payerr.ErrNotFound
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:36:10-60: fmt.Errorf "lookup %d: %w"
+	possibly handled:
+		$WORK/processor/edge.go:28:5-27: errors.Is with a target that is not a sentinel
+	path (origin → target):
+		$WORK/gateway/gateway.go:36:41-59: in example.com/guards/gateway.Lookup
+		$WORK/processor/edge.go:27:9-26: in example.com/guards/processor.LookupIsTarget, call to example.com/guards/gateway.Lookup
+$WORK/payerr/payerr.go:11:2-16: sentinel example.com/guards/payerr.ErrRateLimited
+	possibly handled:
+		$WORK/processor/edge.go:28:5-27: errors.Is with a target that is not a sentinel
+	path (origin → target):
+		$WORK/gateway/gateway.go:40:10-31: in example.com/guards/gateway.Lookup
+		$WORK/processor/edge.go:27:9-26: in example.com/guards/processor.LookupIsTarget, call to example.com/guards/gateway.Lookup
+$WORK/gateway/gateway.go:42:9-39: concrete *example.com/guards/payerr.NetError
+	possibly handled:
+		$WORK/processor/edge.go:28:5-27: errors.Is with a target that is not a sentinel
+	path (origin → target):
+		$WORK/gateway/gateway.go:42:9-39: in example.com/guards/gateway.Lookup
+		$WORK/processor/edge.go:27:9-26: in example.com/guards/processor.LookupIsTarget, call to example.com/guards/gateway.Lookup

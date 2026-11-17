@@ -1,0 +1,20 @@
+Callback parameter with three kinds of function value: a bound method of
+a concrete type (sms.Send), a plain function (Validate) and a method value
+bound to an interface (d.Send, d is a Pager). Expected: ErrSMS,
+ErrEmptyBody, ErrPager.
+-- args --
+dispatch/funcs.go:@retry
+-- stdout --
+$WORK/dispatch/funcs.go:71:16-21: Error Set of example.com/plugins/dispatch.retry: 3 entries
+$WORK/core/core.go:17:2-14: sentinel example.com/plugins/core.ErrEmptyBody
+	path (origin → target):
+		$WORK/dispatch/dispatch.go:94:10-27: in example.com/plugins/dispatch.Validate
+		$WORK/dispatch/funcs.go:73:12-17: in example.com/plugins/dispatch.retry, call to example.com/plugins/dispatch.Validate (dynamic function value fn: 3 of 3 candidates)
+$WORK/drivers/drivers.go:14:2-8: sentinel example.com/plugins/drivers.ErrSMS
+	path (origin → target):
+		$WORK/drivers/drivers.go:37:10-16: in (*example.com/plugins/drivers.SMS).Send
+		$WORK/dispatch/funcs.go:73:12-17: in example.com/plugins/dispatch.retry, call to (*example.com/plugins/drivers.SMS).Send (dynamic function value fn: 3 of 3 candidates)
+$WORK/drivers/drivers.go:16:2-10: sentinel example.com/plugins/drivers.ErrPager
+	path (origin → target):
+		$WORK/drivers/drivers.go:82:10-18: in (example.com/plugins/drivers.Pager).Send
+		$WORK/dispatch/funcs.go:73:12-17: in example.com/plugins/dispatch.retry, call to (example.com/plugins/drivers.Pager).Send (dynamic function value fn: 3 of 3 candidates)

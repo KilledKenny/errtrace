@@ -1,0 +1,20 @@
+SUSPECTED BUG: call-site target in a go statement: go warm(s).
+Expected 2 entries: store.ErrNotFound wrapped "get %q: %w"; store.ErrClosed unwrapped with [+1 more paths] (it reaches warm via ping() AND via s.Get->Check), exactly as the declaration target decl_warm_paths prints it. Must NOT contain disk.ErrNoEntry (warm returns nil when errors.Is(err, disk.ErrNoEntry)).
+Actual: entries are right, but the ErrClosed entry lacks the [+1 more paths] marker: paths merged inside the callee are not counted for a call-site Target (same with a plain, non-go call).
+-- args --
+cmd/ingest/main.go:@go_call
+-- stdout --
+$WORK/cmd/ingest/main.go:50:17-24: Error Set of call to warm in example.com/targets/cmd/ingest.run: 2 entries
+$WORK/internal/store/store.go:11:2-13: sentinel example.com/targets/internal/store.ErrNotFound
+	wrap chain (origin → target):
+		$WORK/internal/store/store.go:51:30-79: fmt.Errorf "get %q: %w"
+	path (origin → target):
+		$WORK/internal/store/store.go:111:15-26: in (*example.com/targets/internal/store.mem).Read
+		$WORK/internal/store/store.go:49:14-43: in (*example.com/targets/internal/store.Store).Get, call to (*example.com/targets/internal/store.mem).Read (dynamic (example.com/targets/internal/store.Backend).Read: 2 of 2 candidates)
+		$WORK/cmd/ingest/main.go:65:12-25: in example.com/targets/cmd/ingest.warm, call to (*example.com/targets/internal/store.Store).Get
+		$WORK/cmd/ingest/main.go:50:17-24: in example.com/targets/cmd/ingest.run, call to example.com/targets/cmd/ingest.warm
+$WORK/internal/store/store.go:12:2-11: sentinel example.com/targets/internal/store.ErrClosed
+	path (origin → target):
+		$WORK/internal/store/store.go:62:10-19: in (example.com/targets/internal/store.Store).Ping
+		$WORK/cmd/ingest/main.go:62:22-28: in example.com/targets/cmd/ingest.warm, call to (example.com/targets/internal/store.Store).Ping
+		$WORK/cmd/ingest/main.go:50:17-24: in example.com/targets/cmd/ingest.run, call to example.com/targets/cmd/ingest.warm

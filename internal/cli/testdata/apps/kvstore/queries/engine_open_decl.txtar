@@ -1,0 +1,9 @@
+Constructor returning (*Engine, error); the *Engine result is not an error.
+Expect: 1 entry, opaque fmt.Errorf "engine: bad limit %d" (no %w).
+-- args --
+engine/engine.go:@open
+-- stdout --
+$WORK/engine/engine.go:52:15-19: Error Set of example.com/kvstore/engine.Open: 1 entries
+$WORK/engine/engine.go:54:15-56: opaque fmt.Errorf "engine: bad limit %d"
+	path (origin → target):
+		$WORK/engine/engine.go:54:15-56: in example.com/kvstore/engine.Open

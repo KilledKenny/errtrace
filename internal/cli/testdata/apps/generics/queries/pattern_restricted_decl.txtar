@@ -1,0 +1,7 @@
+Only ./seq is loaded (-p), so main and its instantiations of Map are not in the program.
+Expect unresolved(no-instances) for Map and nothing from the closures of package main.
+-- args --
+-p ./seq seq/seq.go:@map
+-- stdout --
+$WORK/seq/seq.go:11:14-17: Error Set of example.com/generics/seq.Map: 1 entries, 1 unresolved
+$WORK/seq/seq.go:11:14-17: unresolved(no-instances): generic function example.com/generics/seq.Map has no instances in the loaded program

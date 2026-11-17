@@ -1,0 +1,9 @@
+-p naming the directory of the nested module tools/lintcfg (not part of example.com/targets).
+Negative: exit 2 with the go list error "main module (example.com/targets) does not contain package ...".
+-- args --
+-p ./tools/lintcfg internal/platform/platform.go:5:6
+-- stdout --
+-- stderr --
+errtrace: -: main module (example.com/targets) does not contain package example.com/targets/tools/lintcfg
+-- exit --
+2

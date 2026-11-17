@@ -1,0 +1,15 @@
+Local io.Reader passed to the stdlib (io.ReadAll calls r.Read
+dynamically); Load is given a *tmpl.Source and a *strings.Reader.
+Expected: tmpl.ErrTemplate wrapped by "tmpl: %w". io.EOF must not survive:
+ReadAll turns it into nil.
+-- args --
+tmpl/tmpl.go:@load
+-- stdout --
+$WORK/tmpl/tmpl.go:34:15-19: Error Set of example.com/plugins/tmpl.Load: 1 entries
+$WORK/tmpl/tmpl.go:12:5-16: sentinel example.com/plugins/tmpl.ErrTemplate
+	wrap chain (origin → target):
+		$WORK/tmpl/tmpl.go:37:14-41: fmt.Errorf "tmpl: %w"
+	path (origin → target):
+		$WORK/tmpl/tmpl.go:23:13-24: in (*example.com/plugins/tmpl.Source).Read
+		$GOROOT/src/io/io.go:*: in io.ReadAll, call to (*example.com/plugins/tmpl.Source).Read (dynamic (io.Reader).Read: 2 of 2 candidates)
+		$WORK/tmpl/tmpl.go:35:12-37: in example.com/plugins/tmpl.Load, call to io.ReadAll

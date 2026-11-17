@@ -1,0 +1,15 @@
+Notify calls a func stored in a context value: ctx.Value(hookKey{}).(Hook). Expected:
+sentinel jobs.ErrNoHook, and for the dynamic call either the one Hook the program
+stores (main's closure: opaque fmt.Errorf "hook: step %s rejected") as a Candidate, or
+an explicit Unresolved; the call must not vanish.
+-- args --
+jobs/jobs.go:@notify
+-- stdout --
+$WORK/jobs/jobs.go:64:17-23: Error Set of example.com/stdlibio/jobs.Notify: 2 entries
+$WORK/jobs/jobs.go:15:5-14: sentinel example.com/stdlibio/jobs.ErrNoHook
+	path (origin → target):
+		$WORK/jobs/jobs.go:67:10-19: in example.com/stdlibio/jobs.Notify
+$WORK/main.go:42:10-52: opaque fmt.Errorf "hook: step %s rejected"
+	path (origin → target):
+		$WORK/main.go:42:10-52: in example.com/stdlibio.run$1
+		$WORK/jobs/jobs.go:69:22-32: in example.com/stdlibio/jobs.Notify, call to example.com/stdlibio.run$1 (dynamic function value of type example.com/stdlibio/jobs.Hook: 1 of 1 candidates)

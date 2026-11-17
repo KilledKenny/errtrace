@@ -1,0 +1,22 @@
+if err == ErrDeclined { return nil }; return err, on gateway.Charge.
+Expect 4 entries: ErrTimeout, *CodeError, ValidationError, opaque "gateway down". ErrDeclined must NOT appear.
+-- args --
+processor/eq.go:@ignoreDeclined
+-- stdout --
+$WORK/processor/eq.go:13:25-45: Error Set of example.com/guards/processor.ChargeIgnoreDeclined: 4 entries
+$WORK/payerr/payerr.go:9:2-12: sentinel example.com/guards/payerr.ErrTimeout
+	path (origin → target):
+		$WORK/gateway/gateway.go:20:10-27: in example.com/guards/gateway.Charge
+		$WORK/processor/eq.go:14:9-26: in example.com/guards/processor.ChargeIgnoreDeclined, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:22:10-63: concrete *example.com/guards/payerr.CodeError
+	path (origin → target):
+		$WORK/gateway/gateway.go:22:10-63: in example.com/guards/gateway.Charge
+		$WORK/processor/eq.go:14:9-26: in example.com/guards/processor.ChargeIgnoreDeclined, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:24:10-51: concrete example.com/guards/payerr.ValidationError
+	path (origin → target):
+		$WORK/gateway/gateway.go:24:10-51: in example.com/guards/gateway.Charge
+		$WORK/processor/eq.go:14:9-26: in example.com/guards/processor.ChargeIgnoreDeclined, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:26:9-35: opaque errors.New "gateway down"
+	path (origin → target):
+		$WORK/gateway/gateway.go:26:9-35: in example.com/guards/gateway.Charge
+		$WORK/processor/eq.go:14:9-26: in example.com/guards/processor.ChargeIgnoreDeclined, call to example.com/guards/gateway.Charge

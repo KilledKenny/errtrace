@@ -1,0 +1,9 @@
+A file: URI instead of a path (the grammar accepts only file paths).
+Negative: exit 2; the URI is taken as a relative path named "file:/..." under the working directory, which is in no package.
+-- args --
+file://internal/platform/platform.go:5:6
+-- stdout --
+-- stderr --
+errtrace: $WORK/file:/internal/platform/platform.go: file is not in any loaded package
+-- exit --
+2

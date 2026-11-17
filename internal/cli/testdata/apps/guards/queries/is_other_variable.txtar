@@ -1,0 +1,27 @@
+errors.Is(verr, ErrDeclined) guards the Void error while the Charge error cerr is returned in the guarded branch.
+Expect all 5 Charge entries with paths through gateway.Charge, including ErrDeclined (must NOT be filtered:
+the guard is on a different variable); nothing with a path through gateway.Void.
+-- args --
+processor/edge.go:@isOtherVar
+-- stdout --
+$WORK/processor/edge.go:91:21-41: Error Set of example.com/guards/processor.ChargeIfVoidDeclined: 5 entries
+$WORK/payerr/payerr.go:8:2-13: sentinel example.com/guards/payerr.ErrDeclined
+	path (origin → target):
+		$WORK/gateway/gateway.go:18:10-28: in example.com/guards/gateway.Charge
+		$WORK/processor/edge.go:92:10-27: in example.com/guards/processor.ChargeIfVoidDeclined, call to example.com/guards/gateway.Charge
+$WORK/payerr/payerr.go:9:2-12: sentinel example.com/guards/payerr.ErrTimeout
+	path (origin → target):
+		$WORK/gateway/gateway.go:20:10-27: in example.com/guards/gateway.Charge
+		$WORK/processor/edge.go:92:10-27: in example.com/guards/processor.ChargeIfVoidDeclined, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:22:10-63: concrete *example.com/guards/payerr.CodeError
+	path (origin → target):
+		$WORK/gateway/gateway.go:22:10-63: in example.com/guards/gateway.Charge
+		$WORK/processor/edge.go:92:10-27: in example.com/guards/processor.ChargeIfVoidDeclined, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:24:10-51: concrete example.com/guards/payerr.ValidationError
+	path (origin → target):
+		$WORK/gateway/gateway.go:24:10-51: in example.com/guards/gateway.Charge
+		$WORK/processor/edge.go:92:10-27: in example.com/guards/processor.ChargeIfVoidDeclined, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:26:9-35: opaque errors.New "gateway down"
+	path (origin → target):
+		$WORK/gateway/gateway.go:26:9-35: in example.com/guards/gateway.Charge
+		$WORK/processor/edge.go:92:10-27: in example.com/guards/processor.ChargeIfVoidDeclined, call to example.com/guards/gateway.Charge

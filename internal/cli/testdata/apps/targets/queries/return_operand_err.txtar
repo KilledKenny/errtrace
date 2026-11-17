@@ -1,0 +1,9 @@
+Position on the identifier err in "return err" of warm (a plain error variable, after the errors.Is guard).
+Negative: exit 2, no target: only declarations and calls are Targets, not arbitrary error expressions.
+-- args --
+cmd/ingest/main.go:@warm_ret
+-- stdout --
+-- stderr --
+errtrace: $WORK/cmd/ingest/main.go:69:22: no function declaration or call at position
+-- exit --
+2

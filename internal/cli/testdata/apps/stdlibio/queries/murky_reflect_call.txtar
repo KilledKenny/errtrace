@@ -1,0 +1,11 @@
+Out of scope by design: plugin is invoked through reflect.Value.Call and the result
+asserted back to error. Documented expectation: an Unresolved entry (plan: kind
+"reflection"; today the type assertion is reported as Unresolved(memory)); ErrPlugin
+need not be resolved, but 0 entries would be a silent drop.
+-- args --
+murky/murky.go:@reflective
+-- stdout --
+$WORK/murky/murky.go:103:21-31: Error Set of example.com/stdlibio/murky.Reflective: 1 entries, 1 unresolved
+$WORK/murky/murky.go:105:5-8: unresolved(memory): value of TypeAssert not modelled
+	path (origin → target):
+		$WORK/murky/murky.go:105:5-8: in example.com/stdlibio/murky.Reflective

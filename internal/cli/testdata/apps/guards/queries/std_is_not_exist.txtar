@@ -1,0 +1,10 @@
+errors.Is(err, fs.ErrNotExist) || err == io.EOF on &fs.PathError{Err: fs.ErrNotExist}, io.EOF, io.ErrUnexpectedEOF.
+Expect exactly 1 entry: io.ErrUnexpectedEOF.
+-- args --
+processor/receipts.go:@stdIs
+-- stdout --
+$WORK/processor/receipts.go:44:16-27: Error Set of example.com/guards/processor.StatReceipt: 1 entries
+$GOROOT/src/io/io.go:*: sentinel io.ErrUnexpectedEOF
+	path (origin → target):
+		$WORK/fsx/fsx.go:59:10-29: in example.com/guards/fsx.Stat
+		$WORK/processor/receipts.go:45:9-23: in example.com/guards/processor.StatReceipt, call to example.com/guards/fsx.Stat

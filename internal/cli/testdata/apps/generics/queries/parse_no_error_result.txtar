@@ -1,0 +1,9 @@
+Negative: Parse returns iter.Seq2[T, error]; it has no error result of its own.
+Expect exit 2 with a message that the Target has no error result.
+-- args --
+seq/iter.go:@parse
+-- stdout --
+-- stderr --
+errtrace: $WORK/seq/iter.go:6:16: example.com/generics/seq.Parse has no error result
+-- exit --
+2

@@ -1,0 +1,10 @@
+Call site of InRange[UserID]: must narrow to that instance.
+Expect only concrete *TypedErr[validate.UserID]; *TypedErr[float64] must not appear.
+-- args --
+validation.go:@rangeid
+-- stdout --
+$WORK/validation.go:36:12-53: Error Set of call to validate.InRange in example.com/generics.checkLimits: 1 entries
+$WORK/validate/validate.go:106:10-48: concrete *example.com/generics/errs.TypedErr[example.com/generics/validate.UserID]
+	path (origin → target):
+		$WORK/validate/validate.go:106:10-48: in example.com/generics/validate.InRange[example.com/generics/validate.UserID]
+		$WORK/validation.go:36:12-53: in example.com/generics.checkLimits, call to example.com/generics/validate.InRange[example.com/generics/validate.UserID]

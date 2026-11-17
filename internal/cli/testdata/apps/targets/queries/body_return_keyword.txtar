@@ -1,0 +1,9 @@
+Position on a "return" keyword whose operands contain a call (fmt.Errorf).
+Negative: a keyword is neither a callee identifier nor an opening paren; exit 2, no target.
+-- args --
+internal/store/store.go:@get_return
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/store/store.go:51:18: no function declaration or call at position
+-- exit --
+2

@@ -1,0 +1,12 @@
+SUSPECTED BUG: a pointer that is nil on one path and allocated on the other loses both its typed-nil Origin and its Unwrap chain.
+`var oe *kverr.OpError; if key == "" { oe = &kverr.OpError{Op: "probe", Err: kverr.ErrEmptyKey} }; return oe`.
+Expected 2 entries: sentinel kverr.ErrEmptyKey under *kverr.OpError.Unwrap, and concrete *kverr.OpError [typed nil] for the path that leaves oe nil
+(the direct form `var p *T; return p` is reported as typed nil, see e2e origins/typed_nil).
+Actual: 1 bare `concrete *kverr.OpError` entry: no [typed nil], and kverr.ErrEmptyKey is dropped without an Unresolved entry, although errors.Is(err, kverr.ErrEmptyKey) holds.
+-- args --
+repo/repo.go:@probe
+-- stdout --
+$WORK/repo/repo.go:162:26-31: Error Set of (*example.com/kvstore/repo.Repo).Probe: 1 entries
+$WORK/repo/repo.go:167:9-11: concrete *example.com/kvstore/kverr.OpError
+	path (origin → target):
+		$WORK/repo/repo.go:167:9-11: in (*example.com/kvstore/repo.Repo).Probe

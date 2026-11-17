@@ -1,0 +1,9 @@
+Literal position 4:25: the "(" right after Größe (the identifier ends at byte column 24). Counting runes instead of bytes would land elsewhere.
+Negative: the parameter list paren of a declaration is no target; exit 2.
+-- args --
+internal/codec/unicode.go:4:25
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/codec/unicode.go:4:25: no function declaration or call at position
+-- exit --
+2

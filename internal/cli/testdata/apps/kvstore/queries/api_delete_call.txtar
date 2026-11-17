@@ -1,0 +1,15 @@
+Call site in the middle of a multi-value return statement: return "ok", h.svc.Delete(key, 2).
+Expect: kverr.ErrReadOnly and service.errGaveUp.
+-- args --
+api/api.go:@delete_call
+-- stdout --
+$WORK/api/api.go:49:16-52: Error Set of call to h.svc.Delete in (*example.com/kvstore/api.Handler).Handle: 2 entries
+$WORK/kverr/kverr.go:16:2-13: sentinel example.com/kvstore/kverr.ErrReadOnly
+	path (origin → target):
+		$WORK/service/service.go:92:10-27: in (*example.com/kvstore/service.Service).Delete
+		$WORK/api/api.go:49:16-52: in (*example.com/kvstore/api.Handler).Handle, call to (*example.com/kvstore/service.Service).Delete
+$WORK/service/service.go:17:5-14: sentinel example.com/kvstore/service.errGaveUp
+	path (origin → target):
+		$WORK/service/service.go:104:10-19: in (*example.com/kvstore/service.Service).retry
+		$WORK/service/service.go:94:9-24: in (*example.com/kvstore/service.Service).Delete, call to (*example.com/kvstore/service.Service).retry
+		$WORK/api/api.go:49:16-52: in (*example.com/kvstore/api.Handler).Handle, call to (*example.com/kvstore/service.Service).Delete

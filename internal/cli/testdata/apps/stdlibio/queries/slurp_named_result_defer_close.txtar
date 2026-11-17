@@ -1,0 +1,29 @@
+SUSPECTED BUG: (placeholder span "-") Slurp has a named result err that a deferred closure
+overwrites with fmt.Errorf("source: close: %w", cerr). The final expectation (plan S08,
+not implemented yet) is: os.Open origins under "source: open: %w", the io.ReadAll set
+(readall_call_site) under "source: read: %w", sentinel source.ErrEmpty, and the Close set
+(close_in_deferred_closure) under "source: close: %w". Today a variable captured and
+written by a closure is documented as Unresolved(memory) "load of escaping variable err"
+(e2e dynamic/freevar_other_closure_store), so 5 such entries, one per return plus the
+recover exit, and no origins is the honest interim result: nothing is silently dropped.
+What is wrong today is the entry for the recover exit: its span and its path hop are
+printed as "-" although the output contract says an Unresolved entry's span is its site.
+-- args --
+source/source.go:@slurp
+-- stdout --
+$WORK/source/source.go:100:16-21: Error Set of example.com/stdlibio/source.Slurp: 5 entries, 5 unresolved
+-: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		-: in example.com/stdlibio/source.Slurp
+$WORK/source/source.go:103:3-3: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/source/source.go:103:3-3: in example.com/stdlibio/source.Slurp
+$WORK/source/source.go:112:3-3: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/source/source.go:112:3-3: in example.com/stdlibio/source.Slurp
+$WORK/source/source.go:115:3-3: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/source/source.go:115:3-3: in example.com/stdlibio/source.Slurp
+$WORK/source/source.go:117:2-2: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/source/source.go:117:2-2: in example.com/stdlibio/source.Slurp

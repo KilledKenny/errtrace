@@ -1,0 +1,17 @@
+Format from a named constant, and %w mixed with %d/%s/%v. Expected 2 entries:
+doc.ErrEmpty via "row %d: %w" and doc.ErrTooLong via "line %d (%s...): %v: %w".
+doc.ErrSyntax is only formatted with %v and must NOT appear; no opaque entry.
+-- args --
+parse/parse.go:@row
+-- stdout --
+$WORK/parse/parse.go:65:14-17: Error Set of example.com/wrapchain/parse.Row: 2 entries
+$WORK/doc/doc.go:17:2-10: sentinel example.com/wrapchain/doc.ErrEmpty
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:67:10-45: fmt.Errorf "row %d: %w"
+	path (origin → target):
+		$WORK/parse/parse.go:67:32-44: in example.com/wrapchain/parse.Row
+$WORK/doc/doc.go:19:2-12: sentinel example.com/wrapchain/doc.ErrTooLong
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:70:10-91: fmt.Errorf "line %d (%s...): %v: %w"
+	path (origin → target):
+		$WORK/parse/parse.go:70:76-90: in example.com/wrapchain/parse.Row

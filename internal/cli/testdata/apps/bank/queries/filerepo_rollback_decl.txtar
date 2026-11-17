@@ -1,0 +1,19 @@
+Guard with || of two errors.Is whose body returns nil: fileTx.Rollback swallows fs.ErrNotExist and
+repo.ErrTxDone from release().
+Expect only os.Remove's errors behind (*fs.PathError).Unwrap, each possibly handled (syscall.Errno has a custom
+Is; unresolved values); repo.ErrTxDone must NOT appear. (The candidates named in the group belong to other callers
+of os.ignoringEINTR, see filerepo_commit_decl.)
+-- args --
+repo/filerepo/filerepo.go:@rollback
+-- stdout --
+$WORK/repo/filerepo/filerepo.go:128:31-39: Error Set of (*example.com/bank/repo/filerepo.fileTx).Rollback: 9 entries, 2 unresolved, 9 possibly handled
+$GOROOT/src/os/file_posix.go:*: group of 9 entries via dynamic call to function value fn (9 candidates) in os.ignoringEINTR
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN (candidate os.Mkdir$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL (candidate os.Mkdir$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT (candidate os.Mkdir$1)
+	$GOROOT/src/syscall/syscall.go:*: concrete syscall.Errno (candidate os.Mkdir$1)
+	$GOROOT/src/syscall/syscall_linux.go:*: concrete syscall.Errno (candidate os.chmod$1)
+	$GOROOT/src/syscall/syscall_linux.go:*: concrete syscall.Errno (candidate os.chmod$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno (candidate os.Mkdir$1)
+	$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e (candidate os.openFileNolog$1)
+	$GOROOT/src/syscall/syscall_linux.go:*: unresolved(no-body): internal/runtime/syscall/linux.Syscall6 has no body (candidate os.checkPidfd$1)

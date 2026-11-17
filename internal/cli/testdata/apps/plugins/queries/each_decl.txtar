@@ -1,0 +1,35 @@
+Callback parameter with two callers: main's closure (errUnnamed) and
+SelfTest's closure (calls h.Handle). Expected: main.errUnnamed,
+ErrAuditFull, ErrMetricsDown, ErrPager, all wrapped by "handler %s: %w".
+-- args --
+registry/registry.go:@each
+-- stdout --
+$WORK/registry/registry.go:77:15-19: Error Set of example.com/plugins/registry.Each: 4 entries
+$WORK/drivers/drivers.go:16:2-10: sentinel example.com/plugins/drivers.ErrPager
+	wrap chain (origin → target):
+		$WORK/registry/registry.go:85:11-50: fmt.Errorf "handler %s: %w"
+	path (origin → target):
+		$WORK/drivers/drivers.go:82:10-18: in (example.com/plugins/drivers.Pager).Send
+		$WORK/main.go:30:57-80: in (example.com/plugins.pagerHandler).Handle, call to (example.com/plugins/drivers.Pager).Send
+		$WORK/registry/registry.go:93:60-71: in example.com/plugins/registry.SelfTest$1, call to (example.com/plugins.pagerHandler).Handle (dynamic (example.com/plugins/core.Handler).Handle: 3 of 3 candidates)
+		$WORK/registry/registry.go:84:13-37: in example.com/plugins/registry.Each, call to example.com/plugins/registry.SelfTest$1 (dynamic function value fn: 2 of 2 candidates)
+$WORK/main.go:23:2-12: sentinel example.com/plugins.errUnnamed
+	wrap chain (origin → target):
+		$WORK/registry/registry.go:85:11-50: fmt.Errorf "handler %s: %w"
+	path (origin → target):
+		$WORK/main.go:175:11-21: in example.com/plugins.handlers$1
+		$WORK/registry/registry.go:84:13-37: in example.com/plugins/registry.Each, call to example.com/plugins.handlers$1 (dynamic function value fn: 2 of 2 candidates)
+$WORK/registry/registry.go:13:2-14: sentinel example.com/plugins/registry.ErrAuditFull
+	wrap chain (origin → target):
+		$WORK/registry/registry.go:85:11-50: fmt.Errorf "handler %s: %w"
+	path (origin → target):
+		$WORK/registry/registry.go:22:10-22: in (example.com/plugins/registry.auditHandler).Handle
+		$WORK/registry/registry.go:93:60-71: in example.com/plugins/registry.SelfTest$1, call to (example.com/plugins/registry.auditHandler).Handle (dynamic (example.com/plugins/core.Handler).Handle: 3 of 3 candidates)
+		$WORK/registry/registry.go:84:13-37: in example.com/plugins/registry.Each, call to example.com/plugins/registry.SelfTest$1 (dynamic function value fn: 2 of 2 candidates)
+$WORK/registry/registry.go:14:2-16: sentinel example.com/plugins/registry.ErrMetricsDown
+	wrap chain (origin → target):
+		$WORK/registry/registry.go:85:11-50: fmt.Errorf "handler %s: %w"
+	path (origin → target):
+		$WORK/registry/registry.go:34:10-24: in (*example.com/plugins/registry.metricsHandler).Handle
+		$WORK/registry/registry.go:93:60-71: in example.com/plugins/registry.SelfTest$1, call to (*example.com/plugins/registry.metricsHandler).Handle (dynamic (example.com/plugins/core.Handler).Handle: 3 of 3 candidates)
+		$WORK/registry/registry.go:84:13-37: in example.com/plugins/registry.Each, call to example.com/plugins/registry.SelfTest$1 (dynamic function value fn: 2 of 2 candidates)

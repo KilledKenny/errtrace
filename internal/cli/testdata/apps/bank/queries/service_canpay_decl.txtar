@@ -1,0 +1,11 @@
+Guard that leaves a single origin: Get's errors are swallowed (return nil), Debit's sentinels (wrapped
+"debit %s: %w") fail errors.As(InsufficientFundsError) and become nil.
+Expect exactly 1 entry: concrete domain.InsufficientFundsError, no chain.
+-- args --
+service/service.go:@canpay
+-- stdout --
+$WORK/service/service.go:170:30-36: Error Set of (*example.com/bank/service.Service).CanPay: 1 entries
+$WORK/domain/domain.go:58:10-73: concrete example.com/bank/domain.InsufficientFundsError
+	path (origin → target):
+		$WORK/domain/domain.go:58:10-73: in (*example.com/bank/domain.Account).Debit
+		$WORK/service/service.go:175:8-23: in (*example.com/bank/service.Service).CanPay, call to (*example.com/bank/domain.Account).Debit

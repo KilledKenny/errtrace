@@ -1,0 +1,10 @@
+Literal position on the callee identifier MaxBatch (6:12).
+Expected: call-site target, 1 entry platform.ErrNoLimit; span 6:12-22.
+-- args --
+internal/platform/platform.go:6:12
+-- stdout --
+$WORK/internal/platform/platform.go:6:12-22: Error Set of call to MaxBatch in example.com/targets/internal/platform.Probe: 1 entries
+$WORK/internal/platform/limits_default.go:8:5-15: sentinel example.com/targets/internal/platform.ErrNoLimit
+	path (origin → target):
+		$WORK/internal/platform/limits_default.go:12:12-22: in example.com/targets/internal/platform.MaxBatch
+		$WORK/internal/platform/platform.go:6:12-22: in example.com/targets/internal/platform.Probe, call to example.com/targets/internal/platform.MaxBatch

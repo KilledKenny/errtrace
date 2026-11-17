@@ -1,0 +1,26 @@
+Call-site s.Get("total") in cmd/report with the default ./... (both binaries loaded).
+Under Go semantics cmd/report only ever uses the mem Backend: store.ErrClosed and store.ErrNotFound wrapped "get %q: %w".
+The tool resolves s.be.Read per program, not per binary, so disk.ErrNoEntry (wired only by cmd/ingest) is expected too as a documented over-approximation; with -p ./cmd/report it disappears (p_changes_candidates).
+-- args --
+cmd/report/main.go:@get_call
+-- stdout --
+$WORK/cmd/report/main.go:29:14-41: Error Set of call to s.Get in example.com/targets/cmd/report.run: 3 entries
+$WORK/internal/store/disk/disk.go:7:5-15: sentinel example.com/targets/internal/store/disk.ErrNoEntry
+	wrap chain (origin → target):
+		$WORK/internal/store/store.go:51:30-79: fmt.Errorf "get %q: %w"
+	path (origin → target):
+		$WORK/internal/store/disk/disk.go:40:15-25: in (*example.com/targets/internal/store/disk.Disk).Read
+		$WORK/internal/store/store.go:49:14-43: in (*example.com/targets/internal/store.Store).Get, call to (*example.com/targets/internal/store/disk.Disk).Read (dynamic (example.com/targets/internal/store.Backend).Read: 2 of 2 candidates)
+		$WORK/cmd/report/main.go:29:14-41: in example.com/targets/cmd/report.run, call to (*example.com/targets/internal/store.Store).Get
+$WORK/internal/store/store.go:11:2-13: sentinel example.com/targets/internal/store.ErrNotFound
+	wrap chain (origin → target):
+		$WORK/internal/store/store.go:51:30-79: fmt.Errorf "get %q: %w"
+	path (origin → target):
+		$WORK/internal/store/store.go:111:15-26: in (*example.com/targets/internal/store.mem).Read
+		$WORK/internal/store/store.go:49:14-43: in (*example.com/targets/internal/store.Store).Get, call to (*example.com/targets/internal/store.mem).Read (dynamic (example.com/targets/internal/store.Backend).Read: 2 of 2 candidates)
+		$WORK/cmd/report/main.go:29:14-41: in example.com/targets/cmd/report.run, call to (*example.com/targets/internal/store.Store).Get
+$WORK/internal/store/store.go:12:2-11: sentinel example.com/targets/internal/store.ErrClosed
+	path (origin → target):
+		$WORK/internal/store/store.go:28:10-19: in (*example.com/targets/internal/store.base).Check
+		$WORK/internal/store/store.go:45:12-34: in (*example.com/targets/internal/store.Store).Get, call to (*example.com/targets/internal/store.base).Check
+		$WORK/cmd/report/main.go:29:14-41: in example.com/targets/cmd/report.run, call to (*example.com/targets/internal/store.Store).Get

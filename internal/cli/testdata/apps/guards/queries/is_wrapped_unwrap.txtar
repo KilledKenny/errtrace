@@ -1,0 +1,14 @@
+errors.Is through fmt.Errorf %w (ErrNotFound) and through a custom Unwrap type (ErrTimeout in *OpError).
+Expect 2 entries: ErrRateLimited and *NetError. ErrNotFound and ErrTimeout must NOT appear.
+-- args --
+processor/is.go:@isWrapped
+-- stdout --
+$WORK/processor/is.go:13:20-28: Error Set of example.com/guards/processor.LookupIs: 2 entries
+$WORK/payerr/payerr.go:11:2-16: sentinel example.com/guards/payerr.ErrRateLimited
+	path (origin → target):
+		$WORK/gateway/gateway.go:40:10-31: in example.com/guards/gateway.Lookup
+		$WORK/processor/is.go:14:9-26: in example.com/guards/processor.LookupIs, call to example.com/guards/gateway.Lookup
+$WORK/gateway/gateway.go:42:9-39: concrete *example.com/guards/payerr.NetError
+	path (origin → target):
+		$WORK/gateway/gateway.go:42:9-39: in example.com/guards/gateway.Lookup
+		$WORK/processor/is.go:14:9-26: in example.com/guards/processor.LookupIs, call to example.com/guards/gateway.Lookup

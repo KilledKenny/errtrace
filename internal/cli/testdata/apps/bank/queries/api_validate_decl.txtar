@@ -1,0 +1,29 @@
+Translation layer over pure parsing: Translate(parse.Request error). Parse errors are *ValidationError (400) or
+opaque / strconv-wrapped (500); none contains ErrDuplicate, has a custom Is method or is unresolved.
+Expect only fresh *api.Error values and api.ErrUnavailable (the 409 site has no cause to show; the 404/402/503
+sites are a tolerated path-insensitive over-approximation) and NOTHING behind (*api.Error).Unwrap: no parse,
+strconv, json or domain origin.
+-- args --
+api/api.go:@validate
+-- stdout --
+$WORK/api/api.go:118:31-39: Error Set of (*example.com/bank/api.Server).Validate: 5 entries
+$WORK/api/api.go:28:5-19: sentinel example.com/bank/api.ErrUnavailable
+	path (origin → target):
+		$WORK/api/api.go:48:10-24: in example.com/bank/api.Translate
+		$WORK/api/api.go:120:9-23: in (*example.com/bank/api.Server).Validate, call to example.com/bank/api.Translate
+$WORK/api/api.go:40:10-48: concrete *example.com/bank/api.Error
+	path (origin → target):
+		$WORK/api/api.go:40:10-48: in example.com/bank/api.Translate
+		$WORK/api/api.go:120:9-23: in (*example.com/bank/api.Server).Validate, call to example.com/bank/api.Translate
+$WORK/api/api.go:44:10-55: concrete *example.com/bank/api.Error
+	path (origin → target):
+		$WORK/api/api.go:44:10-55: in example.com/bank/api.Translate
+		$WORK/api/api.go:120:9-23: in (*example.com/bank/api.Server).Validate, call to example.com/bank/api.Translate
+$WORK/api/api.go:46:10-58: concrete *example.com/bank/api.Error
+	path (origin → target):
+		$WORK/api/api.go:46:10-58: in example.com/bank/api.Translate
+		$WORK/api/api.go:120:9-23: in (*example.com/bank/api.Server).Validate, call to example.com/bank/api.Translate
+$WORK/api/api.go:51:9-53: concrete *example.com/bank/api.Error
+	path (origin → target):
+		$WORK/api/api.go:51:9-53: in example.com/bank/api.Translate
+		$WORK/api/api.go:120:9-23: in (*example.com/bank/api.Server).Validate, call to example.com/bank/api.Translate

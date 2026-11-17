@@ -1,0 +1,9 @@
+A non-Go file.
+Negative: exit 2; recorded is the generic "file is not in any loaded package" (see file_nonexistent), nothing is parsed.
+-- args --
+assets/schema.txt:1:1
+-- stdout --
+-- stderr --
+errtrace: $WORK/assets/schema.txt: file is not in any loaded package
+-- exit --
+2

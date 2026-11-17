@@ -1,0 +1,16 @@
+Is(ErrRateLimited) || Is(ErrTimeout) || force -> return nil; the false branch implies neither matched.
+Expect 2 entries: ErrNotFound (fmt.Errorf chain) and *NetError.
+-- args --
+processor/is.go:@orChain
+-- stdout --
+$WORK/processor/is.go:43:18-26: Error Set of example.com/guards/processor.LookupOr: 2 entries
+$WORK/payerr/payerr.go:10:2-13: sentinel example.com/guards/payerr.ErrNotFound
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:36:10-60: fmt.Errorf "lookup %d: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:36:41-59: in example.com/guards/gateway.Lookup
+		$WORK/processor/is.go:44:9-26: in example.com/guards/processor.LookupOr, call to example.com/guards/gateway.Lookup
+$WORK/gateway/gateway.go:42:9-39: concrete *example.com/guards/payerr.NetError
+	path (origin → target):
+		$WORK/gateway/gateway.go:42:9-39: in example.com/guards/gateway.Lookup
+		$WORK/processor/is.go:44:9-26: in example.com/guards/processor.LookupOr, call to example.com/guards/gateway.Lookup

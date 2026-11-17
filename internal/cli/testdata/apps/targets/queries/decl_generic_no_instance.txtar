@@ -1,0 +1,7 @@
+Generic declaration with only its own package loaded: no main, so Decode has no instance at all.
+Expected (plan S02/S06): the generic body is never analysed on its own, so exit 0 with exactly 1 entry, unresolved(no-instances); never an empty "0 entries" set. No unreachable warning (there is no function to root). With a binary loaded see decl_generic_one_binary.
+-- args --
+-p ./internal/codec internal/codec/codec.go:@decode
+-- stdout --
+$WORK/internal/codec/codec.go:29:17-23: Error Set of example.com/targets/internal/codec.Decode: 1 entries, 1 unresolved
+$WORK/internal/codec/codec.go:29:17-23: unresolved(no-instances): generic function example.com/targets/internal/codec.Decode has no instances in the loaded program

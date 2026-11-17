@@ -1,0 +1,9 @@
+The error is guarded inside a goroutine and delivered over a channel (channels are out of scope).
+Expect an explicit unresolved(memory) entry for the channel receive; the set must not be silently empty.
+-- args --
+processor/flow.go:@goChan
+-- stdout --
+$WORK/processor/flow.go:60:17-26: Error Set of example.com/guards/processor.VoidAsync: 1 entries, 1 unresolved
+$WORK/processor/flow.go:70:9-15: unresolved(memory): channel receive
+	path (origin → target):
+		$WORK/processor/flow.go:70:9-15: in example.com/guards/processor.VoidAsync

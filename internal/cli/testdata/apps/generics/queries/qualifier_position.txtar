@@ -1,0 +1,9 @@
+Negative: the position is on the package qualifier of validate.Check(e), the first byte of the call expression.
+A call-site Target must point at the callee name or its "(": expect exit 2, no function declaration or call at position.
+-- args --
+validation.go:@qualifier
+-- stdout --
+-- stderr --
+errtrace: $WORK/validation.go:17:23: no function declaration or call at position
+-- exit --
+2

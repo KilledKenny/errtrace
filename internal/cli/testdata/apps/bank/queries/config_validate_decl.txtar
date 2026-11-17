@@ -1,0 +1,16 @@
+errors.Join of two independently nil-able errors (sentinel + concrete pointer type from another package).
+Expect 2 entries, both with the chain errors.Join: sentinel config.ErrNoToken and concrete *domain.ValidationError.
+-- args --
+config/config.go:@validate
+-- stdout --
+$WORK/config/config.go:86:31-39: Error Set of (*example.com/bank/config.Config).validate: 2 entries
+$WORK/config/config.go:17:5-15: sentinel example.com/bank/config.ErrNoToken
+	wrap chain (origin → target):
+		$WORK/config/config.go:94:9-40: errors.Join
+	path (origin → target):
+		$WORK/config/config.go:89:14-24: in (*example.com/bank/config.Config).validate
+$WORK/config/config.go:92:14-83: concrete *example.com/bank/domain.ValidationError
+	wrap chain (origin → target):
+		$WORK/config/config.go:94:9-40: errors.Join
+	path (origin → target):
+		$WORK/config/config.go:92:14-83: in (*example.com/bank/config.Config).validate

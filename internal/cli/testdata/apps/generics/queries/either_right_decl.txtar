@@ -1,0 +1,7 @@
+Method of a generic type that is never instantiated.
+Expect a single unresolved(no-instances) entry.
+-- args --
+result/result.go:@right
+-- stdout --
+$WORK/result/result.go:44:33-38: Error Set of (example.com/generics/result.Either[L, R]).Right: 1 entries, 1 unresolved
+$WORK/result/result.go:44:33-38: unresolved(no-instances): generic function (example.com/generics/result.Either[L, R]).Right has no instances in the loaded program

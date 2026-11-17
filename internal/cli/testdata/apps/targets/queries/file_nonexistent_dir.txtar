@@ -1,0 +1,9 @@
+A file in a directory that does not exist.
+Negative: exit 2 with a message naming the path (generic "not in any loaded package" text, see file_nonexistent).
+-- args --
+internal/nowhere/x.go:1:1
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/nowhere/x.go: file is not in any loaded package
+-- exit --
+2

@@ -1,0 +1,9 @@
+Negative: the Target is a conversion to an error type, kverr.Code(len(v)), which looks like a call but is not one.
+Expect: exit 2 with a diagnostic ('not a call to a function'); never a crash or an empty set.
+-- args --
+validate/validate.go:@conv
+-- stdout --
+-- stderr --
+errtrace: $WORK/validate/validate.go:30:25: not a call to a function
+-- exit --
+2

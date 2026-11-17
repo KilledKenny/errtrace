@@ -1,0 +1,9 @@
+The isolated type-error package is explicitly included while the Target is elsewhere.
+Negative: exit 2, the type error in _broken/typeerr/typeerr.go is reported; no partial Error Set.
+-- args --
+-p ./...,./_broken/typeerr internal/platform/platform.go:5:6
+-- stdout --
+-- stderr --
+errtrace: $WORK/_broken/typeerr/typeerr.go:12:14: cannot use "not a number" (untyped string constant) as int value in variable declaration
+-- exit --
+2

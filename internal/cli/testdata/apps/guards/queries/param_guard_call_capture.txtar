@@ -1,0 +1,33 @@
+Call-site query: Classify(err) with err from gateway.Capture.
+Expect 3 entries with the "classified: %w" chain: both *CodeError origins and ErrDeclined, which is wrapped
+by "capture: %w" so Classify's err == ErrDeclined must NOT remove it.
+-- args --
+processor/helper.go:@classifyCaptureCall
+-- stdout --
+$WORK/processor/helper.go:63:33-46: Error Set of call to Classify in example.com/guards/processor.CaptureClassified: 3 entries
+$WORK/payerr/payerr.go:8:2-13: sentinel example.com/guards/payerr.ErrDeclined
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:76:10-55: fmt.Errorf "capture: %w"
+		$WORK/processor/helper.go:51:9-42: fmt.Errorf "classified: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:76:36-54: in example.com/guards/gateway.Capture
+		$WORK/processor/helper.go:62:9-27: in example.com/guards/processor.CaptureClassified, call to example.com/guards/gateway.Capture
+		$WORK/processor/helper.go:45:5-8: in example.com/guards/processor.Classify
+		$WORK/processor/helper.go:63:33-46: in example.com/guards/processor.CaptureClassified, call to example.com/guards/processor.Classify
+$WORK/gateway/gateway.go:70:46-91: concrete *example.com/guards/payerr.CodeError
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:70:10-92: *example.com/guards/payerr.OpError.Unwrap
+		$WORK/processor/helper.go:51:9-42: fmt.Errorf "classified: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:70:46-91: in example.com/guards/gateway.Capture
+		$WORK/processor/helper.go:62:9-27: in example.com/guards/processor.CaptureClassified, call to example.com/guards/gateway.Capture
+		$WORK/processor/helper.go:45:5-8: in example.com/guards/processor.Classify
+		$WORK/processor/helper.go:63:33-46: in example.com/guards/processor.CaptureClassified, call to example.com/guards/processor.Classify
+$WORK/gateway/gateway.go:73:10-51: concrete *example.com/guards/payerr.CodeError
+	wrap chain (origin → target):
+		$WORK/processor/helper.go:51:9-42: fmt.Errorf "classified: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:73:10-51: in example.com/guards/gateway.Capture
+		$WORK/processor/helper.go:62:9-27: in example.com/guards/processor.CaptureClassified, call to example.com/guards/gateway.Capture
+		$WORK/processor/helper.go:45:5-8: in example.com/guards/processor.Classify
+		$WORK/processor/helper.go:63:33-46: in example.com/guards/processor.CaptureClassified, call to example.com/guards/processor.Classify

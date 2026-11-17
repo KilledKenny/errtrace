@@ -1,0 +1,12 @@
+Hidden -debug=summary.
+Expected: stdout identical to pos_line_col; stderr one "summary: functions=N sccs=M" line (Probe and MaxBatch: 2 functions, 2 SCCs).
+-- args --
+-debug=summary internal/platform/platform.go:5:6
+-- stdout --
+$WORK/internal/platform/platform.go:5:6-11: Error Set of example.com/targets/internal/platform.Probe: 1 entries
+$WORK/internal/platform/limits_default.go:8:5-15: sentinel example.com/targets/internal/platform.ErrNoLimit
+	path (origin → target):
+		$WORK/internal/platform/limits_default.go:12:12-22: in example.com/targets/internal/platform.MaxBatch
+		$WORK/internal/platform/platform.go:6:12-22: in example.com/targets/internal/platform.Probe, call to example.com/targets/internal/platform.MaxBatch
+-- stderr --
+summary: functions=2 sccs=2

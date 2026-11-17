@@ -1,0 +1,13 @@
+Error stored in a local inside nested loops, left through a labeled break, then wrapped with %w.
+The error comes from a function-valued parameter; its only Candidate is the closure in repo.Keys.
+Expect: sentinel repo.ErrTooMany with wrap chain fmt.Errorf "scan %q: %w"; no unwrapped entry.
+-- args --
+engine/engine.go:@scan
+-- stdout --
+$WORK/engine/engine.go:146:27-31: Error Set of (*example.com/kvstore/engine.Engine).Scan: 1 entries
+$WORK/repo/repo.go:16:5-15: sentinel example.com/kvstore/repo.ErrTooMany
+	wrap chain (origin → target):
+		$WORK/engine/engine.go:163:10-48: fmt.Errorf "scan %q: %w"
+	path (origin → target):
+		$WORK/repo/repo.go:121:11-21: in (*example.com/kvstore/repo.Repo).Keys$1
+		$WORK/engine/engine.go:154:13-21: in (*example.com/kvstore/engine.Engine).Scan, call to (*example.com/kvstore/repo.Repo).Keys$1 (dynamic function value visit: 1 of 1 candidates)

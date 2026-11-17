@@ -1,0 +1,21 @@
+errors.As(&*CodeError) on gateway.Quirky: *ShapeError has a custom As that accepts **CodeError.
+Expect 3 entries: *ShapeError kept and marked possibly handled; *FlexError and ErrNotFound kept (no As
+method in their trees, so ideally unmarked).
+-- args --
+processor/as.go:@customAs
+-- stdout --
+$WORK/processor/as.go:65:19-27: Error Set of example.com/guards/processor.QuirkyAs: 3 entries, 1 possibly handled
+$WORK/payerr/payerr.go:10:2-13: sentinel example.com/guards/payerr.ErrNotFound
+	path (origin → target):
+		$WORK/gateway/gateway.go:90:10-28: in example.com/guards/gateway.Quirky
+		$WORK/processor/as.go:66:9-26: in example.com/guards/processor.QuirkyAs, call to example.com/guards/gateway.Quirky
+$WORK/gateway/gateway.go:84:10-45: concrete *example.com/guards/payerr.FlexError
+	path (origin → target):
+		$WORK/gateway/gateway.go:84:10-45: in example.com/guards/gateway.Quirky
+		$WORK/processor/as.go:66:9-26: in example.com/guards/processor.QuirkyAs, call to example.com/guards/gateway.Quirky
+$WORK/gateway/gateway.go:87:10-37: concrete *example.com/guards/payerr.ShapeError
+	possibly handled:
+		$WORK/processor/as.go:68:5-24: errors.As to *example.com/guards/payerr.CodeError: custom As method of *example.com/guards/payerr.ShapeError
+	path (origin → target):
+		$WORK/gateway/gateway.go:87:10-37: in example.com/guards/gateway.Quirky
+		$WORK/processor/as.go:66:9-26: in example.com/guards/processor.QuirkyAs, call to example.com/guards/gateway.Quirky

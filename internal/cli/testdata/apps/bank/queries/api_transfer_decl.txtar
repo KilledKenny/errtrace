@@ -1,0 +1,1516 @@
+SUSPECTED BUG: translation layer end to end, Translate(handleTransfer(...)); domain and infrastructure errors must not
+leak. Correct set: fresh *api.Error (400/404/402/500), api.ErrUnavailable, and behind (*api.Error).Unwrap only values
+that contain domain.ErrDuplicate (ErrDuplicate behind "transfer %d: %w" x2, plus audit/rollback errors joined to it).
+Actual: domain.ErrDuplicate is missing, because execute's set is hidden behind WithTx's "load of escaping variable
+err" values (plan S08 is not implemented, see tx_withtx_decl), and handleTransfer's set is cut at
+unresolved(fixpoint-limit) (see service_transfer_decl). The entries behind (*api.Error).Unwrap (retry.ErrBusy,
+errDryRun, NotFoundError[AccountID], filerepo and audit errors) are not leaks in the tool's model: each belongs to
+an errors.Join / double-%w value with a may-match part (an Unresolved value, or a type with a custom Is method),
+which errors.Is(err, ErrDuplicate) keeps by the documented rule. Compare api_import_decl, where the same
+translation is precise for the part that is visible.
+-- args --
+api/api.go:@transfer
+-- stdout --
+$WORK/api/api.go:108:31-39: Error Set of (*example.com/bank/api.Server).Transfer: 72 entries, 6 unresolved, 14 possibly handled
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/audit/audit.go:65:10-45: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).writeLock, call to internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to (*internal/poll.FD).writeLock
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/audit/audit.go:63:12-50: in example.com/bank/audit.Write, call to (*os.File).Write (dynamic (io.Writer).Write: 3 of 3 candidates)
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).readLock, call to internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).readLock
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing
+	wrap chain (origin → target):
+		$WORK/audit/audit.go:65:10-45: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).writeLock, call to internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to (*internal/poll.FD).writeLock
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/audit/audit.go:63:12-50: in example.com/bank/audit.Write, call to (*os.File).Write (dynamic (io.Writer).Write: 3 of 3 candidates)
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).readLock, call to internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).readLock
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrFileClosing
+	wrap chain (origin → target):
+		$WORK/audit/audit.go:65:10-45: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).writeLock, call to internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to (*internal/poll.FD).writeLock
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/audit/audit.go:63:12-50: in example.com/bank/audit.Write, call to (*os.File).Write (dynamic (io.Writer).Write: 3 of 3 candidates)
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrFileClosing
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd.go:*: in internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_mutex.go:*: in (*internal/poll.FD).readLock, call to internal/poll.errClosing
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).readLock
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrDeadlineExceeded
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/audit/audit.go:65:10-45: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepare, call to internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepareWrite, call to (*internal/poll.pollDesc).prepare
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to (*internal/poll.pollDesc).prepareWrite
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/audit/audit.go:63:12-50: in example.com/bank/audit.Write, call to (*os.File).Write (dynamic (io.Writer).Write: 3 of 3 candidates)
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrDeadlineExceeded
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepare, call to internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepareRead, call to (*internal/poll.pollDesc).prepare
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.pollDesc).prepareRead
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrDeadlineExceeded
+	wrap chain (origin → target):
+		$WORK/audit/audit.go:65:10-45: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepare, call to internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepareWrite, call to (*internal/poll.pollDesc).prepare
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to (*internal/poll.pollDesc).prepareWrite
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/audit/audit.go:63:12-50: in example.com/bank/audit.Write, call to (*os.File).Write (dynamic (io.Writer).Write: 3 of 3 candidates)
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrDeadlineExceeded
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepare, call to internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepareRead, call to (*internal/poll.pollDesc).prepare
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.pollDesc).prepareRead
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNotPollable
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/audit/audit.go:65:10-45: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepare, call to internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepareWrite, call to (*internal/poll.pollDesc).prepare
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to (*internal/poll.pollDesc).prepareWrite
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/audit/audit.go:63:12-50: in example.com/bank/audit.Write, call to (*os.File).Write (dynamic (io.Writer).Write: 3 of 3 candidates)
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNotPollable
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepare, call to internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepareRead, call to (*internal/poll.pollDesc).prepare
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.pollDesc).prepareRead
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNotPollable
+	wrap chain (origin → target):
+		$WORK/audit/audit.go:65:10-45: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepare, call to internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepareWrite, call to (*internal/poll.pollDesc).prepare
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to (*internal/poll.pollDesc).prepareWrite
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/audit/audit.go:63:12-50: in example.com/bank/audit.Write, call to (*os.File).Write (dynamic (io.Writer).Write: 3 of 3 candidates)
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNotPollable
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepare, call to internal/poll.convertErr
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).prepareRead, call to (*internal/poll.pollDesc).prepare
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.pollDesc).prepareRead
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/io/io.go:*: sentinel io.ErrShortWrite
+	wrap chain (origin → target):
+		$WORK/audit/audit.go:65:10-45: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/os/file.go:*: in (*os.File).Write
+		$WORK/audit/audit.go:63:12-50: in example.com/bank/audit.Write, call to (*os.File).Write (dynamic (io.Writer).Write: 3 of 3 candidates)
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/io/io.go:*: sentinel io.ErrShortWrite
+	wrap chain (origin → target):
+		$WORK/audit/audit.go:68:10-58: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$WORK/audit/audit.go:68:41-57: in example.com/bank/audit.Write
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/io/io.go:*: sentinel io.ErrUnexpectedEOF
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/audit/audit.go:65:10-45: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/audit/audit.go:63:12-50: in example.com/bank/audit.Write, call to (*os.File).Write (dynamic (io.Writer).Write: 3 of 3 candidates)
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/io/io.go:*: sentinel io.ErrUnexpectedEOF
+	wrap chain (origin → target):
+		$WORK/audit/audit.go:65:10-45: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/audit/audit.go:63:12-50: in example.com/bank/audit.Write, call to (*os.File).Write (dynamic (io.Writer).Write: 3 of 3 candidates)
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid
+	wrap chain (origin → target):
+		$WORK/audit/audit.go:65:10-45: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).checkValid
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).checkValid
+		$WORK/audit/audit.go:63:12-50: in example.com/bank/audit.Write, call to (*os.File).Write (dynamic (io.Writer).Write: 3 of 3 candidates)
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).checkValid
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).checkValid
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/audit/audit.go:65:10-45: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/audit/audit.go:63:12-50: in example.com/bank/audit.Write, call to (*os.File).Write (dynamic (io.Writer).Write: 3 of 3 candidates)
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrRange
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.rangeError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.rangeError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrSyntax
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.syntaxError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.syntaxError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/audit/audit.go:65:10-45: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/audit/audit.go:63:12-50: in example.com/bank/audit.Write, call to (*os.File).Write (dynamic (io.Writer).Write: 3 of 3 candidates)
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	possibly handled:
+		$WORK/repo/filerepo/filerepo.go:45:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN
+	wrap chain (origin → target):
+		$WORK/audit/audit.go:65:10-45: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/audit/audit.go:63:12-50: in example.com/bank/audit.Write, call to (*os.File).Write (dynamic (io.Writer).Write: 3 of 3 candidates)
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	possibly handled:
+		$WORK/repo/filerepo/filerepo.go:45:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/audit/audit.go:65:10-45: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/audit/audit.go:63:12-50: in example.com/bank/audit.Write, call to (*os.File).Write (dynamic (io.Writer).Write: 3 of 3 candidates)
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	possibly handled:
+		$WORK/repo/filerepo/filerepo.go:45:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL
+	wrap chain (origin → target):
+		$WORK/audit/audit.go:65:10-45: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/audit/audit.go:63:12-50: in example.com/bank/audit.Write, call to (*os.File).Write (dynamic (io.Writer).Write: 3 of 3 candidates)
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	possibly handled:
+		$WORK/repo/filerepo/filerepo.go:45:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/audit/audit.go:65:10-45: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/audit/audit.go:63:12-50: in example.com/bank/audit.Write, call to (*os.File).Write (dynamic (io.Writer).Write: 3 of 3 candidates)
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	possibly handled:
+		$WORK/repo/filerepo/filerepo.go:45:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT
+	wrap chain (origin → target):
+		$WORK/audit/audit.go:65:10-45: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/audit/audit.go:63:12-50: in example.com/bank/audit.Write, call to (*os.File).Write (dynamic (io.Writer).Write: 3 of 3 candidates)
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	possibly handled:
+		$WORK/repo/filerepo/filerepo.go:45:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$WORK/api/api.go:28:5-19: sentinel example.com/bank/api.ErrUnavailable
+	path (origin → target):
+		$WORK/api/api.go:48:10-24: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$WORK/audit/audit.go:16:2-11: sentinel example.com/bank/audit.ErrClosed
+	wrap chain (origin → target):
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$WORK/audit/audit.go:51:10-19: in (*example.com/bank/audit.Logger).Record
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$WORK/audit/audit.go:18:2-9: sentinel example.com/bank/audit.ErrFull
+	wrap chain (origin → target):
+		$WORK/audit/audit.go:65:10-45: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$WORK/audit/audit.go:93:13-20: in (*example.com/bank/audit.Quota).Write
+		$WORK/audit/audit.go:63:12-50: in example.com/bank/audit.Write, call to (*example.com/bank/audit.Quota).Write (dynamic (io.Writer).Write: 3 of 3 candidates)
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$WORK/cmd/cli/main.go:29:2-11: sentinel example.com/bank/cmd/cli.errDryRun
+	wrap chain (origin → target):
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$WORK/cmd/cli/main.go:200:10-19: in example.com/bank/cmd/cli.probe$2
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/cmd/cli.probe$2 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$WORK/repo/filerepo/filerepo.go:28:5-19: sentinel example.com/bank/repo/filerepo.errShortRecord
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$WORK/repo/filerepo/filerepo.go:62:15-29: in example.com/bank/repo/filerepo.decode
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$WORK/retry/retry.go:13:2-9: sentinel example.com/bank/retry.ErrBusy
+	wrap chain (origin → target):
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$WORK/cmd/cli/main.go:198:11-24: in example.com/bank/cmd/cli.probe$2
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/cmd/cli.probe$2 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$WORK/retry/retry.go:15:2-11: sentinel example.com/bank/retry.ErrGaveUp
+	wrap chain (origin → target):
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$WORK/retry/retry.go:44:48-57: in example.com/bank/retry.Do
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/audit/audit.go:65:10-45: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/audit/audit.go:63:12-50: in example.com/bank/audit.Write, call to (*os.File).Write (dynamic (io.Writer).Write: 3 of 3 candidates)
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	possibly handled:
+		$WORK/repo/filerepo/filerepo.go:45:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$WORK/audit/audit.go:65:10-45: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/audit/audit.go:63:12-50: in example.com/bank/audit.Write, call to (*os.File).Write (dynamic (io.Writer).Write: 3 of 3 candidates)
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	possibly handled:
+		$WORK/repo/filerepo/filerepo.go:45:5-35: errors.Is with io/fs.ErrNotExist: custom Is method of syscall.Errno
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.Write, call to syscall.errnoErr
+		$GOROOT/src/internal/poll/fd_unix.go:*: in internal/poll.ignoringEINTRIO, call to syscall.Write (dynamic function value fn: 2 of 2 candidates)
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to internal/poll.ignoringEINTRIO
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$WORK/api/api.go:40:10-48: concrete *example.com/bank/api.Error
+	path (origin → target):
+		$WORK/api/api.go:40:10-48: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$WORK/api/api.go:44:10-55: concrete *example.com/bank/api.Error
+	path (origin → target):
+		$WORK/api/api.go:44:10-55: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$WORK/api/api.go:46:10-58: concrete *example.com/bank/api.Error
+	path (origin → target):
+		$WORK/api/api.go:46:10-58: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$WORK/api/api.go:51:9-53: concrete *example.com/bank/api.Error
+	path (origin → target):
+		$WORK/api/api.go:51:9-53: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$WORK/repo/filerepo/filerepo.go:46:15-78: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID]
+	wrap chain (origin → target):
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$WORK/repo/filerepo/filerepo.go:46:15-78: in (*example.com/bank/repo/filerepo.Store).Get
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type"
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/audit/audit.go:65:10-45: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).waitWrite, call to (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to (*internal/poll.pollDesc).waitWrite
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/audit/audit.go:63:12-50: in example.com/bank/audit.Write, call to (*os.File).Write (dynamic (io.Writer).Write: 3 of 3 candidates)
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type"
+	wrap chain (origin → target):
+		$GOROOT/src/os/file.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).waitRead, call to (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.pollDesc).waitRead
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type"
+	wrap chain (origin → target):
+		$WORK/audit/audit.go:65:10-45: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).waitWrite, call to (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Write, call to (*internal/poll.pollDesc).waitWrite
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).write, call to (*internal/poll.FD).Write
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).write
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Write, call to (*os.File).wrapErr
+		$WORK/audit/audit.go:63:12-50: in example.com/bank/audit.Write, call to (*os.File).Write (dynamic (io.Writer).Write: 3 of 3 candidates)
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type"
+	wrap chain (origin → target):
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_poll_runtime.go:*: in (*internal/poll.pollDesc).waitRead, call to (*internal/poll.pollDesc).wait
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.pollDesc).waitRead
+		$GOROOT/src/internal/poll/fd_posix.go:*: in (*internal/poll.FD).eofError
+		$GOROOT/src/internal/poll/fd_unix.go:*: in (*internal/poll.FD).Read, call to (*internal/poll.FD).eofError
+		$GOROOT/src/os/file_posix.go:*: in (*os.File).read, call to (*internal/poll.FD).Read
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).read
+		$GOROOT/src/os/file.go:*: in (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in (*os.File).Read, call to (*os.File).wrapErr
+		$GOROOT/src/os/file.go:*: in os.readFileContents, call to (*os.File).Read (dynamic function value read: 1 of 1 candidates)
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.readFileContents
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/strconv/number.go:*: opaque errors.New
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.baseError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.baseError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/strconv/number.go:*: opaque errors.New
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:66:15-45: fmt.Errorf "balance: %w"
+		$WORK/repo/filerepo/filerepo.go:53:15-46: *example.com/bank/repo/filerepo.CorruptError.Unwrap
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.bitSizeError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.bitSizeError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/repo/filerepo/filerepo.go:64:14-48: in example.com/bank/repo/filerepo.decode, call to strconv.ParseInt
+		$WORK/repo/filerepo/filerepo.go:51:28-52: in (*example.com/bank/repo/filerepo.Store).Get, call to example.com/bank/repo/filerepo.decode
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+-: unresolved(memory): load of escaping variable err
+	wrap chain (origin → target):
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	possibly handled:
+		$WORK/api/api.go:39:7-26: errors.As to *example.com/bank/domain.ValidationError: unresolved value
+	path (origin → target):
+		-: in (*example.com/bank/tx.Manager).WithTx
+		$WORK/service/service.go:41:10-110: in (*example.com/bank/service.Service).Transfer$1, call to (*example.com/bank/tx.Manager).WithTx
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to (*example.com/bank/service.Service).Transfer$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:49:15-59: fmt.Errorf "filerepo: read %s: %w"
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	possibly handled:
+		$WORK/repo/filerepo/filerepo.go:45:5-35: errors.Is with io/fs.ErrNotExist: unresolved value
+		$WORK/api/api.go:39:7-26: errors.As to *example.com/bank/domain.ValidationError: unresolved value
+	path (origin → target):
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.OpenFile, call to os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.Open, call to os.OpenFile
+		$GOROOT/src/os/file.go:*: in os.ReadFile, call to os.Open
+		$WORK/repo/filerepo/filerepo.go:44:15-38: in (*example.com/bank/repo/filerepo.Store).Get, call to os.ReadFile
+		$WORK/service/service.go:106:10-30: in (*example.com/bank/service.Service).Balance$1, call to (*example.com/bank/repo/filerepo.Store).Get (dynamic (example.com/bank/repo.Store).Get: 2 of 2 candidates)
+		$WORK/retry/retry.go:51:14-18: in example.com/bank/retry.Value[*example.com/bank/domain.Account]$1, call to (*example.com/bank/service.Service).Balance$1 (dynamic function value of type func() (*example.com/bank/domain.Account, error): 1 of 1 candidates)
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to example.com/bank/retry.Value[*example.com/bank/domain.Account]$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$WORK/api/api.go:85:38-52: unresolved(fixpoint-limit): result 0 of (*example.com/bank/api.Server).handleTransfer can carry more than 1024 values
+	wrap chain (origin → target):
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	possibly handled:
+		$WORK/api/api.go:39:7-26: errors.As to *example.com/bank/domain.ValidationError: unresolved value
+	path (origin → target):
+		$WORK/api/api.go:85:38-52: in (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$WORK/tx/tx.go:25:3-3: unresolved(memory): load of escaping variable err
+	wrap chain (origin → target):
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	possibly handled:
+		$WORK/api/api.go:39:7-26: errors.As to *example.com/bank/domain.ValidationError: unresolved value
+	path (origin → target):
+		$WORK/tx/tx.go:25:3-3: in (*example.com/bank/tx.Manager).WithTx
+		$WORK/service/service.go:41:10-110: in (*example.com/bank/service.Service).Transfer$1, call to (*example.com/bank/tx.Manager).WithTx
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to (*example.com/bank/service.Service).Transfer$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$WORK/tx/tx.go:39:3-3: unresolved(memory): load of escaping variable err
+	wrap chain (origin → target):
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	possibly handled:
+		$WORK/api/api.go:39:7-26: errors.As to *example.com/bank/domain.ValidationError: unresolved value
+	path (origin → target):
+		$WORK/tx/tx.go:39:3-3: in (*example.com/bank/tx.Manager).WithTx
+		$WORK/service/service.go:41:10-110: in (*example.com/bank/service.Service).Transfer$1, call to (*example.com/bank/tx.Manager).WithTx
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to (*example.com/bank/service.Service).Transfer$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate
+$WORK/tx/tx.go:41:2-2: unresolved(memory): load of escaping variable err
+	wrap chain (origin → target):
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	possibly handled:
+		$WORK/api/api.go:39:7-26: errors.As to *example.com/bank/domain.ValidationError: unresolved value
+	path (origin → target):
+		$WORK/tx/tx.go:41:2-2: in (*example.com/bank/tx.Manager).WithTx
+		$WORK/service/service.go:41:10-110: in (*example.com/bank/service.Service).Transfer$1, call to (*example.com/bank/tx.Manager).WithTx
+		$WORK/retry/retry.go:31:10-14: in example.com/bank/retry.Do, call to (*example.com/bank/service.Service).Transfer$1 (dynamic function value op: 3 of 3 candidates)
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/api/api.go:90:9-31: in (*example.com/bank/api.Server).handleTransfer, call to (*example.com/bank/service.Service).Transfer
+		$WORK/api/api.go:109:38-110: in (*example.com/bank/api.Server).Transfer, call to (*example.com/bank/api.Server).handleTransfer
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate
+		$WORK/api/api.go:109:28-111: in (*example.com/bank/api.Server).Transfer, call to example.com/bank/api.Translate

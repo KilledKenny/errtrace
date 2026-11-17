@@ -1,0 +1,16 @@
+WithStage calls WithOp: a wrap helper two levels deep. Expected 1 entry:
+doc.ErrNoTitle with the chain *xerr.OpError.Unwrap and a path through both helpers.
+-- args --
+transform/transform.go:@stage
+-- stdout --
+$WORK/transform/transform.go:31:16-21: Error Set of example.com/wrapchain/transform.Stage: 1 entries
+$WORK/doc/doc.go:20:2-12: sentinel example.com/wrapchain/doc.ErrNoTitle
+	wrap chain (origin → target):
+		$WORK/xerr/helpers.go:29:9-35: *example.com/wrapchain/xerr.OpError.Unwrap
+	path (origin → target):
+		$WORK/transform/transform.go:15:10-24: in example.com/wrapchain/transform.upper
+		$WORK/transform/transform.go:32:37-45: in example.com/wrapchain/transform.Stage, call to example.com/wrapchain/transform.upper
+		$WORK/xerr/helpers.go:34:32-35: in example.com/wrapchain/xerr.WithStage
+		$WORK/xerr/helpers.go:26:5-8: in example.com/wrapchain/xerr.WithOp
+		$WORK/xerr/helpers.go:34:9-36: in example.com/wrapchain/xerr.WithStage, call to example.com/wrapchain/xerr.WithOp
+		$WORK/transform/transform.go:32:9-46: in example.com/wrapchain/transform.Stage, call to example.com/wrapchain/xerr.WithStage

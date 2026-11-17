@@ -1,0 +1,14 @@
+Map of functions filled by a package-level initialiser. Expected: opaque
+fmt.Errorf "unknown format %q" and core.ErrEmptyBody (formatJSON);
+formatText never fails. 2 candidates.
+-- args --
+tmpl/tmpl.go:@format
+-- stdout --
+$WORK/tmpl/tmpl.go:67:17-23: Error Set of example.com/plugins/tmpl.Format: 2 entries
+$WORK/core/core.go:17:2-14: sentinel example.com/plugins/core.ErrEmptyBody
+	path (origin → target):
+		$WORK/tmpl/tmpl.go:51:14-31: in example.com/plugins/tmpl.formatJSON
+		$WORK/tmpl/tmpl.go:72:9-13: in example.com/plugins/tmpl.Format, call to example.com/plugins/tmpl.formatJSON (dynamic function value of type func(example.com/plugins/core.Event) (string, error): 2 of 2 candidates)
+$WORK/tmpl/tmpl.go:70:14-51: opaque fmt.Errorf "unknown format %q"
+	path (origin → target):
+		$WORK/tmpl/tmpl.go:70:14-51: in example.com/plugins/tmpl.Format

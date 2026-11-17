@@ -1,0 +1,21 @@
+fmt.Errorf("echo %w (again: %w)", err, err): the same operand under two %w.
+Expected 2 entries, strconv.ErrRange and strconv.ErrSyntax, each once, with the
+chain *strconv.NumError.Unwrap then the fmt.Errorf line (no duplicate entries).
+-- args --
+parse/parse.go:@echo
+-- stdout --
+$WORK/parse/parse.go:166:15-19: Error Set of example.com/wrapchain/parse.Echo: 2 entries
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrRange
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:43:13-77: *strconv.NumError.Unwrap
+		$WORK/parse/parse.go:168:10-53: fmt.Errorf "echo %w (again: %w)"
+	path (origin → target):
+		$WORK/parse/parse.go:43:60-76: in example.com/wrapchain/parse.digits
+		$WORK/parse/parse.go:167:15-26: in example.com/wrapchain/parse.Echo, call to example.com/wrapchain/parse.digits
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrSyntax
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:48:14-79: *strconv.NumError.Unwrap
+		$WORK/parse/parse.go:168:10-53: fmt.Errorf "echo %w (again: %w)"
+	path (origin → target):
+		$WORK/parse/parse.go:48:61-78: in example.com/wrapchain/parse.digits
+		$WORK/parse/parse.go:167:15-26: in example.com/wrapchain/parse.Echo, call to example.com/wrapchain/parse.digits

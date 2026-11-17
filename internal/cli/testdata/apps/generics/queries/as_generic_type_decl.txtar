@@ -1,0 +1,15 @@
+errors.As with a *TypedErr[int] target over classify, which returns fresh *TypedErr[int]/*TypedErr[string]
+and the sentinels ErrIntRange (*TypedErr[int]) and ErrStrRange (*TypedErr[string]).
+Expect only concrete *TypedErr[string] and sentinel ErrStrRange; both int-instantiated origins are removed.
+-- args --
+failures.go:@onlystrings
+-- stdout --
+$WORK/failures.go:27:22-33: Error Set of example.com/generics.onlyStrings: 2 entries
+$WORK/errs/errs.go:35:2-13: sentinel example.com/generics/errs.ErrStrRange
+	path (origin → target):
+		$WORK/failures.go:21:10-26: in example.com/generics.classify
+		$WORK/failures.go:28:9-23: in example.com/generics.onlyStrings, call to example.com/generics.classify
+$WORK/failures.go:17:10-56: concrete *example.com/generics/errs.TypedErr[string]
+	path (origin → target):
+		$WORK/failures.go:17:10-56: in example.com/generics.classify
+		$WORK/failures.go:28:9-23: in example.com/generics.onlyStrings, call to example.com/generics.classify

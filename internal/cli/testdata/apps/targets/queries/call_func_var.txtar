@@ -1,0 +1,10 @@
+Call-site target hook(key): call to a package-level function-typed variable.
+Expected: 1 entry, errUsage from the literal assigned to hook.
+-- args --
+cmd/ingest/main.go:@fnvar
+-- stdout --
+$WORK/cmd/ingest/main.go:73:22-31: Error Set of call to hook in example.com/targets/cmd/ingest.ingest: 1 entries
+$WORK/cmd/ingest/main.go:14:5-13: sentinel example.com/targets/cmd/ingest.errUsage
+	path (origin → target):
+		$WORK/cmd/ingest/main.go:22:10-18: in example.com/targets/cmd/ingest.init$1
+		$WORK/cmd/ingest/main.go:73:22-31: in example.com/targets/cmd/ingest.ingest, call to example.com/targets/cmd/ingest.init$1 (dynamic function value example.com/targets/cmd/ingest.hook: 1 of 1 candidates)

@@ -1,0 +1,20 @@
+SUSPECTED BUG: expected only sentinel dispatch.ErrMaintenance, through the
+closure failWith$1 (1 of 1 candidates). Actual: no Origin, one entry
+"unresolved(depends-on-caller): parameter err (error)". The parameter is
+failWith's, and its caller is the Target itself (failWith(ErrMaintenance)
+two lines above the dynamic call), so nothing depends on Maintenance's
+caller; the label does not say whose parameter it is either.
+Closure capturing an error value: failWith(err) returns a closure that
+returns its free variable, and Maintenance calls the result. A closure
+that captures a local of its creator works (limited_decl, e2e
+dynamic/freevar_dynamic). ErrRateLimited (the other returned closure,
+Limit$1) must be absent, and is.
+-- args --
+dispatch/funcs.go:@maintenance
+-- stdout --
+$WORK/dispatch/funcs.go:121:22-33: Error Set of example.com/plugins/dispatch.Maintenance: 1 entries, 1 unresolved
+$WORK/dispatch/funcs.go:116:15-18: unresolved(depends-on-caller): parameter err (error)
+	path (origin → target):
+		$WORK/dispatch/funcs.go:116:15-18: in example.com/plugins/dispatch.failWith
+		$WORK/dispatch/funcs.go:117:41-44: in example.com/plugins/dispatch.failWith$1
+		$WORK/dispatch/funcs.go:123:9-17: in example.com/plugins/dispatch.Maintenance, call to example.com/plugins/dispatch.failWith$1 (dynamic function value of type func(example.com/plugins/core.Event) error: 1 of 1 candidates)

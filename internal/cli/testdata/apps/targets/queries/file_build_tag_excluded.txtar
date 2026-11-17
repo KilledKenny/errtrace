@@ -1,0 +1,9 @@
+File excluded by its build constraint (//go:build fast), queried without -tags.
+Negative: exit 2, "file is not in any loaded package" (no hint at build tags is given); with -tags fast see file_build_tag_included.
+-- args --
+internal/platform/limits_fast.go:@maxbatch
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/platform/limits_fast.go: file is not in any loaded package
+-- exit --
+2

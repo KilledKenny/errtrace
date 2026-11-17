@@ -1,0 +1,18 @@
+SUSPECTED BUG (same as close_decl): one of the two Unresolved entries has
+the position-less span "-".
+Closure with a deferred recover() that overwrites the named result, plus a
+dynamic call on a captured interface. Under Go semantics the set is opaque
+fmt.Errorf "panic: %v" plus what next.Handle returns (here Retry's
+"%w: %w" of ErrGaveUp and ErrPager). Plan step S08 is not built yet, so
+today's accepted result is no Origin and unresolved(memory) "load of
+escaping variable err" (see close_decl).
+-- args --
+-chain-depth=1 middleware/middleware.go:@recover_lit
+-- stdout --
+$WORK/middleware/middleware.go:67:43-47: Error Set of example.com/plugins/middleware.Recover$1$1: 2 entries, 2 unresolved
+-: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		-: in example.com/plugins/middleware.Recover$1$1
+$WORK/middleware/middleware.go:73:4-4: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/middleware/middleware.go:73:4-4: in example.com/plugins/middleware.Recover$1$1

@@ -1,0 +1,9 @@
+Position given in the virtual file named by the //line directive (codec.tmpl does not exist on disk).
+Negative: exit 2, file not found / not in any loaded package; must not resolve to gen.go.
+-- args --
+internal/codec/codec.tmpl:12:6
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/codec/codec.tmpl: file is not in any loaded package
+-- exit --
+2

@@ -1,0 +1,19 @@
+err.(*xerr.OpError) swallows only the top-level wrapper. Expected 2 entries:
+doc.ErrNoTitle bare and doc.ErrNoTitle under fmt.Errorf "fast: %w" (the analysis
+is path-insensitive on the bool argument); the *OpError-wrapped one is removed.
+-- args --
+pipeline.go:@normquiet
+-- stdout --
+$WORK/pipeline.go:45:20-34: Error Set of example.com/wrapchain.normalizeQuiet: 2 entries
+$WORK/doc/doc.go:20:2-12: sentinel example.com/wrapchain/doc.ErrNoTitle
+	path (origin → target):
+		$WORK/transform/transform.go:15:10-24: in example.com/wrapchain/transform.upper
+		$WORK/transform/transform.go:157:9-17: in example.com/wrapchain/transform.Normalize, call to example.com/wrapchain/transform.upper
+		$WORK/pipeline.go:46:9-38: in example.com/wrapchain.normalizeQuiet, call to example.com/wrapchain/transform.Normalize
+$WORK/doc/doc.go:20:2-12: sentinel example.com/wrapchain/doc.ErrNoTitle
+	wrap chain (origin → target):
+		$WORK/transform/transform.go:162:10-37: fmt.Errorf "fast: %w"
+	path (origin → target):
+		$WORK/transform/transform.go:15:10-24: in example.com/wrapchain/transform.upper
+		$WORK/transform/transform.go:157:9-17: in example.com/wrapchain/transform.Normalize, call to example.com/wrapchain/transform.upper
+		$WORK/pipeline.go:46:9-38: in example.com/wrapchain.normalizeQuiet, call to example.com/wrapchain/transform.Normalize

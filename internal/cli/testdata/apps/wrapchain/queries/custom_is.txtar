@@ -1,0 +1,11 @@
+if errors.Is(err, xerr.ErrRetryable) { return err } where *xerr.CodeError has an
+Is method that matches ErrRetryable. Expected 1 entry: concrete *xerr.CodeError.
+doc.ErrDisk must NOT appear (it never matches).
+-- args --
+transform/transform.go:@retryable
+-- stdout --
+$WORK/transform/transform.go:116:20-29: Error Set of example.com/wrapchain/transform.Retryable: 1 entries
+$WORK/transform/transform.go:107:10-36: concrete *example.com/wrapchain/xerr.CodeError
+	path (origin → target):
+		$WORK/transform/transform.go:107:10-36: in example.com/wrapchain/transform.fetch
+		$WORK/transform/transform.go:117:9-17: in example.com/wrapchain/transform.Retryable, call to example.com/wrapchain/transform.fetch

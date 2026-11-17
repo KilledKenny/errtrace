@@ -1,0 +1,9 @@
+Position on the closing brace of the last declaration, on the last line of the file (8:1).
+Negative: exit 2, no target.
+-- args --
+internal/platform/platform.go:8:1
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/platform/platform.go:8:1: no function declaration or call at position
+-- exit --
+2

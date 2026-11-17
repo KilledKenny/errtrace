@@ -1,0 +1,31 @@
+Guard on cerr (Charge) while verr (Void) is returned in the guarded branch: verr is NOT filtered.
+Expect 6 entries: ErrDeclined and ErrInternal with a path through gateway.Void only; ErrTimeout, *CodeError,
+ValidationError, opaque through gateway.Charge. ErrDeclined must not have a path through Charge.
+-- args --
+processor/eq.go:@otherVar
+-- stdout --
+$WORK/processor/eq.go:100:19-34: Error Set of example.com/guards/processor.ChargeVoidOther: 6 entries
+$WORK/payerr/payerr.go:8:2-13: sentinel example.com/guards/payerr.ErrDeclined
+	path (origin → target):
+		$WORK/gateway/gateway.go:59:10-28: in example.com/guards/gateway.Void
+		$WORK/processor/eq.go:102:10-25: in example.com/guards/processor.ChargeVoidOther, call to example.com/guards/gateway.Void
+$WORK/payerr/payerr.go:9:2-12: sentinel example.com/guards/payerr.ErrTimeout
+	path (origin → target):
+		$WORK/gateway/gateway.go:20:10-27: in example.com/guards/gateway.Charge
+		$WORK/processor/eq.go:101:10-27: in example.com/guards/processor.ChargeVoidOther, call to example.com/guards/gateway.Charge
+$WORK/payerr/payerr.go:12:2-13: sentinel example.com/guards/payerr.ErrInternal
+	path (origin → target):
+		$WORK/gateway/gateway.go:62:10-28: in example.com/guards/gateway.Void
+		$WORK/processor/eq.go:102:10-25: in example.com/guards/processor.ChargeVoidOther, call to example.com/guards/gateway.Void
+$WORK/gateway/gateway.go:22:10-63: concrete *example.com/guards/payerr.CodeError
+	path (origin → target):
+		$WORK/gateway/gateway.go:22:10-63: in example.com/guards/gateway.Charge
+		$WORK/processor/eq.go:101:10-27: in example.com/guards/processor.ChargeVoidOther, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:24:10-51: concrete example.com/guards/payerr.ValidationError
+	path (origin → target):
+		$WORK/gateway/gateway.go:24:10-51: in example.com/guards/gateway.Charge
+		$WORK/processor/eq.go:101:10-27: in example.com/guards/processor.ChargeVoidOther, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:26:9-35: opaque errors.New "gateway down"
+	path (origin → target):
+		$WORK/gateway/gateway.go:26:9-35: in example.com/guards/gateway.Charge
+		$WORK/processor/eq.go:101:10-27: in example.com/guards/processor.ChargeVoidOther, call to example.com/guards/gateway.Charge

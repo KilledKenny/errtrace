@@ -1,0 +1,11 @@
+Generic method that no code calls; instances exist only because *Cache values are converted to Flusher.
+Expect ErrNotFound and the "target not reachable" warning (or unresolved(no-instances)); never a crash.
+-- args --
+cache/cache.go:@evict
+-- stdout --
+$WORK/cache/cache.go:74:33-38: Error Set of (*example.com/generics/cache.Cache[K, V]).Evict: 1 entries
+$WORK/errs/errs.go:12:2-13: sentinel example.com/generics/errs.ErrNotFound [+1 more paths]
+	path (origin → target):
+		$WORK/cache/cache.go:76:10-26: in (*example.com/generics/cache.Cache[example.com/generics/validate.UserID, example.com/generics/validate.Name]).Evict
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates

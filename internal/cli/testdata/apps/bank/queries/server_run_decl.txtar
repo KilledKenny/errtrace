@@ -1,0 +1,24 @@
+SUSPECTED BUG: end to end (large); a deferred closure joins logger.Close() onto the named result. Correct set:
+config.Load's set behind "server: %w", openStore's, audit.Open's behind "audit: %w", serve's unhandled error, and
+Close's (audit.ErrClosed, file close errors), every entry with errors.Join as outermost link. Actual: 5
+unresolved(memory) "load of escaping variable err" entries and nothing else - not even the values stored before
+the defer runs (plan S08 is not implemented); the first entry has no position ("-:") and the others zero-width spans.
+-- args --
+cmd/server/main.go:@run
+-- stdout --
+$WORK/cmd/server/main.go:40:14-17: Error Set of example.com/bank/cmd/server.run: 5 entries, 5 unresolved
+-: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		-: in example.com/bank/cmd/server.run
+$WORK/cmd/server/main.go:43:3-3: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/cmd/server/main.go:43:3-3: in example.com/bank/cmd/server.run
+$WORK/cmd/server/main.go:47:3-3: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/cmd/server/main.go:47:3-3: in example.com/bank/cmd/server.run
+$WORK/cmd/server/main.go:51:3-3: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/cmd/server/main.go:51:3-3: in example.com/bank/cmd/server.run
+$WORK/cmd/server/main.go:71:2-2: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/cmd/server/main.go:71:2-2: in example.com/bank/cmd/server.run

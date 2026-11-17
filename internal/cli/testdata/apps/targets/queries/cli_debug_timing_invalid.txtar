@@ -1,0 +1,26 @@
+Hidden -debug list mixing the valid mode "timing" with an invalid one. (timing alone is never recorded: its output is nondeterministic.)
+Negative: the whole list is validated before anything runs: exit 2, invalid -debug value "nope" plus usage; no timing line, no query.
+-- args --
+-debug=timing,nope internal/platform/platform.go:5:6
+-- stdout --
+-- stderr --
+errtrace: invalid -debug value "nope" (want a comma-separated list of target,timing,summary)
+usage: errtrace [flags] <target>
+
+errtrace reports the Error Set of a Target: every Error Origin that can reach
+the Target's error result, with its Propagation Path.
+
+<target> is a position in a Go file, with byte columns:
+  file.go:LINE:COL | file.go:#OFFSET | file.go:L:C-L2:C2 (the start is used)
+
+flags:
+  -chain-depth N
+    	max Wrap Chain depth N before truncation (default 8)
+  -fanout N
+    	group entries under dynamic call sites with at least N Candidates (0 = never group) (default 8)
+  -p patterns
+    	comma-separated package patterns to load (default "./...")
+  -tags list
+    	comma-separated list of build tags
+-- exit --
+2

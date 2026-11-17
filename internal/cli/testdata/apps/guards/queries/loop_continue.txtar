@@ -1,0 +1,22 @@
+if err == ErrTimeout { continue }; if err != nil { return err } inside a retry loop.
+Expect 4 entries: ErrDeclined, *CodeError, ValidationError, opaque. ErrTimeout must NOT appear.
+-- args --
+runner/runner.go:@loopContinue
+-- stdout --
+$WORK/runner/runner.go:34:35-50: Error Set of (*example.com/guards/runner.Runner).RunSkipTimeouts: 4 entries
+$WORK/payerr/payerr.go:8:2-13: sentinel example.com/guards/payerr.ErrDeclined
+	path (origin → target):
+		$WORK/gateway/gateway.go:18:10-28: in example.com/guards/gateway.Charge
+		$WORK/runner/runner.go:36:10-33: in (*example.com/guards/runner.Runner).RunSkipTimeouts, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:22:10-63: concrete *example.com/guards/payerr.CodeError
+	path (origin → target):
+		$WORK/gateway/gateway.go:22:10-63: in example.com/guards/gateway.Charge
+		$WORK/runner/runner.go:36:10-33: in (*example.com/guards/runner.Runner).RunSkipTimeouts, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:24:10-51: concrete example.com/guards/payerr.ValidationError
+	path (origin → target):
+		$WORK/gateway/gateway.go:24:10-51: in example.com/guards/gateway.Charge
+		$WORK/runner/runner.go:36:10-33: in (*example.com/guards/runner.Runner).RunSkipTimeouts, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:26:9-35: opaque errors.New "gateway down"
+	path (origin → target):
+		$WORK/gateway/gateway.go:26:9-35: in example.com/guards/gateway.Charge
+		$WORK/runner/runner.go:36:10-33: in (*example.com/guards/runner.Runner).RunSkipTimeouts, call to example.com/guards/gateway.Charge

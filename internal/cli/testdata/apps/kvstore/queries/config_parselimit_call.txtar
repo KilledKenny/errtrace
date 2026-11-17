@@ -1,0 +1,14 @@
+Call site inside a tuple assignment `cfg.Limit, err = parseLimit(val)` (one result stored to a field).
+Expect: the two opaque errors of parseLimit; no strconv origins.
+-- args --
+config/config.go:@parselimit_call
+-- stdout --
+$WORK/config/config.go:28:44-59: Error Set of call to parseLimit in example.com/kvstore/config.Load: 2 entries
+$WORK/config/config.go:49:13-59: opaque fmt.Errorf "config: bad limit %q: %v"
+	path (origin → target):
+		$WORK/config/config.go:49:13-59: in example.com/kvstore/config.parseLimit
+		$WORK/config/config.go:28:44-59: in example.com/kvstore/config.Load, call to example.com/kvstore/config.parseLimit
+$WORK/config/config.go:52:13-57: opaque errors.New "config: limit must not be zero"
+	path (origin → target):
+		$WORK/config/config.go:52:13-57: in example.com/kvstore/config.parseLimit
+		$WORK/config/config.go:28:44-59: in example.com/kvstore/config.Load, call to example.com/kvstore/config.parseLimit

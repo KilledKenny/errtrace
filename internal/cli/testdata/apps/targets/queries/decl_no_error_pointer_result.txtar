@@ -1,0 +1,9 @@
+Declaration target store.New, which returns *Store (a pointer type that does not implement error).
+Negative: exit 2, "example.com/targets/internal/store.New has no error result".
+-- args --
+internal/store/store.go:@new
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/store/store.go:41:14: example.com/targets/internal/store.New has no error result
+-- exit --
+2

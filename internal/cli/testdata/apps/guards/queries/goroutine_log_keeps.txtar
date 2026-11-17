@@ -1,0 +1,11 @@
+A goroutine inspects the captured err but never changes it; the guard must not filter.
+Precise answer: ErrDeclined and ErrInternal. A variable captured by a closure escapes, which is outside the
+documented scope: the tool reports one unresolved(memory) "load of escaping variable err" and no origins.
+The set must not be silently empty and must not claim ErrDeclined was handled.
+-- args --
+processor/flow.go:@goLog
+-- stdout --
+$WORK/processor/flow.go:45:16-27: Error Set of example.com/guards/processor.VoidWatched: 1 entries, 1 unresolved
+$WORK/processor/flow.go:56:9-12: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/processor/flow.go:56:9-12: in example.com/guards/processor.VoidWatched

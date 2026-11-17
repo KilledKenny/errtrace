@@ -1,0 +1,9 @@
+Negative: Describe returns only a string. A declaration Target without an error
+result is rejected: exit 2, message "... has no error result", empty stdout.
+-- args --
+config/config.go:@describe
+-- stdout --
+-- stderr --
+errtrace: $WORK/config/config.go:125:19: example.com/stdlibio/config.Describe has no error result
+-- exit --
+2

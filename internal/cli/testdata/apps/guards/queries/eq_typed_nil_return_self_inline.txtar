@@ -1,0 +1,12 @@
+As eq_typed_nil_return_self on gateway.PrecheckInline (var ce *CodeError, maybe assigned, return ce).
+Run-time truth: only the typed nil is returned. Expect exactly 1 entry: concrete *CodeError at the conversion
+"return ce" in PrecheckInline (one entry stands for the nil and the non-nil pointer; no [typed nil] mark).
+An empty set would be unsound.
+-- args --
+processor/edge.go:@onlyTypedNilInline
+-- stdout --
+$WORK/processor/edge.go:63:29-55: Error Set of example.com/guards/processor.PrecheckInlineOnlyTypedNil: 1 entries
+$WORK/gateway/gateway.go:128:9-11: concrete *example.com/guards/payerr.CodeError
+	path (origin → target):
+		$WORK/gateway/gateway.go:128:9-11: in example.com/guards/gateway.PrecheckInline
+		$WORK/processor/edge.go:64:9-34: in example.com/guards/processor.PrecheckInlineOnlyTypedNil, call to example.com/guards/gateway.PrecheckInline

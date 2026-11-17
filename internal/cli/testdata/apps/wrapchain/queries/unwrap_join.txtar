@@ -1,0 +1,18 @@
+errors.Unwrap of an errors.Join result is always nil at run time (Unwrap()
+[]error is not consulted), so the precise set is empty. By design the call is
+analysed without its operand: the same 2 unresolved(memory) entries as
+unwrap_returned. doc.ErrEmpty and doc.ErrNoTitle must NOT appear.
+-- args --
+transform/transform.go:@peeljoin
+-- stdout --
+$WORK/transform/transform.go:194:19-27: Error Set of example.com/wrapchain/transform.PeelJoin: 2 entries, 2 unresolved
+$GOROOT/src/fmt/errors.go:*: unresolved(memory): load of field err of *fmt.wrapError
+	path (origin → target):
+		$GOROOT/src/fmt/errors.go:*: in (*fmt.wrapError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*fmt.wrapError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 2 of 2 candidates)
+		$WORK/transform/transform.go:195:9-65: in example.com/wrapchain/transform.PeelJoin, call to errors.Unwrap
+$WORK/xerr/types.go:18:43-48: unresolved(memory): load of field Err of *example.com/wrapchain/xerr.OpError
+	path (origin → target):
+		$WORK/xerr/types.go:18:43-48: in (*example.com/wrapchain/xerr.OpError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*example.com/wrapchain/xerr.OpError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 2 of 2 candidates)
+		$WORK/transform/transform.go:195:9-65: in example.com/wrapchain/transform.PeelJoin, call to errors.Unwrap

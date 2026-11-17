@@ -1,0 +1,13 @@
+A function-typed field that is never assigned: the call has no
+Candidates. Expected: sentinel core.ErrDropped plus one
+unresolved(no-candidates) for d.onDrop(e).
+-- args --
+dispatch/dispatch.go:@drop
+-- stdout --
+$WORK/dispatch/dispatch.go:128:31-35: Error Set of (*example.com/plugins/dispatch.Dispatcher).Drop: 2 entries, 1 unresolved
+$WORK/core/core.go:16:2-12: sentinel example.com/plugins/core.ErrDropped
+	path (origin → target):
+		$WORK/dispatch/dispatch.go:130:10-25: in (*example.com/plugins/dispatch.Dispatcher).Drop
+$WORK/dispatch/dispatch.go:132:9-20: unresolved(no-candidates): dynamic call to function value of type func(example.com/plugins/core.Event) error
+	path (origin → target):
+		$WORK/dispatch/dispatch.go:132:9-20: in (*example.com/plugins/dispatch.Dispatcher).Drop

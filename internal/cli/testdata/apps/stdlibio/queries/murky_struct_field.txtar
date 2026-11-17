@@ -1,0 +1,10 @@
+Out of scope by design: Stage.Err returns the field s.err (set by Fail to a wrapped
+ErrStage). Documented expectation: one Unresolved(memory) "load of field err of
+*murky.Stage".
+-- args --
+murky/murky.go:@stageerr
+-- stdout --
+$WORK/murky/murky.go:54:30-33: Error Set of (*example.com/stdlibio/murky.Stage).Err: 1 entries, 1 unresolved
+$WORK/murky/murky.go:55:9-14: unresolved(memory): load of field err of *example.com/stdlibio/murky.Stage
+	path (origin → target):
+		$WORK/murky/murky.go:55:9-14: in (*example.com/stdlibio/murky.Stage).Err

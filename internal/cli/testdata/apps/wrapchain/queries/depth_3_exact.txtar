@@ -1,0 +1,18 @@
+3 Wraps (Errorf, *OpError, single-operand Join) with -chain-depth=3: the exact
+boundary. Expected 1 entry: doc.ErrDisk with 3 links, not truncated.
+-- args --
+-chain-depth=3 export/deliver.go:@l3
+-- stdout --
+$WORK/export/deliver.go:20:13-25: Error Set of example.com/wrapchain/export.writeSegment: 1 entries
+$WORK/doc/doc.go:22:2-9: sentinel example.com/wrapchain/doc.ErrDisk
+	wrap chain (origin → target):
+		$WORK/export/deliver.go:16:36-69: fmt.Errorf "fsync: %w"
+		$WORK/xerr/helpers.go:29:9-35: *example.com/wrapchain/xerr.OpError.Unwrap
+		$WORK/export/deliver.go:20:43-68: errors.Join
+	path (origin → target):
+		$WORK/export/deliver.go:14:30-41: in example.com/wrapchain/export.commit
+		$WORK/export/deliver.go:16:60-68: in example.com/wrapchain/export.fsync, call to example.com/wrapchain/export.commit
+		$WORK/export/deliver.go:18:62-69: in example.com/wrapchain/export.writeBlock, call to example.com/wrapchain/export.fsync
+		$WORK/xerr/helpers.go:26:5-8: in example.com/wrapchain/xerr.WithOp
+		$WORK/export/deliver.go:18:41-70: in example.com/wrapchain/export.writeBlock, call to example.com/wrapchain/xerr.WithOp
+		$WORK/export/deliver.go:20:55-67: in example.com/wrapchain/export.writeSegment, call to example.com/wrapchain/export.writeBlock

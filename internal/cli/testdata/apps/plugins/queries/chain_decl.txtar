@@ -1,0 +1,9 @@
+Negative: middleware.Chain returns a Handler, not an error. Expected:
+exit 2, "... has no error result".
+-- args --
+middleware/middleware.go:@chain
+-- stdout --
+-- stderr --
+errtrace: $WORK/middleware/middleware.go:18:16: example.com/plugins/middleware.Chain has no error result
+-- exit --
+2

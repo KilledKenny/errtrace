@@ -1,0 +1,1000 @@
+ReadJSONLines returns nil on err == io.EOF and wraps everything else with
+"records: json: %w". Expected: json's concrete *SyntaxError / *InvalidUnmarshalError,
+opaque fmt.Errorf origins and Unresolved entries (decoder fields, reader r is
+caller-supplied / *strings.Reader), all under the fmt.Errorf link. A sentinel io.EOF
+must NOT be in the set (io.ErrUnexpectedEOF may be).
+-- args --
+records/records.go:@readjson
+-- stdout --
+$WORK/records/records.go:61:19-32: Error Set of example.com/stdlibio/records.ReadJSONLines: 156 entries, 42 unresolved, 28 possibly handled
+$GOROOT/src/encoding/json/internal/internal.go:*: sentinel encoding/json/internal.ErrNonNilReference
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/arshal.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/internal/jsonwire/wire.go:*: sentinel encoding/json/internal/jsonwire.ErrInvalidUTF8
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: *encoding/json/jsontext.SyntacticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/internal/jsonwire/decode.go:*: in encoding/json/internal/jsonwire.ConsumeStringResumable
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeString, call to encoding/json/internal/jsonwire.ConsumeStringResumable
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeValue, call to (*encoding/json/jsontext.decoderState).consumeString
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to (*encoding/json/jsontext.decoderState).consumeValue
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to (*encoding/json/jsontext.decoderState).CheckNextValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/internal/jsonwire/wire.go:*: sentinel encoding/json/internal/jsonwire.ErrInvalidUTF8
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/jsontext/quote.go:*: *encoding/json/jsontext.SyntacticError.Unwrap
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/encoding/json/internal/jsonwire/wire.go:*: sentinel encoding/json/internal/jsonwire.ErrInvalidUTF8
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/internal/jsonwire/decode.go:*: in encoding/json/internal/jsonwire.ConsumeStringResumable
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeString, call to encoding/json/internal/jsonwire.ConsumeStringResumable
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeValue, call to (*encoding/json/jsontext.decoderState).consumeString
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to (*encoding/json/jsontext.decoderState).consumeValue
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to (*encoding/json/jsontext.decoderState).CheckNextValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/jsontext/decode.go:*: sentinel encoding/json/jsontext.errBufferWriteAfterNext
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: *encoding/json/jsontext.ioError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).fetch
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeWhitespace, call to (*encoding/json/jsontext.decoderState).fetch
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).checkEOF, call to (*encoding/json/jsontext.decoderState).consumeWhitespace
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to (*encoding/json/jsontext.decoderState).checkEOF
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to (*encoding/json/jsontext.decoderState).CheckNextValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/jsontext/state.go:*: sentinel encoding/json/jsontext.errMismatchDelim
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: *encoding/json/jsontext.SyntacticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeValue
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to (*encoding/json/jsontext.decoderState).consumeValue
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to (*encoding/json/jsontext.decoderState).CheckNextValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/jsontext/state.go:*: sentinel encoding/json/jsontext.errMismatchDelim
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeValue
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to (*encoding/json/jsontext.decoderState).consumeValue
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to (*encoding/json/jsontext.decoderState).CheckNextValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/jsontext/state.go:*: sentinel encoding/json/jsontext.errMaxDepth
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: *encoding/json/jsontext.SyntacticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeObject
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeValue, call to (*encoding/json/jsontext.decoderState).consumeObject
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to (*encoding/json/jsontext.decoderState).consumeValue
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to (*encoding/json/jsontext.decoderState).CheckNextValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/jsontext/state.go:*: sentinel encoding/json/jsontext.errMaxDepth
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeObject
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeValue, call to (*encoding/json/jsontext.decoderState).consumeObject
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to (*encoding/json/jsontext.decoderState).consumeValue
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to (*encoding/json/jsontext.decoderState).CheckNextValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/v2/arshal_default.go:*: sentinel encoding/json/v2.errNilField
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/encoding/json/v2/arshal_embedded.go:*: sentinel encoding/json/v2.errRawEmbedNotObject
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/encoding/json/v2/arshal_funcs.go:*: sentinel encoding/json/v2.errUnsupportedMutation
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/encoding/json/v2/arshal_funcs.go:*: sentinel encoding/json/v2.errNonSingularValue
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/encoding/json/v2/arshal_methods.go:*: sentinel encoding/json/v2.errNonStringValue
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/encoding/json/v2/arshal_time.go:*: sentinel encoding/json/v2.errInaccurateDateUnits
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/arshal_time.go:*: fmt.Errorf "invalid ISO 8601 duration %q: %w"
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/encoding/json/v2/errors.go:*: sentinel encoding/json/v2.ErrUnknownName
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/encoding/json/v2/errors.go:*: sentinel encoding/json/v2.errAmbiguousName
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/io/io.go:*: sentinel io.ErrUnexpectedEOF
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: *encoding/json/jsontext.SyntacticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).fetch
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeString, call to (*encoding/json/jsontext.decoderState).fetch
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeValue, call to (*encoding/json/jsontext.decoderState).consumeString
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to (*encoding/json/jsontext.decoderState).consumeValue
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to (*encoding/json/jsontext.decoderState).CheckNextValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/io/io.go:*: sentinel io.ErrUnexpectedEOF
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/jsontext/quote.go:*: *encoding/json/jsontext.SyntacticError.Unwrap
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/io/io.go:*: sentinel io.ErrUnexpectedEOF
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/arshal.go:*: *encoding/json/jsontext.SyntacticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/io/io.go:*: sentinel io.ErrUnexpectedEOF
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/arshal.go:*: *encoding/json/jsontext.SyntacticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/io/io.go:*: sentinel io.ErrUnexpectedEOF
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).fetch
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeString, call to (*encoding/json/jsontext.decoderState).fetch
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeValue, call to (*encoding/json/jsontext.decoderState).consumeString
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to (*encoding/json/jsontext.decoderState).consumeValue
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to (*encoding/json/jsontext.decoderState).CheckNextValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrRange
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/arshal_time.go:*: fmt.Errorf "invalid duration %q: %w"
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrRange
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/arshal_time.go:*: fmt.Errorf "invalid ISO 8601 duration %q: %w"
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrRange
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/arshal_time.go:*: fmt.Errorf "invalid time %q: %w"
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrRange
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/arshal_time.go:*: fmt.Errorf "invalid time %q: %w"
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrSyntax
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/arshal_time.go:*: fmt.Errorf "invalid duration %q: %w"
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrSyntax
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/arshal_time.go:*: fmt.Errorf "invalid ISO 8601 duration %q: %w"
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrSyntax
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/arshal_time.go:*: fmt.Errorf "invalid time %q: %w"
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrSyntax
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/arshal_time.go:*: fmt.Errorf "invalid time %q: %w"
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/encoding/json/internal/jsonwire/wire.go:*: concrete *encoding/json/internal/jsonwire.InvalidTextError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: *encoding/json/jsontext.SyntacticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/internal/jsonwire/wire.go:*: in encoding/json/internal/jsonwire.NewInvalidCharacterError[[]byte]
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in encoding/json/jsontext.wrapSyntacticError, call to encoding/json/internal/jsonwire.NewInvalidCharacterError[[]byte]
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to (*encoding/json/jsontext.decoderState).CheckNextValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/internal/jsonwire/wire.go:*: concrete *encoding/json/internal/jsonwire.InvalidTextError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/jsontext/quote.go:*: *encoding/json/jsontext.SyntacticError.Unwrap
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/encoding/json/internal/jsonwire/wire.go:*: concrete *encoding/json/internal/jsonwire.InvalidTextError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/internal/jsonwire/wire.go:*: in encoding/json/internal/jsonwire.NewInvalidCharacterError[[]byte]
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).checkEOF, call to encoding/json/internal/jsonwire.NewInvalidCharacterError[[]byte]
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).checkEOF, call to encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to (*encoding/json/jsontext.decoderState).checkEOF
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to (*encoding/json/jsontext.decoderState).CheckNextValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/internal/jsonwire/wire.go:*: concrete *encoding/json/internal/jsonwire.InvalidTextError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: *encoding/json/jsontext.SyntacticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/internal/jsonwire/wire.go:*: in encoding/json/internal/jsonwire.NewInvalidEscapeSequenceError[[]byte]
+		$GOROOT/src/encoding/json/internal/jsonwire/decode.go:*: in encoding/json/internal/jsonwire.ConsumeStringResumable, call to encoding/json/internal/jsonwire.NewInvalidEscapeSequenceError[[]byte]
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeString, call to encoding/json/internal/jsonwire.ConsumeStringResumable
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeValue, call to (*encoding/json/jsontext.decoderState).consumeString
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to (*encoding/json/jsontext.decoderState).consumeValue
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to (*encoding/json/jsontext.decoderState).CheckNextValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/internal/jsonwire/wire.go:*: concrete *encoding/json/internal/jsonwire.InvalidTextError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/jsontext/quote.go:*: *encoding/json/jsontext.SyntacticError.Unwrap
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/encoding/json/internal/jsonwire/wire.go:*: concrete *encoding/json/internal/jsonwire.InvalidTextError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/internal/jsonwire/wire.go:*: in encoding/json/internal/jsonwire.NewInvalidEscapeSequenceError[[]byte]
+		$GOROOT/src/encoding/json/internal/jsonwire/decode.go:*: in encoding/json/internal/jsonwire.ConsumeStringResumable, call to encoding/json/internal/jsonwire.NewInvalidEscapeSequenceError[[]byte]
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeString, call to encoding/json/internal/jsonwire.ConsumeStringResumable
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeValue, call to (*encoding/json/jsontext.decoderState).consumeString
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to (*encoding/json/jsontext.decoderState).consumeValue
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to (*encoding/json/jsontext.decoderState).CheckNextValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/internal/jsonwire/wire.go:*: concrete *encoding/json/internal/jsonwire.InvalidTextError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: *encoding/json/jsontext.SyntacticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/internal/jsonwire/wire.go:*: in encoding/json/internal/jsonwire.NewInvalidEscapeSequenceError[[]byte]
+		$GOROOT/src/encoding/json/internal/jsonwire/decode.go:*: in encoding/json/internal/jsonwire.ConsumeStringResumable, call to encoding/json/internal/jsonwire.NewInvalidEscapeSequenceError[[]byte]
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeString, call to encoding/json/internal/jsonwire.ConsumeStringResumable
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeValue, call to (*encoding/json/jsontext.decoderState).consumeString
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to (*encoding/json/jsontext.decoderState).consumeValue
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to (*encoding/json/jsontext.decoderState).CheckNextValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/internal/jsonwire/wire.go:*: concrete *encoding/json/internal/jsonwire.InvalidTextError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/jsontext/quote.go:*: *encoding/json/jsontext.SyntacticError.Unwrap
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/encoding/json/internal/jsonwire/wire.go:*: concrete *encoding/json/internal/jsonwire.InvalidTextError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/internal/jsonwire/wire.go:*: in encoding/json/internal/jsonwire.NewInvalidEscapeSequenceError[[]byte]
+		$GOROOT/src/encoding/json/internal/jsonwire/decode.go:*: in encoding/json/internal/jsonwire.ConsumeStringResumable, call to encoding/json/internal/jsonwire.NewInvalidEscapeSequenceError[[]byte]
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeString, call to encoding/json/internal/jsonwire.ConsumeStringResumable
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeValue, call to (*encoding/json/jsontext.decoderState).consumeString
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to (*encoding/json/jsontext.decoderState).consumeValue
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to (*encoding/json/jsontext.decoderState).CheckNextValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/jsontext/errors.go:*: concrete *encoding/json/jsontext.pointerSuffixError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in encoding/json/jsontext.wrapWithObjectName
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeObject, call to encoding/json/jsontext.wrapWithObjectName
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeValue, call to (*encoding/json/jsontext.decoderState).consumeObject
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to (*encoding/json/jsontext.decoderState).consumeValue
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to (*encoding/json/jsontext.decoderState).CheckNextValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/jsontext/errors.go:*: concrete *encoding/json/jsontext.pointerSuffixError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in encoding/json/jsontext.wrapWithArrayIndex
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeArray, call to encoding/json/jsontext.wrapWithArrayIndex
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).consumeValue, call to (*encoding/json/jsontext.decoderState).consumeArray
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to (*encoding/json/jsontext.decoderState).consumeValue
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to (*encoding/json/jsontext.decoderState).CheckNextValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/v2/arshal_time.go:*: concrete *time.ParseError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/encoding/json/v2/arshal_time.go:*: concrete *time.ParseError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/encoding/json/v2/errors.go:*: concrete *encoding/json/v2.SemanticError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/encoding/json/v2_inject.go:*: concrete *encoding/json.InvalidUnmarshalError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/v2_inject.go:*: concrete *encoding/json.UnmarshalTypeError [typed nil]
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/v2_scanner.go:*: concrete *encoding/json.SyntaxError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/v2_scanner.go:*: concrete *encoding/json.SyntaxError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/v2_scanner.go:*: concrete *encoding/json.SyntaxError [typed nil]
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/v2_scanner.go:*: concrete *encoding/json.SyntaxError [typed nil]
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/time/format.go:*: concrete *time.ParseError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/time/format.go:*: concrete *time.ParseError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/time/format.go:*: concrete *time.parseDurationError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/time/format.go:*: concrete *time.parseDurationError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/time/format.go:*: concrete *time.parseDurationError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/time/format.go:*: concrete *time.parseDurationError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/time/format.go:*: concrete *time.parseDurationError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/time/format.go:*: concrete *time.parseDurationError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/time/format.go:*: concrete *time.parseDurationError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/time/format.go:*: concrete *time.parseDurationError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/time/format.go:*: concrete *time.parseDurationError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/time/format.go:*: concrete *time.parseDurationError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/time/format_rfc3339.go:*: concrete *time.ParseError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/time/format_rfc3339.go:*: concrete *time.ParseError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/time/format_rfc3339.go:*: concrete *time.ParseError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/time/format_rfc3339.go:*: concrete *time.ParseError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/time/format_rfc3339.go:*: concrete *time.ParseError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/time/format_rfc3339.go:*: concrete *time.ParseError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/time/format_rfc3339.go:*: concrete *time.ParseError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/time/format_rfc3339.go:*: concrete *time.ParseError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/time/format_rfc3339.go:*: concrete *time.ParseError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/time/format_rfc3339.go:*: concrete *time.ParseError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/encoding/json/v2/arshal_time.go:*: opaque errors.New
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/encoding/json/v2/errors.go:*: opaque errors.New
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/encoding/json/v2/errors.go:*: opaque errors.New
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+$GOROOT/src/encoding/json/v2_inject.go:*: opaque fmt.Errorf "json: unknown field %q"
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/csv/reader.go:*: unresolved(memory): load of field Err of *encoding/csv.ParseError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/csv/reader.go:*: in (*encoding/csv.ParseError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/csv.ParseError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/csv/reader.go:*: unresolved(memory): load of field Err of *encoding/csv.ParseError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$WORK/records/records.go:67:6-19: comparison with io.EOF: unresolved value
+	path (origin → target):
+		$GOROOT/src/encoding/csv/reader.go:*: in (*encoding/csv.ParseError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/csv.ParseError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/internal/internal.go:*: unresolved(memory): load of field Err of *encoding/json/internal.ValueError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/internal/internal.go:*: in (*encoding/json/internal.ValueError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json/internal.ValueError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/internal/internal.go:*: unresolved(memory): load of field Err of *encoding/json/internal.ValueError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$WORK/records/records.go:67:6-19: comparison with io.EOF: unresolved value
+	path (origin → target):
+		$GOROOT/src/encoding/json/internal/internal.go:*: in (*encoding/json/internal.ValueError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json/internal.ValueError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/jsontext/decode.go:*: unresolved(memory): load of field peekErr of *encoding/json/jsontext.decodeBuffer
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$WORK/records/records.go:67:6-19: comparison with io.EOF: unresolved value
+	path (origin → target):
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to (*encoding/json/jsontext.decoderState).CheckNextValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/jsontext/errors.go:*: unresolved(memory): load of field err of *encoding/json/jsontext.ioError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in (*encoding/json/jsontext.ioError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json/jsontext.ioError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/jsontext/errors.go:*: unresolved(memory): load of field err of *encoding/json/jsontext.ioError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$WORK/records/records.go:67:6-19: comparison with io.EOF: unresolved value
+	path (origin → target):
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in (*encoding/json/jsontext.ioError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json/jsontext.ioError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/jsontext/errors.go:*: unresolved(memory): load of field error of *encoding/json/jsontext.pointerSuffixError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: *encoding/json/jsontext.SyntacticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/jsontext/decode.go:*: in (*encoding/json/jsontext.decoderState).CheckNextValue, call to encoding/json/jsontext.wrapSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.unmarshalDecode, call to (*encoding/json/jsontext.decoderState).CheckNextValue
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json/v2.unmarshalDecode
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/jsontext/errors.go:*: unresolved(memory): load of field Err of *encoding/json/jsontext.SyntacticError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in (*encoding/json/jsontext.SyntacticError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json/jsontext.SyntacticError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/jsontext/errors.go:*: unresolved(memory): load of field Err of *encoding/json/jsontext.SyntacticError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$WORK/records/records.go:67:6-19: comparison with io.EOF: unresolved value
+	path (origin → target):
+		$GOROOT/src/encoding/json/jsontext/errors.go:*: in (*encoding/json/jsontext.SyntacticError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json/jsontext.SyntacticError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/v2/arshal_default.go:*: unresolved(memory): load of field Err of *encoding/json/v2.SemanticError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$GOROOT/src/encoding/json/v2/errors.go:*: comparison with io.EOF: unresolved value
+$GOROOT/src/encoding/json/v2/arshal_default.go:*: unresolved(memory): load of field Err of *encoding/json/v2.SemanticError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$GOROOT/src/encoding/json/v2/errors.go:*: comparison with io.EOF: unresolved value
+$GOROOT/src/encoding/json/v2/arshal_methods.go:*: unresolved(no-candidates): dynamic call to (encoding.TextUnmarshaler).UnmarshalText
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$GOROOT/src/encoding/json/v2/errors.go:*: errors.Is with errors.ErrUnsupported: unresolved value
+		$GOROOT/src/encoding/json/v2/arshal_methods.go:*: guarded by call to encoding/json/v2.isSemanticError
+		$GOROOT/src/encoding/json/v2/arshal_methods.go:*: guarded by call to (encoding/json/jsontext.export).IsIOError
+		$GOROOT/src/encoding/json/v2/arshal_methods.go:*: guarded by call to encoding/json/v2.isSyntacticError
+		$GOROOT/src/encoding/json/v2/errors.go:*: comparison with io.EOF: unresolved value
+$GOROOT/src/encoding/json/v2/arshal_methods.go:*: unresolved(no-candidates): dynamic call to (encoding.TextUnmarshaler).UnmarshalText
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$GOROOT/src/encoding/json/v2/errors.go:*: errors.Is with errors.ErrUnsupported: unresolved value
+		$WORK/records/records.go:67:6-19: comparison with io.EOF: unresolved value
+$GOROOT/src/encoding/json/v2/arshal_methods.go:*: unresolved(no-candidates): dynamic call to (encoding/json/v2.Unmarshaler).UnmarshalJSON
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: *encoding/json/v2.SemanticError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$GOROOT/src/encoding/json/v2/errors.go:*: errors.Is with errors.ErrUnsupported: unresolved value
+		$GOROOT/src/encoding/json/v2/errors.go:*: comparison with io.EOF: unresolved value
+$GOROOT/src/encoding/json/v2/arshal_methods.go:*: unresolved(no-candidates): dynamic call to (encoding/json/v2.Unmarshaler).UnmarshalJSON
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$GOROOT/src/encoding/json/v2/errors.go:*: errors.Is with errors.ErrUnsupported: unresolved value
+		$WORK/records/records.go:67:6-19: comparison with io.EOF: unresolved value
+$GOROOT/src/encoding/json/v2/arshal_methods.go:*: unresolved(no-candidates): dynamic call to (encoding/json/v2.UnmarshalerFrom).UnmarshalJSONFrom
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$GOROOT/src/encoding/json/v2/arshal_methods.go:*: errors.Is with errors.ErrUnsupported: unresolved value
+		$WORK/records/records.go:67:6-19: comparison with io.EOF: unresolved value
+$GOROOT/src/encoding/json/v2/errors.go:*: unresolved(memory): load of field Err of *encoding/json/v2.SemanticError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: in (*encoding/json/v2.SemanticError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json/v2.SemanticError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/v2/errors.go:*: unresolved(memory): load of field Err of *encoding/json/v2.SemanticError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$WORK/records/records.go:67:6-19: comparison with io.EOF: unresolved value
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2/errors.go:*: in (*encoding/json/v2.SemanticError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json/v2.SemanticError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/v2_decode.go:*: unresolved(memory): load of field Err of *encoding/json.UnmarshalTypeError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2_decode.go:*: in (*encoding/json.UnmarshalTypeError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json.UnmarshalTypeError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/v2_decode.go:*: unresolved(memory): load of field Err of *encoding/json.UnmarshalTypeError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$WORK/records/records.go:67:6-19: comparison with io.EOF: unresolved value
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2_decode.go:*: in (*encoding/json.UnmarshalTypeError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json.UnmarshalTypeError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/v2_encode.go:*: unresolved(memory): load of field Err of *encoding/json.MarshalerError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2_encode.go:*: in (*encoding/json.MarshalerError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json.MarshalerError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/v2_encode.go:*: unresolved(memory): load of field Err of *encoding/json.MarshalerError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$WORK/records/records.go:67:6-19: comparison with io.EOF: unresolved value
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2_encode.go:*: in (*encoding/json.MarshalerError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*encoding/json.MarshalerError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/v2_inject.go:*: unresolved(memory): load of field Err of *encoding/json/v2.SemanticError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$GOROOT/src/encoding/json/v2_scanner.go:*: guarded by call to (encoding/json/jsontext.export).IsIOError
+		$GOROOT/src/encoding/json/v2_scanner.go:*: type assertion to *encoding/json/jsontext.SyntacticError: unresolved value
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/v2_stream.go:*: unresolved(memory): load of field err of *encoding/json.Decoder
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$WORK/records/records.go:67:6-19: comparison with io.EOF: unresolved value
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/v2_stream.go:*: unresolved(memory): load of field err of *encoding/json.Decoder
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$WORK/records/records.go:67:6-19: comparison with io.EOF: unresolved value
+	path (origin → target):
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/fmt/errors.go:*: unresolved(memory): load of field err of *fmt.wrapError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/fmt/errors.go:*: in (*fmt.wrapError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*fmt.wrapError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/fmt/errors.go:*: unresolved(memory): load of field err of *fmt.wrapError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$WORK/records/records.go:67:6-19: comparison with io.EOF: unresolved value
+	path (origin → target):
+		$GOROOT/src/fmt/errors.go:*: in (*fmt.wrapError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*fmt.wrapError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/io/fs/fs.go:*: unresolved(memory): load of field Err of *io/fs.PathError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/io/fs/fs.go:*: in (*io/fs.PathError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*io/fs.PathError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/io/fs/fs.go:*: unresolved(memory): load of field Err of *io/fs.PathError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$WORK/records/records.go:67:6-19: comparison with io.EOF: unresolved value
+	path (origin → target):
+		$GOROOT/src/io/fs/fs.go:*: in (*io/fs.PathError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*io/fs.PathError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/net/url/url.go:*: unresolved(memory): load of field Err of *net/url.Error
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/net/url/url.go:*: in (*net/url.Error).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*net/url.Error).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/net/url/url.go:*: unresolved(memory): load of field Err of *net/url.Error
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$WORK/records/records.go:67:6-19: comparison with io.EOF: unresolved value
+	path (origin → target):
+		$GOROOT/src/net/url/url.go:*: in (*net/url.Error).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*net/url.Error).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/os/error.go:*: unresolved(memory): load of field Err of *os.SyscallError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/os/error.go:*: in (*os.SyscallError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*os.SyscallError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/os/error.go:*: unresolved(memory): load of field Err of *os.SyscallError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$WORK/records/records.go:67:6-19: comparison with io.EOF: unresolved value
+	path (origin → target):
+		$GOROOT/src/os/error.go:*: in (*os.SyscallError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*os.SyscallError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/strconv/number.go:*: unresolved(memory): load of field Err of *strconv.NumError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in (*strconv.NumError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*strconv.NumError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/strconv/number.go:*: unresolved(memory): load of field Err of *strconv.NumError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$WORK/records/records.go:67:6-19: comparison with io.EOF: unresolved value
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in (*strconv.NumError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*strconv.NumError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$WORK/records/records.go:24:44-49: unresolved(memory): load of field Err of *example.com/stdlibio/records.RowError
+	wrap chain (origin → target):
+		$GOROOT/src/encoding/json/v2_inject.go:*: *encoding/json.UnmarshalTypeError.Unwrap
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	path (origin → target):
+		$WORK/records/records.go:24:44-49: in (*example.com/stdlibio/records.RowError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*example.com/stdlibio/records.RowError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$WORK/records/records.go:24:44-49: unresolved(memory): load of field Err of *example.com/stdlibio/records.RowError
+	wrap chain (origin → target):
+		$WORK/records/records.go:71:17-53: fmt.Errorf "records: json: %w"
+	possibly handled:
+		$WORK/records/records.go:67:6-19: comparison with io.EOF: unresolved value
+	path (origin → target):
+		$WORK/records/records.go:24:44-49: in (*example.com/stdlibio/records.RowError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*example.com/stdlibio/records.RowError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 13 of 13 candidates)
+		$GOROOT/src/encoding/json/v2_scanner.go:*: in encoding/json.transformSyntacticError, call to errors.Unwrap
+		$GOROOT/src/encoding/json/v2_inject.go:*: in encoding/json.transformUnmarshalError, call to encoding/json.transformSyntacticError
+		$GOROOT/src/encoding/json/v2/arshal.go:*: in encoding/json/v2.Unmarshal, call to encoding/json.transformUnmarshalError (dynamic function value encoding/json/internal.TransformUnmarshalError: 1 of 1 candidates)
+		$GOROOT/src/encoding/json/v2_stream.go:*: in (*encoding/json.Decoder).Decode, call to encoding/json/v2.Unmarshal
+		$WORK/records/records.go:66:10-37: in example.com/stdlibio/records.ReadJSONLines, call to (*encoding/json.Decoder).Decode
+$GOROOT/src/encoding/json/v2/arshal.go:*: group of 42 entries via dynamic call to function value of type encoding/json/v2.unmarshaler (19 candidates) in encoding/json/v2.unmarshalDecode
+	$GOROOT/src/encoding/hex/hex.go:*: sentinel encoding/hex.ErrLength (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/json/internal/internal.go:*: sentinel encoding/json/internal.ErrNilInterface (candidate encoding/json/v2.makeInterfaceArshaler$2)
+	$GOROOT/src/encoding/json/jsontext/state.go:*: sentinel encoding/json/jsontext.ErrDuplicateName (candidate encoding/json/v2.makeInterfaceArshaler$2)
+	$GOROOT/src/encoding/json/jsontext/state.go:*: sentinel encoding/json/jsontext.ErrNonStringName (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/json/jsontext/state.go:*: sentinel encoding/json/jsontext.ErrNonStringName (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/json/jsontext/state.go:*: sentinel encoding/json/jsontext.errMissingValue (candidate encoding/json/v2.makeArrayArshaler$3)
+	$GOROOT/src/encoding/json/jsontext/state.go:*: sentinel encoding/json/jsontext.errMissingValue (candidate encoding/json/v2.makeArrayArshaler$3)
+	$GOROOT/src/encoding/json/jsontext/state.go:*: sentinel encoding/json/jsontext.errInvalidNamespace (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/json/jsontext/state.go:*: sentinel encoding/json/jsontext.errInvalidNamespace (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/json/v2/arshal_default.go:*: sentinel encoding/json/v2.errInvalidStringTag (candidate encoding/json/v2.makeArrayArshaler$3)
+	$GOROOT/src/encoding/json/v2/arshal_default.go:*: sentinel encoding/json/v2.errArrayUnderflow (candidate encoding/json/v2.makeArrayArshaler$3)
+	$GOROOT/src/encoding/json/v2/arshal_default.go:*: sentinel encoding/json/v2.errArrayOverflow (candidate encoding/json/v2.makeArrayArshaler$3)
+	$GOROOT/src/io/io.go:*: sentinel io.ErrUnexpectedEOF (candidate encoding/json/v2.makeArrayArshaler$3)
+	$GOROOT/src/io/io.go:*: sentinel io.ErrUnexpectedEOF (candidate encoding/json/v2.makeArrayArshaler$3)
+	$GOROOT/src/io/io.go:*: sentinel io.ErrUnexpectedEOF (candidate encoding/json/v2.makeArrayArshaler$3)
+	$GOROOT/src/encoding/base32/base32.go:*: concrete encoding/base32.CorruptInputError (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/base32/base32.go:*: concrete encoding/base32.CorruptInputError (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/base32/base32.go:*: concrete encoding/base32.CorruptInputError (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/base32/base32.go:*: concrete encoding/base32.CorruptInputError (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/base32/base32.go:*: concrete encoding/base32.CorruptInputError (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/base64/base64.go:*: concrete encoding/base64.CorruptInputError (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/base64/base64.go:*: concrete encoding/base64.CorruptInputError (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/base64/base64.go:*: concrete encoding/base64.CorruptInputError (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/base64/base64.go:*: concrete encoding/base64.CorruptInputError (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/base64/base64.go:*: concrete encoding/base64.CorruptInputError (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/base64/base64.go:*: concrete encoding/base64.CorruptInputError (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/base64/base64.go:*: concrete encoding/base64.CorruptInputError (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/base64/base64.go:*: concrete encoding/base64.CorruptInputError (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/hex/hex.go:*: concrete encoding/hex.InvalidByteError (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/hex/hex.go:*: concrete encoding/hex.InvalidByteError (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/hex/hex.go:*: concrete encoding/hex.InvalidByteError (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/json/v2/errors.go:*: concrete *encoding/json/v2.SemanticError (candidate encoding/json/v2.makeBoolArshaler$2)
+	$GOROOT/src/encoding/json/v2/arshal_default.go:*: opaque fmt.Errorf "illegal character %s at offset %d" (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/json/v2/arshal_default.go:*: opaque fmt.Errorf "decoded length of %d mismatches array length of %d" (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/json/v2/arshal_default.go:*: opaque fmt.Errorf "invalid incomparable key type %v" (candidate (*encoding/json/v2.typedArshalers[encoding/json/jsontext.Decoder]).lookup$1)
+	$GOROOT/src/encoding/json/v2/errors.go:*: opaque fmt.Errorf "invalid format flag %q" (candidate encoding/json/v2.makeArrayArshaler$3)
+	$GOROOT/src/encoding/json/v2/errors.go:*: opaque fmt.Errorf "invalid format flag %q" (candidate encoding/json/v2.makeArrayArshaler$3)
+	$GOROOT/src/encoding/json/v2/errors.go:*: opaque fmt.Errorf "invalid format flag %q" (candidate encoding/json/v2.makeArrayArshaler$3)
+	$GOROOT/src/cmp/cmp.go:*: unresolved(memory): load of slice or array element (candidate encoding/json/v2.makeArrayArshaler$3)
+	$GOROOT/src/encoding/json/jsontext/decode.go:*: unresolved(memory): load of field peekErr of *encoding/json/jsontext.decodeBuffer (candidate encoding/json/v2.makeArrayArshaler$3)
+	$GOROOT/src/encoding/json/jsontext/decode.go:*: unresolved(memory): load of field peekErr of *encoding/json/jsontext.decodeBuffer (candidate encoding/json/v2.makeBytesArshaler$2)
+	$GOROOT/src/encoding/json/v2/arshal_funcs.go:*: unresolved(no-candidates): dynamic call to function value of type func(*encoding/json/jsontext.Decoder, encoding/json/v2.addressableValue, *encoding/json/internal/jsonopts.Struct) error (candidate (*encoding/json/v2.typedArshalers[encoding/json/jsontext.Decoder]).lookup$1)

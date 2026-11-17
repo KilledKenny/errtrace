@@ -1,0 +1,239 @@
+Disjunctive == guard: Commit returns release()'s error as is when it is nil or repo.ErrTxDone
+(if err == nil || err == repo.ErrTxDone { return err }), otherwise wrapped.
+Go semantics: sentinel repo.ErrTxDone bare, and os.Remove's errors ONLY behind (*fs.PathError).Unwrap +
+"filerepo: commit: %w".
+Recorded: repo.ErrTxDone only bare (the wrap path is filtered correctly), but every os.Remove error twice, once
+wrapped and once bare (chain (*fs.PathError).Unwrap only). Not flagged: guards are applied by dominance (plan S07:
+"if neither dominates R, the guard doesn't apply on that path"), and neither comparison dominates the body of an
+||, so this is a documented, sound over-approximation; nothing is missing. The same shape in os.(*File).wrapErr
+(err == nil || err == io.EOF) adds PathError-less variants to every (*os.File) Read/Write set in this app.
+The leaves come from closures of other os functions too (os.chmod$1, os.openFileNolog$1, os.checkPidfd$1), which
+os.Remove never passes to os.ignoringEINTR: Candidates are not narrowed per caller (plan S09, see
+server_openstore_call).
+-- args --
+-fanout=0 repo/filerepo/filerepo.go:@commit
+-- stdout --
+$WORK/repo/filerepo/filerepo.go:119:29-35: Error Set of (*example.com/bank/repo/filerepo.fileTx).Commit: 19 entries, 4 unresolved
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Mkdirat, call to syscall.errnoErr
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Mkdir, call to syscall.Mkdirat
+		$GOROOT/src/os/file.go:*: in os.Mkdir$1, call to syscall.Mkdir
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Mkdir$1 (dynamic function value fn: 9 of 9 candidates)
+		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:120:9-20: in (*example.com/bank/repo/filerepo.fileTx).Commit, call to (*example.com/bank/repo/filerepo.fileTx).release
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:124:9-48: fmt.Errorf "filerepo: commit: %w"
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Mkdirat, call to syscall.errnoErr
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Mkdir, call to syscall.Mkdirat
+		$GOROOT/src/os/file.go:*: in os.Mkdir$1, call to syscall.Mkdir
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Mkdir$1 (dynamic function value fn: 9 of 9 candidates)
+		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:120:9-20: in (*example.com/bank/repo/filerepo.fileTx).Commit, call to (*example.com/bank/repo/filerepo.fileTx).release
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Mkdirat, call to syscall.errnoErr
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Mkdir, call to syscall.Mkdirat
+		$GOROOT/src/os/file.go:*: in os.Mkdir$1, call to syscall.Mkdir
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Mkdir$1 (dynamic function value fn: 9 of 9 candidates)
+		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:120:9-20: in (*example.com/bank/repo/filerepo.fileTx).Commit, call to (*example.com/bank/repo/filerepo.fileTx).release
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:124:9-48: fmt.Errorf "filerepo: commit: %w"
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Mkdirat, call to syscall.errnoErr
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Mkdir, call to syscall.Mkdirat
+		$GOROOT/src/os/file.go:*: in os.Mkdir$1, call to syscall.Mkdir
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Mkdir$1 (dynamic function value fn: 9 of 9 candidates)
+		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:120:9-20: in (*example.com/bank/repo/filerepo.fileTx).Commit, call to (*example.com/bank/repo/filerepo.fileTx).release
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Mkdirat, call to syscall.errnoErr
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Mkdir, call to syscall.Mkdirat
+		$GOROOT/src/os/file.go:*: in os.Mkdir$1, call to syscall.Mkdir
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Mkdir$1 (dynamic function value fn: 9 of 9 candidates)
+		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:120:9-20: in (*example.com/bank/repo/filerepo.fileTx).Commit, call to (*example.com/bank/repo/filerepo.fileTx).release
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:124:9-48: fmt.Errorf "filerepo: commit: %w"
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Mkdirat, call to syscall.errnoErr
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Mkdir, call to syscall.Mkdirat
+		$GOROOT/src/os/file.go:*: in os.Mkdir$1, call to syscall.Mkdir
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Mkdir$1 (dynamic function value fn: 9 of 9 candidates)
+		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:120:9-20: in (*example.com/bank/repo/filerepo.fileTx).Commit, call to (*example.com/bank/repo/filerepo.fileTx).release
+$WORK/repo/repo.go:12:5-14: sentinel example.com/bank/repo.ErrTxDone
+	path (origin → target):
+		$WORK/repo/filerepo/filerepo.go:138:10-24: in (*example.com/bank/repo/filerepo.fileTx).release
+		$WORK/repo/filerepo/filerepo.go:120:9-20: in (*example.com/bank/repo/filerepo.fileTx).Commit, call to (*example.com/bank/repo/filerepo.fileTx).release
+$GOROOT/src/syscall/syscall.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall.go:*: in syscall.ByteSliceFromString
+		$GOROOT/src/syscall/syscall.go:*: in syscall.BytePtrFromString, call to syscall.ByteSliceFromString
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Mkdirat, call to syscall.BytePtrFromString
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Mkdir, call to syscall.Mkdirat
+		$GOROOT/src/os/file.go:*: in os.Mkdir$1, call to syscall.Mkdir
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Mkdir$1 (dynamic function value fn: 9 of 9 candidates)
+		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:120:9-20: in (*example.com/bank/repo/filerepo.fileTx).Commit, call to (*example.com/bank/repo/filerepo.fileTx).release
+$GOROOT/src/syscall/syscall.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:124:9-48: fmt.Errorf "filerepo: commit: %w"
+	path (origin → target):
+		$GOROOT/src/syscall/syscall.go:*: in syscall.ByteSliceFromString
+		$GOROOT/src/syscall/syscall.go:*: in syscall.BytePtrFromString, call to syscall.ByteSliceFromString
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Mkdirat, call to syscall.BytePtrFromString
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Mkdir, call to syscall.Mkdirat
+		$GOROOT/src/os/file.go:*: in os.Mkdir$1, call to syscall.Mkdir
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Mkdir$1 (dynamic function value fn: 9 of 9 candidates)
+		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:120:9-20: in (*example.com/bank/repo/filerepo.fileTx).Commit, call to (*example.com/bank/repo/filerepo.fileTx).release
+$GOROOT/src/syscall/syscall_linux.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Fchmodat
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Chmod, call to syscall.Fchmodat
+		$GOROOT/src/os/file_posix.go:*: in os.chmod$1, call to syscall.Chmod
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.chmod$1 (dynamic function value fn: 9 of 9 candidates)
+		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:120:9-20: in (*example.com/bank/repo/filerepo.fileTx).Commit, call to (*example.com/bank/repo/filerepo.fileTx).release
+$GOROOT/src/syscall/syscall_linux.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:124:9-48: fmt.Errorf "filerepo: commit: %w"
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Fchmodat
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Chmod, call to syscall.Fchmodat
+		$GOROOT/src/os/file_posix.go:*: in os.chmod$1, call to syscall.Chmod
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.chmod$1 (dynamic function value fn: 9 of 9 candidates)
+		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:120:9-20: in (*example.com/bank/repo/filerepo.fileTx).Commit, call to (*example.com/bank/repo/filerepo.fileTx).release
+$GOROOT/src/syscall/syscall_linux.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Fchmodat
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Chmod, call to syscall.Fchmodat
+		$GOROOT/src/os/file_posix.go:*: in os.chmod$1, call to syscall.Chmod
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.chmod$1 (dynamic function value fn: 9 of 9 candidates)
+		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:120:9-20: in (*example.com/bank/repo/filerepo.fileTx).Commit, call to (*example.com/bank/repo/filerepo.fileTx).release
+$GOROOT/src/syscall/syscall_linux.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:124:9-48: fmt.Errorf "filerepo: commit: %w"
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Fchmodat
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Chmod, call to syscall.Fchmodat
+		$GOROOT/src/os/file_posix.go:*: in os.chmod$1, call to syscall.Chmod
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.chmod$1 (dynamic function value fn: 9 of 9 candidates)
+		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:120:9-20: in (*example.com/bank/repo/filerepo.fileTx).Commit, call to (*example.com/bank/repo/filerepo.fileTx).release
+$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Mkdirat, call to syscall.errnoErr
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Mkdir, call to syscall.Mkdirat
+		$GOROOT/src/os/file.go:*: in os.Mkdir$1, call to syscall.Mkdir
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Mkdir$1 (dynamic function value fn: 9 of 9 candidates)
+		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:120:9-20: in (*example.com/bank/repo/filerepo.fileTx).Commit, call to (*example.com/bank/repo/filerepo.fileTx).release
+$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:124:9-48: fmt.Errorf "filerepo: commit: %w"
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.Mkdirat, call to syscall.errnoErr
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Mkdir, call to syscall.Mkdirat
+		$GOROOT/src/os/file.go:*: in os.Mkdir$1, call to syscall.Mkdir
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.Mkdir$1 (dynamic function value fn: 9 of 9 candidates)
+		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:120:9-20: in (*example.com/bank/repo/filerepo.fileTx).Commit, call to (*example.com/bank/repo/filerepo.fileTx).release
+$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog$1
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.openFileNolog$1 (dynamic function value fn: 9 of 9 candidates)
+		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:120:9-20: in (*example.com/bank/repo/filerepo.fileTx).Commit, call to (*example.com/bank/repo/filerepo.fileTx).release
+$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:124:9-48: fmt.Errorf "filerepo: commit: %w"
+	path (origin → target):
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog$1
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.openFileNolog$1 (dynamic function value fn: 9 of 9 candidates)
+		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:120:9-20: in (*example.com/bank/repo/filerepo.fileTx).Commit, call to (*example.com/bank/repo/filerepo.fileTx).release
+$GOROOT/src/syscall/syscall_linux.go:*: unresolved(no-body): internal/runtime/syscall/linux.Syscall6 has no body
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.RawSyscall6
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Syscall6, call to syscall.RawSyscall6
+		$GOROOT/src/internal/syscall/unix/waitid_linux.go:*: in internal/syscall/unix.Waitid, call to syscall.Syscall6
+		$GOROOT/src/os/pidfd_linux.go:*: in os.checkPidfd$1, call to internal/syscall/unix.Waitid
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.checkPidfd$1 (dynamic function value fn: 9 of 9 candidates)
+		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:120:9-20: in (*example.com/bank/repo/filerepo.fileTx).Commit, call to (*example.com/bank/repo/filerepo.fileTx).release
+$GOROOT/src/syscall/syscall_linux.go:*: unresolved(no-body): internal/runtime/syscall/linux.Syscall6 has no body
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:124:9-48: fmt.Errorf "filerepo: commit: %w"
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.RawSyscall6
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Syscall6, call to syscall.RawSyscall6
+		$GOROOT/src/internal/syscall/unix/waitid_linux.go:*: in internal/syscall/unix.Waitid, call to syscall.Syscall6
+		$GOROOT/src/os/pidfd_linux.go:*: in os.checkPidfd$1, call to internal/syscall/unix.Waitid
+		$GOROOT/src/os/file_posix.go:*: in os.ignoringEINTR, call to os.checkPidfd$1 (dynamic function value fn: 9 of 9 candidates)
+		$GOROOT/src/os/file_unix.go:*: in os.Remove, call to os.ignoringEINTR
+		$WORK/repo/filerepo/filerepo.go:141:9-26: in (*example.com/bank/repo/filerepo.fileTx).release, call to os.Remove
+		$WORK/repo/filerepo/filerepo.go:120:9-20: in (*example.com/bank/repo/filerepo.fileTx).Commit, call to (*example.com/bank/repo/filerepo.fileTx).release

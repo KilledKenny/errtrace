@@ -1,0 +1,16 @@
+Call site directly on os.Open: everything it returns is &PathError{Op: "open", Err: e}
+where e is assigned inside the closure passed to ignoringEINTR. Expected: entries
+under *fs.PathError.Unwrap only; an Unresolved(memory) for the captured variable e is
+acceptable, a 0-entry set would be a silent drop.
+-- args --
+source/source.go:@open
+-- stdout --
+$WORK/source/source.go:74:12-34: Error Set of call to os.Open in example.com/stdlibio/source.Peek: 1 entries, 1 unresolved
+$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.OpenFile, call to os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.Open, call to os.OpenFile
+		$WORK/source/source.go:74:12-34: in example.com/stdlibio/source.Peek, call to os.Open

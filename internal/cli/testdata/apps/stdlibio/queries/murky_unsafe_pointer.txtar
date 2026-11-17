@@ -1,0 +1,10 @@
+The error is read back through unsafe.Pointer(&err). The value is really
+murky.ErrStage, but unsafe is not modelled: expected one Unresolved(memory) "load
+through pointer"; resolving sentinel ErrStage would also be correct. Not empty.
+-- args --
+murky/murky.go:@reinterpret
+-- stdout --
+$WORK/murky/murky.go:158:22-33: Error Set of example.com/stdlibio/murky.Reinterpret: 1 entries, 1 unresolved
+$WORK/murky/murky.go:161:9-21: unresolved(memory): load through pointer
+	path (origin → target):
+		$WORK/murky/murky.go:161:9-21: in example.com/stdlibio/murky.Reinterpret

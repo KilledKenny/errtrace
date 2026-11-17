@@ -1,0 +1,22 @@
+SUSPECTED BUG (low confidence): the concrete drivers.Status entry has a
+zero-width span on the return keyword (N:3-3) instead of the expression
+that builds it, the conversion Status(503) on the same line (cols 26-37).
+A constant conversion has no SSA position, and the plan ("Positions and
+spans") names the enclosing Return's position as the fallback for an
+implicit MakeInterface, but the output contract says a Concrete Type entry
+carries the building expression, which is the Return's result here.
+Otherwise as expected.
+-fanout=1 on a Target without any dynamic call: nothing to group.
+Gateway.Send returns Status(503) (a type that is both fmt.Stringer and
+error) and the sentinel ErrBusy (declared as error, holding a Status).
+Expected: concrete drivers.Status and sentinel drivers.ErrBusy, ungrouped.
+-- args --
+-fanout=1 drivers/extra.go:@gw_send
+-- stdout --
+$WORK/drivers/extra.go:88:30-34: Error Set of (example.com/plugins/drivers.Gateway).Send: 2 entries
+$WORK/drivers/extra.go:83:5-12: sentinel example.com/plugins/drivers.ErrBusy
+	path (origin → target):
+		$WORK/drivers/extra.go:93:10-17: in (example.com/plugins/drivers.Gateway).Send
+$WORK/drivers/extra.go:90:3-3: concrete example.com/plugins/drivers.Status
+	path (origin → target):
+		$WORK/drivers/extra.go:90:3-3: in (example.com/plugins/drivers.Gateway).Send

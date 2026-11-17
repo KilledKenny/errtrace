@@ -1,0 +1,13 @@
+SUSPECTED BUG: Last returns the package-level variable lastErr, which
+has no initialiser and is assigned at run time by Remember(err) (called from main with
+importFile's error). It is not a Sentinel. Expected: Unresolved(memory), or at least the
+"[mutable global: assigned at murky.go:30]" mark of plan S10. Actual: reported as a plain
+"sentinel example.com/stdlibio/murky.lastErr", which hides that any error can be behind
+it.
+-- args --
+murky/murky.go:@last
+-- stdout --
+$WORK/murky/murky.go:33:15-19: Error Set of example.com/stdlibio/murky.Last: 1 entries
+$WORK/murky/murky.go:27:5-12: sentinel example.com/stdlibio/murky.lastErr
+	path (origin → target):
+		$WORK/murky/murky.go:34:9-16: in example.com/stdlibio/murky.Last

@@ -1,0 +1,30 @@
+Dynamic call m.store.Begin() in WithTx: two Candidates (memory.Store, filerepo.Store), without WithTx's wrap.
+Expect memory.ErrClosed and *retry.TimeoutError (memory), retry.ErrBusy (filerepo, replaces fs.ErrExist) and
+os.OpenFile's errors behind "filerepo: lock: %w" (possibly handled by the ErrExist guard); no "tx: begin: %w".
+-- args --
+tx/tx.go:@begin_call
+-- stdout --
+$WORK/tx/tx.go:23:12-42: Error Set of call to m.store.Begin in (*example.com/bank/tx.Manager).WithTx: 4 entries, 1 unresolved, 1 possibly handled
+$WORK/repo/memory/memory.go:16:5-14: sentinel example.com/bank/repo/memory.ErrClosed
+	path (origin → target):
+		$WORK/repo/memory/memory.go:97:15-24: in (*example.com/bank/repo/memory.Store).Begin
+		$WORK/tx/tx.go:23:12-42: in (*example.com/bank/tx.Manager).WithTx, call to (*example.com/bank/repo/memory.Store).Begin (dynamic (example.com/bank/repo.Store).Begin: 2 of 2 candidates)
+$WORK/retry/retry.go:13:2-9: sentinel example.com/bank/retry.ErrBusy
+	path (origin → target):
+		$WORK/repo/filerepo/filerepo.go:104:16-29: in (*example.com/bank/repo/filerepo.Store).Begin
+		$WORK/tx/tx.go:23:12-42: in (*example.com/bank/tx.Manager).WithTx, call to (*example.com/bank/repo/filerepo.Store).Begin (dynamic (example.com/bank/repo.Store).Begin: 2 of 2 candidates)
+$WORK/repo/memory/memory.go:101:15-55: concrete *example.com/bank/retry.TimeoutError
+	path (origin → target):
+		$WORK/repo/memory/memory.go:101:15-55: in (*example.com/bank/repo/memory.Store).Begin
+		$WORK/tx/tx.go:23:12-42: in (*example.com/bank/tx.Manager).WithTx, call to (*example.com/bank/repo/memory.Store).Begin (dynamic (example.com/bank/repo.Store).Begin: 2 of 2 candidates)
+$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:106:15-52: fmt.Errorf "filerepo: lock: %w"
+	possibly handled:
+		$WORK/repo/filerepo/filerepo.go:103:6-33: errors.Is with io/fs.ErrExist: unresolved value
+	path (origin → target):
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.OpenFile, call to os.openFileNolog
+		$WORK/repo/filerepo/filerepo.go:101:12-75: in (*example.com/bank/repo/filerepo.Store).Begin, call to os.OpenFile
+		$WORK/tx/tx.go:23:12-42: in (*example.com/bank/tx.Manager).WithTx, call to (*example.com/bank/repo/filerepo.Store).Begin (dynamic (example.com/bank/repo.Store).Begin: 2 of 2 candidates)

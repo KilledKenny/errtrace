@@ -1,0 +1,14 @@
+Method expressions (*SMS).Send and Email.Send stored in variables and
+called. Expected: drivers.ErrSMS and drivers.ErrEmail, no Unresolved.
+-- args --
+dispatch/funcs.go:@mexpr
+-- stdout --
+$WORK/dispatch/funcs.go:97:16-29: Error Set of example.com/plugins/dispatch.ViaMethodExpr: 2 entries
+$WORK/drivers/drivers.go:13:2-10: sentinel example.com/plugins/drivers.ErrEmail
+	path (origin → target):
+		$WORK/drivers/drivers.go:26:10-18: in (example.com/plugins/drivers.Email).Send
+		$WORK/dispatch/funcs.go:103:9-33: in example.com/plugins/dispatch.ViaMethodExpr, call to (example.com/plugins/drivers.Email).Send
+$WORK/drivers/drivers.go:14:2-8: sentinel example.com/plugins/drivers.ErrSMS
+	path (origin → target):
+		$WORK/drivers/drivers.go:37:10-16: in (*example.com/plugins/drivers.SMS).Send
+		$WORK/dispatch/funcs.go:99:27-50: in example.com/plugins/dispatch.ViaMethodExpr, call to (*example.com/plugins/drivers.SMS).Send

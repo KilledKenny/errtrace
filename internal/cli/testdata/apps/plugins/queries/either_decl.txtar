@@ -1,0 +1,11 @@
+The same type passed by value (Email) and by pointer (*Email) to one
+interface parameter; (*Email).Send is the promoted wrapper of the value
+method. Expected: one Origin, drivers.ErrEmail; nothing else.
+-- args --
+dispatch/fanout.go:@either
+-- stdout --
+$WORK/dispatch/fanout.go:16:17-27: Error Set of example.com/plugins/dispatch.SendEither: 1 entries
+$WORK/drivers/drivers.go:13:2-10: sentinel example.com/plugins/drivers.ErrEmail
+	path (origin → target):
+		$WORK/drivers/drivers.go:26:10-18: in (example.com/plugins/drivers.Email).Send
+		$WORK/dispatch/fanout.go:16:72-81: in example.com/plugins/dispatch.SendEither, call to (example.com/plugins/drivers.Email).Send (dynamic (example.com/plugins/core.Driver).Send: 1 of 1 candidates)

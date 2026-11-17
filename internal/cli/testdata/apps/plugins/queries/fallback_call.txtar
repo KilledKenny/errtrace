@@ -1,0 +1,14 @@
+Call-site Target on an interface field whose only value comes from a
+functional option closure and is a type of another package (sink.Remote).
+Expected: sink.ErrRemote wrapped by "remote %s: %w", 1 of 1 candidates;
+no *HTTPError (the primary field).
+-- args --
+dispatch/dispatch.go:@fallback
+-- stdout --
+$WORK/dispatch/dispatch.go:108:9-40: Error Set of call to d.fallback.Send in (*example.com/plugins/dispatch.Dispatcher).Send: 1 entries
+$WORK/sink/sink.go:12:5-14: sentinel example.com/plugins/sink.ErrRemote
+	wrap chain (origin → target):
+		$WORK/sink/sink.go:19:10-57: fmt.Errorf "remote %s: %w"
+	path (origin → target):
+		$WORK/sink/sink.go:19:47-56: in (example.com/plugins/sink.Remote).Send
+		$WORK/dispatch/dispatch.go:108:9-40: in (*example.com/plugins/dispatch.Dispatcher).Send, call to (example.com/plugins/sink.Remote).Send (dynamic (example.com/plugins/core.Driver).Send: 1 of 1 candidates)

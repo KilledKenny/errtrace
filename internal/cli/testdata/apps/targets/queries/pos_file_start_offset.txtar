@@ -1,0 +1,9 @@
+Offset 0, the start of the file (inside the package doc comment).
+Negative: exit 2, no target at 1:1.
+-- args --
+internal/platform/platform.go:#0
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/platform/platform.go:1:1: no function declaration or call at position
+-- exit --
+2

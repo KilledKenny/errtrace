@@ -1,0 +1,10 @@
+Out of scope by design: the error is received from a channel (a goroutine sends
+murky.ErrWorker). Documented expectation: exactly one Unresolved(memory) "channel
+receive" entry; ErrWorker need not be resolved, but the set must not be empty.
+-- args --
+murky/murky.go:@fromchannel
+-- stdout --
+$WORK/murky/murky.go:38:22-33: Error Set of example.com/stdlibio/murky.FromChannel: 1 entries, 1 unresolved
+$WORK/murky/murky.go:41:9-15: unresolved(memory): channel receive
+	path (origin → target):
+		$WORK/murky/murky.go:41:9-15: in example.com/stdlibio/murky.FromChannel

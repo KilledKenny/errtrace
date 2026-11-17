@@ -1,0 +1,9 @@
+Error loaded from a struct field (out of scope by design).
+Expect: 1 entry, unresolved(memory).
+-- args --
+engine/engine.go:@lasterr
+-- stdout --
+$WORK/engine/engine.go:215:30-37: Error Set of (*example.com/kvstore/engine.Engine).LastErr: 1 entries, 1 unresolved
+$WORK/engine/engine.go:215:55-61: unresolved(memory): load of field last of *example.com/kvstore/engine.Engine
+	path (origin → target):
+		$WORK/engine/engine.go:215:55-61: in (*example.com/kvstore/engine.Engine).LastErr

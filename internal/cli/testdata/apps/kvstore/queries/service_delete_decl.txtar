@@ -1,0 +1,13 @@
+Calls a directly recursive helper whose callee error is only compared with nil and never returned.
+Expect: kverr.ErrReadOnly and service.errGaveUp. Engine.Delete's errors (ErrClosed, ErrEmptyKey) must NOT appear.
+-- args --
+service/service.go:@delete
+-- stdout --
+$WORK/service/service.go:90:30-36: Error Set of (*example.com/kvstore/service.Service).Delete: 2 entries
+$WORK/kverr/kverr.go:16:2-13: sentinel example.com/kvstore/kverr.ErrReadOnly
+	path (origin → target):
+		$WORK/service/service.go:92:10-27: in (*example.com/kvstore/service.Service).Delete
+$WORK/service/service.go:17:5-14: sentinel example.com/kvstore/service.errGaveUp
+	path (origin → target):
+		$WORK/service/service.go:104:10-19: in (*example.com/kvstore/service.Service).retry
+		$WORK/service/service.go:94:9-24: in (*example.com/kvstore/service.Service).Delete, call to (*example.com/kvstore/service.Service).retry

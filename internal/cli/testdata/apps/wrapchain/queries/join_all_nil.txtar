@@ -1,0 +1,5 @@
+errors.Join of only nil operands returns nil. Expected 0 entries.
+-- args --
+validate/validate.go:@none
+-- stdout --
+$WORK/validate/validate.go:44:15-19: Error Set of example.com/wrapchain/validate.None: 0 entries

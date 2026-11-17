@@ -1,0 +1,30 @@
+== guard against a sentinel that is reassigned in func init(), applied to the result of a promoted method.
+Go semantics: engine.ErrClosed never leaves Alive; kverr.errInternal and the channel error (unresolved(memory)) do.
+errtrace treats ErrClosed as unstable (two loads may differ), so it keeps all 3 of Ping's entries and marks each 'possibly handled':
+ErrClosed ("is reassigned outside its initialization"), errInternal ("may be the same value as engine.ErrClosed") and the unresolved value.
+This is the documented conservative behaviour (plan P07, e2e guards/eq_unstable_sentinel); the entry that matters is that nothing is dropped.
+-- args --
+repo/repo.go:@alive
+-- stdout --
+$WORK/repo/repo.go:174:26-31: Error Set of (*example.com/kvstore/repo.Repo).Alive: 3 entries, 1 unresolved, 3 possibly handled
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	possibly handled:
+		$WORK/repo/repo.go:176:5-28: comparison with example.com/kvstore/engine.ErrClosed: engine.ErrClosed is reassigned outside its initialization
+	path (origin → target):
+		$WORK/engine/engine.go:195:10-19: in (*example.com/kvstore/engine.Engine).Wait
+		$WORK/repo/repo.go:28:9-21: in (*example.com/kvstore/repo.base).Ping, call to (*example.com/kvstore/engine.Engine).Wait
+		$WORK/repo/repo.go:175:9-17: in (*example.com/kvstore/repo.Repo).Alive, call to (*example.com/kvstore/repo.base).Ping
+$WORK/kverr/kverr.go:18:2-13: sentinel example.com/kvstore/kverr.errInternal
+	possibly handled:
+		$WORK/repo/repo.go:176:5-28: comparison with example.com/kvstore/engine.ErrClosed: sentinel kverr.errInternal may be the same value as engine.ErrClosed
+	path (origin → target):
+		$WORK/kverr/kverr.go:22:45-56: in example.com/kvstore/kverr.Internal
+		$WORK/repo/repo.go:26:10-26: in (*example.com/kvstore/repo.base).Ping, call to example.com/kvstore/kverr.Internal
+		$WORK/repo/repo.go:175:9-17: in (*example.com/kvstore/repo.Repo).Alive, call to (*example.com/kvstore/repo.base).Ping
+$WORK/engine/engine.go:196:14-22: unresolved(memory): channel receive in select
+	possibly handled:
+		$WORK/repo/repo.go:176:5-28: comparison with example.com/kvstore/engine.ErrClosed: unresolved value
+	path (origin → target):
+		$WORK/engine/engine.go:196:14-22: in (*example.com/kvstore/engine.Engine).Wait
+		$WORK/repo/repo.go:28:9-21: in (*example.com/kvstore/repo.base).Ping, call to (*example.com/kvstore/engine.Engine).Wait
+		$WORK/repo/repo.go:175:9-17: in (*example.com/kvstore/repo.Repo).Alive, call to (*example.com/kvstore/repo.base).Ping

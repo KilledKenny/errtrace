@@ -1,0 +1,10 @@
+Out of scope by design: the error is loaded from a sync/atomic.Value as *error and
+dereferenced. Documented expectation: one Unresolved(memory) (load through pointer /
+type assertion); no entry for the "return nil" path.
+-- args --
+murky/murky.go:@health
+-- stdout --
+$WORK/murky/murky.go:149:17-23: Error Set of example.com/stdlibio/murky.Health: 1 entries, 1 unresolved
+$WORK/murky/murky.go:154:9-11: unresolved(memory): load through pointer
+	path (origin → target):
+		$WORK/murky/murky.go:154:9-11: in example.com/stdlibio/murky.Health

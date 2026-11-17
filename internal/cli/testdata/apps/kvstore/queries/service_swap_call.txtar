@@ -1,0 +1,31 @@
+Call-site Target whose callee has two error results.
+Expect the union of both results (same 5 entries as service_exchange_decl).
+-- args --
+service/service.go:@swap_call
+-- stdout --
+$WORK/service/service.go:210:16-47: Error Set of call to s.repo.Swap in (*example.com/kvstore/service.Service).Exchange: 5 entries, 1 unresolved
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed [+1 more paths]
+	path (origin → target):
+		$WORK/engine/engine.go:68:15-24: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:78:17-37: in (*example.com/kvstore/repo.Repo).Swap, call to (*example.com/kvstore/engine.Engine).Get
+		$WORK/service/service.go:210:16-47: in (*example.com/kvstore/service.Service).Exchange, call to (*example.com/kvstore/repo.Repo).Swap
+$WORK/kverr/kverr.go:10:5-16: sentinel example.com/kvstore/kverr.ErrNotFound
+	path (origin → target):
+		$WORK/engine/engine.go:72:15-32: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:78:17-37: in (*example.com/kvstore/repo.Repo).Swap, call to (*example.com/kvstore/engine.Engine).Get
+		$WORK/service/service.go:210:16-47: in (*example.com/kvstore/service.Service).Exchange, call to (*example.com/kvstore/repo.Repo).Swap
+$WORK/kverr/kverr.go:33:5-13: sentinel example.com/kvstore/kverr.ErrQuota
+	path (origin → target):
+		$WORK/engine/engine.go:107:10-24: in (*example.com/kvstore/engine.Engine).Put
+		$WORK/repo/repo.go:86:16-40: in (*example.com/kvstore/repo.Repo).Swap, call to (*example.com/kvstore/engine.Engine).Put
+		$WORK/service/service.go:210:16-47: in (*example.com/kvstore/service.Service).Exchange, call to (*example.com/kvstore/repo.Repo).Swap
+$WORK/engine/engine.go:104:3-3: concrete example.com/kvstore/kverr.Code
+	path (origin → target):
+		$WORK/engine/engine.go:104:3-3: in (*example.com/kvstore/engine.Engine).Put
+		$WORK/repo/repo.go:86:16-40: in (*example.com/kvstore/repo.Repo).Swap, call to (*example.com/kvstore/engine.Engine).Put
+		$WORK/service/service.go:210:16-47: in (*example.com/kvstore/service.Service).Exchange, call to (*example.com/kvstore/repo.Repo).Swap
+$WORK/engine/engine.go:111:19-34: unresolved(no-body): example.com/kvstore/engine.fsync has no body
+	path (origin → target):
+		$WORK/engine/engine.go:111:19-34: in (*example.com/kvstore/engine.Engine).Put
+		$WORK/repo/repo.go:86:16-40: in (*example.com/kvstore/repo.Repo).Swap, call to (*example.com/kvstore/engine.Engine).Put
+		$WORK/service/service.go:210:16-47: in (*example.com/kvstore/service.Service).Exchange, call to (*example.com/kvstore/repo.Repo).Swap

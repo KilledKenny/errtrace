@@ -1,0 +1,10 @@
+SUSPECTED BUG (low confidence; plan S10 behaviour not present): no hint that the sentinel is unstable.
+ErrStale is reassigned outside init by SetStaleError(err), so the reported variable may hold any caller-supplied error.
+Expected: sentinel engine.ErrStale marked '[mutable global: assigned at engine.go:<SetStaleError>]'. Actual: a plain sentinel entry, indistinguishable from a stable one.
+-- args --
+engine/engine.go:@snapshot
+-- stdout --
+$WORK/engine/engine.go:138:31-39: Error Set of (*example.com/kvstore/engine.Engine).Snapshot: 1 entries
+$WORK/engine/engine.go:20:2-10: sentinel example.com/kvstore/engine.ErrStale
+	path (origin → target):
+		$WORK/engine/engine.go:140:10-18: in (*example.com/kvstore/engine.Engine).Snapshot

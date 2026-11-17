@@ -1,0 +1,15 @@
+Driver selected by a switch in pick(); Route also returns a static
+sentinel. Expected: core.ErrNoRoute as an ordinary entry, then a group of 3
+(ErrEmail, ErrSMS, sink.ErrRemote wrapped by "remote %s: %w") for the
+dynamic site with 3 Candidates, one of them from another package.
+-- args --
+-fanout=3 dispatch/dispatch.go:@route
+-- stdout --
+$WORK/dispatch/dispatch.go:220:16-21: Error Set of example.com/plugins/dispatch.Route: 4 entries
+$WORK/core/core.go:15:2-12: sentinel example.com/plugins/core.ErrNoRoute
+	path (origin → target):
+		$WORK/dispatch/dispatch.go:223:10-25: in example.com/plugins/dispatch.Route
+$WORK/dispatch/dispatch.go:225:9-33: group of 3 entries via dynamic call to (example.com/plugins/core.Driver).Send (3 candidates) in example.com/plugins/dispatch.Route
+	$WORK/drivers/drivers.go:13:2-10: sentinel example.com/plugins/drivers.ErrEmail (candidate (example.com/plugins/drivers.Email).Send)
+	$WORK/drivers/drivers.go:14:2-8: sentinel example.com/plugins/drivers.ErrSMS (candidate (*example.com/plugins/drivers.SMS).Send)
+	$WORK/sink/sink.go:12:5-14: sentinel example.com/plugins/sink.ErrRemote (candidate (example.com/plugins/sink.Remote).Send)

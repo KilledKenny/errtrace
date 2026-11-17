@@ -1,0 +1,9 @@
+Position without a file name.
+Negative: exit 2, "missing file name".
+-- args --
+:5:6
+-- stdout --
+-- stderr --
+errtrace: invalid position ":5:6": missing file name
+-- exit --
+2

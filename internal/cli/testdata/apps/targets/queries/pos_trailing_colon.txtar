@@ -1,0 +1,9 @@
+Trailing colon with a missing column.
+Negative: exit 2, "missing column".
+-- args --
+internal/platform/platform.go:5:
+-- stdout --
+-- stderr --
+errtrace: invalid position "internal/platform/platform.go:5:": missing column
+-- exit --
+2

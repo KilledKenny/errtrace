@@ -1,0 +1,18 @@
+Declaration target warm, the callee of call_go.
+Expected 2 entries: store.ErrNotFound wrapped "get %q: %w"; store.ErrClosed unwrapped with [+1 more paths] (via ping() and via Get->Check). Must NOT contain disk.ErrNoEntry (errors.Is guard returns nil).
+Compare by hand with call_go, which must list the same entries.
+-- args --
+cmd/ingest/main.go:@warm
+-- stdout --
+$WORK/cmd/ingest/main.go:60:15-19: Error Set of example.com/targets/cmd/ingest.warm: 2 entries
+$WORK/internal/store/store.go:11:2-13: sentinel example.com/targets/internal/store.ErrNotFound
+	wrap chain (origin → target):
+		$WORK/internal/store/store.go:51:30-79: fmt.Errorf "get %q: %w"
+	path (origin → target):
+		$WORK/internal/store/store.go:111:15-26: in (*example.com/targets/internal/store.mem).Read
+		$WORK/internal/store/store.go:49:14-43: in (*example.com/targets/internal/store.Store).Get, call to (*example.com/targets/internal/store.mem).Read (dynamic (example.com/targets/internal/store.Backend).Read: 2 of 2 candidates)
+		$WORK/cmd/ingest/main.go:65:12-25: in example.com/targets/cmd/ingest.warm, call to (*example.com/targets/internal/store.Store).Get
+$WORK/internal/store/store.go:12:2-11: sentinel example.com/targets/internal/store.ErrClosed [+1 more paths]
+	path (origin → target):
+		$WORK/internal/store/store.go:62:10-19: in (example.com/targets/internal/store.Store).Ping
+		$WORK/cmd/ingest/main.go:62:22-28: in example.com/targets/cmd/ingest.warm, call to (example.com/targets/internal/store.Store).Ping

@@ -1,0 +1,31 @@
+Parameter-driven dispatch: Explain's r is only ever rules.Funds{} or rules.Limit{} (two call sites in cmd/cli).
+Expect 3 entries, all behind "%s says no: %w": InsufficientFundsError (Funds) and the two unresolved
+(*Exceeded).Unwrap results of Limit (one also behind "daily budget of %s: %w"); 2 of 2 candidates, no origin of
+the other 8 rules.
+-- args --
+rules/rules.go:@explain
+-- stdout --
+$WORK/rules/rules.go:74:18-25: Error Set of example.com/bank/rules.Explain: 3 entries, 2 unresolved
+$WORK/rules/builtin.go:52:10-109: concrete example.com/bank/domain.InsufficientFundsError
+	wrap chain (origin → target):
+		$WORK/rules/rules.go:76:10-53: fmt.Errorf "%s says no: %w"
+	path (origin → target):
+		$WORK/rules/builtin.go:52:10-109: in (example.com/bank/rules.Funds).Check
+		$WORK/rules/rules.go:75:12-28: in example.com/bank/rules.Explain, call to (example.com/bank/rules.Funds).Check (dynamic (example.com/bank/rules.Rule).Check: 2 of 2 candidates)
+$WORK/limits/limits.go:32:10-82: unresolved(memory): *example.com/bank/limits.Exceeded.Unwrap not modelled
+	wrap chain (origin → target):
+		$WORK/limits/limits.go:32:10-82: *example.com/bank/limits.Exceeded.Unwrap
+		$WORK/rules/rules.go:76:10-53: fmt.Errorf "%s says no: %w"
+	path (origin → target):
+		$WORK/limits/limits.go:32:10-82: in (example.com/bank/limits.Policy).Check
+		$WORK/rules/builtin.go:62:9-56: in (example.com/bank/rules.Limit).Check, call to (example.com/bank/limits.Policy).Check
+		$WORK/rules/rules.go:75:12-28: in example.com/bank/rules.Explain, call to (example.com/bank/rules.Limit).Check (dynamic (example.com/bank/rules.Rule).Check: 2 of 2 candidates)
+$WORK/limits/limits.go:36:4-71: unresolved(memory): *example.com/bank/limits.Exceeded.Unwrap not modelled
+	wrap chain (origin → target):
+		$WORK/limits/limits.go:36:4-71: *example.com/bank/limits.Exceeded.Unwrap
+		$WORK/limits/limits.go:35:10-36:72: fmt.Errorf "daily budget of %s: %w"
+		$WORK/rules/rules.go:76:10-53: fmt.Errorf "%s says no: %w"
+	path (origin → target):
+		$WORK/limits/limits.go:36:4-71: in (example.com/bank/limits.Policy).Check
+		$WORK/rules/builtin.go:62:9-56: in (example.com/bank/rules.Limit).Check, call to (example.com/bank/limits.Policy).Check
+		$WORK/rules/rules.go:75:12-28: in example.com/bank/rules.Explain, call to (example.com/bank/rules.Limit).Check (dynamic (example.com/bank/rules.Rule).Check: 2 of 2 candidates)

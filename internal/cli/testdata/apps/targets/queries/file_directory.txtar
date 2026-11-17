@@ -1,0 +1,9 @@
+A directory instead of a file.
+Negative: exit 2. Ideally the message would say that a file is needed; recorded is the generic "file is not in any loaded package" (see file_nonexistent).
+-- args --
+cmd/ingest
+-- stdout --
+-- stderr --
+errtrace: $WORK/cmd/ingest: file is not in any loaded package
+-- exit --
+2

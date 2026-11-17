@@ -1,0 +1,66 @@
+SUSPECTED BUG: path only - the Walk[Name]/walkKids[Name] hops are collapsed (see check_explicit_call).
+Run with -chain-depth=2 to keep the output small: expect ErrEmpty and *TypedErr[string], each with chains of 0, 1 and 2
+"kid %d: %w" links plus a [chain truncated] entry for the deeper ones.
+Generic mutual recursion Walk[Name] <-> walkKids[Name], wrapping with "kid %d: %w" on each level.
+Expect ErrEmpty and *TypedErr[string] from Name.Validate, both bare (root) and with repeated "kid %d: %w" wraps
+(bounded by -chain-depth, marked truncated).
+-- args --
+-chain-depth=2 pipeline.go:@walk
+-- stdout --
+$WORK/pipeline.go:113:9-85: Error Set of call to seq.Walk in example.com/generics.walkNames: 8 entries
+$WORK/errs/errs.go:13:2-10: sentinel example.com/generics/errs.ErrEmpty
+	path (origin → target):
+		$WORK/validate/validate.go:35:10-23: in (example.com/generics/validate.Name).Validate
+		$WORK/pipeline.go:113:70-82: in example.com/generics.walkNames$1, call to (example.com/generics/validate.Name).Validate
+		$WORK/pipeline.go:113:9-85: in example.com/generics.walkNames, call to example.com/generics.walkNames$1 (dynamic function value visit: 1 of 1 candidates)
+$WORK/errs/errs.go:13:2-10: sentinel example.com/generics/errs.ErrEmpty
+	wrap chain (origin → target):
+		$WORK/seq/tree.go:26:11-43: fmt.Errorf "kid %d: %w"
+	path (origin → target):
+		$WORK/validate/validate.go:35:10-23: in (example.com/generics/validate.Name).Validate
+		$WORK/pipeline.go:113:70-82: in example.com/generics.walkNames$1, call to (example.com/generics/validate.Name).Validate
+		$WORK/pipeline.go:113:9-85: in example.com/generics.walkNames, call to example.com/generics.walkNames$1 (dynamic function value visit: 1 of 1 candidates)
+$WORK/errs/errs.go:13:2-10: sentinel example.com/generics/errs.ErrEmpty
+	wrap chain (origin → target):
+		$WORK/seq/tree.go:26:11-43: fmt.Errorf "kid %d: %w"
+		$WORK/seq/tree.go:26:11-43: fmt.Errorf "kid %d: %w"
+	path (origin → target):
+		$WORK/validate/validate.go:35:10-23: in (example.com/generics/validate.Name).Validate
+		$WORK/pipeline.go:113:70-82: in example.com/generics.walkNames$1, call to (example.com/generics/validate.Name).Validate
+		$WORK/pipeline.go:113:9-85: in example.com/generics.walkNames, call to example.com/generics.walkNames$1 (dynamic function value visit: 1 of 1 candidates)
+$WORK/errs/errs.go:13:2-10: sentinel example.com/generics/errs.ErrEmpty [chain truncated]
+	wrap chain (origin → target):
+		$WORK/seq/tree.go:26:11-43: fmt.Errorf "kid %d: %w"
+		$WORK/seq/tree.go:26:11-43: fmt.Errorf "kid %d: %w"
+	path (origin → target):
+		$WORK/validate/validate.go:35:10-23: in (example.com/generics/validate.Name).Validate
+		$WORK/pipeline.go:113:70-82: in example.com/generics.walkNames$1, call to (example.com/generics/validate.Name).Validate
+		$WORK/pipeline.go:113:9-85: in example.com/generics.walkNames, call to example.com/generics.walkNames$1 (dynamic function value visit: 1 of 1 candidates)
+$WORK/validate/validate.go:38:10-60: concrete *example.com/generics/errs.TypedErr[string]
+	path (origin → target):
+		$WORK/validate/validate.go:38:10-60: in (example.com/generics/validate.Name).Validate
+		$WORK/pipeline.go:113:70-82: in example.com/generics.walkNames$1, call to (example.com/generics/validate.Name).Validate
+		$WORK/pipeline.go:113:9-85: in example.com/generics.walkNames, call to example.com/generics.walkNames$1 (dynamic function value visit: 1 of 1 candidates)
+$WORK/validate/validate.go:38:10-60: concrete *example.com/generics/errs.TypedErr[string]
+	wrap chain (origin → target):
+		$WORK/seq/tree.go:26:11-43: fmt.Errorf "kid %d: %w"
+	path (origin → target):
+		$WORK/validate/validate.go:38:10-60: in (example.com/generics/validate.Name).Validate
+		$WORK/pipeline.go:113:70-82: in example.com/generics.walkNames$1, call to (example.com/generics/validate.Name).Validate
+		$WORK/pipeline.go:113:9-85: in example.com/generics.walkNames, call to example.com/generics.walkNames$1 (dynamic function value visit: 1 of 1 candidates)
+$WORK/validate/validate.go:38:10-60: concrete *example.com/generics/errs.TypedErr[string]
+	wrap chain (origin → target):
+		$WORK/seq/tree.go:26:11-43: fmt.Errorf "kid %d: %w"
+		$WORK/seq/tree.go:26:11-43: fmt.Errorf "kid %d: %w"
+	path (origin → target):
+		$WORK/validate/validate.go:38:10-60: in (example.com/generics/validate.Name).Validate
+		$WORK/pipeline.go:113:70-82: in example.com/generics.walkNames$1, call to (example.com/generics/validate.Name).Validate
+		$WORK/pipeline.go:113:9-85: in example.com/generics.walkNames, call to example.com/generics.walkNames$1 (dynamic function value visit: 1 of 1 candidates)
+$WORK/validate/validate.go:38:10-60: concrete *example.com/generics/errs.TypedErr[string] [chain truncated]
+	wrap chain (origin → target):
+		$WORK/seq/tree.go:26:11-43: fmt.Errorf "kid %d: %w"
+		$WORK/seq/tree.go:26:11-43: fmt.Errorf "kid %d: %w"
+	path (origin → target):
+		$WORK/validate/validate.go:38:10-60: in (example.com/generics/validate.Name).Validate
+		$WORK/pipeline.go:113:70-82: in example.com/generics.walkNames$1, call to (example.com/generics/validate.Name).Validate
+		$WORK/pipeline.go:113:9-85: in example.com/generics.walkNames, call to example.com/generics.walkNames$1 (dynamic function value visit: 1 of 1 candidates)

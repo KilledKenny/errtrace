@@ -1,0 +1,8 @@
+Same call site with -fanout=1: the entry through the 3-Candidate dynamic call is grouped.
+Expect ErrEmpty printed inside a group naming the dynamic call (cache.Flusher).Flush and its generic Candidate.
+-- args --
+-fanout=1 caching.go:@flush
+-- stdout --
+$WORK/caching.go:86:13-32: Error Set of call to f.Flush in example.com/generics.flushAll: 1 entries
+$WORK/caching.go:86:13-32: group of 1 entries via dynamic call to (example.com/generics/cache.Flusher).Flush (3 candidates) in example.com/generics.flushAll
+	$WORK/errs/errs.go:13:2-10: sentinel example.com/generics/errs.ErrEmpty (candidate (*example.com/generics/cache.Cache[example.com/generics/validate.UserID, example.com/generics/validate.Name]).Flush)

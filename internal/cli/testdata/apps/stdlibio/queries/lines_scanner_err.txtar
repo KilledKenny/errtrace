@@ -1,0 +1,12 @@
+Lines returns bufio.Scanner.Err(), which loads the scanner's err field (and hides
+io.EOF). The errors a Scanner records (bufio.ErrTooLong, ErrNegativeAdvance, ...,
+reader errors) are stored in that field, which is out of scope: expected is an
+explicit Unresolved(memory) "load of field err of *bufio.Scanner", not 0 entries.
+-- args --
+source/source.go:@lines
+-- stdout --
+$WORK/source/source.go:147:16-21: Error Set of example.com/stdlibio/source.Lines: 1 entries, 1 unresolved
+$GOROOT/src/bufio/scan.go:*: unresolved(memory): load of field err of *bufio.Scanner
+	path (origin → target):
+		$GOROOT/src/bufio/scan.go:*: in (*bufio.Scanner).Err
+		$WORK/source/source.go:153:14-34: in example.com/stdlibio/source.Lines, call to (*bufio.Scanner).Err

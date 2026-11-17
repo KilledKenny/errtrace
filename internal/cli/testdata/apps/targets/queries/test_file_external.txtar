@@ -1,0 +1,9 @@
+Declaration target in an external test package (package store_test).
+Tests are not loaded: exit 2 with a clear message is expected.
+-- args --
+internal/store/store_ext_test.go:@roundtrip
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/store/store_ext_test.go: file is not in any loaded package
+-- exit --
+2

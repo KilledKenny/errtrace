@@ -1,0 +1,9 @@
+Line 9 of an 8-line file.
+Negative: exit 2, "line 9 is out of range (file has 8 lines)".
+-- args --
+internal/platform/platform.go:9:1
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/platform/platform.go: line 9 is out of range (file has 8 lines)
+-- exit --
+2

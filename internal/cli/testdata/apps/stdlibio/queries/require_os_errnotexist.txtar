@@ -1,0 +1,23 @@
+Require passes Exists' errors through and adds "return os.ErrNotExist".
+os.ErrNotExist is an alias variable for fs.ErrNotExist: one sentinel entry for it
+(named os.ErrNotExist or io/fs.ErrNotExist via os.ErrNotExist) with no wrap chain,
+plus the wrapped os.Stat set of Exists.
+-- args --
+source/source.go:@require
+-- stdout --
+$WORK/source/source.go:51:18-25: Error Set of example.com/stdlibio/source.Require: 12 entries, 4 unresolved, 11 possibly handled
+$GOROOT/src/os/error.go:*: sentinel os.ErrNotExist
+	path (origin → target):
+		$WORK/source/source.go:57:10-24: in example.com/stdlibio/source.Require
+$GOROOT/src/os/file_posix.go:*: group of 11 entries via dynamic call to function value fn (10 candidates) in os.ignoringEINTR
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN (candidate os.Remove$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL (candidate os.Remove$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT (candidate os.Remove$1)
+	$GOROOT/src/syscall/syscall.go:*: concrete syscall.Errno (candidate os.Remove$1)
+	$GOROOT/src/syscall/syscall_linux.go:*: concrete syscall.Errno (candidate os.chmod$1)
+	$GOROOT/src/syscall/syscall_linux.go:*: concrete syscall.Errno (candidate os.chmod$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno (candidate os.Remove$1)
+	$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e (candidate os.openFileNolog$1)
+	$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e (candidate os.openDirNolog$1)
+	$GOROOT/src/os/root_unix.go:*: unresolved(memory): load of escaping variable e (candidate os.readlinkat$1)
+	$GOROOT/src/syscall/syscall_linux.go:*: unresolved(no-body): internal/runtime/syscall/linux.Syscall6 has no body (candidate os.checkPidfd$1)

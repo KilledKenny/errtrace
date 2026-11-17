@@ -1,0 +1,12 @@
+Unwrap that decides at run time (returns nil or the Cause field). Under Go
+semantics doc.ErrSyntax may be wrapped. By design (plan S05) the non-trivial Unwrap
+shows as unresolved(memory) "*xerr.LazyError.Unwrap not modelled" under the wrapper.
+-- args --
+transform/transform.go:@lazy
+-- stdout --
+$WORK/transform/transform.go:44:15-19: Error Set of example.com/wrapchain/transform.Lazy: 1 entries, 1 unresolved
+$WORK/transform/transform.go:46:10-71: unresolved(memory): *example.com/wrapchain/xerr.LazyError.Unwrap not modelled
+	wrap chain (origin → target):
+		$WORK/transform/transform.go:46:10-71: *example.com/wrapchain/xerr.LazyError.Unwrap
+	path (origin → target):
+		$WORK/transform/transform.go:46:10-71: in example.com/wrapchain/transform.Lazy

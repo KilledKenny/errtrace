@@ -1,0 +1,15 @@
+SUSPECTED BUG: a typed nil returned through a helper with a pointer result type is silently dropped.
+gateway.Precheck does return check(n); check returns *CodeError, nil for small n: converted to error this is
+a NON-nil error holding a nil pointer, which if err != nil { return err } forwards (the app prints it).
+Expected 2 entries: concrete *CodeError (the &CodeError literal in gateway.check) and concrete *CodeError
+[typed nil] (the "return nil" in gateway.check). Actual: only the literal; no entry and no Unresolved for the
+typed nil. (A function that only does "return nilPtrHelper()" gets "0 entries" although it never returns nil.)
+-- args --
+processor/eq.go:@nilCheck
+-- stdout --
+$WORK/processor/eq.go:163:19-35: Error Set of example.com/guards/processor.PrecheckNilCheck: 1 entries
+$WORK/gateway/gateway.go:112:10-54: concrete *example.com/guards/payerr.CodeError
+	path (origin → target):
+		$WORK/gateway/gateway.go:112:10-54: in example.com/guards/gateway.check
+		$WORK/gateway/gateway.go:119:9-17: in example.com/guards/gateway.Precheck, call to example.com/guards/gateway.check
+		$WORK/processor/eq.go:164:12-31: in example.com/guards/processor.PrecheckNilCheck, call to example.com/guards/gateway.Precheck

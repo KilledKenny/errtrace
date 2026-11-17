@@ -1,0 +1,11 @@
+SUSPECTED BUG (low confidence, same root cause as repo_stat_decl): the receiver's wrapped error is not represented at all.
+Method on a concrete pointer error type that returns its own receiver as error after a nil check (so no typed nil).
+Expected: the caller-supplied receiver, i.e. unresolved(depends-on-caller), or concrete *kverr.OpError with the chain *kverr.OpError.Unwrap ending in an Unresolved entry for the unknown Err field.
+Actual: a bare `concrete *kverr.OpError` with no chain and 0 unresolved, positioned at the first use of e (`e == nil`, 75:5-6) instead of `return e`.
+-- args --
+kverr/kverr.go:@ornil
+-- stdout --
+$WORK/kverr/kverr.go:74:29-34: Error Set of (*example.com/kvstore/kverr.OpError).OrNil: 1 entries
+$WORK/kverr/kverr.go:75:5-6: concrete *example.com/kvstore/kverr.OpError
+	path (origin → target):
+		$WORK/kverr/kverr.go:75:5-6: in (*example.com/kvstore/kverr.OpError).OrNil

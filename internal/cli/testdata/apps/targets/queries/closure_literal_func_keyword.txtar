@@ -1,0 +1,9 @@
+Position on the "func" keyword of an immediately invoked literal func() error {...}().
+Expected: declaration target for the closure (ingest$1): 1 entry, errUsage.
+-- args --
+cmd/ingest/main.go:@iife_kw
+-- stdout --
+$WORK/cmd/ingest/main.go:85:20-24: Error Set of example.com/targets/cmd/ingest.ingest$1: 1 entries
+$WORK/cmd/ingest/main.go:14:5-13: sentinel example.com/targets/cmd/ingest.errUsage
+	path (origin → target):
+		$WORK/cmd/ingest/main.go:87:11-19: in example.com/targets/cmd/ingest.ingest$1

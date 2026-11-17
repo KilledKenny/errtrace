@@ -1,0 +1,13 @@
+Call site of the local function value hook(step) in Notify; hook comes out of a
+context value (ctx.Value(hookKey{}).(Hook)). The only Hook the program stores is the
+closure in main.run: expected exactly 1 entry, opaque fmt.Errorf "hook: step %s
+rejected", through a dynamic hop "1 of 1 candidates". jobs.ErrNoHook is not part of
+this call.
+-- args --
+jobs/jobs.go:@hookcall
+-- stdout --
+$WORK/jobs/jobs.go:69:22-32: Error Set of call to hook in example.com/stdlibio/jobs.Notify: 1 entries
+$WORK/main.go:42:10-52: opaque fmt.Errorf "hook: step %s rejected"
+	path (origin → target):
+		$WORK/main.go:42:10-52: in example.com/stdlibio.run$1
+		$WORK/jobs/jobs.go:69:22-32: in example.com/stdlibio/jobs.Notify, call to example.com/stdlibio.run$1 (dynamic function value of type example.com/stdlibio/jobs.Hook: 1 of 1 candidates)

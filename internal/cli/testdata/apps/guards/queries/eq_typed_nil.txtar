@@ -1,0 +1,13 @@
+err == (*CodeError)(nil) -> return nil on gateway.Precheck, which returns a typed nil or &CodeError.
+Expect 1 entry: the non-nil concrete *CodeError built in gateway.check; the typed nil is handled.
+Note: the recorded output is right, but it does not prove the guard removed anything: the typed nil is never
+reported in the first place (see nil_check_typed_nil and eq_typed_nil_return_self).
+-- args --
+processor/eq.go:@typedNil
+-- stdout --
+$WORK/processor/eq.go:154:19-35: Error Set of example.com/guards/processor.PrecheckTypedNil: 1 entries
+$WORK/gateway/gateway.go:112:10-54: concrete *example.com/guards/payerr.CodeError
+	path (origin → target):
+		$WORK/gateway/gateway.go:112:10-54: in example.com/guards/gateway.check
+		$WORK/gateway/gateway.go:119:9-17: in example.com/guards/gateway.Precheck, call to example.com/guards/gateway.check
+		$WORK/processor/eq.go:155:9-28: in example.com/guards/processor.PrecheckTypedNil, call to example.com/guards/gateway.Precheck

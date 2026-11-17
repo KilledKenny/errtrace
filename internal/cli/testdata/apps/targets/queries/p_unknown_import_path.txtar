@@ -1,0 +1,9 @@
+-p naming an import path that no module provides.
+Negative: exit 2 with the go list error for example.com/nope (under the harness environment: module lookup disabled by GOPROXY=off); no Error Set. The message carries the stray "-: " prefix described in p_no_go_files.
+-- args --
+-p example.com/nope internal/platform/platform.go:5:6
+-- stdout --
+-- stderr --
+errtrace: -: cannot find module providing package example.com/nope: module lookup disabled by GOPROXY=off
+-- exit --
+2

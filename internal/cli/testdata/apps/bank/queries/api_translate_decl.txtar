@@ -1,0 +1,30 @@
+Translation function queried alone: every branch builds a fresh *api.Error or returns the sentinel
+ErrUnavailable; only the ErrDuplicate branch keeps err as Cause (custom Unwrap over a field).
+Expect concrete *api.Error for 400/404/402/500, sentinel api.ErrUnavailable, and one
+unresolved(depends-on-caller) for parameter err behind (*api.Error).Unwrap; nothing else.
+-- args --
+api/api.go:@translate
+-- stdout --
+$WORK/api/api.go:32:20-29: Error Set of example.com/bank/api.Translate: 6 entries, 1 unresolved, 1 possibly handled
+$WORK/api/api.go:28:5-19: sentinel example.com/bank/api.ErrUnavailable
+	path (origin → target):
+		$WORK/api/api.go:48:10-24: in example.com/bank/api.Translate
+$WORK/api/api.go:40:10-48: concrete *example.com/bank/api.Error
+	path (origin → target):
+		$WORK/api/api.go:40:10-48: in example.com/bank/api.Translate
+$WORK/api/api.go:44:10-55: concrete *example.com/bank/api.Error
+	path (origin → target):
+		$WORK/api/api.go:44:10-55: in example.com/bank/api.Translate
+$WORK/api/api.go:46:10-58: concrete *example.com/bank/api.Error
+	path (origin → target):
+		$WORK/api/api.go:46:10-58: in example.com/bank/api.Translate
+$WORK/api/api.go:51:9-53: concrete *example.com/bank/api.Error
+	path (origin → target):
+		$WORK/api/api.go:51:9-53: in example.com/bank/api.Translate
+$WORK/api/api.go:33:5-8: unresolved(depends-on-caller): parameter err (error)
+	wrap chain (origin → target):
+		$WORK/api/api.go:42:10-68: *example.com/bank/api.Error.Unwrap
+	possibly handled:
+		$WORK/api/api.go:39:7-26: errors.As to *example.com/bank/domain.ValidationError: unresolved value
+	path (origin → target):
+		$WORK/api/api.go:33:5-8: in example.com/bank/api.Translate

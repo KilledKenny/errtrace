@@ -1,0 +1,19 @@
+Target inside a file with a syntax error.
+Negative: exit 2 with the parse error(s).
+-- args --
+_broken/syntaxerr/syntaxerr.go:@half
+-- stdout --
+-- stderr --
+errtrace: 8 errors loading packages:
+	$WORK/_broken/syntaxerr/syntaxerr.go:8:26: missing ',' before newline in argument list
+	$WORK/_broken/syntaxerr/syntaxerr.go:9:1: expected operand, found '}'
+	$WORK/_broken/syntaxerr/syntaxerr.go:9:3: expected ')', found 'EOF'
+	$WORK/_broken/syntaxerr/syntaxerr.go:9:3: expected ';', found 'EOF'
+	$WORK/_broken/syntaxerr/syntaxerr.go:9:3: expected ';', found 'EOF'
+	$WORK/_broken/syntaxerr/syntaxerr.go:9:3: expected '}', found 'EOF'
+	$WORK/_broken/syntaxerr/syntaxerr.go:9:3: missing ',' in argument list
+	$WORK/_broken/syntaxerr/syntaxerr.go:9:1: too many arguments in call to errors.New
+	have (string, unknown type)
+	want (string)
+-- exit --
+2

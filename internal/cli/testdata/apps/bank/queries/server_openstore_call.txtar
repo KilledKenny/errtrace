@@ -1,0 +1,50 @@
+SUSPECTED BUG: interface-typed result built from two concrete stores; only filerepo.Open can fail. Correct set:
+os.MkdirAll's errors behind (*fs.PathError).Unwrap + "filerepo: %w" + "server: store: %w"; nothing from package
+memory. Actual: right chains and nothing from memory, but (1) the syscall.ENOTDIR origin in os.MkdirAll (a constant
+converted to error inside &PathError{...}) is printed with the position "-" instead of a $GOROOT span, and (2) the
+Candidates of fn in os.ignoringEINTR are those of every caller (9), so MkdirAll gets the errors of closures it
+never passes (os.chmod$1, os.openFileNolog$1, os.checkPidfd$1): no narrowing at substitution (plan S09 is not
+implemented). The identical lines in the group are distinct entries: they differ in the *fs.PathError site (Mkdir,
+chmod, Stat), which a group line does not show (documented group format).
+-- args --
+cmd/server/main.go:@openstore_call
+-- stdout --
+$WORK/cmd/server/main.go:45:35-49: Error Set of call to openStore in example.com/bank/cmd/server.run: 28 entries, 6 unresolved
+-: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/path.go:*: *io/fs.PathError.Unwrap
+		$WORK/repo/filerepo/filerepo.go:36:15-46: fmt.Errorf "filerepo: %w"
+		$WORK/cmd/server/main.go:81:15-51: fmt.Errorf "server: store: %w"
+	path (origin → target):
+		-: in os.MkdirAll
+		$WORK/repo/filerepo/filerepo.go:35:12-35: in example.com/bank/repo/filerepo.Open, call to os.MkdirAll
+		$WORK/cmd/server/main.go:79:12-38: in example.com/bank/cmd/server.openStore, call to example.com/bank/repo/filerepo.Open
+		$WORK/cmd/server/main.go:45:35-49: in example.com/bank/cmd/server.run, call to example.com/bank/cmd/server.openStore
+$GOROOT/src/os/file_posix.go:*: group of 27 entries via dynamic call to function value fn (9 candidates) in os.ignoringEINTR
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN (candidate os.Mkdir$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN (candidate os.Mkdir$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN (candidate os.Mkdir$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL (candidate os.Mkdir$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL (candidate os.Mkdir$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL (candidate os.Mkdir$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT (candidate os.Mkdir$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT (candidate os.Mkdir$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT (candidate os.Mkdir$1)
+	$GOROOT/src/syscall/syscall.go:*: concrete syscall.Errno (candidate os.Mkdir$1)
+	$GOROOT/src/syscall/syscall.go:*: concrete syscall.Errno (candidate os.Mkdir$1)
+	$GOROOT/src/syscall/syscall.go:*: concrete syscall.Errno (candidate os.Mkdir$1)
+	$GOROOT/src/syscall/syscall_linux.go:*: concrete syscall.Errno (candidate os.chmod$1)
+	$GOROOT/src/syscall/syscall_linux.go:*: concrete syscall.Errno (candidate os.chmod$1)
+	$GOROOT/src/syscall/syscall_linux.go:*: concrete syscall.Errno (candidate os.chmod$1)
+	$GOROOT/src/syscall/syscall_linux.go:*: concrete syscall.Errno (candidate os.chmod$1)
+	$GOROOT/src/syscall/syscall_linux.go:*: concrete syscall.Errno (candidate os.chmod$1)
+	$GOROOT/src/syscall/syscall_linux.go:*: concrete syscall.Errno (candidate os.chmod$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno (candidate os.Mkdir$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno (candidate os.Mkdir$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno (candidate os.Mkdir$1)
+	$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e (candidate os.openFileNolog$1)
+	$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e (candidate os.openFileNolog$1)
+	$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e (candidate os.openFileNolog$1)
+	$GOROOT/src/syscall/syscall_linux.go:*: unresolved(no-body): internal/runtime/syscall/linux.Syscall6 has no body (candidate os.checkPidfd$1)
+	$GOROOT/src/syscall/syscall_linux.go:*: unresolved(no-body): internal/runtime/syscall/linux.Syscall6 has no body (candidate os.checkPidfd$1)
+	$GOROOT/src/syscall/syscall_linux.go:*: unresolved(no-body): internal/runtime/syscall/linux.Syscall6 has no body (candidate os.checkPidfd$1)

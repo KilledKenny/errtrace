@@ -1,0 +1,9 @@
+Literal position 4:21 is the second byte of "ö" inside Größe (byte columns).
+Expected: still inside the identifier, so the same output as unicode_decl (compare the files by hand).
+-- args --
+internal/codec/unicode.go:4:21
+-- stdout --
+$WORK/internal/codec/unicode.go:4:18-25: Error Set of example.com/targets/internal/codec.Größe: 1 entries
+$WORK/internal/codec/codec.go:12:2-10: sentinel example.com/targets/internal/codec.ErrEmpty
+	path (origin → target):
+		$WORK/internal/codec/unicode.go:6:13-21: in example.com/targets/internal/codec.Größe

@@ -1,0 +1,11 @@
+Interface call s.be.Read(key) with only the library packages loaded (-p ./internal/store/...): no main package, so nothing ever stores a Backend into a Store.
+Expected (documented scope until plan step S12 adds synthetic roots): exit 0, 1 entry, unresolved(no-candidates) for the dynamic call, never an empty set; stderr has the "target not reachable from main/init" warning. With a main loaded the Candidates appear (call_interface_method, p_changes_candidates).
+-- args --
+-p ./internal/store/... internal/store/store.go:@iface_call
+-- stdout --
+$WORK/internal/store/store.go:49:14-43: Error Set of call to s.be.Read in (*example.com/targets/internal/store.Store).Get: 1 entries, 1 unresolved
+$WORK/internal/store/store.go:49:14-43: unresolved(no-candidates): dynamic call to (example.com/targets/internal/store.Backend).Read
+	path (origin → target):
+		$WORK/internal/store/store.go:49:14-43: in (*example.com/targets/internal/store.Store).Get
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates

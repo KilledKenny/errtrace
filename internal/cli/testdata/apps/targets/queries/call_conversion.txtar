@@ -1,0 +1,9 @@
+Position on the conversion kind(len(raw)): T(x) is not a call.
+Negative: exit 2, "not a call to a function".
+-- args --
+cmd/ingest/main.go:@conv
+-- stdout --
+-- stderr --
+errtrace: $WORK/cmd/ingest/main.go:80:16: not a call to a function
+-- exit --
+2

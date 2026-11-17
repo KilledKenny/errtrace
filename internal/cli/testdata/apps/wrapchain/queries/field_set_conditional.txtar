@@ -1,0 +1,17 @@
+The wrapped field is doc.ErrEmpty in the literal and overwritten with
+doc.ErrTooLong on one branch. Expected 2 entries, both with the chain
+*xerr.OpError.Unwrap: doc.ErrEmpty and doc.ErrTooLong.
+-- args --
+transform/transform.go:@maybe
+-- stdout --
+$WORK/transform/transform.go:62:16-21: Error Set of example.com/wrapchain/transform.Maybe: 2 entries
+$WORK/doc/doc.go:17:2-10: sentinel example.com/wrapchain/doc.ErrEmpty
+	wrap chain (origin → target):
+		$WORK/transform/transform.go:64:8-53: *example.com/wrapchain/xerr.OpError.Unwrap
+	path (origin → target):
+		$WORK/transform/transform.go:64:40-52: in example.com/wrapchain/transform.Maybe
+$WORK/doc/doc.go:19:2-12: sentinel example.com/wrapchain/doc.ErrTooLong
+	wrap chain (origin → target):
+		$WORK/transform/transform.go:64:8-53: *example.com/wrapchain/xerr.OpError.Unwrap
+	path (origin → target):
+		$WORK/transform/transform.go:66:12-26: in example.com/wrapchain/transform.Maybe

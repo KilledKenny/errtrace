@@ -1,0 +1,9 @@
+Offset one past EOF.
+Negative: exit 2, "offset #181 is out of range (file has 180 bytes)".
+-- args --
+internal/platform/platform.go:#181
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/platform/platform.go: offset #181 is out of range (file has 180 bytes)
+-- exit --
+2

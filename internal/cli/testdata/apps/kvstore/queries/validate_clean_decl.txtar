@@ -1,0 +1,9 @@
+Negative: declaration Target without any error result.
+Expect: an empty Error Set (0 entries) or a diagnostic saying the function has no error result.
+-- args --
+validate/validate.go:@clean
+-- stdout --
+-- stderr --
+errtrace: $WORK/validate/validate.go:43:16: example.com/kvstore/validate.Clean has no error result
+-- exit --
+2

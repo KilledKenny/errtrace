@@ -1,0 +1,14 @@
+Chained call: position on Commit (last link, returns error).
+Expected: sentinel store.ErrEmptyBatch; plus b.err, an error read from a struct field. At run time that is what Backend.Write returned in Add (store.ErrClosed from mem, *disk.DiskError from Disk); the tool does not track errors through memory, so the documented outcome is one explicit unresolved(memory) entry. Span covers the whole chain expression.
+-- args --
+cmd/ingest/main.go:@chain_commit
+-- stdout --
+$WORK/cmd/ingest/main.go:56:23-111: Error Set of call to store.NewBatch(s).Add("last", nil).Commit in example.com/targets/cmd/ingest.run: 2 entries, 1 unresolved
+$WORK/internal/store/store.go:13:2-15: sentinel example.com/targets/internal/store.ErrEmptyBatch
+	path (origin → target):
+		$WORK/internal/store/store.go:98:10-23: in (*example.com/targets/internal/store.Batch).Commit
+		$WORK/cmd/ingest/main.go:56:23-111: in example.com/targets/cmd/ingest.run, call to (*example.com/targets/internal/store.Batch).Commit
+$WORK/internal/store/store.go:100:9-14: unresolved(memory): load of field err of *example.com/targets/internal/store.Batch
+	path (origin → target):
+		$WORK/internal/store/store.go:100:9-14: in (*example.com/targets/internal/store.Batch).Commit
+		$WORK/cmd/ingest/main.go:56:23-111: in example.com/targets/cmd/ingest.run, call to (*example.com/targets/internal/store.Batch).Commit

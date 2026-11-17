@@ -1,0 +1,9 @@
+Declaration target below a "//line codec.tmpl:10" directive in a generated file (DO NOT EDIT header).
+Expected: 1 entry codec.ErrUnknownFormat; every span uses the real file gen.go and physical lines (8, 14), not codec.tmpl.
+-- args --
+internal/codec/gen.go:@format
+-- stdout --
+$WORK/internal/codec/gen.go:8:17-23: Error Set of example.com/targets/internal/codec.Format: 1 entries
+$WORK/internal/codec/codec.go:14:2-18: sentinel example.com/targets/internal/codec.ErrUnknownFormat
+	path (origin → target):
+		$WORK/internal/codec/gen.go:14:24-40: in example.com/targets/internal/codec.Format

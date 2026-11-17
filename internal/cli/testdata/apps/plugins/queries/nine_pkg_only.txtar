@@ -1,0 +1,14 @@
+Negative: the same declaration as nine_default, but only package dispatch
+is loaded (-p ./dispatch), so there is no main package and nothing ever
+passes a driver to SendNine. Expected: the "not reachable" warning and a
+single unresolved(no-candidates) entry for d.Send; none of the eight driver
+Origins of nine_default (no fallback to all implementers).
+-- args --
+-p ./dispatch dispatch/fanout.go:@nine
+-- stdout --
+$WORK/dispatch/fanout.go:28:15-23: Error Set of example.com/plugins/dispatch.SendNine: 1 entries, 1 unresolved
+$WORK/dispatch/fanout.go:28:68-91: unresolved(no-candidates): dynamic call to (example.com/plugins/core.Driver).Send
+	path (origin → target):
+		$WORK/dispatch/fanout.go:28:68-91: in example.com/plugins/dispatch.SendNine
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates

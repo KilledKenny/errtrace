@@ -1,0 +1,16 @@
+SUSPECTED BUG: (low confidence) ErrNotFound is kept with no possibly-handled note: the == between two parameters
+(v == skip) is ignored when the arguments are substituted at the call site (same for a non-generic
+func skip(v, s error) error). The plan's guard table only lists == against a sentinel or nil, so the kept entry is a
+sound over-approximation; what is missing is the removal or at least a note.
+Skip with inferred T = error and the errors.New sentinel ErrNotFound: v == skip inside the generic body turns the only
+error of (*Cache).Get into the zero value (nil). Expect 0 entries.
+-- args --
+failures.go:@skipmissing
+-- stdout --
+$WORK/failures.go:97:9-57: Error Set of call to errs.Skip in example.com/generics.skipMissing: 1 entries
+$WORK/errs/errs.go:12:2-13: sentinel example.com/generics/errs.ErrNotFound
+	path (origin → target):
+		$WORK/cache/cache.go:33:16-32: in (*example.com/generics/cache.Cache[string, int]).Get
+		$WORK/failures.go:96:12-20: in example.com/generics.skipMissing, call to (*example.com/generics/cache.Cache[string, int]).Get
+		$WORK/errs/errs.go:89:5-6: in example.com/generics/errs.Skip[error]
+		$WORK/failures.go:97:9-57: in example.com/generics.skipMissing, call to example.com/generics/errs.Skip[error]

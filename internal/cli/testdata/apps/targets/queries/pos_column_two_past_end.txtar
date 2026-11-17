@@ -1,0 +1,9 @@
+Column two past the last byte of line 5 (20 bytes): the first rejected column.
+Negative: exit 2, "column 22 is out of range (line 5 has 20 bytes)".
+-- args --
+internal/platform/platform.go:5:22
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/platform/platform.go: column 22 is out of range (line 5 has 20 bytes)
+-- exit --
+2

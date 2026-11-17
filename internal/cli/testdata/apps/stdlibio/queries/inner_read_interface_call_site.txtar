@@ -1,0 +1,11 @@
+Call-site Target on the interface method call l.R.Read(p). The field R is only ever
+set to *stream.Chunks, so the one Candidate returns io.EOF: exactly 1 entry, sentinel
+io.EOF, through a dynamic hop. ErrQuota is not part of this call.
+-- args --
+stream/stream.go:@innerread
+-- stdout --
+$WORK/stream/stream.go:29:12-37: Error Set of call to l.R.Read in (*example.com/stdlibio/stream.Limited).Read: 1 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/stream/stream.go:41:13-19: in (*example.com/stdlibio/stream.Chunks).Read
+		$WORK/stream/stream.go:29:12-37: in (*example.com/stdlibio/stream.Limited).Read, call to (*example.com/stdlibio/stream.Chunks).Read (dynamic (io.Reader).Read: 1 of 1 candidates)

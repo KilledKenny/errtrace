@@ -1,0 +1,22 @@
+SUSPECTED BUG (cosmetic): zero-width span for the zero-size literal payerr.Empty{}.
+== against a value-type sentinel (ErrBadAmount = ValidationError{"amount"}) and a zero-size one (ErrEmpty =
+Empty{}) removes both sentinels; the fresh ValidationError{"amount"} and Empty{} compare equal by value at run
+time (precise answer: 0 entries), so keeping them marked possibly handled is the expected sound result.
+But the entry for "return payerr.Empty{}" is reported at a zero-width span on the return keyword (L:3-3), for
+the entry and its first hop; expected the span of the composite literal (L:10-24), as for ValidationError{...}.
+-- args --
+processor/eq.go:@valueSentinels
+-- stdout --
+$WORK/processor/eq.go:145:25-42: Error Set of example.com/guards/processor.ValidateSentinels: 2 entries, 2 possibly handled
+$WORK/gateway/gateway.go:101:10-49: concrete example.com/guards/payerr.ValidationError
+	possibly handled:
+		$WORK/processor/eq.go:147:5-31: comparison with example.com/guards/payerr.ErrBadAmount: value of comparable type example.com/guards/payerr.ValidationError may equal ErrBadAmount
+	path (origin → target):
+		$WORK/gateway/gateway.go:101:10-49: in example.com/guards/gateway.Validate
+		$WORK/processor/eq.go:146:9-28: in example.com/guards/processor.ValidateSentinels, call to example.com/guards/gateway.Validate
+$WORK/gateway/gateway.go:105:3-3: concrete example.com/guards/payerr.Empty
+	possibly handled:
+		$WORK/processor/eq.go:147:35-57: comparison with example.com/guards/payerr.ErrEmpty: value of comparable type example.com/guards/payerr.Empty may equal ErrEmpty
+	path (origin → target):
+		$WORK/gateway/gateway.go:105:3-3: in example.com/guards/gateway.Validate
+		$WORK/processor/eq.go:146:9-28: in example.com/guards/processor.ValidateSentinels, call to example.com/guards/gateway.Validate

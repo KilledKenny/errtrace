@@ -1,0 +1,6 @@
+Negative: a handler that logs and swallows every error of svc.Exists (dynamic store.Get + errors.Is guard).
+Expect 0 entries.
+-- args --
+api/api.go:@handle_health
+-- stdout --
+$WORK/api/api.go:99:36-48: Error Set of (*example.com/bank/api.Server).handleHealth: 0 entries

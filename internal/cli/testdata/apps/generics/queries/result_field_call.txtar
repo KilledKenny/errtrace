@@ -1,0 +1,11 @@
+Result[int] carries the error of parsePort in a struct field and Get reads it back.
+Go semantics: ErrEmpty and *TypedErr[string]. Errors through struct fields are out of scope, so expect an
+explicit Unresolved for the field load rather than an empty set.
+-- args --
+caching.go:@resget
+-- stdout --
+$WORK/caching.go:75:9-27: Error Set of call to r.Get in example.com/generics.viaResult: 1 entries, 1 unresolved
+$WORK/result/result.go:19:61-66: unresolved(memory): load of field err of *example.com/generics/result.Result[int]
+	path (origin → target):
+		$WORK/result/result.go:19:61-66: in (example.com/generics/result.Result[int]).Get
+		$WORK/caching.go:75:9-27: in example.com/generics.viaResult, call to (example.com/generics/result.Result[int]).Get

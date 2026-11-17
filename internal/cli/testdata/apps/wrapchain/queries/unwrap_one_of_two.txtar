@@ -1,0 +1,18 @@
+errors.Unwrap of a doubly wrapped error: at run time doc.ErrNoTitle under
+fmt.Errorf "inner: %w" only. By design (errors.Unwrap is analysed as ordinary
+code, field loads are unresolved(memory)) the result is the same 2 Unresolved
+entries as unwrap_returned; the "outer: %w" chain must NOT be shown.
+-- args --
+transform/transform.go:@peeltwice
+-- stdout --
+$WORK/transform/transform.go:204:20-29: Error Set of example.com/wrapchain/transform.PeelTwice: 2 entries, 2 unresolved
+$GOROOT/src/fmt/errors.go:*: unresolved(memory): load of field err of *fmt.wrapError
+	path (origin → target):
+		$GOROOT/src/fmt/errors.go:*: in (*fmt.wrapError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*fmt.wrapError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 2 of 2 candidates)
+		$WORK/transform/transform.go:211:9-29: in example.com/wrapchain/transform.PeelTwice, call to errors.Unwrap
+$WORK/xerr/types.go:18:43-48: unresolved(memory): load of field Err of *example.com/wrapchain/xerr.OpError
+	path (origin → target):
+		$WORK/xerr/types.go:18:43-48: in (*example.com/wrapchain/xerr.OpError).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*example.com/wrapchain/xerr.OpError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 2 of 2 candidates)
+		$WORK/transform/transform.go:211:9-29: in example.com/wrapchain/transform.PeelTwice, call to errors.Unwrap

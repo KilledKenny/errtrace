@@ -1,0 +1,9 @@
+Negative: call site of seq.Keys, a generic function that returns no error.
+Expect exit 2 with a message that the call has no error result.
+-- args --
+main.go:@keys
+-- stdout --
+-- stderr --
+errtrace: $WORK/main.go:62:27: seq.Keys has no error result
+-- exit --
+2

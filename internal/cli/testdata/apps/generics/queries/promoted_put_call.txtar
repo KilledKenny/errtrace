@@ -1,0 +1,14 @@
+Method promoted from the embedded generic *Cache[K,V] through TTL[string,int].
+Expect ErrDuplicate and *TypedErr[string], as for (*Cache[string,int]).Put.
+-- args --
+caching.go:@promoted
+-- stdout --
+$WORK/caching.go:43:12-36: Error Set of call to t.Put in example.com/generics.session: 2 entries
+$WORK/errs/errs.go:16:2-14: sentinel example.com/generics/errs.ErrDuplicate
+	path (origin → target):
+		$WORK/cache/cache.go:41:10-27: in (*example.com/generics/cache.Cache[string, int]).Put
+		$WORK/caching.go:43:12-36: in example.com/generics.session, call to (*example.com/generics/cache.Cache[string, int]).Put
+$WORK/cache/cache.go:44:10-46: concrete *example.com/generics/errs.TypedErr[string]
+	path (origin → target):
+		$WORK/cache/cache.go:44:10-46: in (*example.com/generics/cache.Cache[string, int]).Put
+		$WORK/caching.go:43:12-36: in example.com/generics.session, call to (*example.com/generics/cache.Cache[string, int]).Put

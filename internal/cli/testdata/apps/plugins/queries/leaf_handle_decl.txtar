@@ -1,0 +1,15 @@
+Dynamic call through an interface-typed struct field of a value
+receiver. Expected: ErrFile and ErrQueue (the two drivers stored in
+Leaf.Driver), 2 candidates.
+-- args --
+tree/tree.go:@leaf_handle
+-- stdout --
+$WORK/tree/tree.go:13:31-37: Error Set of (example.com/plugins/tree.Leaf).Handle: 2 entries
+$WORK/drivers/drivers.go:17:2-9: sentinel example.com/plugins/drivers.ErrFile
+	path (origin → target):
+		$WORK/drivers/drivers.go:92:10-17: in (example.com/plugins/drivers.File).Send
+		$WORK/tree/tree.go:13:67-83: in (example.com/plugins/tree.Leaf).Handle, call to (example.com/plugins/drivers.File).Send (dynamic (example.com/plugins/core.Driver).Send: 2 of 2 candidates)
+$WORK/drivers/drivers.go:18:2-10: sentinel example.com/plugins/drivers.ErrQueue
+	path (origin → target):
+		$WORK/drivers/drivers.go:102:10-18: in (example.com/plugins/drivers.Queue).Send
+		$WORK/tree/tree.go:13:67-83: in (example.com/plugins/tree.Leaf).Handle, call to (example.com/plugins/drivers.Queue).Send (dynamic (example.com/plugins/core.Driver).Send: 2 of 2 candidates)

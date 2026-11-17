@@ -1,0 +1,9 @@
+Combined form whose offset contradicts the line:col.
+Negative: exit 2, "offset #129 does not match 5:6 (offset #128)".
+-- args --
+internal/platform/platform.go:5:6#129
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/platform/platform.go: offset #129 does not match 5:6 (offset #128)
+-- exit --
+2

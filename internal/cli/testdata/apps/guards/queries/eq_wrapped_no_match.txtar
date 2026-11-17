@@ -1,0 +1,23 @@
+== against three sentinels on gateway.Lookup, where two arrive wrapped.
+Expect 3 entries: ErrNotFound (fmt.Errorf chain) and ErrTimeout (OpError.Unwrap chain) STAY because == never
+matches a wrapper; *NetError stays. Only the bare ErrRateLimited is removed.
+-- args --
+processor/eq.go:@eqWrapped
+-- stdout --
+$WORK/processor/eq.go:32:20-35: Error Set of example.com/guards/processor.LookupEqWrapped: 3 entries
+$WORK/payerr/payerr.go:9:2-12: sentinel example.com/guards/payerr.ErrTimeout
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:38:10-63: *example.com/guards/payerr.OpError.Unwrap
+	path (origin → target):
+		$WORK/gateway/gateway.go:38:45-62: in example.com/guards/gateway.Lookup
+		$WORK/processor/eq.go:33:9-26: in example.com/guards/processor.LookupEqWrapped, call to example.com/guards/gateway.Lookup
+$WORK/payerr/payerr.go:10:2-13: sentinel example.com/guards/payerr.ErrNotFound
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:36:10-60: fmt.Errorf "lookup %d: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:36:41-59: in example.com/guards/gateway.Lookup
+		$WORK/processor/eq.go:33:9-26: in example.com/guards/processor.LookupEqWrapped, call to example.com/guards/gateway.Lookup
+$WORK/gateway/gateway.go:42:9-39: concrete *example.com/guards/payerr.NetError
+	path (origin → target):
+		$WORK/gateway/gateway.go:42:9-39: in example.com/guards/gateway.Lookup
+		$WORK/processor/eq.go:33:9-26: in example.com/guards/processor.LookupEqWrapped, call to example.com/guards/gateway.Lookup

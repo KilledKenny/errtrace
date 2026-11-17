@@ -1,0 +1,21 @@
+if nil / else if == ErrDeclined -> ErrDuplicate / else if == ErrTimeout -> nil / else return err.
+Expect 4 entries: ErrDuplicate (translation), *CodeError, ValidationError, opaque. No ErrDeclined, no ErrTimeout.
+-- args --
+processor/eq.go:@elseChain
+-- stdout --
+$WORK/processor/eq.go:50:20-35: Error Set of example.com/guards/processor.ChargeElseChain: 4 entries
+$WORK/payerr/payerr.go:13:2-14: sentinel example.com/guards/payerr.ErrDuplicate
+	path (origin → target):
+		$WORK/processor/eq.go:55:10-29: in example.com/guards/processor.ChargeElseChain
+$WORK/gateway/gateway.go:22:10-63: concrete *example.com/guards/payerr.CodeError
+	path (origin → target):
+		$WORK/gateway/gateway.go:22:10-63: in example.com/guards/gateway.Charge
+		$WORK/processor/eq.go:51:9-26: in example.com/guards/processor.ChargeElseChain, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:24:10-51: concrete example.com/guards/payerr.ValidationError
+	path (origin → target):
+		$WORK/gateway/gateway.go:24:10-51: in example.com/guards/gateway.Charge
+		$WORK/processor/eq.go:51:9-26: in example.com/guards/processor.ChargeElseChain, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:26:9-35: opaque errors.New "gateway down"
+	path (origin → target):
+		$WORK/gateway/gateway.go:26:9-35: in example.com/guards/gateway.Charge
+		$WORK/processor/eq.go:51:9-26: in example.com/guards/processor.ChargeElseChain, call to example.com/guards/gateway.Charge

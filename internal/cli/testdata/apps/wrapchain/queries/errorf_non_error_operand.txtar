@@ -1,0 +1,10 @@
+%w with a string operand: fmt.Errorf returns a non-nil error that wraps nothing.
+Expected 1 entry for that error (an opaque fmt.Errorf "label %w"); an empty Error
+Set would claim Label never fails.
+-- args --
+parse/parse.go:@label
+-- stdout --
+$WORK/parse/parse.go:124:16-21: Error Set of example.com/wrapchain/parse.Label: 1 entries
+$WORK/parse/parse.go:127:10-34: opaque fmt.Errorf "label %w"
+	path (origin → target):
+		$WORK/parse/parse.go:127:10-34: in example.com/wrapchain/parse.Label

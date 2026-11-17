@@ -1,0 +1,9 @@
+CRLF file, line 1 is "package codec\r\n": column 14 is the \r, column 15 the \n position (line has 14 bytes incl. \r).
+Negative either way: no target at the end of the package clause; must not crash. Column 15 is the last accepted column.
+-- args --
+internal/codec/crlf.go:1:15
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/codec/crlf.go:1:15: no function declaration or call at position
+-- exit --
+2

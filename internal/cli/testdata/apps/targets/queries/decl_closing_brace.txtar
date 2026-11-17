@@ -1,0 +1,9 @@
+Position on the closing brace of Get.
+Negative: exit 2, "no function declaration or call at position", empty stdout.
+-- args --
+internal/store/store.go:@get_close
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/store/store.go:54:15: no function declaration or call at position
+-- exit --
+2

@@ -1,0 +1,9 @@
+The //go:build !fast file queried with -tags=fast: it is now the excluded one.
+Negative: exit 2, file is not in any loaded package.
+-- args --
+-tags=fast internal/platform/limits_default.go:@maxbatch
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/platform/limits_default.go: file is not in any loaded package
+-- exit --
+2

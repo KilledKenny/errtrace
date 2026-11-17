@@ -1,0 +1,9 @@
+Position on the format string argument inside fmt.Errorf(...).
+Negative: inside a call's arguments but not on the callee or "(": exit 2, no target (the enclosing call must not be picked).
+-- args --
+internal/store/store.go:@get_string
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/store/store.go:51:56: no function declaration or call at position
+-- exit --
+2

@@ -1,0 +1,10 @@
+Call-site Target inside a defer statement: `defer eng.Close()`.
+Expect: 1 entry, sentinel engine.ErrClosed.
+-- args --
+cmd/kvstore/main.go:@eng_close_call
+-- stdout --
+$WORK/cmd/kvstore/main.go:32:8-38: Error Set of call to eng.Close in example.com/kvstore/cmd/kvstore.run: 1 entries
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	path (origin → target):
+		$WORK/engine/engine.go:220:10-19: in (*example.com/kvstore/engine.Engine).Close
+		$WORK/cmd/kvstore/main.go:32:8-38: in example.com/kvstore/cmd/kvstore.run, call to (*example.com/kvstore/engine.Engine).Close

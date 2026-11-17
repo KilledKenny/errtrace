@@ -1,0 +1,9 @@
+-p directory wildcard whose root directory does not exist.
+Negative: exit 2 with the go list error for ./nope/... (lstat ... no such file or directory); no Error Set. Contrast p_wildcard_matches_nothing, where the root exists.
+-- args --
+-p ./nope/... internal/platform/platform.go:5:6
+-- stdout --
+-- stderr --
+errtrace: -: pattern ./nope/...: lstat ./nope/: no such file or directory
+-- exit --
+2

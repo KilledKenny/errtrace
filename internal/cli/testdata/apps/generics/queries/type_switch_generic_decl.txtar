@@ -1,0 +1,15 @@
+SUSPECTED BUG: the sentinel ErrStrRange is missing (errors.Is(describe(...), ErrStrRange) holds at run time) and the
+concrete entry's origin span is the use of the switch variable at failures.go `err` in fmt.Errorf, not the literal in
+classify: the type-switch binding re-converted to error is treated as a fresh Concrete Type origin.
+Type switch over the instantiations: *TypedErr[string] is wrapped, *TypedErr[int] returns nil.
+Expect concrete *TypedErr[string] and sentinel ErrStrRange, both wrapped by "string: %w"; nothing from the
+int instantiation and nothing bare from the default case.
+-- args --
+failures.go:@describe
+-- stdout --
+$WORK/failures.go:55:19-27: Error Set of example.com/generics.describe: 1 entries
+$WORK/failures.go:60:35-38: concrete *example.com/generics/errs.TypedErr[string]
+	wrap chain (origin → target):
+		$WORK/failures.go:60:10-39: fmt.Errorf "string: %w"
+	path (origin → target):
+		$WORK/failures.go:60:35-38: in example.com/generics.describe

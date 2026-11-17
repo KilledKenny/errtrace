@@ -1,0 +1,29 @@
+SUSPECTED BUG (precision; plan step S09 not built yet, see ops_call): two
+calls of deliver in one function, with an Email value and a *SMS of
+concrete type, so both arguments have a complete local type set. Expected:
+ErrEmail and ErrSMS only. Actual: also ErrPager and ErrQueue, the
+Candidates other callers give deliver's parameter ("4 of 4 candidates").
+-- args --
+dispatch/dispatch.go:@alertuser
+-- stdout --
+$WORK/dispatch/dispatch.go:195:20-29: Error Set of example.com/plugins/dispatch.AlertUser: 4 entries
+$WORK/drivers/drivers.go:13:2-10: sentinel example.com/plugins/drivers.ErrEmail [+1 more paths]
+	path (origin → target):
+		$WORK/drivers/drivers.go:26:10-18: in (example.com/plugins/drivers.Email).Send
+		$WORK/dispatch/dispatch.go:187:70-79: in example.com/plugins/dispatch.deliver, call to (example.com/plugins/drivers.Email).Send (dynamic (example.com/plugins/core.Driver).Send: 4 of 4 candidates)
+		$WORK/dispatch/dispatch.go:196:12-39: in example.com/plugins/dispatch.AlertUser, call to example.com/plugins/dispatch.deliver
+$WORK/drivers/drivers.go:14:2-8: sentinel example.com/plugins/drivers.ErrSMS [+1 more paths]
+	path (origin → target):
+		$WORK/drivers/drivers.go:37:10-16: in (*example.com/plugins/drivers.SMS).Send
+		$WORK/dispatch/dispatch.go:187:70-79: in example.com/plugins/dispatch.deliver, call to (*example.com/plugins/drivers.SMS).Send (dynamic (example.com/plugins/core.Driver).Send: 4 of 4 candidates)
+		$WORK/dispatch/dispatch.go:196:12-39: in example.com/plugins/dispatch.AlertUser, call to example.com/plugins/dispatch.deliver
+$WORK/drivers/drivers.go:16:2-10: sentinel example.com/plugins/drivers.ErrPager [+1 more paths]
+	path (origin → target):
+		$WORK/drivers/drivers.go:82:10-18: in (example.com/plugins/drivers.Pager).Send
+		$WORK/dispatch/dispatch.go:187:70-79: in example.com/plugins/dispatch.deliver, call to (example.com/plugins/drivers.Pager).Send (dynamic (example.com/plugins/core.Driver).Send: 4 of 4 candidates)
+		$WORK/dispatch/dispatch.go:196:12-39: in example.com/plugins/dispatch.AlertUser, call to example.com/plugins/dispatch.deliver
+$WORK/drivers/drivers.go:18:2-10: sentinel example.com/plugins/drivers.ErrQueue [+1 more paths]
+	path (origin → target):
+		$WORK/drivers/drivers.go:102:10-18: in (example.com/plugins/drivers.Queue).Send
+		$WORK/dispatch/dispatch.go:187:70-79: in example.com/plugins/dispatch.deliver, call to (example.com/plugins/drivers.Queue).Send (dynamic (example.com/plugins/core.Driver).Send: 4 of 4 candidates)
+		$WORK/dispatch/dispatch.go:196:12-39: in example.com/plugins/dispatch.AlertUser, call to example.com/plugins/dispatch.deliver

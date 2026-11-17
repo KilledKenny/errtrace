@@ -1,0 +1,15 @@
+SUSPECTED BUG (precision; plan step S09 not built yet, see retrysms_call):
+a method value bound to an interface (d.Send, d only ever a Pager) is
+passed as a callback, so only drivers.ErrPager is possible. Actual: the
+three Candidates of retry's fn (ErrEmptyBody, ErrSMS, ErrPager).
+With -fanout=1 they are printed as one group at the fn(e) site in retry.
+The bound-method wrapper is not shown as a hop: the Candidate is the method
+itself.
+-- args --
+-fanout=1 dispatch/funcs.go:@retrydriver
+-- stdout --
+$WORK/dispatch/funcs.go:91:22-33: Error Set of example.com/plugins/dispatch.RetryDriver: 3 entries
+$WORK/dispatch/funcs.go:73:12-17: group of 3 entries via dynamic call to function value fn (3 candidates) in example.com/plugins/dispatch.retry
+	$WORK/core/core.go:17:2-14: sentinel example.com/plugins/core.ErrEmptyBody (candidate example.com/plugins/dispatch.Validate)
+	$WORK/drivers/drivers.go:14:2-8: sentinel example.com/plugins/drivers.ErrSMS (candidate (*example.com/plugins/drivers.SMS).Send)
+	$WORK/drivers/drivers.go:16:2-10: sentinel example.com/plugins/drivers.ErrPager (candidate (example.com/plugins/drivers.Pager).Send)

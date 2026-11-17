@@ -1,0 +1,9 @@
+Position on the type argument "string" of codec.Decode[string](...).
+Negative: the type argument is not the callee; exit 2, no target.
+-- args --
+cmd/ingest/main.go:@decode_targ
+-- stdout --
+-- stderr --
+errtrace: $WORK/cmd/ingest/main.go:81:79: no function declaration or call at position
+-- exit --
+2

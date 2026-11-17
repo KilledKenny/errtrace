@@ -1,0 +1,9 @@
+Negative: call-site Target whose callee (validate.Clean) has no error result.
+Expect the same treatment as the declaration: 0 entries or a diagnostic; no origins.
+-- args --
+api/api.go:@clean_call
+-- stdout --
+-- stderr --
+errtrace: $WORK/api/api.go:39:33: validate.Clean has no error result
+-- exit --
+2

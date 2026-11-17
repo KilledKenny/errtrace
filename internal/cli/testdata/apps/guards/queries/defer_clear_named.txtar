@@ -1,0 +1,17 @@
+SUSPECTED BUG: a deferred closure guarding a named result gives only unresolved entries, one without a position.
+defer func() { if errors.Is(err, ErrDeclined) { err = nil } }(); return gateway.Charge(n).
+Expected (plan S08): 4 entries: ErrTimeout, *CodeError, ValidationError, opaque; ErrDeclined removed.
+Actual: only 2 unresolved(memory) "load of escaping variable err" entries, none of gateway.Charge's origins,
+and one of the entries has no position at all ("-:" as entry span and hop span), the other a zero-width span.
+The unresolved entries are sound (S08, deferred changes to named results, is not implemented yet: the tool
+stops at S07); the entry without a position is a defect in any case.
+-- args --
+processor/flow.go:@deferClear
+-- stdout --
+$WORK/processor/flow.go:14:21-35: Error Set of example.com/guards/processor.SettleDeferred: 2 entries, 2 unresolved
+-: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		-: in example.com/guards/processor.SettleDeferred
+$WORK/processor/flow.go:20:2-2: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/processor/flow.go:20:2-2: in example.com/guards/processor.SettleDeferred

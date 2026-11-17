@@ -1,0 +1,9 @@
+Variadic error parameter ranged over and returned.
+Expect: an Unresolved entry (depends-on-caller for errs, or memory for the slice element); never 0 entries.
+-- args --
+service/service.go:@firsterr
+-- stdout --
+$WORK/service/service.go:139:19-27: Error Set of example.com/kvstore/service.firstErr: 1 entries, 1 unresolved
+$WORK/service/service.go:140:9-12: unresolved(memory): load of slice or array element
+	path (origin → target):
+		$WORK/service/service.go:140:9-12: in example.com/kvstore/service.firstErr

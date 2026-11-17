@@ -1,0 +1,12 @@
+Returns from a select statement: a sentinel, an error received from a channel, and nil.
+Expect: sentinel engine.ErrClosed and unresolved(memory) for the channel receive. 2 entries.
+-- args --
+engine/engine.go:@wait
+-- stdout --
+$WORK/engine/engine.go:192:27-31: Error Set of (*example.com/kvstore/engine.Engine).Wait: 2 entries, 1 unresolved
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	path (origin → target):
+		$WORK/engine/engine.go:195:10-19: in (*example.com/kvstore/engine.Engine).Wait
+$WORK/engine/engine.go:196:14-22: unresolved(memory): channel receive in select
+	path (origin → target):
+		$WORK/engine/engine.go:196:14-22: in (*example.com/kvstore/engine.Engine).Wait

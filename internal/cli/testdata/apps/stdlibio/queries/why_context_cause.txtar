@@ -1,0 +1,17 @@
+Why returns context.Cause(ctx). The cause (jobs.ErrShutdown, passed to
+cancel(ErrShutdown) in Run) is stored in the cancelCtx: expected Unresolved(memory)
+entries for the cause/err loads inside context/context.go; ErrShutdown itself is not
+expected to be resolved (fields are out of scope), but the set must not be empty.
+-- args --
+jobs/jobs.go:@why
+-- stdout --
+$WORK/jobs/jobs.go:33:14-17: Error Set of example.com/stdlibio/jobs.Why: 2 entries, 2 unresolved
+$GOROOT/src/context/context.go:*: unresolved(memory): load of field cause of *context.cancelCtx
+	path (origin → target):
+		$GOROOT/src/context/context.go:*: in context.Cause
+		$WORK/jobs/jobs.go:34:9-37: in example.com/stdlibio/jobs.Why, call to context.Cause
+$GOROOT/src/context/context.go:*: unresolved(memory): value of TypeAssert not modelled
+	path (origin → target):
+		$GOROOT/src/context/context.go:*: in (*context.cancelCtx).Err
+		$GOROOT/src/context/context.go:*: in context.Cause, call to (*context.cancelCtx).Err (dynamic (context.Context).Err: 2 of 2 candidates)
+		$WORK/jobs/jobs.go:34:9-37: in example.com/stdlibio/jobs.Why, call to context.Cause

@@ -1,0 +1,11 @@
+time.Parse only ever returns *time.ParseError. Since replaces it, under
+errors.As(err, &pe), by an fmt.Errorf without %w. Expected: exactly one entry, the
+opaque fmt.Errorf "config: since: bad %s in %q"; no *time.ParseError entry may
+survive through the trailing "return time.Time{}, err".
+-- args --
+config/config.go:@since
+-- stdout --
+$WORK/config/config.go:68:16-21: Error Set of example.com/stdlibio/config.Since: 1 entries
+$WORK/config/config.go:73:24-90: opaque fmt.Errorf "config: since: bad %s in %q"
+	path (origin → target):
+		$WORK/config/config.go:73:24-90: in example.com/stdlibio/config.Since

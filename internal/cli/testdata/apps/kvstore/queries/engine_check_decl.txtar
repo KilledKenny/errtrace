@@ -1,0 +1,19 @@
+SUSPECTED BUG: dead-branch origins propagate interprocedurally (see engine_verify_decl).
+Expected only: concrete kverr.Code. Actual: also kverr.ErrCorrupt and engine.errTorn, which sit behind `if paranoid` (const false) / `if false` in verify.
+-- args --
+engine/engine.go:@check
+-- stdout --
+$WORK/engine/engine.go:130:28-33: Error Set of (*example.com/kvstore/engine.Engine).Check: 3 entries
+$WORK/engine/engine.go:24:2-9: sentinel example.com/kvstore/engine.errTorn
+	path (origin → target):
+		$WORK/engine/engine.go:82:10-17: in (*example.com/kvstore/engine.Engine).verify
+		$WORK/engine/engine.go:131:12-25: in (*example.com/kvstore/engine.Engine).Check, call to (*example.com/kvstore/engine.Engine).verify
+$WORK/kverr/kverr.go:71:5-15: sentinel example.com/kvstore/kverr.ErrCorrupt
+	path (origin → target):
+		$WORK/engine/engine.go:93:10-26: in (*example.com/kvstore/engine.Engine).deepVerify
+		$WORK/engine/engine.go:79:10-41: in (*example.com/kvstore/engine.Engine).verify, call to (*example.com/kvstore/engine.Engine).deepVerify
+		$WORK/engine/engine.go:131:12-25: in (*example.com/kvstore/engine.Engine).Check, call to (*example.com/kvstore/engine.Engine).verify
+$WORK/engine/engine.go:85:3-3: concrete example.com/kvstore/kverr.Code
+	path (origin → target):
+		$WORK/engine/engine.go:85:3-3: in (*example.com/kvstore/engine.Engine).verify
+		$WORK/engine/engine.go:131:12-25: in (*example.com/kvstore/engine.Engine).Check, call to (*example.com/kvstore/engine.Engine).verify

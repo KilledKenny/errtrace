@@ -1,0 +1,313 @@
+SUSPECTED BUG: top-down, the CLI's entry point (large, -fanout=2): a switch over 11 commands, each returning the
+set of a different use case. Correct set: errUsage bare and behind "%w (unknown command %q)", parse.Line's set,
+and the sets of Transfer, Balance (behind "cli: balance: %w"), Owner, batch, Explain, Preview, settled, SetStatus,
+check, Ready and PublishFirst; the deferred io.Copy / store.Close cannot change the unnamed result.
+Actual: 87 entries that all come from the first case (parse.Line and Service.Transfer) plus bare errUsage, and one
+unresolved(fixpoint-limit) "result 0 of run can carry more than 1024 values". Everything else is cut: no
+"cli: balance: %w", no "%w (unknown command %q)", no ErrUnsupported, NotFoundError[TransferID], ErrTxDone, rule or
+event-handler origin. The cut is announced, but the 1024 values are used up by the combinations of
+errors.Join(err, aerr) in Service.Transfer (see service_transfer_decl), so an entry point with about 300 distinct
+origins degrades to an arbitrary prefix.
+-- args --
+-fanout=2 cmd/cli/main.go:@run
+-- stdout --
+$WORK/cmd/cli/main.go:81:14-17: Error Set of example.com/bank/cmd/cli.run: 87 entries, 6 unresolved, 9 possibly handled
+$GOROOT/src/io/io.go:*: sentinel io.ErrShortWrite [+35 more paths]
+	wrap chain (origin → target):
+		$WORK/audit/audit.go:68:10-58: fmt.Errorf "audit: write: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+	path (origin → target):
+		$WORK/audit/audit.go:68:41-57: in example.com/bank/audit.Write
+		$WORK/audit/audit.go:57:9-22: in (*example.com/bank/audit.Logger).Record, call to example.com/bank/audit.Write
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/cmd/cli/main.go:94:10-50: in example.com/bank/cmd/cli.run, call to (*example.com/bank/service.Service).Transfer
+$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrSyntax [+1 more paths]
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.syntaxError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.syntaxError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+		$WORK/cmd/cli/main.go:90:13-46: in example.com/bank/cmd/cli.run, call to example.com/bank/parse.Line
+$WORK/audit/audit.go:16:2-11: sentinel example.com/bank/audit.ErrClosed [+35 more paths]
+	wrap chain (origin → target):
+		$WORK/service/service.go:47:10-32: errors.Join
+	path (origin → target):
+		$WORK/audit/audit.go:51:10-19: in (*example.com/bank/audit.Logger).Record
+		$WORK/service/service.go:46:13-63: in (*example.com/bank/service.Service).Transfer, call to (*example.com/bank/audit.Logger).Record
+		$WORK/cmd/cli/main.go:94:10-50: in example.com/bank/cmd/cli.run, call to (*example.com/bank/service.Service).Transfer
+$WORK/cmd/cli/main.go:28:2-10: sentinel example.com/bank/cmd/cli.errUsage [+1 more paths]
+	path (origin → target):
+		$WORK/cmd/cli/main.go:83:10-18: in example.com/bank/cmd/cli.run
+$WORK/parse/parse.go:16:5-15: sentinel example.com/bank/parse.ErrBadDate [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:49:24-75: fmt.Errorf "%w: near %q"
+		$WORK/parse/parse.go:110:30-68: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$WORK/parse/parse.go:49:50-60: in example.com/bank/parse.When
+		$WORK/parse/parse.go:109:30-45: in example.com/bank/parse.Line, call to example.com/bank/parse.When
+		$WORK/cmd/cli/main.go:90:13-46: in example.com/bank/cmd/cli.run, call to example.com/bank/parse.Line
+$WORK/retry/retry.go:15:2-11: sentinel example.com/bank/retry.ErrGaveUp [+875 more paths]
+	wrap chain (origin → target):
+		$WORK/retry/retry.go:44:9-74: fmt.Errorf "%w after %d attempts: %w"
+		$WORK/service/service.go:44:9-49: fmt.Errorf "transfer %d: %w"
+		$WORK/service/service.go:47:10-32: errors.Join
+	path (origin → target):
+		$WORK/retry/retry.go:44:48-57: in example.com/bank/retry.Do
+		$WORK/service/service.go:40:9-42:4: in (*example.com/bank/service.Service).Transfer, call to example.com/bank/retry.Do
+		$WORK/cmd/cli/main.go:94:10-50: in example.com/bank/cmd/cli.run, call to (*example.com/bank/service.Service).Transfer
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+		$WORK/cmd/cli/main.go:90:13-46: in example.com/bank/cmd/cli.run, call to example.com/bank/parse.Line
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+		$WORK/cmd/cli/main.go:90:13-46: in example.com/bank/cmd/cli.run, call to example.com/bank/parse.Line
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+		$WORK/cmd/cli/main.go:90:13-46: in example.com/bank/cmd/cli.run, call to example.com/bank/parse.Line
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+		$WORK/cmd/cli/main.go:90:13-46: in example.com/bank/cmd/cli.run, call to example.com/bank/parse.Line
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+		$WORK/cmd/cli/main.go:90:13-46: in example.com/bank/cmd/cli.run, call to example.com/bank/parse.Line
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+		$WORK/cmd/cli/main.go:90:13-46: in example.com/bank/cmd/cli.run, call to example.com/bank/parse.Line
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+		$WORK/cmd/cli/main.go:90:13-46: in example.com/bank/cmd/cli.run, call to example.com/bank/parse.Line
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+		$WORK/cmd/cli/main.go:90:13-46: in example.com/bank/cmd/cli.run, call to example.com/bank/parse.Line
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+		$WORK/cmd/cli/main.go:90:13-46: in example.com/bank/cmd/cli.run, call to example.com/bank/parse.Line
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+		$WORK/cmd/cli/main.go:90:13-46: in example.com/bank/cmd/cli.run, call to example.com/bank/parse.Line
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+		$WORK/cmd/cli/main.go:90:13-46: in example.com/bank/cmd/cli.run, call to example.com/bank/parse.Line
+$WORK/parse/parse.go:23:14-75: concrete *example.com/bank/domain.ValidationError [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$WORK/parse/parse.go:23:14-75: in example.com/bank/parse.Amount
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+		$WORK/cmd/cli/main.go:90:13-46: in example.com/bank/cmd/cli.run, call to example.com/bank/parse.Line
+$WORK/parse/parse.go:28:13-81: concrete *example.com/bank/domain.ValidationError [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$WORK/parse/parse.go:28:13-81: in example.com/bank/parse.Amount
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+		$WORK/cmd/cli/main.go:90:13-46: in example.com/bank/cmd/cli.run, call to example.com/bank/parse.Line
+$WORK/parse/parse.go:101:29-98: concrete *example.com/bank/domain.ValidationError [+1 more paths]
+	path (origin → target):
+		$WORK/parse/parse.go:101:29-98: in example.com/bank/parse.Line
+		$WORK/cmd/cli/main.go:90:13-46: in example.com/bank/cmd/cli.run, call to example.com/bank/parse.Line
+$GOROOT/src/strconv/number.go:*: opaque errors.New [+1 more paths]
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.baseError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.baseError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+		$WORK/cmd/cli/main.go:90:13-46: in example.com/bank/cmd/cli.run, call to example.com/bank/parse.Line
+$GOROOT/src/strconv/number.go:*: opaque errors.New [+1 more paths]
+	wrap chain (origin → target):
+		$GOROOT/src/strconv/number.go:*: *strconv.NumError.Unwrap
+		$WORK/parse/parse.go:25:13-48: fmt.Errorf "amount %q: %w"
+		$WORK/parse/parse.go:105:29-67: fmt.Errorf "transfer %d: %w"
+	path (origin → target):
+		$GOROOT/src/strconv/number.go:*: in strconv.bitSizeError
+		$GOROOT/src/strconv/number.go:*: in strconv.toError, call to strconv.bitSizeError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/parse/parse.go:20:12-58: in example.com/bank/parse.Amount, call to strconv.ParseInt
+		$WORK/parse/parse.go:103:14-31: in example.com/bank/parse.Line, call to example.com/bank/parse.Amount
+		$WORK/cmd/cli/main.go:90:13-46: in example.com/bank/cmd/cli.run, call to example.com/bank/parse.Line
+$WORK/cmd/cli/main.go:81:14-17: unresolved(fixpoint-limit): result 0 of example.com/bank/cmd/cli.run can carry more than 1024 values
+	path (origin → target):
+		$WORK/cmd/cli/main.go:81:14-17: in example.com/bank/cmd/cli.run
+$WORK/audit/audit.go:63:12-50: group of 23 entries via dynamic call to (io.Writer).Write (3 candidates) in example.com/bank/audit.Write
+	$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing (candidate (*os.File).Write)
+	$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing (candidate (*os.File).Write)
+	$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrFileClosing (candidate (*os.File).Write)
+	$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrDeadlineExceeded (candidate (*os.File).Write)
+	$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrDeadlineExceeded (candidate (*os.File).Write)
+	$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNotPollable (candidate (*os.File).Write)
+	$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNotPollable (candidate (*os.File).Write)
+	$GOROOT/src/io/io.go:*: sentinel io.ErrShortWrite (candidate (*os.File).Write)
+	$GOROOT/src/io/io.go:*: sentinel io.ErrUnexpectedEOF (candidate (*os.File).Write)
+	$GOROOT/src/io/io.go:*: sentinel io.ErrUnexpectedEOF (candidate (*os.File).Write)
+	$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid (candidate (*os.File).Write)
+	$GOROOT/src/os/error.go:*: sentinel os.ErrClosed (candidate (*os.File).Write)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN (candidate (*os.File).Write)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN (candidate (*os.File).Write)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL (candidate (*os.File).Write)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL (candidate (*os.File).Write)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT (candidate (*os.File).Write)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT (candidate (*os.File).Write)
+	$WORK/audit/audit.go:18:2-9: sentinel example.com/bank/audit.ErrFull (candidate (*example.com/bank/audit.Quota).Write)
+	$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno (candidate (*os.File).Write)
+	$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno (candidate (*os.File).Write)
+	$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type" (candidate (*os.File).Write)
+	$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type" (candidate (*os.File).Write)
+$WORK/retry/retry.go:31:10-14: group of 41 entries via dynamic call to function value op (3 candidates) in example.com/bank/retry.Do
+	$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNetClosing (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrFileClosing (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrDeadlineExceeded (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrDeadlineExceeded (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNotPollable (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/internal/poll/fd.go:*: sentinel internal/poll.ErrNotPollable (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/os/error.go:*: sentinel os.ErrClosed (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrRange (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/strconv/number.go:*: sentinel strconv.ErrSyntax (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$WORK/cmd/cli/main.go:29:2-11: sentinel example.com/bank/cmd/cli.errDryRun (candidate example.com/bank/cmd/cli.probe$2)
+	$WORK/repo/filerepo/filerepo.go:28:5-19: sentinel example.com/bank/repo/filerepo.errShortRecord (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$WORK/retry/retry.go:13:2-9: sentinel example.com/bank/retry.ErrBusy (candidate example.com/bank/cmd/cli.probe$2)
+	$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$WORK/repo/filerepo/filerepo.go:46:15-78: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.AccountID] (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type" (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/internal/poll/fd_poll_runtime.go:*: opaque errors.New "waiting for unsupported file type" (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/strconv/number.go:*: opaque errors.New (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$GOROOT/src/strconv/number.go:*: opaque errors.New (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	-: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
+	$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e (candidate example.com/bank/retry.Value[*example.com/bank/domain.Account]$1)
+	$WORK/tx/tx.go:25:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
+	$WORK/tx/tx.go:39:3-3: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)
+	$WORK/tx/tx.go:41:2-2: unresolved(memory): load of escaping variable err (candidate (*example.com/bank/service.Service).Transfer$1)

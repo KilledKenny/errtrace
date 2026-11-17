@@ -1,0 +1,11 @@
+Negative: declaration of Skip[T comparable](v, skip T) T. The declared result type is the type parameter T, which
+does not implement error, so the Target is rejected with "has no error result" (exit 2), although the only instance,
+Skip[error], returns error and call sites of it are accepted (skip_comparable_call). This follows the documented
+error-result predicate (the declared result type is error or implements it); recorded as a limit, not as a bug.
+-- args --
+errs/errs.go:@skip
+-- stdout --
+-- stderr --
+errtrace: $WORK/errs/errs.go:88:15: example.com/generics/errs.Skip has no error result
+-- exit --
+2

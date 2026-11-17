@@ -1,0 +1,16 @@
+Wait wraps ctx.Err() with "jobs: wait: %w" unless errors.Is(err,
+context.DeadlineExceeded). ctx.Err() is an Unresolved load inside package context,
+which no guard can remove: expected that Unresolved(memory) entry under the fmt.Errorf
+link, marked "possibly handled" by the errors.Is guard. No sentinel entries.
+-- args --
+jobs/jobs.go:@wait
+-- stdout --
+$WORK/jobs/jobs.go:39:15-19: Error Set of example.com/stdlibio/jobs.Wait: 1 entries, 1 unresolved, 1 possibly handled
+$GOROOT/src/context/context.go:*: unresolved(memory): value of TypeAssert not modelled
+	wrap chain (origin → target):
+		$WORK/jobs/jobs.go:48:10-43: fmt.Errorf "jobs: wait: %w"
+	possibly handled:
+		$WORK/jobs/jobs.go:45:6-46: errors.Is with context.DeadlineExceeded: unresolved value
+	path (origin → target):
+		$GOROOT/src/context/context.go:*: in (*context.cancelCtx).Err
+		$WORK/jobs/jobs.go:44:10-19: in example.com/stdlibio/jobs.Wait, call to (*context.cancelCtx).Err (dynamic (context.Context).Err: 1 of 1 candidates)

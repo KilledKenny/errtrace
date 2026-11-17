@@ -1,0 +1,7 @@
+errors.Is(err, doc.ErrNoTitle) { return nil } on transform.Title, whose only
+error is doc.ErrNoTitle inside an *xerr.OpError. Expected 0 entries: Is sees
+through the custom Unwrap.
+-- args --
+pipeline.go:@titlelenient
+-- stdout --
+$WORK/pipeline.go:54:23-35: Error Set of example.com/wrapchain.titleLenient: 0 entries

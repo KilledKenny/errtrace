@@ -1,0 +1,22 @@
+SUSPECTED BUG: callback transaction with a deferred closure on the named result (rollback error joined, commit error
+wrapped). Correct set: Begin's errors behind "tx: begin: %w", ctx.Err() bare, fn's errors (execute's set, via the
+closure in Service.Transfer) bare and behind errors.Join together with "tx: rollback: %w" errors, commit errors
+behind "tx: commit: %w". Actual: 4 unresolved(memory) "load of escaping variable err" entries and nothing else -
+even "tx: begin: %w" and fn's errors, which are plain stores before the defer runs, are lost (plan S08 is not
+implemented). The first entry has no position ("-:"), the others zero-width spans (24:3-3).
+-- args --
+-fanout=2 tx/tx.go:@withtx
+-- stdout --
+$WORK/tx/tx.go:22:30-36: Error Set of (*example.com/bank/tx.Manager).WithTx: 4 entries, 4 unresolved
+-: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		-: in (*example.com/bank/tx.Manager).WithTx
+$WORK/tx/tx.go:25:3-3: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/tx/tx.go:25:3-3: in (*example.com/bank/tx.Manager).WithTx
+$WORK/tx/tx.go:39:3-3: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/tx/tx.go:39:3-3: in (*example.com/bank/tx.Manager).WithTx
+$WORK/tx/tx.go:41:2-2: unresolved(memory): load of escaping variable err
+	path (origin → target):
+		$WORK/tx/tx.go:41:2-2: in (*example.com/bank/tx.Manager).WithTx

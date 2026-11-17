@@ -1,0 +1,27 @@
+if errors.Is(err, ErrTimeout) { err = gateway.Lookup(n+1) }; return err.
+The first call's ErrTimeout is replaced, but the second call can return ErrTimeout again: all 4 Lookup
+origins must appear; ErrTimeout only with a path through the second call (line of the reassignment).
+-- args --
+processor/is.go:@swapOnIs
+-- stdout --
+$WORK/processor/is.go:124:19-33: Error Set of example.com/guards/processor.LookupSwapOnIs: 4 entries
+$WORK/payerr/payerr.go:9:2-12: sentinel example.com/guards/payerr.ErrTimeout
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:38:10-63: *example.com/guards/payerr.OpError.Unwrap
+	path (origin → target):
+		$WORK/gateway/gateway.go:38:45-62: in example.com/guards/gateway.Lookup
+		$WORK/processor/is.go:127:9-30: in example.com/guards/processor.LookupSwapOnIs, call to example.com/guards/gateway.Lookup
+$WORK/payerr/payerr.go:10:2-13: sentinel example.com/guards/payerr.ErrNotFound [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:36:10-60: fmt.Errorf "lookup %d: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:36:41-59: in example.com/guards/gateway.Lookup
+		$WORK/processor/is.go:125:9-26: in example.com/guards/processor.LookupSwapOnIs, call to example.com/guards/gateway.Lookup
+$WORK/payerr/payerr.go:11:2-16: sentinel example.com/guards/payerr.ErrRateLimited [+1 more paths]
+	path (origin → target):
+		$WORK/gateway/gateway.go:40:10-31: in example.com/guards/gateway.Lookup
+		$WORK/processor/is.go:125:9-26: in example.com/guards/processor.LookupSwapOnIs, call to example.com/guards/gateway.Lookup
+$WORK/gateway/gateway.go:42:9-39: concrete *example.com/guards/payerr.NetError [+1 more paths]
+	path (origin → target):
+		$WORK/gateway/gateway.go:42:9-39: in example.com/guards/gateway.Lookup
+		$WORK/processor/is.go:125:9-26: in example.com/guards/processor.LookupSwapOnIs, call to example.com/guards/gateway.Lookup

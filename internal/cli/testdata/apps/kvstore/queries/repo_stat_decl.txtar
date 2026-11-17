@@ -1,0 +1,13 @@
+SUSPECTED BUG: origins wrapped in a concrete error value are lost when it is passed as a method receiver (or any concrete-typed parameter) and converted to error in the callee.
+`return r.find(key).OrNil()`: OrNil returns its non-nil receiver, so Stat returns exactly find's non-nil values.
+Expected: find's 3 entries (kverr.ErrEmptyKey, engine.ErrClosed, kverr.ErrNotFound), each under *kverr.OpError.Unwrap; no typed nil.
+Actual: 1 bare `concrete *kverr.OpError` positioned inside OrNil: no chain, no Unresolved entry, so the set hides that errors.Is(err, kverr.ErrNotFound) can hold
+(a later errors.Is guard on such a value is ignored without a 'possibly handled' note).
+-- args --
+repo/repo.go:@stat
+-- stdout --
+$WORK/repo/repo.go:171:25-29: Error Set of (*example.com/kvstore/repo.Repo).Stat: 1 entries
+$WORK/kverr/kverr.go:75:5-6: concrete *example.com/kvstore/kverr.OpError
+	path (origin → target):
+		$WORK/kverr/kverr.go:75:5-6: in (*example.com/kvstore/kverr.OpError).OrNil
+		$WORK/repo/repo.go:171:57-76: in (*example.com/kvstore/repo.Repo).Stat, call to (*example.com/kvstore/kverr.OpError).OrNil

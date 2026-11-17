@@ -1,0 +1,11 @@
+Negative: -tags legacy pulls in source/legacy.go, which deliberately does not
+type-check (undefined: decodeLegacy). A package type error is a load failure: exit 2,
+the compiler diagnostic with the legacy.go position on stderr, empty stdout, even
+though the Target itself (Require) is fine.
+-- args --
+-tags legacy source/source.go:@require
+-- stdout --
+-- stderr --
+errtrace: $WORK/source/legacy.go:8:9: undefined: decodeLegacy
+-- exit --
+2

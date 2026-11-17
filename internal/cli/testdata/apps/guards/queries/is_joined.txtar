@@ -1,0 +1,11 @@
+errors.Is(err, ErrDuplicate) on errors.Join(ErrDeclined, ErrDuplicate) / ErrInternal.
+The join always contains ErrDuplicate, so the whole joined error is handled: expect 1 entry, ErrInternal.
+Neither ErrDuplicate nor the joined ErrDeclined should remain.
+-- args --
+processor/is.go:@isJoined
+-- stdout --
+$WORK/processor/is.go:79:19-33: Error Set of example.com/guards/processor.RefundIsJoined: 1 entries
+$WORK/payerr/payerr.go:12:2-13: sentinel example.com/guards/payerr.ErrInternal
+	path (origin → target):
+		$WORK/gateway/gateway.go:51:10-28: in example.com/guards/gateway.Refund
+		$WORK/processor/is.go:80:9-26: in example.com/guards/processor.RefundIsJoined, call to example.com/guards/gateway.Refund

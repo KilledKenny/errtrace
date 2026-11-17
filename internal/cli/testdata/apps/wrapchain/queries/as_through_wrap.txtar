@@ -1,0 +1,7 @@
+errors.As(err, &numErr) { return 0, nil } on parse.Field's two-%w wrap: every
+error value holds a *strconv.NumError next to doc.ErrSyntax, so As always matches.
+Expected 0 entries (doc.ErrSyntax must go too: it shares the wrap with the NumError).
+-- args --
+pipeline.go:@fieldzero
+-- stdout --
+$WORK/pipeline.go:64:20-31: Error Set of example.com/wrapchain.fieldOrZero: 0 entries

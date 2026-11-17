@@ -1,0 +1,9 @@
+Literal position 50:2, the "go" keyword of "go warm(s)" in run.
+Negative: exit 2, "no function declaration or call at position". Contrast call_go (position on warm).
+-- args --
+cmd/ingest/main.go:50:2
+-- stdout --
+-- stderr --
+errtrace: $WORK/cmd/ingest/main.go:50:2: no function declaration or call at position
+-- exit --
+2

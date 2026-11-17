@@ -1,0 +1,9 @@
+Unexported sentinel declared inside a var block, returned by an exported accessor.
+Expect exactly: sentinel kverr.errInternal. ErrConflict/ErrReadOnly (same block) must not appear.
+-- args --
+kverr/kverr.go:@internal
+-- stdout --
+$WORK/kverr/kverr.go:22:19-27: Error Set of example.com/kvstore/kverr.Internal: 1 entries
+$WORK/kverr/kverr.go:18:2-13: sentinel example.com/kvstore/kverr.errInternal
+	path (origin → target):
+		$WORK/kverr/kverr.go:22:45-56: in example.com/kvstore/kverr.Internal

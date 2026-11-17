@@ -1,0 +1,13 @@
+Call site of the interface method ctx.Err(). The context implementations return the
+error stored in the context (context.Canceled / DeadlineExceeded are stored by
+cancel), so the expected result is an explicit Unresolved(memory) entry inside
+context/context.go reached through a dynamic hop; a 0-entry set would be a silent
+drop. The sentinels themselves are not expected to be resolved.
+-- args --
+jobs/jobs.go:@ctxerr
+-- stdout --
+$WORK/jobs/jobs.go:29:9-29: Error Set of call to ctx.Err in example.com/stdlibio/jobs.Check: 1 entries, 1 unresolved
+$GOROOT/src/context/context.go:*: unresolved(memory): value of TypeAssert not modelled
+	path (origin → target):
+		$GOROOT/src/context/context.go:*: in (*context.cancelCtx).Err
+		$WORK/jobs/jobs.go:29:9-29: in example.com/stdlibio/jobs.Check, call to (*context.cancelCtx).Err (dynamic (context.Context).Err: 1 of 1 candidates)

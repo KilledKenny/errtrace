@@ -1,0 +1,20 @@
+Functional options: a variadic slice of closures called in a loop.
+Expected: ErrBadLimit (WithLimit) and opaque "dispatch: empty name"
+(WithName), both wrapped by "dispatch.New: %w". WithFallback's closure
+never fails. ErrNoCert must be absent: WithTLS is never called.
+-- args --
+dispatch/dispatch.go:@new
+-- stdout --
+$WORK/dispatch/dispatch.go:79:14-17: Error Set of example.com/plugins/dispatch.New: 2 entries
+$WORK/dispatch/dispatch.go:14:2-13: sentinel example.com/plugins/dispatch.ErrBadLimit
+	wrap chain (origin → target):
+		$WORK/dispatch/dispatch.go:83:16-51: fmt.Errorf "dispatch.New: %w"
+	path (origin → target):
+		$WORK/dispatch/dispatch.go:44:11-22: in example.com/plugins/dispatch.WithLimit$1
+		$WORK/dispatch/dispatch.go:82:26-32: in example.com/plugins/dispatch.New, call to example.com/plugins/dispatch.WithLimit$1 (dynamic function value of type example.com/plugins/dispatch.Option: 3 of 3 candidates)
+$WORK/dispatch/dispatch.go:54:11-45: opaque errors.New "dispatch: empty name"
+	wrap chain (origin → target):
+		$WORK/dispatch/dispatch.go:83:16-51: fmt.Errorf "dispatch.New: %w"
+	path (origin → target):
+		$WORK/dispatch/dispatch.go:54:11-45: in example.com/plugins/dispatch.WithName$1
+		$WORK/dispatch/dispatch.go:82:26-32: in example.com/plugins/dispatch.New, call to example.com/plugins/dispatch.WithName$1 (dynamic function value of type example.com/plugins/dispatch.Option: 3 of 3 candidates)

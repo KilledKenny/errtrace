@@ -1,0 +1,9 @@
+Negative: the position is on a method value (d.Send without a call).
+Expected: exit 2, "no function declaration or call at position".
+-- args --
+dispatch/funcs.go:@mv_noncall
+-- stdout --
+-- stderr --
+errtrace: $WORK/dispatch/funcs.go:92:27: no function declaration or call at position
+-- exit --
+2

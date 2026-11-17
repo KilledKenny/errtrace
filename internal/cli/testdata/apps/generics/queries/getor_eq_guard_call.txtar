@@ -1,0 +1,6 @@
+Negative: GetOr[K comparable, V] handles ErrNotFound with == inside the generic body and returns nil.
+(*Cache).Get returns nothing else, so expect 0 entries.
+-- args --
+caching.go:@getor
+-- stdout --
+$WORK/caching.go:31:9-39: Error Set of call to cache.GetOr in example.com/generics.score: 0 entries

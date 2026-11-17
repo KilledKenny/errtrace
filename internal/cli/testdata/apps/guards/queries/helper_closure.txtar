@@ -1,0 +1,37 @@
+Guard through a local function literal: isDeclined := func(e error) bool { return e == ErrDeclined }.
+Run-time truth: ErrDeclined is handled. Helper guards are not summarised: expect all 5 Charge entries kept and
+marked possibly handled (guarded by call to the closure); no entry may disappear silently.
+-- args --
+processor/edge.go:@closureGuard
+-- stdout --
+$WORK/processor/edge.go:81:23-41: Error Set of example.com/guards/processor.ChargeClosureGuard: 5 entries, 5 possibly handled
+$WORK/payerr/payerr.go:8:2-13: sentinel example.com/guards/payerr.ErrDeclined
+	possibly handled:
+		$WORK/processor/edge.go:84:5-20: guarded by call to example.com/guards/processor.ChargeClosureGuard$1
+	path (origin → target):
+		$WORK/gateway/gateway.go:18:10-28: in example.com/guards/gateway.Charge
+		$WORK/processor/edge.go:83:9-26: in example.com/guards/processor.ChargeClosureGuard, call to example.com/guards/gateway.Charge
+$WORK/payerr/payerr.go:9:2-12: sentinel example.com/guards/payerr.ErrTimeout
+	possibly handled:
+		$WORK/processor/edge.go:84:5-20: guarded by call to example.com/guards/processor.ChargeClosureGuard$1
+	path (origin → target):
+		$WORK/gateway/gateway.go:20:10-27: in example.com/guards/gateway.Charge
+		$WORK/processor/edge.go:83:9-26: in example.com/guards/processor.ChargeClosureGuard, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:22:10-63: concrete *example.com/guards/payerr.CodeError
+	possibly handled:
+		$WORK/processor/edge.go:84:5-20: guarded by call to example.com/guards/processor.ChargeClosureGuard$1
+	path (origin → target):
+		$WORK/gateway/gateway.go:22:10-63: in example.com/guards/gateway.Charge
+		$WORK/processor/edge.go:83:9-26: in example.com/guards/processor.ChargeClosureGuard, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:24:10-51: concrete example.com/guards/payerr.ValidationError
+	possibly handled:
+		$WORK/processor/edge.go:84:5-20: guarded by call to example.com/guards/processor.ChargeClosureGuard$1
+	path (origin → target):
+		$WORK/gateway/gateway.go:24:10-51: in example.com/guards/gateway.Charge
+		$WORK/processor/edge.go:83:9-26: in example.com/guards/processor.ChargeClosureGuard, call to example.com/guards/gateway.Charge
+$WORK/gateway/gateway.go:26:9-35: opaque errors.New "gateway down"
+	possibly handled:
+		$WORK/processor/edge.go:84:5-20: guarded by call to example.com/guards/processor.ChargeClosureGuard$1
+	path (origin → target):
+		$WORK/gateway/gateway.go:26:9-35: in example.com/guards/gateway.Charge
+		$WORK/processor/edge.go:83:9-26: in example.com/guards/processor.ChargeClosureGuard, call to example.com/guards/gateway.Charge

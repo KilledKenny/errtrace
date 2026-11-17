@@ -1,0 +1,80 @@
+Switch assigning one local from four sources (phi), then passed through a wrapping helper.
+Expect, all under "health: %w": kverr.ErrReadOnly; Ping's errInternal, ErrClosed, unresolved(memory);
+kverr.ErrThrottled (interface-typed sentinel holding a Code); Check's 3 entries under *kverr.OpError.Unwrap. No depends-on-caller.
+-- args --
+service/service.go:@health
+-- stdout --
+$WORK/service/service.go:157:30-36: Error Set of (*example.com/kvstore/service.Service).Health: 8 entries, 1 unresolved
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:98:10-56: *example.com/kvstore/kverr.OpError.Unwrap
+		$WORK/service/service.go:135:9-38: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/engine/engine.go:68:15-24: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:97:15-37: in (*example.com/kvstore/repo.Repo).find, call to (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:110:10-21: in (*example.com/kvstore/repo.Repo).Check, call to (*example.com/kvstore/repo.Repo).find
+		$WORK/service/service.go:167:9-26: in (*example.com/kvstore/service.Service).Health, call to (*example.com/kvstore/repo.Repo).Check
+		$WORK/service/service.go:132:5-8: in example.com/kvstore/service.annotate
+		$WORK/service/service.go:169:27-50: in (*example.com/kvstore/service.Service).Health, call to example.com/kvstore/service.annotate
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	wrap chain (origin → target):
+		$WORK/service/service.go:135:9-38: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/engine/engine.go:195:10-19: in (*example.com/kvstore/engine.Engine).Wait
+		$WORK/repo/repo.go:28:9-21: in (*example.com/kvstore/repo.base).Ping, call to (*example.com/kvstore/engine.Engine).Wait
+		$WORK/service/service.go:163:9-36: in (*example.com/kvstore/service.Service).Health, call to (*example.com/kvstore/repo.base).Ping
+		$WORK/service/service.go:132:5-8: in example.com/kvstore/service.annotate
+		$WORK/service/service.go:169:27-50: in (*example.com/kvstore/service.Service).Health, call to example.com/kvstore/service.annotate
+$WORK/kverr/kverr.go:10:5-16: sentinel example.com/kvstore/kverr.ErrNotFound
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:98:10-56: *example.com/kvstore/kverr.OpError.Unwrap
+		$WORK/service/service.go:135:9-38: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/engine/engine.go:72:15-32: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:97:15-37: in (*example.com/kvstore/repo.Repo).find, call to (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:110:10-21: in (*example.com/kvstore/repo.Repo).Check, call to (*example.com/kvstore/repo.Repo).find
+		$WORK/service/service.go:167:9-26: in (*example.com/kvstore/service.Service).Health, call to (*example.com/kvstore/repo.Repo).Check
+		$WORK/service/service.go:132:5-8: in example.com/kvstore/service.annotate
+		$WORK/service/service.go:169:27-50: in (*example.com/kvstore/service.Service).Health, call to example.com/kvstore/service.annotate
+$WORK/kverr/kverr.go:16:2-13: sentinel example.com/kvstore/kverr.ErrReadOnly
+	wrap chain (origin → target):
+		$WORK/service/service.go:135:9-38: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/service/service.go:161:9-26: in (*example.com/kvstore/service.Service).Health
+		$WORK/service/service.go:132:5-8: in example.com/kvstore/service.annotate
+		$WORK/service/service.go:169:27-50: in (*example.com/kvstore/service.Service).Health, call to example.com/kvstore/service.annotate
+$WORK/kverr/kverr.go:18:2-13: sentinel example.com/kvstore/kverr.errInternal
+	wrap chain (origin → target):
+		$WORK/service/service.go:135:9-38: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/kverr/kverr.go:22:45-56: in example.com/kvstore/kverr.Internal
+		$WORK/repo/repo.go:26:10-26: in (*example.com/kvstore/repo.base).Ping, call to example.com/kvstore/kverr.Internal
+		$WORK/service/service.go:163:9-36: in (*example.com/kvstore/service.Service).Health, call to (*example.com/kvstore/repo.base).Ping
+		$WORK/service/service.go:132:5-8: in example.com/kvstore/service.annotate
+		$WORK/service/service.go:169:27-50: in (*example.com/kvstore/service.Service).Health, call to example.com/kvstore/service.annotate
+$WORK/kverr/kverr.go:36:5-17: sentinel example.com/kvstore/kverr.ErrThrottled
+	wrap chain (origin → target):
+		$WORK/service/service.go:135:9-38: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/service/service.go:165:9-27: in (*example.com/kvstore/service.Service).Health
+		$WORK/service/service.go:132:5-8: in example.com/kvstore/service.annotate
+		$WORK/service/service.go:169:27-50: in (*example.com/kvstore/service.Service).Health, call to example.com/kvstore/service.annotate
+$WORK/kverr/kverr.go:44:5-16: sentinel example.com/kvstore/kverr.ErrEmptyKey
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:95:10-60: *example.com/kvstore/kverr.OpError.Unwrap
+		$WORK/service/service.go:135:9-38: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/repo/repo.go:95:42-59: in (*example.com/kvstore/repo.Repo).find
+		$WORK/repo/repo.go:110:10-21: in (*example.com/kvstore/repo.Repo).Check, call to (*example.com/kvstore/repo.Repo).find
+		$WORK/service/service.go:167:9-26: in (*example.com/kvstore/service.Service).Health, call to (*example.com/kvstore/repo.Repo).Check
+		$WORK/service/service.go:132:5-8: in example.com/kvstore/service.annotate
+		$WORK/service/service.go:169:27-50: in (*example.com/kvstore/service.Service).Health, call to example.com/kvstore/service.annotate
+$WORK/engine/engine.go:196:14-22: unresolved(memory): channel receive in select
+	wrap chain (origin → target):
+		$WORK/service/service.go:135:9-38: fmt.Errorf "%s: %w"
+	path (origin → target):
+		$WORK/engine/engine.go:196:14-22: in (*example.com/kvstore/engine.Engine).Wait
+		$WORK/repo/repo.go:28:9-21: in (*example.com/kvstore/repo.base).Ping, call to (*example.com/kvstore/engine.Engine).Wait
+		$WORK/service/service.go:163:9-36: in (*example.com/kvstore/service.Service).Health, call to (*example.com/kvstore/repo.base).Ping
+		$WORK/service/service.go:132:5-8: in example.com/kvstore/service.annotate
+		$WORK/service/service.go:169:27-50: in (*example.com/kvstore/service.Service).Health, call to example.com/kvstore/service.annotate

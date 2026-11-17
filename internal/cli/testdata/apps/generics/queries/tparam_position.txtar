@@ -1,0 +1,9 @@
+Negative: the position is on a type parameter name, which is neither a function name nor a call.
+Expect exit 2 with "no function declaration or call at position".
+-- args --
+validate/validate.go:@tparam
+-- stdout --
+-- stderr --
+errtrace: $WORK/validate/validate.go:54:33: no function declaration or call at position
+-- exit --
+2

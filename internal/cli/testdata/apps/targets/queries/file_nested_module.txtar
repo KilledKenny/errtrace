@@ -1,0 +1,12 @@
+SUSPECTED BUG (low confidence): a Go file inside the app tree that belongs to a nested module (tools/lintcfg has its own go.mod), i.e. outside example.com/targets.
+Expected: either exit 2 saying the file is outside the main module, or the Error Set {lintcfg.ErrNoConfig} named with its real package example.com/lintcfg.
+Actual: the file is loaded as an ad-hoc package and everything is named "command-line-arguments.Load" / "command-line-arguments.ErrNoConfig", exit 0 (the Error Set itself, 1 sentinel, is right).
+-- args --
+tools/lintcfg/cfg.go:@load
+-- stdout --
+$WORK/tools/lintcfg/cfg.go:10:15-19: Error Set of command-line-arguments.Load: 1 entries
+$WORK/tools/lintcfg/cfg.go:7:5-16: sentinel command-line-arguments.ErrNoConfig
+	path (origin → target):
+		$WORK/tools/lintcfg/cfg.go:12:10-21: in command-line-arguments.Load
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates

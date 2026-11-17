@@ -1,0 +1,9 @@
+Interface call with exactly one Candidate, grouping threshold 1.
+Expected: only drivers.ErrEmail (SendDirect is only given an Email), printed
+as a group of 1 entry with 1 candidate. No other driver sentinel.
+-- args --
+-fanout=1 dispatch/fanout.go:@direct
+-- stdout --
+$WORK/dispatch/fanout.go:10:17-27: Error Set of example.com/plugins/dispatch.SendDirect: 1 entries
+$WORK/dispatch/fanout.go:10:72-81: group of 1 entries via dynamic call to (example.com/plugins/core.Driver).Send (1 candidates) in example.com/plugins/dispatch.SendDirect
+	$WORK/drivers/drivers.go:13:2-10: sentinel example.com/plugins/drivers.ErrEmail (candidate (example.com/plugins/drivers.Email).Send)

@@ -1,0 +1,14 @@
+SUSPECTED BUG: as iter_collect_decl - nameless "load of escaping variable " Unresolved entries at zero-width spans
+instead of origins or an Unresolved that names the iterator parameter.
+Declaration of the generic Collect[T] (one instance, Collect[int]); the error comes out of the iterator parameter.
+Expect ErrEmpty and *TypedErr[string] from parsePort (or an Unresolved naming the iterator), never an empty set.
+-- args --
+seq/iter.go:@collect
+-- stdout --
+$WORK/seq/iter.go:17:18-25: Error Set of example.com/generics/seq.Collect: 2 entries, 2 unresolved
+$WORK/seq/iter.go:21:4-4: unresolved(memory): load of escaping variable 
+	path (origin → target):
+		$WORK/seq/iter.go:21:4-4: in example.com/generics/seq.Collect[int]
+$WORK/seq/iter.go:25:2-2: unresolved(memory): load of escaping variable 
+	path (origin → target):
+		$WORK/seq/iter.go:25:2-2: in example.com/generics/seq.Collect[int]

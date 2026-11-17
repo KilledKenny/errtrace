@@ -1,0 +1,10 @@
+Interface holding nil: "var d core.Driver; return d.Send(e)" (panics at
+run time). Expected: one unresolved(no-candidates) entry and no Origin, even
+though core.Driver has many implementations elsewhere.
+-- args --
+dispatch/dispatch.go:@probe
+-- stdout --
+$WORK/dispatch/dispatch.go:136:16-21: Error Set of example.com/plugins/dispatch.Probe: 1 entries, 1 unresolved
+$WORK/dispatch/dispatch.go:138:9-18: unresolved(no-candidates): dynamic call to (example.com/plugins/core.Driver).Send
+	path (origin → target):
+		$WORK/dispatch/dispatch.go:138:9-18: in example.com/plugins/dispatch.Probe

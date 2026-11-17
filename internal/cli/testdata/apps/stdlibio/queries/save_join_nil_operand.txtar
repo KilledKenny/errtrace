@@ -1,0 +1,22 @@
+SUSPECTED BUG: Save returns errors.Join(werr, flush(f), f.Close()). In the default
+build flush always returns nil, but Join drops nil operands and still returns the
+others. Expected: the os.Create origin under "source: create: %w" AND, under an
+errors.Join link, the (*os.File).Write origins (seal_write_call_site) and the
+(*os.File).Close origins (close_in_deferred_closure). Actual: only the os.Create entry;
+the whole Join disappears as soon as one operand is a call that can only return nil
+(a literal nil operand is handled correctly). Cause: when a callee summary is
+substituted, the operand sets are multiplied and an empty set gives an empty product
+(internal/summary/eval.go, mapTreeRaw). Compare save_join_durable, where flush can fail.
+-- args --
+source/source.go:@save
+-- stdout --
+$WORK/source/source.go:83:15-19: Error Set of example.com/stdlibio/source.Save: 1 entries, 1 unresolved
+$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+		$WORK/source/source.go:86:10-47: fmt.Errorf "source: create: %w"
+	path (origin → target):
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.OpenFile, call to os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.Create, call to os.OpenFile
+		$WORK/source/source.go:84:12-27: in example.com/stdlibio/source.Save, call to os.Create

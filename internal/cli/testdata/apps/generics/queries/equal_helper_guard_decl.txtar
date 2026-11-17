@@ -1,0 +1,13 @@
+ErrNotFound is handled through the generic helper errs.Equal[error] (a == on a comparable type parameter).
+Under Go semantics the set is empty; guards through helpers are documented as undecidable, so expect
+ErrNotFound kept and marked possibly handled.
+-- args --
+caching.go:@viaequal
+-- stdout --
+$WORK/caching.go:56:19-27: Error Set of example.com/generics.viaEqual: 1 entries, 1 possibly handled
+$WORK/errs/errs.go:12:2-13: sentinel example.com/generics/errs.ErrNotFound
+	possibly handled:
+		$WORK/caching.go:58:5-38: guarded by call to example.com/generics/errs.Equal[error]
+	path (origin → target):
+		$WORK/cache/cache.go:33:16-32: in (*example.com/generics/cache.Cache[string, int]).Get
+		$WORK/caching.go:57:12-20: in example.com/generics.viaEqual, call to (*example.com/generics/cache.Cache[string, int]).Get

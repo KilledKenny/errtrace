@@ -1,0 +1,9 @@
+Call-site target inside a Test function of an in-package _test.go file.
+Same as test_file_func: tests are not loaded, so exit 2 with a clear message is expected.
+-- args --
+internal/store/store_test.go:@test_call
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/store/store_test.go: file is not in any loaded package
+-- exit --
+2

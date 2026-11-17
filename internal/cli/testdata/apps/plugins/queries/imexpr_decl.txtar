@@ -1,0 +1,20 @@
+Interface method expression core.Handler.Handle called with a handler from
+the registry map. Expected (map values merged by VTA): ErrAuditFull,
+ErrMetricsDown, ErrPager; no ErrOrphan; a dynamic hop with 3 candidates.
+-- args --
+dispatch/funcs.go:@imexpr
+-- stdout --
+$WORK/dispatch/funcs.go:107:17-35: Error Set of example.com/plugins/dispatch.ViaIfaceMethodExpr: 3 entries
+$WORK/drivers/drivers.go:16:2-10: sentinel example.com/plugins/drivers.ErrPager
+	path (origin → target):
+		$WORK/drivers/drivers.go:82:10-18: in (example.com/plugins/drivers.Pager).Send
+		$WORK/main.go:30:57-80: in (example.com/plugins.pagerHandler).Handle, call to (example.com/plugins/drivers.Pager).Send
+		$WORK/dispatch/funcs.go:109:9-21: in example.com/plugins/dispatch.ViaIfaceMethodExpr, call to (example.com/plugins.pagerHandler).Handle (dynamic (example.com/plugins/core.Handler).Handle: 3 of 3 candidates)
+$WORK/registry/registry.go:13:2-14: sentinel example.com/plugins/registry.ErrAuditFull
+	path (origin → target):
+		$WORK/registry/registry.go:22:10-22: in (example.com/plugins/registry.auditHandler).Handle
+		$WORK/dispatch/funcs.go:109:9-21: in example.com/plugins/dispatch.ViaIfaceMethodExpr, call to (example.com/plugins/registry.auditHandler).Handle (dynamic (example.com/plugins/core.Handler).Handle: 3 of 3 candidates)
+$WORK/registry/registry.go:14:2-16: sentinel example.com/plugins/registry.ErrMetricsDown
+	path (origin → target):
+		$WORK/registry/registry.go:34:10-24: in (*example.com/plugins/registry.metricsHandler).Handle
+		$WORK/dispatch/funcs.go:109:9-21: in example.com/plugins/dispatch.ViaIfaceMethodExpr, call to (*example.com/plugins/registry.metricsHandler).Handle (dynamic (example.com/plugins/core.Handler).Handle: 3 of 3 candidates)

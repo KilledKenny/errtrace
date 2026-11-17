@@ -1,0 +1,21 @@
+Type switch with a bound variable: case Temporary -> nil; case *OpError -> e.Err; case nil; default -> e.
+Expect *NetError removed; ErrNotFound (fmt.Errorf chain) and ErrRateLimited via default. The *OpError case
+returns the field e.Err: ErrTimeout WITHOUT an OpError.Unwrap chain, or an Unresolved entry for the field
+read (fields are out of scope) - but it must not vanish silently and must not keep the Unwrap chain.
+-- args --
+processor/as.go:@typeSwitchIface
+-- stdout --
+$WORK/processor/as.go:117:26-42: Error Set of example.com/guards/processor.LookupTypeSwitch: 3 entries, 1 unresolved
+$WORK/payerr/payerr.go:10:2-13: sentinel example.com/guards/payerr.ErrNotFound
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:36:10-60: fmt.Errorf "lookup %d: %w"
+	path (origin → target):
+		$WORK/gateway/gateway.go:36:41-59: in example.com/guards/gateway.Lookup
+		$WORK/processor/as.go:118:14-31: in example.com/guards/processor.LookupTypeSwitch, call to example.com/guards/gateway.Lookup
+$WORK/payerr/payerr.go:11:2-16: sentinel example.com/guards/payerr.ErrRateLimited
+	path (origin → target):
+		$WORK/gateway/gateway.go:40:10-31: in example.com/guards/gateway.Lookup
+		$WORK/processor/as.go:118:14-31: in example.com/guards/processor.LookupTypeSwitch, call to example.com/guards/gateway.Lookup
+$WORK/processor/as.go:122:10-15: unresolved(memory): load of field Err of *example.com/guards/payerr.OpError
+	path (origin → target):
+		$WORK/processor/as.go:122:10-15: in example.com/guards/processor.LookupTypeSwitch

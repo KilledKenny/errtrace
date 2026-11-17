@@ -1,0 +1,26 @@
+Two named error results, both redeclared with := in the same scope, and early returns with nil in either slot.
+Expect the union: engine.ErrClosed, kverr.ErrNotFound (read side), kverr.ErrQuota, concrete kverr.Code, unresolved(no-body) (write side). 5 entries.
+-- args --
+repo/repo.go:@swap
+-- stdout --
+$WORK/repo/repo.go:77:25-29: Error Set of (*example.com/kvstore/repo.Repo).Swap: 5 entries, 1 unresolved
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed [+3 more paths]
+	path (origin → target):
+		$WORK/engine/engine.go:68:15-24: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:78:17-37: in (*example.com/kvstore/repo.Repo).Swap, call to (*example.com/kvstore/engine.Engine).Get
+$WORK/kverr/kverr.go:10:5-16: sentinel example.com/kvstore/kverr.ErrNotFound [+1 more paths]
+	path (origin → target):
+		$WORK/engine/engine.go:72:15-32: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:78:17-37: in (*example.com/kvstore/repo.Repo).Swap, call to (*example.com/kvstore/engine.Engine).Get
+$WORK/kverr/kverr.go:33:5-13: sentinel example.com/kvstore/kverr.ErrQuota [+1 more paths]
+	path (origin → target):
+		$WORK/engine/engine.go:107:10-24: in (*example.com/kvstore/engine.Engine).Put
+		$WORK/repo/repo.go:86:16-40: in (*example.com/kvstore/repo.Repo).Swap, call to (*example.com/kvstore/engine.Engine).Put
+$WORK/engine/engine.go:104:3-3: concrete example.com/kvstore/kverr.Code [+1 more paths]
+	path (origin → target):
+		$WORK/engine/engine.go:104:3-3: in (*example.com/kvstore/engine.Engine).Put
+		$WORK/repo/repo.go:86:16-40: in (*example.com/kvstore/repo.Repo).Swap, call to (*example.com/kvstore/engine.Engine).Put
+$WORK/engine/engine.go:111:19-34: unresolved(no-body): example.com/kvstore/engine.fsync has no body [+1 more paths]
+	path (origin → target):
+		$WORK/engine/engine.go:111:19-34: in (*example.com/kvstore/engine.Engine).Put
+		$WORK/repo/repo.go:86:16-40: in (*example.com/kvstore/repo.Repo).Swap, call to (*example.com/kvstore/engine.Engine).Put

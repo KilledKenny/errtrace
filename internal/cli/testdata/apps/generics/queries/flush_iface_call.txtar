@@ -1,0 +1,11 @@
+Generic methods called through the non-generic interface Flusher; the values are *Cache[string,int],
+*Cache[UserID,Name] and *TTL[string,int]. Expect 3 Candidates and ErrEmpty from the two Cache instances;
+(*TTL).Flush swallows ErrEmpty and contributes nothing.
+-- args --
+caching.go:@flush
+-- stdout --
+$WORK/caching.go:86:13-32: Error Set of call to f.Flush in example.com/generics.flushAll: 1 entries
+$WORK/errs/errs.go:13:2-10: sentinel example.com/generics/errs.ErrEmpty [+1 more paths]
+	path (origin → target):
+		$WORK/cache/cache.go:67:10-23: in (*example.com/generics/cache.Cache[example.com/generics/validate.UserID, example.com/generics/validate.Name]).Flush
+		$WORK/caching.go:86:13-32: in example.com/generics.flushAll, call to (*example.com/generics/cache.Cache[example.com/generics/validate.UserID, example.com/generics/validate.Name]).Flush (dynamic (example.com/generics/cache.Flusher).Flush: 3 of 3 candidates)

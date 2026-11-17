@@ -1,0 +1,6 @@
+Negative: errors.Is(err, ErrNotFound) directly over (*Repo[UserID,User]).Find, whose only origin is ErrNotFound
+wrapped with "find %v: %w" inside the generic method (only when err != nil). The guard sees through the wrap: expect 0 entries.
+-- args --
+handling.go:@missingok
+-- stdout --
+$WORK/handling.go:72:20-29: Error Set of example.com/generics.missingOK: 0 entries

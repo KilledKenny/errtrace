@@ -1,0 +1,21 @@
+Call-site Target on d.Send where d comes from a switch in another
+function. Expected: ErrEmail, ErrSMS, sink.ErrRemote (wrapped); NOT
+core.ErrNoRoute (returned by Route itself, not by the call).
+-- args --
+dispatch/dispatch.go:@route_send
+-- stdout --
+$WORK/dispatch/dispatch.go:225:9-33: Error Set of call to d.Send in example.com/plugins/dispatch.Route: 3 entries
+$WORK/drivers/drivers.go:13:2-10: sentinel example.com/plugins/drivers.ErrEmail
+	path (origin → target):
+		$WORK/drivers/drivers.go:26:10-18: in (example.com/plugins/drivers.Email).Send
+		$WORK/dispatch/dispatch.go:225:9-33: in example.com/plugins/dispatch.Route, call to (example.com/plugins/drivers.Email).Send (dynamic (example.com/plugins/core.Driver).Send: 3 of 3 candidates)
+$WORK/drivers/drivers.go:14:2-8: sentinel example.com/plugins/drivers.ErrSMS
+	path (origin → target):
+		$WORK/drivers/drivers.go:37:10-16: in (*example.com/plugins/drivers.SMS).Send
+		$WORK/dispatch/dispatch.go:225:9-33: in example.com/plugins/dispatch.Route, call to (*example.com/plugins/drivers.SMS).Send (dynamic (example.com/plugins/core.Driver).Send: 3 of 3 candidates)
+$WORK/sink/sink.go:12:5-14: sentinel example.com/plugins/sink.ErrRemote
+	wrap chain (origin → target):
+		$WORK/sink/sink.go:19:10-57: fmt.Errorf "remote %s: %w"
+	path (origin → target):
+		$WORK/sink/sink.go:19:47-56: in (example.com/plugins/sink.Remote).Send
+		$WORK/dispatch/dispatch.go:225:9-33: in example.com/plugins/dispatch.Route, call to (example.com/plugins/sink.Remote).Send (dynamic (example.com/plugins/core.Driver).Send: 3 of 3 candidates)

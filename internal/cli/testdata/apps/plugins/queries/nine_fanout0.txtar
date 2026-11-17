@@ -1,0 +1,40 @@
+-fanout=0 never groups. Expected: the 8 entries of nine_default in full,
+every dynamic hop "N of 9 candidates".
+-- args --
+-fanout=0 dispatch/fanout.go:@nine
+-- stdout --
+$WORK/dispatch/fanout.go:28:15-23: Error Set of example.com/plugins/dispatch.SendNine: 8 entries
+$WORK/drivers/drivers.go:13:2-10: sentinel example.com/plugins/drivers.ErrEmail
+	path (origin → target):
+		$WORK/drivers/drivers.go:26:10-18: in (example.com/plugins/drivers.Email).Send
+		$WORK/dispatch/fanout.go:28:68-91: in example.com/plugins/dispatch.SendNine, call to (example.com/plugins/drivers.Email).Send (dynamic (example.com/plugins/core.Driver).Send: 9 of 9 candidates)
+$WORK/drivers/drivers.go:14:2-8: sentinel example.com/plugins/drivers.ErrSMS
+	path (origin → target):
+		$WORK/drivers/drivers.go:37:10-16: in (*example.com/plugins/drivers.SMS).Send
+		$WORK/dispatch/fanout.go:28:68-91: in example.com/plugins/dispatch.SendNine, call to (*example.com/plugins/drivers.SMS).Send (dynamic (example.com/plugins/core.Driver).Send: 9 of 9 candidates)
+$WORK/drivers/drivers.go:15:2-10: sentinel example.com/plugins/drivers.ErrSlack
+	wrap chain (origin → target):
+		$WORK/drivers/drivers.go:47:10-55: fmt.Errorf "slack %q: %w"
+	path (origin → target):
+		$WORK/drivers/drivers.go:47:46-54: in (example.com/plugins/drivers.Slack).Send
+		$WORK/dispatch/fanout.go:28:68-91: in example.com/plugins/dispatch.SendNine, call to (example.com/plugins/drivers.Slack).Send (dynamic (example.com/plugins/core.Driver).Send: 9 of 9 candidates)
+$WORK/drivers/drivers.go:16:2-10: sentinel example.com/plugins/drivers.ErrPager
+	path (origin → target):
+		$WORK/drivers/drivers.go:82:10-18: in (example.com/plugins/drivers.Pager).Send
+		$WORK/dispatch/fanout.go:28:68-91: in example.com/plugins/dispatch.SendNine, call to (example.com/plugins/drivers.Pager).Send (dynamic (example.com/plugins/core.Driver).Send: 9 of 9 candidates)
+$WORK/drivers/drivers.go:17:2-9: sentinel example.com/plugins/drivers.ErrFile
+	path (origin → target):
+		$WORK/drivers/drivers.go:92:10-17: in (example.com/plugins/drivers.File).Send
+		$WORK/dispatch/fanout.go:28:68-91: in example.com/plugins/dispatch.SendNine, call to (example.com/plugins/drivers.File).Send (dynamic (example.com/plugins/core.Driver).Send: 9 of 9 candidates)
+$WORK/drivers/drivers.go:18:2-10: sentinel example.com/plugins/drivers.ErrQueue
+	path (origin → target):
+		$WORK/drivers/drivers.go:102:10-18: in (example.com/plugins/drivers.Queue).Send
+		$WORK/dispatch/fanout.go:28:68-91: in example.com/plugins/dispatch.SendNine, call to (example.com/plugins/drivers.Queue).Send (dynamic (example.com/plugins/core.Driver).Send: 9 of 9 candidates)
+$WORK/drivers/drivers.go:62:10-31: concrete *example.com/plugins/drivers.HTTPError
+	path (origin → target):
+		$WORK/drivers/drivers.go:62:10-31: in (*example.com/plugins/drivers.Webhook).Send
+		$WORK/dispatch/fanout.go:28:68-91: in example.com/plugins/dispatch.SendNine, call to (*example.com/plugins/drivers.Webhook).Send (dynamic (example.com/plugins/core.Driver).Send: 9 of 9 candidates)
+$WORK/drivers/drivers.go:72:10-47: opaque errors.New "push: negative priority"
+	path (origin → target):
+		$WORK/drivers/drivers.go:72:10-47: in (example.com/plugins/drivers.Push).Send
+		$WORK/dispatch/fanout.go:28:68-91: in example.com/plugins/dispatch.SendNine, call to (example.com/plugins/drivers.Push).Send (dynamic (example.com/plugins/core.Driver).Send: 9 of 9 candidates)

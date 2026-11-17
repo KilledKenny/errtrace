@@ -1,0 +1,10 @@
+Position on the Sel "Ping" of the inner call in annotate(key, s.Ping()): the innermost call wins.
+Expected: 1 entry store.ErrClosed with NO wrap chain (the "%s: %w" wrap belongs to the outer annotate call, see call_outer_with_call_arg); the header span covers only s.Ping().
+-- args --
+cmd/ingest/main.go:@inner_sel
+-- stdout --
+$WORK/cmd/ingest/main.go:97:43-65: Error Set of call to s.Ping in example.com/targets/cmd/ingest.ingest: 1 entries
+$WORK/internal/store/store.go:12:2-11: sentinel example.com/targets/internal/store.ErrClosed
+	path (origin → target):
+		$WORK/internal/store/store.go:62:10-19: in (example.com/targets/internal/store.Store).Ping
+		$WORK/cmd/ingest/main.go:97:43-65: in example.com/targets/cmd/ingest.ingest, call to (example.com/targets/internal/store.Store).Ping

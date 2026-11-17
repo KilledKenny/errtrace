@@ -1,0 +1,15 @@
+SUSPECTED BUG: &xerr.OpError{Err: upper(d)} is built unconditionally, so the
+result is non-nil even when upper returns nil. Expected 2 entries: doc.ErrNoTitle
+[*xerr.OpError.Unwrap] and concrete *xerr.OpError for the nil-inner case (as in
+wrapper_nil_inner). Actual: only doc.ErrNoTitle; the nil-inner wrapper is dropped,
+although Always never returns nil.
+-- args --
+transform/transform.go:@always
+-- stdout --
+$WORK/transform/transform.go:93:17-23: Error Set of example.com/wrapchain/transform.Always: 1 entries
+$WORK/doc/doc.go:20:2-12: sentinel example.com/wrapchain/doc.ErrNoTitle
+	wrap chain (origin → target):
+		$WORK/transform/transform.go:94:9-51: *example.com/wrapchain/xerr.OpError.Unwrap
+	path (origin → target):
+		$WORK/transform/transform.go:15:10-24: in example.com/wrapchain/transform.upper
+		$WORK/transform/transform.go:94:42-50: in example.com/wrapchain/transform.Always, call to example.com/wrapchain/transform.upper

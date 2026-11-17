@@ -1,0 +1,9 @@
+Position on the plain argument "key" of s.Get(key).
+Negative: an argument is not the call; exit 2, no target.
+-- args --
+cmd/ingest/main.go:@arg_ident
+-- stdout --
+-- stderr --
+errtrace: $WORK/cmd/ingest/main.go:102:67: no function declaration or call at position
+-- exit --
+2

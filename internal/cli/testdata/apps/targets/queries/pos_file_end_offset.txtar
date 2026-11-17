@@ -1,0 +1,9 @@
+Offset equal to the file size (EOF, one past the final newline): documented as accepted.
+Negative: no target; must not crash. The position is echoed as 8:3 (go/token has no line 9 for a file ending in a newline); see pos_column_out_of_range for the related LINE:COL off-by-one.
+-- args --
+internal/platform/platform.go:#180
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/platform/platform.go:8:3: no function declaration or call at position
+-- exit --
+2

@@ -1,0 +1,12 @@
+Call site of When inside Line: the callee's set without the caller's wrap.
+Expect 1 entry: ErrBadDate with only the "%w: near %q" chain (no "transfer %d: %w").
+-- args --
+parse/parse.go:@when_call
+-- stdout --
+$WORK/parse/parse.go:109:30-45: Error Set of call to When in example.com/bank/parse.Line: 1 entries
+$WORK/parse/parse.go:16:5-15: sentinel example.com/bank/parse.ErrBadDate
+	wrap chain (origin → target):
+		$WORK/parse/parse.go:49:24-75: fmt.Errorf "%w: near %q"
+	path (origin → target):
+		$WORK/parse/parse.go:49:50-60: in example.com/bank/parse.When
+		$WORK/parse/parse.go:109:30-45: in example.com/bank/parse.Line, call to example.com/bank/parse.When

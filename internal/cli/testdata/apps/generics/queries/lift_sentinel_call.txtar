@@ -1,0 +1,11 @@
+Lift instantiated with E = error and a sentinel argument.
+Expect one entry, sentinel ErrNotFound.
+-- args --
+failures.go:@liftsent
+-- stdout --
+$WORK/failures.go:73:9-49: Error Set of call to errs.Lift in example.com/generics.liftBoth: 1 entries
+$WORK/errs/errs.go:12:2-13: sentinel example.com/generics/errs.ErrNotFound
+	path (origin → target):
+		$WORK/failures.go:73:32-48: in example.com/generics.liftBoth
+		$WORK/errs/errs.go:66:49-50: in example.com/generics/errs.Lift[error]
+		$WORK/failures.go:73:9-49: in example.com/generics.liftBoth, call to example.com/generics/errs.Lift[error]

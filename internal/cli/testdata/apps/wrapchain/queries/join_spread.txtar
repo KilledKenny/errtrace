@@ -1,0 +1,12 @@
+errors.Join(errs...) over a slice filled with append. Under Go semantics the set
+is doc.ErrNoTitle and doc.ErrEmpty under errors.Join. By design (plan S05) a spread
+slice that is not followed shows as unresolved(memory) under errors.Join instead.
+-- args --
+validate/validate.go:@collect
+-- stdout --
+$WORK/validate/validate.go:50:18-25: Error Set of example.com/wrapchain/validate.Collect: 1 entries, 1 unresolved
+$WORK/validate/validate.go:58:9-29: unresolved(memory): operands of errors.Join passed in a slice that is not followed
+	wrap chain (origin → target):
+		$WORK/validate/validate.go:58:9-29: errors.Join
+	path (origin → target):
+		$WORK/validate/validate.go:58:9-29: in example.com/wrapchain/validate.Collect

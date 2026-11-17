@@ -1,0 +1,38 @@
+errors.Join(Refund(n), Void(n)) guarded by if errors.Is(err, ErrInternal) { return nil }; both operands may be nil.
+Run-time truth: whenever either operand is ErrInternal the join matches, so ErrInternal never comes out;
+ErrDeclined (via Refund's inner join and via Void) and ErrDuplicate stay under errors.Join chains.
+Recorded: those 3 plus ErrInternal kept and marked possibly handled "wrapped value may be nil". Not flagged:
+this is the deliberate conservative rule for a Wrap whose operands may be nil (e2e guards/is_join_nil_operand):
+the join is filtered as one value that does not definitely contain ErrInternal. No entry may be missing.
+-- args --
+processor/is.go:@joinMaybe
+-- stdout --
+$WORK/processor/is.go:88:20-35: Error Set of example.com/guards/processor.RefundJoinMaybe: 4 entries, 1 possibly handled
+$WORK/payerr/payerr.go:8:2-13: sentinel example.com/guards/payerr.ErrDeclined
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:48:10-62: errors.Join
+		$WORK/processor/is.go:89:9-56: errors.Join
+	path (origin → target):
+		$WORK/gateway/gateway.go:48:22-40: in example.com/guards/gateway.Refund
+		$WORK/processor/is.go:89:21-38: in example.com/guards/processor.RefundJoinMaybe, call to example.com/guards/gateway.Refund
+$WORK/payerr/payerr.go:8:2-13: sentinel example.com/guards/payerr.ErrDeclined
+	wrap chain (origin → target):
+		$WORK/processor/is.go:89:9-56: errors.Join
+	path (origin → target):
+		$WORK/gateway/gateway.go:59:10-28: in example.com/guards/gateway.Void
+		$WORK/processor/is.go:89:40-55: in example.com/guards/processor.RefundJoinMaybe, call to example.com/guards/gateway.Void
+$WORK/payerr/payerr.go:12:2-13: sentinel example.com/guards/payerr.ErrInternal [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/processor/is.go:89:9-56: errors.Join
+	possibly handled:
+		$WORK/processor/is.go:90:5-39: errors.Is with example.com/guards/payerr.ErrInternal: wrapped value may be nil
+	path (origin → target):
+		$WORK/gateway/gateway.go:62:10-28: in example.com/guards/gateway.Void
+		$WORK/processor/is.go:89:40-55: in example.com/guards/processor.RefundJoinMaybe, call to example.com/guards/gateway.Void
+$WORK/payerr/payerr.go:13:2-14: sentinel example.com/guards/payerr.ErrDuplicate
+	wrap chain (origin → target):
+		$WORK/gateway/gateway.go:48:10-62: errors.Join
+		$WORK/processor/is.go:89:9-56: errors.Join
+	path (origin → target):
+		$WORK/gateway/gateway.go:48:42-61: in example.com/guards/gateway.Refund
+		$WORK/processor/is.go:89:21-38: in example.com/guards/processor.RefundJoinMaybe, call to example.com/guards/gateway.Refund

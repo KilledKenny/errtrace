@@ -1,0 +1,12 @@
+InRange[N] returns &TypedErr[N]: a generic error type instantiated with the type parameter (min/max builtins are noise).
+Instances are InRange[UserID] and InRange[float64]: expect concrete *TypedErr[validate.UserID] and *TypedErr[float64], no *TypedErr[int].
+-- args --
+validate/validate.go:@inrange
+-- stdout --
+$WORK/validate/validate.go:104:18-25: Error Set of example.com/generics/validate.InRange: 2 entries
+$WORK/validate/validate.go:106:10-48: concrete *example.com/generics/errs.TypedErr[example.com/generics/validate.UserID]
+	path (origin → target):
+		$WORK/validate/validate.go:106:10-48: in example.com/generics/validate.InRange[example.com/generics/validate.UserID]
+$WORK/validate/validate.go:106:10-48: concrete *example.com/generics/errs.TypedErr[float64]
+	path (origin → target):
+		$WORK/validate/validate.go:106:10-48: in example.com/generics/validate.InRange[float64]

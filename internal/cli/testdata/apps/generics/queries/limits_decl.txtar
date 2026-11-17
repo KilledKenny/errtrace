@@ -1,0 +1,18 @@
+Non-generic caller of three type-set instances (Positive[int], InRange[UserID], InRange[float64]).
+Expect ErrNegative, *TypedErr[validate.UserID] and *TypedErr[float64].
+-- args --
+validation.go:@limits
+-- stdout --
+$WORK/validation.go:32:17-28: Error Set of example.com/generics.checkLimits: 3 entries
+$WORK/errs/errs.go:14:2-13: sentinel example.com/generics/errs.ErrNegative
+	path (origin → target):
+		$WORK/validate/validate.go:98:10-26: in example.com/generics/validate.Positive[int]
+		$WORK/validation.go:33:12-45: in example.com/generics.checkLimits, call to example.com/generics/validate.Positive[int]
+$WORK/validate/validate.go:106:10-48: concrete *example.com/generics/errs.TypedErr[example.com/generics/validate.UserID]
+	path (origin → target):
+		$WORK/validate/validate.go:106:10-48: in example.com/generics/validate.InRange[example.com/generics/validate.UserID]
+		$WORK/validation.go:36:12-53: in example.com/generics.checkLimits, call to example.com/generics/validate.InRange[example.com/generics/validate.UserID]
+$WORK/validate/validate.go:106:10-48: concrete *example.com/generics/errs.TypedErr[float64]
+	path (origin → target):
+		$WORK/validate/validate.go:106:10-48: in example.com/generics/validate.InRange[float64]
+		$WORK/validation.go:39:9-38: in example.com/generics.checkLimits, call to example.com/generics/validate.InRange[float64]

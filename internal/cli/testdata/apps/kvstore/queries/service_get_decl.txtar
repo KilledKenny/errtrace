@@ -1,0 +1,182 @@
+Long chain service -> validate / repo -> engine, with mutual recursion (resolve <-> follow) that wraps on every round.
+Expect: Key's 4 origins with chain "get: %w"; ErrLoop, and ErrClosed/ErrNotFound under "repo: load %s: %w",
+each also under 1..n "alias %s: %w" wraps, truncated at -chain-depth=3.
+-- args --
+-chain-depth=3 service/service.go:@get
+-- stdout --
+$WORK/service/service.go:31:27-30: Error Set of (*example.com/kvstore/service.Service).Get: 17 entries
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:48:15-56: fmt.Errorf "repo: load %s: %w"
+	path (origin → target):
+		$WORK/engine/engine.go:68:15-24: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:46:12-47: in (*example.com/kvstore/repo.Repo).Load, call to (*example.com/kvstore/engine.Engine).Get
+		$WORK/service/service.go:43:12-28: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/repo.Repo).Load
+		$WORK/service/service.go:35:9-43: in (*example.com/kvstore/service.Service).Get, call to (*example.com/kvstore/service.Service).resolve
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:48:15-56: fmt.Errorf "repo: load %s: %w"
+		$WORK/service/service.go:56:14-50: fmt.Errorf "alias %s: %w"
+	path (origin → target):
+		$WORK/engine/engine.go:68:15-24: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:46:12-47: in (*example.com/kvstore/repo.Repo).Load, call to (*example.com/kvstore/engine.Engine).Get
+		$WORK/service/service.go:43:12-28: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/repo.Repo).Load
+		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
+		$WORK/service/service.go:35:9-43: in (*example.com/kvstore/service.Service).Get, call to (*example.com/kvstore/service.Service).resolve
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:48:15-56: fmt.Errorf "repo: load %s: %w"
+		$WORK/service/service.go:56:14-50: fmt.Errorf "alias %s: %w"
+		$WORK/service/service.go:56:14-50: fmt.Errorf "alias %s: %w"
+	path (origin → target):
+		$WORK/engine/engine.go:68:15-24: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:46:12-47: in (*example.com/kvstore/repo.Repo).Load, call to (*example.com/kvstore/engine.Engine).Get
+		$WORK/service/service.go:43:12-28: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/repo.Repo).Load
+		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
+		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
+		$WORK/service/service.go:35:9-43: in (*example.com/kvstore/service.Service).Get, call to (*example.com/kvstore/service.Service).resolve
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed [chain truncated]
+	wrap chain (origin → target):
+		$WORK/service/service.go:56:14-50: fmt.Errorf "alias %s: %w"
+		$WORK/service/service.go:56:14-50: fmt.Errorf "alias %s: %w"
+		$WORK/service/service.go:56:14-50: fmt.Errorf "alias %s: %w"
+	path (origin → target):
+		$WORK/engine/engine.go:68:15-24: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:46:12-47: in (*example.com/kvstore/repo.Repo).Load, call to (*example.com/kvstore/engine.Engine).Get
+		$WORK/service/service.go:43:12-28: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/repo.Repo).Load
+		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
+		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
+		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
+		$WORK/service/service.go:35:9-43: in (*example.com/kvstore/service.Service).Get, call to (*example.com/kvstore/service.Service).resolve
+$WORK/kverr/kverr.go:10:5-16: sentinel example.com/kvstore/kverr.ErrNotFound
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:48:15-56: fmt.Errorf "repo: load %s: %w"
+	path (origin → target):
+		$WORK/engine/engine.go:72:15-32: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:46:12-47: in (*example.com/kvstore/repo.Repo).Load, call to (*example.com/kvstore/engine.Engine).Get
+		$WORK/service/service.go:43:12-28: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/repo.Repo).Load
+		$WORK/service/service.go:35:9-43: in (*example.com/kvstore/service.Service).Get, call to (*example.com/kvstore/service.Service).resolve
+$WORK/kverr/kverr.go:10:5-16: sentinel example.com/kvstore/kverr.ErrNotFound
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:48:15-56: fmt.Errorf "repo: load %s: %w"
+		$WORK/service/service.go:56:14-50: fmt.Errorf "alias %s: %w"
+	path (origin → target):
+		$WORK/engine/engine.go:72:15-32: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:46:12-47: in (*example.com/kvstore/repo.Repo).Load, call to (*example.com/kvstore/engine.Engine).Get
+		$WORK/service/service.go:43:12-28: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/repo.Repo).Load
+		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
+		$WORK/service/service.go:35:9-43: in (*example.com/kvstore/service.Service).Get, call to (*example.com/kvstore/service.Service).resolve
+$WORK/kverr/kverr.go:10:5-16: sentinel example.com/kvstore/kverr.ErrNotFound
+	wrap chain (origin → target):
+		$WORK/repo/repo.go:48:15-56: fmt.Errorf "repo: load %s: %w"
+		$WORK/service/service.go:56:14-50: fmt.Errorf "alias %s: %w"
+		$WORK/service/service.go:56:14-50: fmt.Errorf "alias %s: %w"
+	path (origin → target):
+		$WORK/engine/engine.go:72:15-32: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:46:12-47: in (*example.com/kvstore/repo.Repo).Load, call to (*example.com/kvstore/engine.Engine).Get
+		$WORK/service/service.go:43:12-28: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/repo.Repo).Load
+		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
+		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
+		$WORK/service/service.go:35:9-43: in (*example.com/kvstore/service.Service).Get, call to (*example.com/kvstore/service.Service).resolve
+$WORK/kverr/kverr.go:10:5-16: sentinel example.com/kvstore/kverr.ErrNotFound [chain truncated]
+	wrap chain (origin → target):
+		$WORK/service/service.go:56:14-50: fmt.Errorf "alias %s: %w"
+		$WORK/service/service.go:56:14-50: fmt.Errorf "alias %s: %w"
+		$WORK/service/service.go:56:14-50: fmt.Errorf "alias %s: %w"
+	path (origin → target):
+		$WORK/engine/engine.go:72:15-32: in (*example.com/kvstore/engine.Engine).Get
+		$WORK/repo/repo.go:46:12-47: in (*example.com/kvstore/repo.Repo).Load, call to (*example.com/kvstore/engine.Engine).Get
+		$WORK/service/service.go:43:12-28: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/repo.Repo).Load
+		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
+		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
+		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
+		$WORK/service/service.go:35:9-43: in (*example.com/kvstore/service.Service).Get, call to (*example.com/kvstore/service.Service).resolve
+$WORK/kverr/kverr.go:44:5-16: sentinel example.com/kvstore/kverr.ErrEmptyKey
+	wrap chain (origin → target):
+		$WORK/service/service.go:33:14-40: fmt.Errorf "get: %w"
+	path (origin → target):
+		$WORK/validate/validate.go:13:10-27: in example.com/kvstore/validate.Key
+		$WORK/service/service.go:32:12-42: in (*example.com/kvstore/service.Service).Get, call to example.com/kvstore/validate.Key
+$WORK/service/service.go:15:5-12: sentinel example.com/kvstore/service.ErrLoop
+	path (origin → target):
+		$WORK/service/service.go:41:14-21: in (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:35:9-43: in (*example.com/kvstore/service.Service).Get, call to (*example.com/kvstore/service.Service).resolve
+$WORK/service/service.go:15:5-12: sentinel example.com/kvstore/service.ErrLoop
+	wrap chain (origin → target):
+		$WORK/service/service.go:56:14-50: fmt.Errorf "alias %s: %w"
+	path (origin → target):
+		$WORK/service/service.go:41:14-21: in (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
+		$WORK/service/service.go:35:9-43: in (*example.com/kvstore/service.Service).Get, call to (*example.com/kvstore/service.Service).resolve
+$WORK/service/service.go:15:5-12: sentinel example.com/kvstore/service.ErrLoop
+	wrap chain (origin → target):
+		$WORK/service/service.go:56:14-50: fmt.Errorf "alias %s: %w"
+		$WORK/service/service.go:56:14-50: fmt.Errorf "alias %s: %w"
+	path (origin → target):
+		$WORK/service/service.go:41:14-21: in (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
+		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
+		$WORK/service/service.go:35:9-43: in (*example.com/kvstore/service.Service).Get, call to (*example.com/kvstore/service.Service).resolve
+$WORK/service/service.go:15:5-12: sentinel example.com/kvstore/service.ErrLoop
+	wrap chain (origin → target):
+		$WORK/service/service.go:56:14-50: fmt.Errorf "alias %s: %w"
+		$WORK/service/service.go:56:14-50: fmt.Errorf "alias %s: %w"
+		$WORK/service/service.go:56:14-50: fmt.Errorf "alias %s: %w"
+	path (origin → target):
+		$WORK/service/service.go:41:14-21: in (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
+		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
+		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
+		$WORK/service/service.go:35:9-43: in (*example.com/kvstore/service.Service).Get, call to (*example.com/kvstore/service.Service).resolve
+$WORK/service/service.go:15:5-12: sentinel example.com/kvstore/service.ErrLoop [chain truncated]
+	wrap chain (origin → target):
+		$WORK/service/service.go:56:14-50: fmt.Errorf "alias %s: %w"
+		$WORK/service/service.go:56:14-50: fmt.Errorf "alias %s: %w"
+		$WORK/service/service.go:56:14-50: fmt.Errorf "alias %s: %w"
+	path (origin → target):
+		$WORK/service/service.go:41:14-21: in (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
+		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
+		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
+		$WORK/service/service.go:54:14-41: in (*example.com/kvstore/service.Service).follow, call to (*example.com/kvstore/service.Service).resolve
+		$WORK/service/service.go:47:9-51: in (*example.com/kvstore/service.Service).resolve, call to (*example.com/kvstore/service.Service).follow
+		$WORK/service/service.go:35:9-43: in (*example.com/kvstore/service.Service).Get, call to (*example.com/kvstore/service.Service).resolve
+$WORK/validate/validate.go:16:10-68: concrete example.com/kvstore/kverr.FieldError
+	wrap chain (origin → target):
+		$WORK/service/service.go:33:14-40: fmt.Errorf "get: %w"
+	path (origin → target):
+		$WORK/validate/validate.go:16:10-68: in example.com/kvstore/validate.Key
+		$WORK/service/service.go:32:12-42: in (*example.com/kvstore/service.Service).Get, call to example.com/kvstore/validate.Key
+$WORK/validate/validate.go:19:3-3: concrete example.com/kvstore/kverr.Reason
+	wrap chain (origin → target):
+		$WORK/service/service.go:33:14-40: fmt.Errorf "get: %w"
+	path (origin → target):
+		$WORK/validate/validate.go:19:3-3: in example.com/kvstore/validate.Key
+		$WORK/service/service.go:32:12-42: in (*example.com/kvstore/service.Service).Get, call to example.com/kvstore/validate.Key
+$WORK/validate/validate.go:22:3-3: concrete example.com/kvstore/kverr.Code
+	wrap chain (origin → target):
+		$WORK/service/service.go:33:14-40: fmt.Errorf "get: %w"
+	path (origin → target):
+		$WORK/validate/validate.go:22:3-3: in example.com/kvstore/validate.Key
+		$WORK/service/service.go:32:12-42: in (*example.com/kvstore/service.Service).Get, call to example.com/kvstore/validate.Key

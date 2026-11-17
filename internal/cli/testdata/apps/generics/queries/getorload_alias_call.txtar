@@ -1,0 +1,15 @@
+SUSPECTED BUG: the concrete *TypedErr[string] origin is missing; the only entry is unresolved(memory)
+"*errs.Wrapped[string].Unwrap not modelled" (see deep_wrap_decl).
+GetOrLoad replaces ErrNotFound (== guard) by the loader's error, wrapped by the generic Wrap[string].
+The loader returns &errs.Failure[string]{} (generic alias of TypedErr): expect one concrete *TypedErr[string]
+with wrap chain *Wrapped[string].Unwrap; ErrNotFound must not appear.
+-- args --
+caching.go:@lazy
+-- stdout --
+$WORK/caching.go:36:9-38:4: Error Set of call to c.GetOrLoad in example.com/generics.lazy: 1 entries, 1 unresolved
+$WORK/errs/errs.go:52:9-40: unresolved(memory): *example.com/generics/errs.Wrapped[string].Unwrap not modelled
+	wrap chain (origin → target):
+		$WORK/errs/errs.go:52:9-40: *example.com/generics/errs.Wrapped[string].Unwrap
+	path (origin → target):
+		$WORK/errs/errs.go:52:9-40: in example.com/generics/errs.Wrap[string]
+		$WORK/caching.go:36:9-38:4: in example.com/generics.lazy, call to example.com/generics/errs.Wrap[string]

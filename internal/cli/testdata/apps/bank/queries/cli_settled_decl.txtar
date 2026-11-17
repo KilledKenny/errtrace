@@ -1,0 +1,109 @@
+errors.As, then re-wrapping a FIELD of the matched error: "cli: transfer number %q: %w" wraps ne.Err.
+Go semantics: strconv.ErrSyntax / ErrRange behind that errorf (no NumError in the chain), plus
+service.ErrUnsupported and NotFoundError[TransferID] from svc.Settled. Field loads are out of scope, so expect
+unresolved(memory) "load of field Err" behind the errorf instead of the strconv sentinels, and no *strconv.NumError
+chain (As always matches). The bare internal/strconv.Error entries are the noise described in parse_amount_decl.
+-- args --
+cmd/cli/main.go:@settled
+-- stdout --
+$WORK/cmd/cli/main.go:144:18-25: Error Set of example.com/bank/cmd/cli.settled: 14 entries, 1 unresolved
+$WORK/service/service.go:20:5-19: sentinel example.com/bank/service.ErrUnsupported
+	path (origin → target):
+		$WORK/service/service.go:203:10-24: in (*example.com/bank/service.Service).Settled
+		$WORK/cmd/cli/main.go:153:9-42: in example.com/bank/cmd/cli.settled, call to (*example.com/bank/service.Service).Settled
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/cmd/cli/main.go:145:12-41: in example.com/bank/cmd/cli.settled, call to strconv.ParseInt
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/cmd/cli/main.go:145:12-41: in example.com/bank/cmd/cli.settled, call to strconv.ParseInt
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/cmd/cli/main.go:145:12-41: in example.com/bank/cmd/cli.settled, call to strconv.ParseInt
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/cmd/cli/main.go:145:12-41: in example.com/bank/cmd/cli.settled, call to strconv.ParseInt
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/cmd/cli/main.go:145:12-41: in example.com/bank/cmd/cli.settled, call to strconv.ParseInt
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/cmd/cli/main.go:145:12-41: in example.com/bank/cmd/cli.settled, call to strconv.ParseInt
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/cmd/cli/main.go:145:12-41: in example.com/bank/cmd/cli.settled, call to strconv.ParseInt
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseUint
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt, call to internal/strconv.ParseUint
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/cmd/cli/main.go:145:12-41: in example.com/bank/cmd/cli.settled, call to strconv.ParseInt
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/cmd/cli/main.go:145:12-41: in example.com/bank/cmd/cli.settled, call to strconv.ParseInt
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/cmd/cli/main.go:145:12-41: in example.com/bank/cmd/cli.settled, call to strconv.ParseInt
+$GOROOT/src/internal/strconv/atoi.go:*: concrete internal/strconv.Error
+	path (origin → target):
+		$GOROOT/src/internal/strconv/atoi.go:*: in internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to internal/strconv.ParseInt
+		$GOROOT/src/strconv/number.go:*: in strconv.toError
+		$GOROOT/src/strconv/number.go:*: in strconv.ParseInt, call to strconv.toError
+		$WORK/cmd/cli/main.go:145:12-41: in example.com/bank/cmd/cli.settled, call to strconv.ParseInt
+$WORK/repo/memory/memory.go:88:13-56: concrete example.com/bank/domain.NotFoundError[example.com/bank/domain.TransferID]
+	path (origin → target):
+		$WORK/repo/memory/memory.go:88:13-56: in example.com/bank/repo/memory.lookup[example.com/bank/domain.TransferID, bool]
+		$WORK/repo/memory/memory.go:80:12-42: in (*example.com/bank/repo/memory.Store).FindTransfer, call to example.com/bank/repo/memory.lookup[example.com/bank/domain.TransferID, bool]
+		$WORK/service/service.go:205:9-41: in (*example.com/bank/service.Service).Settled, call to (*example.com/bank/repo/memory.Store).FindTransfer (dynamic (interface{FindTransfer(example.com/bank/domain.TransferID) error}).FindTransfer: 1 of 1 candidates)
+		$WORK/cmd/cli/main.go:153:9-42: in example.com/bank/cmd/cli.settled, call to (*example.com/bank/service.Service).Settled
+$WORK/cmd/cli/main.go:149:61-67: unresolved(memory): load of field Err of *strconv.NumError
+	wrap chain (origin → target):
+		$WORK/cmd/cli/main.go:149:11-68: fmt.Errorf "cli: transfer number %q: %w"
+	path (origin → target):
+		$WORK/cmd/cli/main.go:149:61-67: in example.com/bank/cmd/cli.settled

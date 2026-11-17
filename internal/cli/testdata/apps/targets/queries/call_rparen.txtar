@@ -1,0 +1,9 @@
+Position on the closing paren of s.Get(key).
+Negative: exit 2, "no function declaration or call at position", empty stdout.
+-- args --
+cmd/ingest/main.go:@rparen
+-- stdout --
+-- stderr --
+errtrace: $WORK/cmd/ingest/main.go:102:81: no function declaration or call at position
+-- exit --
+2

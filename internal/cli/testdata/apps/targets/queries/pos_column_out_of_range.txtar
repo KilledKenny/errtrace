@@ -1,0 +1,10 @@
+SUSPECTED BUG (low confidence): column beyond the end of the LAST line. Line 8 is "}" + newline, so it has 1 byte; 8:2 (the newline position) is the last valid column.
+Expected: exit 2, "column 3 is out of range (line 8 has 1 bytes)", as pos_column_two_past_end gets for a line in the middle of the file.
+Actual: 8:3 is accepted (the final newline is counted as part of the last line) and reported back as position 8:3, which does not exist; the failure is "no function declaration or call at position". Mitigating: 8:3 is how the tool itself prints the documented EOF offset #180 (pos_file_end_offset). pos_column_last_line_past_eof shows the same miscount in an error message ("line 8 has 2 bytes").
+-- args --
+internal/platform/platform.go:8:3
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/platform/platform.go:8:3: no function declaration or call at position
+-- exit --
+2

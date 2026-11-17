@@ -1,0 +1,12 @@
+Negative: the Target file does not exist. Expected exit 2 and empty stdout. The message
+is "nosuch/file.go: file is not in any loaded package", the documented error for a
+file outside the loaded packages (plan S02) and the same text as for a file excluded
+by build tags or a _test.go file; a "no such file" hint would be friendlier, but the
+message is not wrong.
+-- args --
+nosuch/file.go:3:1
+-- stdout --
+-- stderr --
+errtrace: $WORK/nosuch/file.go: file is not in any loaded package
+-- exit --
+2

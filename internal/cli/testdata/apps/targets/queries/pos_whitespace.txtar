@@ -1,0 +1,9 @@
+Position on the leading tab of the line "_, err := MaxBatch()".
+Negative: whitespace is no target even though the line holds a call.
+-- args --
+internal/platform/platform.go:6:1
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/platform/platform.go:6:1: no function declaration or call at position
+-- exit --
+2

@@ -1,0 +1,17 @@
+Two comma-separated tags: audit.go needs fast && audit.
+Expected 2 entries: platform.ErrAuditOff, and platform.ErrFastDisabled wrapped "audit: %w". Audit is called by nobody, so the "not reachable from main/init" warning is expected on stderr.
+-- args --
+-tags fast,audit internal/platform/audit.go:@audit
+-- stdout --
+$WORK/internal/platform/audit.go:14:16-21: Error Set of example.com/targets/internal/platform.Audit: 2 entries
+$WORK/internal/platform/audit.go:11:5-16: sentinel example.com/targets/internal/platform.ErrAuditOff
+	path (origin → target):
+		$WORK/internal/platform/audit.go:18:9-20: in example.com/targets/internal/platform.Audit
+$WORK/internal/platform/limits_fast.go:8:5-20: sentinel example.com/targets/internal/platform.ErrFastDisabled
+	wrap chain (origin → target):
+		$WORK/internal/platform/audit.go:16:10-38: fmt.Errorf "audit: %w"
+	path (origin → target):
+		$WORK/internal/platform/limits_fast.go:12:12-27: in example.com/targets/internal/platform.MaxBatch
+		$WORK/internal/platform/audit.go:15:15-25: in example.com/targets/internal/platform.Audit, call to example.com/targets/internal/platform.MaxBatch
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates

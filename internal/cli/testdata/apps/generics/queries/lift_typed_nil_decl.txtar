@@ -1,0 +1,11 @@
+Lift of a nil *TypedErr[int] variable: the result is a non-nil error holding a nil pointer.
+Expect one concrete *TypedErr[int]; ideally marked [typed nil], which is not tracked through the call (precision
+limit, not flagged as a bug).
+-- args --
+failures.go:@liftnil
+-- stdout --
+$WORK/failures.go:77:18-25: Error Set of example.com/generics.liftNil: 1 entries
+$WORK/errs/errs.go:66:49-50: concrete *example.com/generics/errs.TypedErr[int]
+	path (origin → target):
+		$WORK/errs/errs.go:66:49-50: in example.com/generics/errs.Lift[*example.com/generics/errs.TypedErr[int]]
+		$WORK/failures.go:79:9-22: in example.com/generics.liftNil, call to example.com/generics/errs.Lift[*example.com/generics/errs.TypedErr[int]]

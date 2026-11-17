@@ -1,0 +1,9 @@
+Negative: the Target is a helper in a _test.go file. Tests are not loaded (-tests is
+a later step), so the file belongs to no loaded package: exit 2, empty stdout.
+-- args --
+source/source_test.go:@failing
+-- stdout --
+-- stderr --
+errtrace: $WORK/source/source_test.go: file is not in any loaded package
+-- exit --
+2

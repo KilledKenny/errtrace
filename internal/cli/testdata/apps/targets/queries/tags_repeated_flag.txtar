@@ -1,0 +1,9 @@
+The -tags flag given twice: the standard flag package keeps the last value only, so "fast" is dropped.
+Negative: exit 2, audit.go not loaded (same as tags_one_of_two). Documents that tags do not accumulate.
+-- args --
+-tags fast -tags audit internal/platform/audit.go:@audit
+-- stdout --
+-- stderr --
+errtrace: $WORK/internal/platform/audit.go: file is not in any loaded package
+-- exit --
+2

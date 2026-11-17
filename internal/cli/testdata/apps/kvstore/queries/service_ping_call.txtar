@@ -1,0 +1,21 @@
+Call site of the promoted method s.repo.Ping() (selector through an embedded struct, implicit &r.base).
+Expect the same 3 entries as the declaration of (*base).Ping.
+-- args --
+service/service.go:@ping_call
+-- stdout --
+$WORK/service/service.go:163:9-36: Error Set of call to s.repo.Ping in (*example.com/kvstore/service.Service).Health: 3 entries, 1 unresolved
+$WORK/engine/engine.go:14:19-28: sentinel example.com/kvstore/engine.ErrClosed
+	path (origin → target):
+		$WORK/engine/engine.go:195:10-19: in (*example.com/kvstore/engine.Engine).Wait
+		$WORK/repo/repo.go:28:9-21: in (*example.com/kvstore/repo.base).Ping, call to (*example.com/kvstore/engine.Engine).Wait
+		$WORK/service/service.go:163:9-36: in (*example.com/kvstore/service.Service).Health, call to (*example.com/kvstore/repo.base).Ping
+$WORK/kverr/kverr.go:18:2-13: sentinel example.com/kvstore/kverr.errInternal
+	path (origin → target):
+		$WORK/kverr/kverr.go:22:45-56: in example.com/kvstore/kverr.Internal
+		$WORK/repo/repo.go:26:10-26: in (*example.com/kvstore/repo.base).Ping, call to example.com/kvstore/kverr.Internal
+		$WORK/service/service.go:163:9-36: in (*example.com/kvstore/service.Service).Health, call to (*example.com/kvstore/repo.base).Ping
+$WORK/engine/engine.go:196:14-22: unresolved(memory): channel receive in select
+	path (origin → target):
+		$WORK/engine/engine.go:196:14-22: in (*example.com/kvstore/engine.Engine).Wait
+		$WORK/repo/repo.go:28:9-21: in (*example.com/kvstore/repo.base).Ping, call to (*example.com/kvstore/engine.Engine).Wait
+		$WORK/service/service.go:163:9-36: in (*example.com/kvstore/service.Service).Health, call to (*example.com/kvstore/repo.base).Ping
