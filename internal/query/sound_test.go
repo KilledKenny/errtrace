@@ -195,14 +195,14 @@ func TestVerdictSoundOperands(t *testing.T) {
 		{fn: "PanicOfPanicValue", subject: "is ErrO11", truth: true},
 		// It panics with a value that is not the Subject.
 		{fn: "PanicOther", subject: "is ErrO12", wantNo: true},
-	})
-}
-
 		// The verbs of a constant format say which methods are called.
 		{fn: "VerbNoError", subject: "is ErrO13", wantNo: true},
 		{fn: "VerbFormat", subject: "is ErrO14", truth: true},
 		{fn: "VerbGoString", subject: "is ErrO15", truth: true},
 		{fn: "VerbExtra", subject: "is ErrO16", truth: true},
+	})
+}
+
 // TestVerdictSoundLibrary does the same for a program without a main
 // package, where the callers are not all loaded.
 func TestVerdictSoundLibrary(t *testing.T) {
