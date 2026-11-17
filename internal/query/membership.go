@@ -103,9 +103,11 @@ type MembershipResult struct {
 	// reaches and the upward pass did not follow, because it cannot tell
 	// where they write (see mark.Result.ReflectStores), if they can
 	// matter to the Target: all of them after a Maybe, and after a No if
-	// the flooding pass (see Membership) reaches the Target. They are
-	// reported with the Verdict (see ApartFromReflection). It is empty
-	// after a No that the flooding pass confirms.
+	// the flooding pass (see Membership) reaches the Target, then with
+	// the stores that only the flooding pass records (of a value that
+	// one of the others wrote, or that is read through reflection).
+	// They are reported with the Verdict (see ApartFromReflection). It
+	// is empty after a No that the flooding pass confirms.
 	ReflectStores []mark.ReflectStore
 	// MarkRan reports whether the upward pass ran; MarkTime is how long
 	// it took (with the flooding pass, if that ran) and MarkStats what
@@ -146,9 +148,11 @@ func (m *MembershipResult) ApartFromReflection() bool {
 //     recorded stores through reflection that it did not follow, it is
 //     run once more as the flooding pass (mark.Result.Flood), in which
 //     each of them writes every memory location a store through
-//     reflection could write. If that does not reach the Target either,
+//     reflection could write, and every read through reflection may
+//     read what they wrote. If that does not reach the Target either,
 //     the stores cannot matter: a plain No. If it does, they are listed
-//     in ReflectStores: the No does not cover what they write
+//     in ReflectStores, with the stores the flooding pass records
+//     besides: the No does not cover what they write
 //     (ApartFromReflection);
 //   - it does: Maybe, with the Carriers, and with every recorded store
 //     in ReflectStores. The Error Set is no proof that the Subject is
@@ -221,7 +225,8 @@ func Membership(ctx context.Context, prog *load.Program, tgt *target.Target, opt
 	m.FloodRan, m.FloodTime = true, time.Since(floodStart)
 	m.MarkTime += m.FloodTime
 	if reached, trace := targetMarked(flood, tgt); reached {
-		m.ReflectStores, m.FloodTrace = stores, trace
+		// With the stores that only the flooding pass recorded.
+		m.ReflectStores, m.FloodTrace = flood.ReflectStores(), trace
 	}
 	return m, nil
 }

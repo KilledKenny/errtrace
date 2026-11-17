@@ -58,14 +58,20 @@ type ReflectStore struct {
 // reaches and that the pass did not follow (all the way), anywhere in
 // the scanned program, in the order of the scan (the same on every run).
 // Whether they can matter to a Target is what the flooding pass tells
-// (see Flood).
+// (see Flood). On the Result of the flooding pass they come with the
+// stores that only the flood reaches.
 func (r *Result) ReflectStores() []ReflectStore {
 	a := r.a
 	sites := make([]ssa.CallInstruction, 0, len(r.unfollowed))
 	for site := range r.unfollowed {
 		sites = append(sites, site)
 	}
-	sort.Slice(sites, func(i, j int) bool { return a.siteOrd[sites[i]] < a.siteOrd[sites[j]] })
+	sort.Slice(sites, func(i, j int) bool {
+		if oi, oj := a.siteOrd[sites[i]], a.siteOrd[sites[j]]; oi != oj {
+			return oi < oj
+		}
+		return sites[i].Pos() < sites[j].Pos()
+	})
 	out := make([]ReflectStore, len(sites))
 	for i, site := range sites {
 		out[i] = ReflectStore{Site: site, Fn: site.Parent()}

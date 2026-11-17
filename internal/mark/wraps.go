@@ -131,6 +131,9 @@ func (a *analysis) indexCall(site ssa.CallInstruction) {
 				a.addReader(a.atomicLoc(res.At(0).Type()), key{call, 0})
 			}
 		case modelReflect:
+			if reflectReads(call) {
+				a.reflectReads = append(a.reflectReads, call)
+			}
 			res := common.Signature().Results()
 			if reflectBoxes(sc) {
 				a.boxes[call] = true
@@ -705,6 +708,26 @@ func (a *analysis) seedIn(t types.Type, seen map[types.Type]bool, depth int) boo
 			if a.seedIn(u.Field(i).Type(), seen, depth+1) {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+// reflectReads reports whether the call of a function of package reflect
+// is passed a reflect.Value, a *reflect.MapIter or a slice of them, as
+// its receiver or an argument: what it returns may then be read from the
+// memory such a value names (Value.Interface, Elem, Field, Index,
+// MapIndex, Recv, reflect.Indirect, MapIter.Value). A call that is passed
+// none (reflect.ValueOf, New, Zero, MakeSlice) reads no memory: it
+// returns what it is passed, or memory it made.
+func reflectReads(call *ssa.Call) bool {
+	for _, arg := range call.Call.Args {
+		t := arg.Type()
+		if st, ok := t.Underlying().(*types.Slice); ok {
+			t = st.Elem()
+		}
+		if isReflectValue(t) || isReflectIter(t) {
+			return true
 		}
 	}
 	return false

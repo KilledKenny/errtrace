@@ -525,15 +525,19 @@ func RunWith(ctx context.Context, prog *ssa.Program, res Callees, subj Subject, 
 // outcome: every store through reflection that the pass does not follow
 // (all the way) is taken to write every memory location that a store
 // through reflection could write, the type-keyed locations of whatever
-// type (see floodable), with the Marks of the value it stores. What the
-// flooding pass does not reach, no recorded store can put the Subject
-// in, as far as the pass models the program: if it does not reach a
-// Target, the stores that ReflectStores lists do not matter to that
-// Target.
+// type (see floodable), with the Marks of the value it stores, and what
+// it wrote is taken to be what every call of package reflect that is
+// passed a reflect.Value hands out (see floodLocs). What the flooding
+// pass does not reach, no recorded store can put the Subject in, as far
+// as the pass models the program: if it does not reach a Target, the
+// stores that ReflectStores lists do not matter to that Target.
 //
 // It is an upper bound of the pass it is called on, and coarse: it tells
 // whether the recorded stores can matter, not where the Subject is. Its
-// Marks and traces are of use only to show why a store can matter.
+// Marks and traces are of use only to show why a store can matter. Its
+// ReflectStores are those of the pass it is called on and the stores
+// that only the flood reaches: of a value that an earlier store wrote,
+// or that is read through reflection.
 func (r *Result) Flood(ctx context.Context) (*Result, error) {
 	a := r.a
 	f := newAnalysis(a.prog, r.ctxRes, a.subj)
@@ -542,7 +546,17 @@ func (r *Result) Flood(ctx context.Context) (*Result, error) {
 	if err := f.run(ctx); err != nil {
 		return nil, err
 	}
-	return &Result{a: f, unfollowed: f.unfollowed, ctxRes: r.ctxRes}, nil
+	// Its stores are those of r and the ones only the flood reaches: a
+	// store of a value that is marked because of an earlier store may
+	// be the one that writes what a Target reads.
+	stores := make(map[ssa.CallInstruction]bool, len(f.unfollowed)+len(r.unfollowed))
+	for site := range r.unfollowed {
+		stores[site] = true
+	}
+	for site := range f.unfollowed {
+		stores[site] = true
+	}
+	return &Result{a: f, unfollowed: stores, ctxRes: r.ctxRes}, nil
 }
 
 // Marked reports whether v may hold the Subject: v carries a Mark (for a

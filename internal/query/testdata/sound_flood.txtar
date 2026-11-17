@@ -2,7 +2,12 @@ Stores through reflection that the upward pass does not follow, each
 case with a Sentinel or type of its own, and functions that the stored
 value reaches only through such a store: the flooding pass, in which a
 recorded store writes every memory location a store through reflection
-could write, decides whether the stores can matter to the function.
+could write, decides whether the stores can matter to the function. So
+too where the function reads what the store wrote through reflection,
+from a reflect.Value the pass can tie to no memory it names: in the
+flooding pass every call of package reflect that is passed a
+reflect.Value hands out what the flooded memory holds. The program prints
+what errors.Is or errors.As says of each case when it runs.
 -- go.mod --
 module example.com/x
 
@@ -188,6 +193,122 @@ func MadeConcrete() error {
 	return e
 }
 
+// The function reads what the store wrote through reflection, from a
+// reflect.Value made of an interface-typed parameter: the pass cannot
+// tell what memory it names.
+
+var ErrR1 = errors.New("r1")
+
+type S10 struct{ Err error }
+
+var cur10 = &S10{}
+var dest10 = reflect.ValueOf(cur10).Elem().Field(0)
+
+func store10() { dest10.Set(reflect.ValueOf(ErrR1)) }
+
+func read10(x any) error {
+	e, _ := reflect.ValueOf(x).Elem().Field(0).Interface().(error)
+	return e
+}
+
+func AnyRead() error { return read10(cur10) }
+
+// The store writes memory that package reflect made, through a second
+// reflect.Value of it, and the function reads its own Value: by
+// Interface, by MapRange, by Recv and by Index.
+
+var errType = reflect.TypeOf((*error)(nil)).Elem()
+
+var ErrR2 = errors.New("r2")
+
+var dests11 []reflect.Value
+
+func store11() { dests11[0].Set(reflect.ValueOf(ErrR2)) }
+
+func FreshRead() error {
+	v := reflect.New(errType).Elem()
+	dests11 = append(dests11, v)
+	store11()
+	e, _ := v.Interface().(error)
+	return e
+}
+
+var ErrR3 = errors.New("r3")
+
+var dests12 []reflect.Value
+
+func store12() { dests12[0].SetMapIndex(reflect.ValueOf("k"), reflect.ValueOf(ErrR3)) }
+
+func MapRangeRead() error {
+	m := reflect.MakeMap(reflect.TypeOf(map[string]error(nil)))
+	dests12 = append(dests12, m)
+	store12()
+	for it := m.MapRange(); it.Next(); {
+		e, _ := it.Value().Interface().(error)
+		return e
+	}
+	return nil
+}
+
+var ErrR4 = errors.New("r4")
+
+var dests13 []reflect.Value
+
+func store13() { dests13[0].Send(reflect.ValueOf(ErrR4)) }
+
+func RecvRead() error {
+	c := reflect.MakeChan(reflect.TypeOf((chan error)(nil)), 1)
+	dests13 = append(dests13, c)
+	store13()
+	v, _ := c.Recv()
+	e, _ := v.Interface().(error)
+	return e
+}
+
+var ErrR5 = errors.New("r5")
+
+var dests14 []reflect.Value
+
+func store14() { dests14[0].Index(0).Set(reflect.ValueOf(ErrR5)) }
+
+func IndexRead() error {
+	sl := reflect.MakeSlice(reflect.TypeOf([]error(nil)), 1, 1)
+	dests14 = append(dests14, sl)
+	store14()
+	e, _ := sl.Index(0).Interface().(error)
+	return e
+}
+
+// The Value of the fresh memory is handed to the store in a struct.
+
+var ErrR6 = errors.New("r6")
+
+type job15 struct{ dst reflect.Value }
+
+func store15(j *job15) { j.dst.Set(reflect.ValueOf(ErrR6)) }
+
+func StructRead() error {
+	v := reflect.New(errType).Elem()
+	store15(&job15{v})
+	e, _ := v.Interface().(error)
+	return e
+}
+
+// Two stores, the second of what the first wrote: only the flooding pass
+// records the second, which is the one that writes what the function
+// reads.
+
+var ErrR7 = errors.New("r7")
+
+var slot16a, slot16b error
+var dest16a = reflect.ValueOf(&slot16a).Elem()
+var dest16b = reflect.ValueOf(&slot16b).Elem()
+
+func store16a() { dest16a.Set(reflect.ValueOf(ErrR7)) }
+func store16b() { dest16b.Set(reflect.ValueOf(slot16a)) }
+
+func TwoStage() error { return slot16b }
+
 // A function the Subject reaches without reflection: the Verdict is a
 // maybe, with the recorded store listed.
 
@@ -215,6 +336,9 @@ func init() {
 	store6()
 	store7()
 	store8()
+	store10()
+	store16a()
+	store16b()
 }
 
 func main() {
@@ -225,6 +349,9 @@ func main() {
 		errors.Is(WrapperFilled(), ErrF2), errors.Is(WrapperFilledFar(), ErrF2),
 		errors.Is(e3, ErrF3), errors.Is(JoinSlice(), ErrF4), errors.Is(MapWhole(), ErrF5),
 		errors.Is(ArgRoute(slot6), ErrF6), errors.Is(MadeSentinel(), ErrF7), errors.As(MadeConcrete(), &ct),
+		errors.Is(AnyRead(), ErrR1), errors.Is(FreshRead(), ErrR2), errors.Is(MapRangeRead(), ErrR3),
+		errors.Is(RecvRead(), ErrR4), errors.Is(IndexRead(), ErrR5), errors.Is(StructRead(), ErrR6),
+		errors.Is(TwoStage(), ErrR7),
 		errors.Is(Direct(), ErrF2),
 		errors.Is(Clean(), ErrF1), errors.Is(QuietVar(), ErrF1), errors.Is(Clean(), ErrF7), errors.As(QuietVar(), &ct))
 }

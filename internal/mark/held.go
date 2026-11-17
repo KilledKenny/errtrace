@@ -323,6 +323,10 @@ func floodable(k locKind) bool {
 // store, or an earlier one, put the value inside of, as markHeld takes
 // it for a store whose destination is known). Locations named later are
 // marked as they are named (see locInfo).
+//
+// A read through reflection is flooded too: the result of every call of
+// package reflect that is passed a reflect.Value (see reflectReads) is
+// marked as a value loaded from a flooded location is.
 func (a *analysis) floodLocs(planes tags, why reason) {
 	fresh := (planes | freeH) & anyFree &^ a.flooded
 	if fresh == 0 {
@@ -338,6 +342,17 @@ func (a *analysis) floodLocs(planes tags, why reason) {
 		if l := a.locOrder[i]; floodable(l.kind) {
 			a.markLoc(l, fresh, a.floodWhy)
 		}
+	}
+	// What is read through reflection is read from memory the pass
+	// cannot always name: the reflect.Value may be made from an
+	// interface value of unknown dynamic type, or name memory that
+	// package reflect made, which is no location at all. So every call
+	// of package reflect that is passed a reflect.Value hands out what
+	// the flooded memory holds.
+	for _, call := range a.reflectReads {
+		why := a.floodWhy
+		why.fn = call.Call.StaticCallee()
+		a.reflectResults(call, fresh, why)
 	}
 }
 

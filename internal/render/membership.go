@@ -142,11 +142,13 @@ type MembershipInput struct {
 // Mark. A maybe that is not possibly handled ends with the recorded
 // stores. After a no they are listed only if they can matter to the
 // Target: the upward pass is run again with each of them taken to write
-// every memory location a store through reflection could write, and if
+// every memory location a store through reflection could write, and
+// every read through reflection taken to read what they wrote, and if
 // that reaches the Target the no becomes "no, apart from reflection" and
-// is followed by every recorded store; if it does not, the no is plain
-// and nothing is listed. The stores come in the order of the pass (the
-// first 5, all with Full):
+// is followed by every recorded store and the stores that second pass
+// records besides (a store of what another store wrote); if it does not,
+// the no is plain and nothing is listed. The stores come in the order of
+// the pass (the first 5, all with Full):
 //
 //	<TAB>not followed: <X> reaches <N> reflective store[s] whose destination is unknown or only partly followed:
 //	<TAB><TAB><span>: in <function>

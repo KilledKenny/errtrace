@@ -263,7 +263,12 @@ func TestVerdictSoundReflect(t *testing.T) {
 		{fn: "EqReflectNew", subject: "is ErrE1", truth: true},
 		{fn: "EqConvert", subject: "is ErrE2", truth: true},
 		{fn: "NewConcrete", subject: "as *CT8", truth: true},
-		{fn: "EqReflectNew", subject: "is ErrE2", wantNo: true},
+		// It cannot be ErrE2 (the function makes a code6). The Verdict
+		// is a No apart from reflection all the same: a store of a made
+		// value is recorded for ErrE2 (in decode), and the function
+		// reads through reflection (v.Interface()), which the flooding
+		// pass cannot tell from a read of what that store wrote.
+		{fn: "EqReflectNew", subject: "is ErrE2", wantApart: true},
 		{fn: "TypeAssertGeneric", subject: "is ErrX1", wantNo: true},
 		// The documented limit.
 		{fn: "FreshAwayTyped", subject: "is ErrW", truth: true, notFollowed: true},
@@ -318,6 +323,18 @@ func TestVerdictSoundFlood(t *testing.T) {
 		// typed code.
 		{fn: "MadeSentinel", subject: "is ErrF7", truth: true, wantApart: true},
 		{fn: "MadeConcrete", subject: "as CT8", truth: true, wantApart: true},
+		// The function reads what the store wrote through reflection:
+		// from a reflect.Value made of an interface-typed parameter,
+		// and from one of memory that package reflect made (by
+		// Interface, MapRange, Recv, Index; handed over in a struct).
+		{fn: "AnyRead", subject: "is ErrR1", truth: true, wantApart: true},
+		{fn: "FreshRead", subject: "is ErrR2", truth: true, wantApart: true},
+		{fn: "MapRangeRead", subject: "is ErrR3", truth: true, wantApart: true},
+		{fn: "RecvRead", subject: "is ErrR4", truth: true, wantApart: true},
+		{fn: "IndexRead", subject: "is ErrR5", truth: true, wantApart: true},
+		{fn: "StructRead", subject: "is ErrR6", truth: true, wantApart: true},
+		// The second of two stores writes what the function reads.
+		{fn: "TwoStage", subject: "is ErrR7", truth: true, wantApart: true},
 		// A recorded store that cannot matter: the function reads no
 		// memory, or only a variable whose address is never taken.
 		{fn: "Clean", subject: "is ErrF1", wantNo: true},
@@ -325,14 +342,19 @@ func TestVerdictSoundFlood(t *testing.T) {
 		{fn: "Clean", subject: "is ErrF5", wantNo: true},
 		{fn: "Clean", subject: "is ErrF7", wantNo: true},
 		{fn: "QuietVar", subject: "as CT8", wantNo: true},
+		{fn: "Clean", subject: "is ErrR1", wantNo: true},
+		{fn: "QuietVar", subject: "is ErrR2", wantNo: true},
 	})
 }
 
 // TestFloodingPass pins when the flooding pass runs and what the Verdict
 // lists: after a No with recorded stores it runs, and the stores are
-// listed, all of them, if and only if it reaches the Target; after a
-// Maybe every recorded store is listed and it does not run; without a
-// recorded store it does not run.
+// listed if and only if it reaches the Target: all of them, with the
+// stores that only the flooding pass records (the stores of a value read
+// through reflection, here the two of a value that reflection made, and
+// the second of two stores in a row); after a Maybe every recorded store
+// is listed and it does not run; without a recorded store it does not
+// run.
 func TestFloodingPass(t *testing.T) {
 	t.Parallel()
 	p := loadProgram(t, "sound_flood.txtar")
@@ -342,21 +364,26 @@ func TestFloodingPass(t *testing.T) {
 		recorded    int
 		flood       bool
 		listed      int
+		// lists is a function with a store that must be listed.
+		lists string
 	}{
 		// Two stores (the two Sends) are recorded for ErrF1.
-		{"ChanCommaOK", "is ErrF1", query.No, 2, true, 2},
-		{"Clean", "is ErrF1", query.No, 2, true, 0},
-		{"QuietVar", "is ErrF1", query.No, 2, true, 0},
+		{"ChanCommaOK", "is ErrF1", query.No, 2, true, 5, "store1"},
+		{"Clean", "is ErrF1", query.No, 2, true, 0, ""},
+		{"QuietVar", "is ErrF1", query.No, 2, true, 0, ""},
 		// The Subject also reaches the function without reflection.
-		{"Direct", "is ErrF2", query.Maybe, 1, false, 1},
+		{"Direct", "is ErrF2", query.Maybe, 1, false, 1, "store2"},
 		// The store is in a method that only fmt calls.
-		{"ErrorMethodStore", "is ErrF3", query.No, 1, true, 1},
+		{"ErrorMethodStore", "is ErrF3", query.No, 1, true, 4, "Error"},
 		// The flood does not ask where a store could write: the store of
 		// ErrF3 into one wrapper's field counts for the other wrapper.
-		{"WrapperFilled", "is ErrF3", query.No, 1, true, 1},
-		{"Clean", "is ErrF3", query.No, 1, true, 0},
+		{"WrapperFilled", "is ErrF3", query.No, 1, true, 4, "Error"},
+		{"Clean", "is ErrF3", query.No, 1, true, 0, ""},
+		// The store that writes what the function reads is recorded in
+		// the flooding pass only.
+		{"TwoStage", "is ErrR7", query.No, 1, true, 4, "store16b"},
 		// Nothing recorded.
-		{"Clean", "is io.EOF", query.No, 0, false, 0},
+		{"Clean", "is io.EOF", query.No, 0, false, 0, ""},
 	} {
 		m := p.membership(t, c.fn, p.subject(t, c.subject))
 		if m.Verdict != c.verdict || m.MarkStats.ReflectStores != c.recorded || m.FloodRan != c.flood || len(m.ReflectStores) != c.listed {
@@ -367,6 +394,18 @@ func TestFloodingPass(t *testing.T) {
 			t.Errorf("%s, %s: apart from reflection %v, want %v", c.fn, c.subject, m.ApartFromReflection(), apart)
 		} else if apart && len(m.FloodTrace) == 0 {
 			t.Errorf("%s, %s: no trace of the flooding pass to the Target", c.fn, c.subject)
+		}
+		found := c.lists == ""
+		for i, rs := range m.ReflectStores {
+			found = found || rs.Fn.Name() == c.lists
+			for _, earlier := range m.ReflectStores[:i] {
+				if earlier.Site == rs.Site {
+					t.Errorf("%s, %s: a store is listed twice", c.fn, c.subject)
+				}
+			}
+		}
+		if !found {
+			t.Errorf("%s, %s: the store in %s is not listed", c.fn, c.subject, c.lists)
 		}
 	}
 }

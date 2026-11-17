@@ -200,6 +200,9 @@ func (a *analysis) describe(why reason, at ref) (Step, bool) {
 		if at.kind == refLoc {
 			return Step{Site: site(why.site), Desc: "stored through reflection, not followed: taken to write " + a.locString(at.l)}, true
 		}
+		if why.fn != nil {
+			return Step{Site: site(why.site), Desc: fmt.Sprintf("stored through reflection, not followed: taken to be what a call of %s hands out", why.fn)}, true
+		}
 	case kOutside:
 		return Step{Site: site(why.site), Desc: "result of a dynamic call on it: the code called may be outside the loaded program"}, true
 	case kSeedOpaque:
