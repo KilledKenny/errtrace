@@ -2,7 +2,10 @@ Carriers whose traces pass the same pivot are printed as one group: here the typ
 -- args --
 -is example.com/fx.ErrX a.go:@f
 -- stdout --
-$WORK/a.go:20:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: 4 entries could carry it (0 unresolved)
+$WORK/a.go:20:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: 5 entries could carry it (1 unresolved)
+$WORK/a.go:18:5-11: unresolved(memory): value of Sentinel main.stored may wrap other errors: its dynamic type is not known
+	path (origin → target):
+		$WORK/a.go:29:9-15: in example.com/fx.F
 $WORK/a.go:10:37-44: group of 4 entries via: loaded from field inner of example.com/fx.W
 	marked via (origin of example.com/fx.ErrX → here):
 		$WORK/a.go:5:5-9: Sentinel example.com/fx.ErrX

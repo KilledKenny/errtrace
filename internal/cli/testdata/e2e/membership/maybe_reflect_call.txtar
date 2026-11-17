@@ -3,16 +3,15 @@ A function called through reflect.Value.Call: its result comes back in the refle
 -is example.com/fx.ErrX a.go:@f
 -- stdout --
 $WORK/a.go:12:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: 1 entry could carry it (1 unresolved)
-$WORK/a.go:12:31-85: unresolved(memory): value of TypeAssert not modelled
+$WORK/a.go:12:31-77: unresolved(memory): result 0 of (reflect.Value).Interface is not tracked
 	path (origin → target):
-		$WORK/a.go:12:31-85: in example.com/fx.F
+		$WORK/a.go:12:31-77: in example.com/fx.F
 	marked via (origin of example.com/fx.ErrX → here):
 		$WORK/a.go:8:5-9: Sentinel example.com/fx.ErrX
 		$WORK/a.go:10:28-32: loaded from variable example.com/fx.ErrX
 		-: returned by example.com/fx.give to a call through reflection (reflect.Value.Call)
 		$WORK/a.go:12:31-65: loaded from memory of type reflect.Value
 		$WORK/a.go:12:31-77: passed to (reflect.Value).Interface, which returns it
-		$WORK/a.go:12:31-85: type assertion to error
 -- exit --
 3
 -- go.mod --

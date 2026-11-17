@@ -99,7 +99,8 @@ type MembershipResult struct {
 	// Verdict is the answer.
 	Verdict Verdict
 	// Matches are the entries that are the Subject, in output order. With
-	// a Maybe Verdict they are all possibly handled.
+	// a Maybe Verdict each is possibly handled or known only through a
+	// field location (errset.Entry.ViaLocation).
 	Matches []errset.Entry
 	// Carriers are the entries the Subject could come through, nearest
 	// the Target first. They are set when there are no Matches.
@@ -192,7 +193,11 @@ func Membership(ctx context.Context, prog *load.Program, tgt *target.Target, opt
 			continue
 		}
 		m.Matches = append(m.Matches, e)
-		if len(e.PossiblyHandled) > 0 {
+		// A match is a witness only if it is neither possibly handled
+		// nor known through a field location alone (ViaLocation): such
+		// an entry says that some value of that field, somewhere, is the
+		// Subject, not that this Target's value is.
+		if len(e.PossiblyHandled) > 0 || e.ViaLocation != "" {
 			handled++
 		}
 	}
@@ -366,7 +371,15 @@ func (c carriers) carrier(e errset.Entry) (bool, []mark.Step, int) {
 		case errset.NoCandidates:
 			// The function or implementation called may come from
 			// outside the program, and return the Subject.
-			if site, ok := v.Site.(ssa.CallInstruction); !ok || c.marks.FromOutside(site.Common().Value) {
+			site, ok := v.Site.(ssa.CallInstruction)
+			if ok {
+				if _, builtin := site.Common().Value.(*ssa.Builtin); builtin {
+					// recover(): what it returns is a panic value, which
+					// the upward pass follows; no caller supplies it.
+					break
+				}
+			}
+			if !ok || c.marks.FromOutside(site.Common().Value) {
 				return true, nil, -1
 			}
 		}

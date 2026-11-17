@@ -107,7 +107,7 @@ func (in Input) head(e errset.Entry) string {
 		b.WriteString(" [chain may repeat]")
 	}
 	if e.ViaLocation != "" {
-		fmt.Fprintf(b, " [via %s]", e.ViaLocation)
+		fmt.Fprintf(&b, " [via %s]", e.ViaLocation)
 	}
 	if e.MorePaths > 0 {
 		fmt.Fprintf(&b, " [+%d more paths]", e.MorePaths)

@@ -6,8 +6,8 @@ $WORK/a.go:14:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe
 -: group of 2 entries via: a parameter of (*example.com/fx.S).Fail: a caller outside the loaded program may pass example.com/fx.ErrX
 	marked via (origin of example.com/fx.ErrX → here):
 		-: a parameter of (*example.com/fx.S).Fail: a caller outside the loaded program may pass example.com/fx.ErrX
-	$WORK/a.go:16:10-16: unresolved(memory): load of field last of *example.com/fx.S
-	$WORK/a.go:18:9-14: unresolved(memory): load of field err of *example.com/fx.S
+	$WORK/a.go:16:10-16: unresolved(memory): field last of example.com/fx.S may be written by code that is not reachable from the Query's roots
+	$WORK/a.go:18:9-14: unresolved(memory): field err of example.com/fx.S may be written by code that is not reachable from the Query's roots
 -- stderr --
 errtrace: warning: target not reachable from main/init; parameters may lack candidates
 -- exit --

@@ -2,7 +2,7 @@
 -- args --
 -full -is example.com/fx.ErrX a.go:@f
 -- stdout --
-$WORK/a.go:20:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: 4 entries could carry it (0 unresolved)
+$WORK/a.go:20:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: 5 entries could carry it (1 unresolved)
 $WORK/a.go:18:5-11: sentinel example.com/fx.stored
 	path (origin → target):
 		$WORK/a.go:29:9-15: in example.com/fx.F
@@ -14,6 +14,9 @@ $WORK/a.go:18:5-11: sentinel example.com/fx.stored
 		$WORK/a.go:12:27-42: value of type *example.com/fx.W, which may wrap example.com/fx.ErrX
 		$WORK/a.go:33:11-16: returned by example.com/fx.bad
 		$WORK/a.go:33:2-8: stored to variable example.com/fx.stored
+$WORK/a.go:18:5-11: unresolved(memory): value of Sentinel main.stored may wrap other errors: its dynamic type is not known
+	path (origin → target):
+		$WORK/a.go:29:9-15: in example.com/fx.F
 $WORK/a.go:14:35-50: opaque errors.New "a"
 	wrap chain (origin → target):
 		$WORK/a.go:14:25-51: *example.com/fx.W.Unwrap

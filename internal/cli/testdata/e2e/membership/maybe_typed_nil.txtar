@@ -2,13 +2,15 @@ A function result of the Concrete Type converted to error: errors.As finds it ev
 -- args --
 -as *example.com/fx.E a.go:@f
 -- stdout --
-$WORK/a.go:9:12-13: *example.com/fx.E in Error Set of example.com/fx.F: maybe: no entry of the Error Set shows how
-	marked via (origin of *example.com/fx.E → target):
-		$WORK/a.go:9:31-36: value of Concrete Type *example.com/fx.E
+$WORK/a.go:9:12-13: *example.com/fx.E in Error Set of example.com/fx.F: yes
+$WORK/a.go:7:17-17: concrete *example.com/fx.E [typed nil]
+	path (origin → target):
+		$WORK/a.go:7:17-17: in example.com/fx.get
+		$WORK/a.go:9:31-36: in example.com/fx.F, call to example.com/fx.get
 -- stderr --
 errtrace: warning: target not reachable from main/init; parameters may lack candidates
 -- exit --
-3
+0
 -- go.mod --
 module example.com/fx
 

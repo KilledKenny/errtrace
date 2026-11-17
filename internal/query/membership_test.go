@@ -154,11 +154,13 @@ func TestMembership(t *testing.T) {
 		{"Hole", "ErrX", query.No, 0, "", false},
 		// other matches the call and returns ErrY.
 		{"Hole", "ErrY", query.Maybe, 0, "dynamic call to function value example.com/fx.hook", true},
-		{"Stored", "ErrX", query.Maybe, 0, "load of field err of *example.com/fx.box", true},
+		// The field's values are resolved: ErrX is an entry, known only
+		// through the field location, so a maybe without the upward pass.
+		{"Stored", "ErrX", query.Maybe, 1, "", false},
 		{"Stored", "ErrY", query.No, 0, "", false},
-		// Of three Unresolved entries only the field that holds ErrX is a
-		// Carrier.
-		{"Two", "ErrX", query.Maybe, 0, "load of field err of *example.com/fx.box", true},
+		// The field that holds ErrX is resolved to an entry known only
+		// through the field location.
+		{"Two", "ErrX", query.Maybe, 1, "", false},
 		{"Two", "ErrY", query.Maybe, 0, "dynamic call to function value example.com/fx.hook", true},
 		// errors.Is(err, ErrX) guards the return: the upward pass stops
 		// the Mark there and does not reach the Target.

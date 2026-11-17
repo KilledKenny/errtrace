@@ -2,29 +2,17 @@ A deferred closure assigns the Sentinel, taken from a recovered panic, to the na
 -- args --
 -is example.com/fx.ErrX a.go:@f
 -- stdout --
-$WORK/a.go:13:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: 2 entries could carry it (2 unresolved)
--: unresolved(memory): load of escaping variable err
+$WORK/a.go:13:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: 1 entry could carry it (1 unresolved)
+$WORK/a.go:15:11-20: unresolved(no-candidates): dynamic call to function value of type func() interface{} [+1 more paths]
 	path (origin → target):
-		-: in example.com/fx.F
-	marked via (origin of example.com/fx.ErrX → here):
-		$WORK/a.go:5:5-9: Sentinel example.com/fx.ErrX
-		$WORK/a.go:9:9-13: loaded from variable example.com/fx.ErrX
-		$WORK/a.go:9:3-14: stored to the panic value
-		$WORK/a.go:15:11-20: loaded from the panic value
-		$WORK/a.go:16:10-19: type assertion to error
-		$WORK/a.go:16:4-7: stored to variable err
-		-: loaded from variable err
-$WORK/a.go:20:2-2: unresolved(memory): load of escaping variable err
-	path (origin → target):
+		$WORK/a.go:15:11-20: in example.com/fx.F$1
+		$WORK/a.go:16:4-7: in example.com/fx.F$1
 		$WORK/a.go:20:2-2: in example.com/fx.F
 	marked via (origin of example.com/fx.ErrX → here):
 		$WORK/a.go:5:5-9: Sentinel example.com/fx.ErrX
 		$WORK/a.go:9:9-13: loaded from variable example.com/fx.ErrX
 		$WORK/a.go:9:3-14: stored to the panic value
 		$WORK/a.go:15:11-20: loaded from the panic value
-		$WORK/a.go:16:10-19: type assertion to error
-		$WORK/a.go:16:4-7: stored to variable err
-		$WORK/a.go:20:2-2: loaded from variable err
 -- stderr --
 errtrace: warning: target not reachable from main/init; parameters may lack candidates
 -- exit --

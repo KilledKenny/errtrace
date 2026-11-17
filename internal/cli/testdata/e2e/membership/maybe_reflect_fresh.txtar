@@ -3,9 +3,9 @@ A store through reflection into fresh memory (reflect.New) is followed: the Valu
 -is example.com/fx.ErrX a.go:@f
 -- stdout --
 $WORK/a.go:13:12-15: example.com/fx.ErrX in Error Set of example.com/fx.Get: maybe: 1 entry could carry it (1 unresolved)
-$WORK/a.go:16:9-30: unresolved(memory): value of TypeAssert not modelled
+$WORK/a.go:16:9-22: unresolved(memory): result 0 of (reflect.Value).Interface is not tracked
 	path (origin → target):
-		$WORK/a.go:16:9-30: in example.com/fx.Get
+		$WORK/a.go:16:9-22: in example.com/fx.Get
 	marked via (origin of example.com/fx.ErrX → here):
 		$WORK/a.go:9:5-9: Sentinel example.com/fx.ErrX
 		$WORK/a.go:15:24-28: loaded from variable example.com/fx.ErrX
@@ -13,7 +13,6 @@ $WORK/a.go:16:9-30: unresolved(memory): value of TypeAssert not modelled
 		$WORK/a.go:15:2-30: stored through reflection into the memory made by reflect.New
 		$WORK/a.go:14:7-53: returned by example.com/fx.newValue
 		$WORK/a.go:16:9-22: passed to (reflect.Value).Interface, which returns it
-		$WORK/a.go:16:9-30: type assertion to error
 -- exit --
 3
 -- go.mod --

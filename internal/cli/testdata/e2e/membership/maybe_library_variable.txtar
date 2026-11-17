@@ -2,8 +2,11 @@ In a library, an exported variable that the program does not initialize may be s
 -- args --
 -is example.com/fx.ErrX a.go:@f
 -- stdout --
-$WORK/a.go:9:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: 1 entry could carry it (0 unresolved)
+$WORK/a.go:9:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: 2 entries could carry it (1 unresolved)
 $WORK/a.go:7:5-10: sentinel example.com/fx.Saved
+	path (origin → target):
+		$WORK/a.go:9:31-36: in example.com/fx.F
+$WORK/a.go:7:5-10: unresolved(memory): value of Sentinel fx.Saved may wrap other errors: its dynamic type is not known
 	path (origin → target):
 		$WORK/a.go:9:31-36: in example.com/fx.F
 -- stderr --

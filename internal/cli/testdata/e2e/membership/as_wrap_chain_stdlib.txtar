@@ -3,10 +3,73 @@ os.Open returns a *fs.PathError that wraps a syscall.Errno: the Concrete Type is
 -fanout=0 -as *io/fs.PathError a.go:@f
 -- stdout --
 $WORK/a.go:5:12-13: *io/fs.PathError in Error Set of example.com/fx.F: yes
-$GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEAGAIN
 	wrap chain (origin → target):
 		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
 	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.openat, call to syscall.errnoErr
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Open, call to syscall.openat
+		$GOROOT/src/os/file_open_unix.go:*: in os.open, call to syscall.Open
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog$1, call to os.open
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog$1
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.OpenFile, call to os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.Open, call to os.OpenFile
+		$WORK/a.go:6:12-35: in example.com/fx.F, call to os.Open
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errEINVAL
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.openat, call to syscall.errnoErr
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Open, call to syscall.openat
+		$GOROOT/src/os/file_open_unix.go:*: in os.open, call to syscall.Open
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog$1, call to os.open
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog$1
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.OpenFile, call to os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.Open, call to os.OpenFile
+		$WORK/a.go:6:12-35: in example.com/fx.F, call to os.Open
+$GOROOT/src/syscall/syscall_unix.go:*: sentinel syscall.errENOENT
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.openat, call to syscall.errnoErr
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Open, call to syscall.openat
+		$GOROOT/src/os/file_open_unix.go:*: in os.open, call to syscall.Open
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog$1, call to os.open
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog$1
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.OpenFile, call to os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.Open, call to os.OpenFile
+		$WORK/a.go:6:12-35: in example.com/fx.F, call to os.Open
+$GOROOT/src/syscall/syscall.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall.go:*: in syscall.ByteSliceFromString
+		$GOROOT/src/syscall/syscall.go:*: in syscall.BytePtrFromString, call to syscall.ByteSliceFromString
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.openat, call to syscall.BytePtrFromString
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Open, call to syscall.openat
+		$GOROOT/src/os/file_open_unix.go:*: in os.open, call to syscall.Open
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog$1, call to os.open
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog$1
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.OpenFile, call to os.openFileNolog
+		$GOROOT/src/os/file.go:*: in os.Open, call to os.OpenFile
+		$WORK/a.go:6:12-35: in example.com/fx.F, call to os.Open
+$GOROOT/src/syscall/syscall_unix.go:*: concrete syscall.Errno
+	wrap chain (origin → target):
+		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$GOROOT/src/syscall/syscall_unix.go:*: in syscall.errnoErr
+		$GOROOT/src/syscall/zsyscall_linux_amd64.go:*: in syscall.openat, call to syscall.errnoErr
+		$GOROOT/src/syscall/syscall_linux.go:*: in syscall.Open, call to syscall.openat
+		$GOROOT/src/os/file_open_unix.go:*: in os.open, call to syscall.Open
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog$1, call to os.open
+		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog$1
 		$GOROOT/src/os/file_unix.go:*: in os.openFileNolog
 		$GOROOT/src/os/file.go:*: in os.OpenFile, call to os.openFileNolog
 		$GOROOT/src/os/file.go:*: in os.Open, call to os.OpenFile

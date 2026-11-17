@@ -2,13 +2,12 @@ The Error Set resolves the result to a Concrete Type that is not a struct and wr
 -- args --
 -is example.com/fx.ErrX a.go:@f
 -- stdout --
-$WORK/a.go:12:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: 1 entry could carry it (0 unresolved)
-$WORK/a.go:12:31-41: concrete example.com/fx.errs
-	path (origin → target):
-		$WORK/a.go:12:31-41: in example.com/fx.F
+$WORK/a.go:12:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: 2 entries could carry it (1 unresolved)
+-: group of 2 entries via: a parameter of (example.com/fx.errs).Error: a caller outside the loaded program may pass example.com/fx.ErrX
 	marked via (origin of example.com/fx.ErrX → here):
 		-: a parameter of (example.com/fx.errs).Error: a caller outside the loaded program may pass example.com/fx.ErrX
-		-: a value of type example.com/fx.errs is or may wrap example.com/fx.ErrX
+	$WORK/a.go:12:31-41: concrete example.com/fx.errs
+	$WORK/a.go:12:31-41: unresolved(memory): example.com/fx.errs.Unwrap not modelled
 -- stderr --
 errtrace: warning: target not reachable from main/init; parameters may lack candidates
 -- exit --

@@ -2,19 +2,16 @@ The Error Set resolves the result to another Sentinel, ErrY, whose value wraps E
 -- args --
 -is example.com/fx.ErrX a.go:@f
 -- stdout --
-$WORK/a.go:11:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: 1 entry could carry it (0 unresolved)
-$WORK/a.go:9:5-9: sentinel example.com/fx.ErrY
+$WORK/a.go:11:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: yes
+$WORK/a.go:8:5-9: sentinel example.com/fx.ErrX
+	wrap chain (origin → target):
+		$WORK/a.go:9:5-9: fmt.Errorf "y: %w"
 	path (origin → target):
 		$WORK/a.go:11:31-35: in example.com/fx.F
-	marked via (origin of example.com/fx.ErrX → here):
-		$WORK/a.go:8:5-9: Sentinel example.com/fx.ErrX
-		$WORK/a.go:9:32-36: loaded from variable example.com/fx.ErrX
-		$WORK/a.go:9:12-37: wrapped by fmt.Errorf
-		$WORK/a.go:9:5-9: stored to variable example.com/fx.ErrY
 -- stderr --
 errtrace: warning: target not reachable from main/init; parameters may lack candidates
 -- exit --
-3
+0
 -- go.mod --
 module example.com/fx
 

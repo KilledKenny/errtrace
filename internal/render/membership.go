@@ -94,8 +94,11 @@ type MembershipInput struct {
 //	<target-span>: <X> in Error Set of <target>: maybe: 1 entry could carry it (<U> unresolved)
 //	<target-span>: <X> in Error Set of <target>: maybe: no entry of the Error Set shows how
 //	<target-span>: <X> in Error Set of <target>: maybe: possibly handled
+//	<target-span>: <X> in Error Set of <target>: maybe: only through a field location
+//	<target-span>: <X> in Error Set of <target>: maybe: possibly handled, or only through a field location
 //
-// After a yes, and after a maybe that is possibly handled, come the
+// After a yes, and after a maybe whose entries are possibly handled or
+// known only through a field location (tagged [via field ...]), come the
 // entries that are X, as Text prints entries (never grouped). After the
 // maybe with K Carriers come those Carriers, nearest the Target first,
 // each as Text prints the entry plus the trace of its Mark, when there is
@@ -171,7 +174,7 @@ func Membership(w io.Writer, in MembershipInput) error {
 	fmt.Fprintf(&b, "%s: %s in Error Set of %s: %s", in.TargetSpan, in.Subject, in.TargetName, in.Verdict)
 	switch {
 	case in.Verdict == "maybe" && len(in.Matches) > 0:
-		b.WriteString(": possibly handled\n")
+		b.WriteString(": " + uncertain(in.Matches) + "\n")
 		for _, e := range in.Matches {
 			in.entry(&b, e)
 		}
@@ -388,4 +391,24 @@ func (in MembershipInput) pivotGroups() ([]pivotGroup, []bool) {
 	}
 	sort.SliceStable(out, func(i, j int) bool { return len(out[i].members) < len(out[j].members) })
 	return out, grouped
+}
+
+// uncertain says why the entries that are the Subject do not make a yes:
+// each is possibly handled, or is known only through a field location.
+func uncertain(matches []errset.Entry) string {
+	handled, via := false, false
+	for _, e := range matches {
+		if e.ViaLocation != "" {
+			via = true
+		} else if len(e.PossiblyHandled) > 0 {
+			handled = true
+		}
+	}
+	switch {
+	case handled && via:
+		return "possibly handled, or only through a field location"
+	case via:
+		return "only through a field location"
+	}
+	return "possibly handled"
 }

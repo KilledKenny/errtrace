@@ -487,8 +487,11 @@ func TestFloodingPass(t *testing.T) {
 		{"ChanCommaOK", "is ErrF1", query.No, 2, true, 5, "store1"},
 		{"Clean", "is ErrF1", query.No, 2, true, 0, ""},
 		{"QuietVar", "is ErrF1", query.No, 2, true, 0, ""},
-		// The Subject also reaches the function without reflection.
-		{"Direct", "is ErrF2", query.Maybe, 1, false, 1, "store2"},
+		// The Subject also reaches the function without reflection,
+		// through a field: the Error Set has it as an entry known only
+		// through a field location, which is a maybe by itself, so the
+		// upward pass does not run and no store is listed.
+		{"Direct", "is ErrF2", query.Maybe, 0, false, 0, ""},
 		// The store is in a method that only fmt calls.
 		{"ErrorMethodStore", "is ErrF3", query.No, 1, true, 4, "Error"},
 		// The flood does not ask where a store could write: the store of
