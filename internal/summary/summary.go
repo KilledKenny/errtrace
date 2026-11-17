@@ -46,10 +46,28 @@
 //     result, or a check made on a copy of the error in a variable that a
 //     closure captured keeps the typed nil, which the caller may never
 //     get.
+//   - A nil pointer of an error type that is converted to an error
+//     outside the function that made it (pass(nil), where pass returns
+//     its *T parameter as an error) is listed as "concrete *T" without
+//     the [typed nil] mark.
 //   - A Sentinel is listed as itself even where its value is known to be
 //     a wrapper: the Wraps of its initializer are listed beside it, not
 //     in place of it, so a guard on a wrapped value (errors.Is with it)
-//     leaves the bare Sentinel entry.
+//     leaves the bare Sentinel entry and, in a chain of wrapper
+//     Sentinels, the inner Sentinels under the outer Wraps.
+//   - A Sentinel that is assigned outside a package-level initializer
+//     (func init() included) is not opened: it gets the Unresolved entry
+//     "its dynamic type is not known".
+//   - A named result that a deferred closure rewrites from itself (err =
+//     fmt.Errorf("f: %w", err)) is listed bare as well as under the Wrap,
+//     and the Wrap Chain is marked [chain may repeat], though the closure
+//     runs once. A closure that is called as well as deferred, a closure
+//     run as a goroutine, or a deferred call that errtrace cannot resolve
+//     (an interface method, a function value) makes every store to the
+//     variable readable by every load of it.
+//   - The nil-field form of a tracked wrapper (the value as it is once
+//     a later writer has set its field to nil) is not listed below the
+//     chain depth limit.
 //   - A parameter that is a function value resolves to every Candidate
 //     of its type, and a value kept by a guard of the form err == nil ||
 //     err == X is not narrowed: both give entries that cannot occur, and
