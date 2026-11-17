@@ -5,6 +5,7 @@ import (
 	"go/constant"
 	"go/token"
 	"go/types"
+	"math"
 
 	"golang.org/x/tools/go/ssa"
 
@@ -979,7 +980,7 @@ func before(x, y ssa.Instruction) bool {
 // A conversion to an interface (a typed nil
 // included), a new allocation, errors.New and fmt.Errorf are never nil.
 func (a *analyzer) mayBeNil(v ssa.Value, pt point) bool {
-	return a.nilWalk(v, pt, make(map[nilKey]bool), 0)
+	return a.nilWalk(v, pt, newNilSeen(), 0)
 }
 
 // MayBeNil reports whether v, a value of fn used by the instruction at,
@@ -994,16 +995,85 @@ type nilKey struct {
 	pt point
 }
 
-func (a *analyzer) nilWalk(v ssa.Value, pt point, seen map[nilKey]bool, depth int) bool {
+// nilSeen is the state of one mayBeNil walk. A key (a value at a point)
+// that is being walked is open: met again, it is a cycle (of Phis, of
+// Sentinels, of recursive calls), which adds no value of its own. A key
+// whose walk is complete has its answer in done, and gives that answer
+// when it is met again. An answer "not nil" found while a key below it on
+// the stack was open and met holds only if that key is not nil either: it
+// waits (in waiting, with the stack position of the lowest such key)
+// until that key is complete, and is forgotten, to be walked again, if
+// that key may be nil.
+type nilSeen struct {
+	open    map[nilKey]int
+	done    map[nilKey]bool
+	waiting map[nilKey]int
+	// order lists the waiting keys as their walks completed.
+	order []nilKey
+	// low is the lowest stack position of the open keys that the answer
+	// of the key on top of the stack depends on.
+	low int
+}
+
+func newNilSeen() *nilSeen {
+	return &nilSeen{open: make(map[nilKey]int), done: make(map[nilKey]bool), waiting: make(map[nilKey]int), low: math.MaxInt}
+}
+
+func (a *analyzer) nilWalk(v ssa.Value, pt point, seen *nilSeen, depth int) bool {
 	if depth > 4*maxDynDepth {
 		return true
 	}
 	k := nilKey{v, pt}
-	if seen[k] {
-		// A cycle (of Phis or Sentinels) adds no value of its own.
+	if ans, ok := seen.done[k]; ok {
+		return ans
+	}
+	if pos, ok := seen.open[k]; ok {
+		// A cycle adds no value of its own.
+		seen.low = min(seen.low, pos)
 		return false
 	}
-	seen[k] = true
+	if pos, ok := seen.waiting[k]; ok {
+		seen.low = min(seen.low, pos)
+		return false
+	}
+	pos, outer, mark := len(seen.open), seen.low, len(seen.order)
+	seen.open[k], seen.low = pos, math.MaxInt
+	ans := a.nilWalkOpen(v, pt, seen, depth)
+	delete(seen.open, k)
+	low := seen.low
+	seen.low = outer
+	switch {
+	case ans:
+		// Whatever the open keys turn out to be. The answers that waited
+		// for k are walked again when they are needed.
+		seen.done[k] = true
+		for _, w := range seen.order[mark:] {
+			delete(seen.waiting, w)
+		}
+		seen.order = seen.order[:mark]
+	case low >= pos:
+		// k and the answers found during its walk depend on no open key.
+		seen.done[k] = false
+		for _, w := range seen.order[mark:] {
+			delete(seen.waiting, w)
+			seen.done[w] = false
+		}
+		seen.order = seen.order[:mark]
+	default:
+		// The answers found during the walk of k that waited for k now
+		// wait for what k waits for.
+		for _, w := range seen.order[mark:] {
+			seen.waiting[w] = min(seen.waiting[w], low)
+		}
+		seen.waiting[k] = low
+		seen.order = append(seen.order, k)
+		seen.low = min(outer, low)
+	}
+	return ans
+}
+
+// nilWalkOpen is nilWalk for a key that is neither open nor done.
+func (a *analyzer) nilWalkOpen(v ssa.Value, pt point, seen *nilSeen, depth int) bool {
 	if a.fn != nil && a.fn.Blocks != nil && v.Parent() == a.fn && a.funcGuards().isNonNil(pt, v) {
 		return false
 	}
@@ -1073,6 +1143,9 @@ func (a *analyzer) nilReaches(v ssa.Value, pt point) bool {
 }
 
 func (a *analyzer) nilReach(v ssa.Value, pt point, seen map[nilKey]bool, depth int) bool {
+	// The walk stops at the first value that nil reaches, so a key met
+	// again has not been reached by nil: seen can be the cycle guard and
+	// the memo at once (unlike in nilWalk).
 	k := nilKey{v, pt}
 	if depth > 4*maxDynDepth || seen[k] {
 		return false
@@ -1124,7 +1197,7 @@ func (a *analyzer) nilReach(v ssa.Value, pt point, seen map[nilKey]bool, depth i
 // resultMayBeNil reports whether result index of the call may be nil: it
 // may, unless the call has a static callee with a body whose every return
 // gives a value for that result that is never nil there.
-func (a *analyzer) resultMayBeNil(call *ssa.Call, index int, seen map[nilKey]bool, depth int) bool {
+func (a *analyzer) resultMayBeNil(call *ssa.Call, index int, seen *nilSeen, depth int) bool {
 	callee := call.Common().StaticCallee()
 	if callee == nil || callee.Blocks == nil || callee.Recover != nil {
 		// A function that recovers from a panic may return the zero
@@ -1150,7 +1223,7 @@ func (a *analyzer) resultMayBeNil(call *ssa.Call, index int, seen map[nilKey]boo
 // nil: unless its value is a Fresh pointer, or every store of its
 // initialization gives a value that is never nil, and it is not stored to
 // elsewhere.
-func (a *analyzer) globalMayBeNil(g *ssa.Global, seen map[nilKey]bool, depth int) bool {
+func (a *analyzer) globalMayBeNil(g *ssa.Global, seen *nilSeen, depth int) bool {
 	s := a.sentinels()
 	inf := s.Info(g)
 	switch {
