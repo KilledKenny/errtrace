@@ -133,7 +133,16 @@ const openWorldReason = "may be written by code that is not reachable from the Q
 type rawLocation struct {
 	name    string
 	writers []*ssa.Store
-	flags   holeFlags
+	// later are the writers that are not construction stores (see
+	// location.later).
+	later []*ssa.Store
+	// copies are the stores of a whole struct that was loaded through
+	// another pointer (see location.copies).
+	copies []*ssa.Store
+	// overwritten: a struct holding the field is stored whole through a
+	// pointer (see location.overwritten).
+	overwritten bool
+	flags       holeFlags
 	// unreached names a function outside the reachable program that
 	// reflection may call and that writes the field, or is empty.
 	unreached string
@@ -217,6 +226,9 @@ type fieldIndex struct {
 	// an interface or asserts an interface for.
 	invoked map[string]bool
 
+	// asserts are the type assertions to a concrete type outside the
+	// standard library (see fromReflect).
+	asserts []*ssa.TypeAssert
 	// sinks and exposeLater are the values and types found at sinks,
 	// handled once the scan is complete; readSinks are the values at
 	// sinks inside the trusted packages.
@@ -319,6 +331,11 @@ func (s *Solver) index(prog *ssa.Program) *fieldIndex {
 			}
 		}
 	}
+	for _, ta := range ix.asserts {
+		if ix.fromReflect(ta.X, make(map[ssa.Value]bool), 0) {
+			ix.exposeLater = append(ix.exposeLater, exposedType{ta.AssertedType, reachMode{write: true, exported: true}})
+		}
+	}
 	for _, e := range ix.exposeLater {
 		ix.reach(e.t, e.mode)
 	}
@@ -346,6 +363,9 @@ func (s *Solver) index(prog *ssa.Program) *fieldIndex {
 			l.name = r.name
 		}
 		l.writers = append(l.writers, r.writers...)
+		l.later = append(l.later, r.later...)
+		l.copies = append(l.copies, r.copies...)
+		l.overwritten = l.overwritten || r.overwritten
 		l.flags |= r.flags
 		if l.unreached == "" {
 			l.unreached = r.unreached
@@ -408,7 +428,13 @@ func fieldDescription(t types.Type, i int) string {
 	if st, ok := t.Underlying().(*types.Struct); ok && i < st.NumFields() {
 		name = st.Field(i).Name()
 	}
-	return fmt.Sprintf("field %s of %s", name, types.TypeString(t, nil))
+	typ := types.TypeString(t, nil)
+	if n, ok := types.Unalias(t).(*types.Named); ok && n.TypeArgs().Len() > 0 && n.Obj().Pkg() != nil {
+		// The instances of a generic struct type share the location
+		// of a field: it is named after the generic type.
+		typ = n.Obj().Pkg().Path() + "." + n.Obj().Name()
+	}
+	return fmt.Sprintf("field %s of %s", name, typ)
 }
 
 // rawAt returns the scan's record of key k, which is field i of the
@@ -500,11 +526,12 @@ func (ix *fieldIndex) scan(fn *ssa.Function) {
 				ix.flow(instr.X.Type(), instr.Type())
 			case *ssa.TypeAssert:
 				ix.flow(instr.X.Type(), instr.AssertedType)
-				if _, toIface := ix.ifaceKey(instr.AssertedType); !toIface && !ix.std(fn) && fromReflect(instr.X, 0) {
-					// Typed code takes a value out of reflection
-					// (v.Interface().(*T)): reflection may have built
-					// it.
-					ix.exposeLater = append(ix.exposeLater, exposedType{instr.AssertedType, reachMode{write: true, exported: true}})
+				if _, toIface := ix.ifaceKey(instr.AssertedType); !toIface && !ix.std(fn) {
+					// Typed code may be taking a value out of
+					// reflection (v.Interface().(*T)), which may have
+					// built it: decided once every call site is known
+					// (see fromReflect).
+					ix.asserts = append(ix.asserts, instr)
 				}
 			case *ssa.ChangeType:
 				ix.convert(safe, instr.X.Type(), instr.Type())
@@ -512,6 +539,8 @@ func (ix *fieldIndex) scan(fn *ssa.Function) {
 				ix.convert(safe, instr.X.Type(), instr.Type())
 			case *ssa.MakeClosure:
 				ix.closure(instr)
+			case *ssa.Store:
+				ix.wholeStore(instr)
 			case *ssa.DebugRef:
 				// Debug information names values without using them.
 				continue
@@ -561,6 +590,9 @@ func (ix *fieldIndex) fieldAddr(fa *ssa.FieldAddr) {
 				continue
 			}
 			r.writers = append(r.writers, ref)
+			if !freshAddr(fa.X) {
+				r.later = append(r.later, ref)
+			}
 		case *ssa.UnOp:
 			if ref.Op != token.MUL {
 				r.flags |= holeEscapes
@@ -572,25 +604,148 @@ func (ix *fieldIndex) fieldAddr(fa *ssa.FieldAddr) {
 	}
 }
 
-// fromReflect reports whether the interface value v is, in its function,
-// the result of a call to a function or method of reflect.
-func fromReflect(v ssa.Value, depth int) bool {
-	if depth > 8 {
+// freshAddr reports whether addr is the address of a local variable of
+// its function (a composite literal, new(T), a declared variable), or of
+// a struct or array inside one: a store through it writes the value that
+// the function is building or holds itself, never one that it got from
+// elsewhere.
+func freshAddr(addr ssa.Value) bool {
+	for {
+		switch a := addr.(type) {
+		case *ssa.Alloc:
+			return true
+		case *ssa.FieldAddr:
+			addr = a.X
+		case *ssa.IndexAddr:
+			if _, ptr := a.X.Type().Underlying().(*types.Pointer); !ptr {
+				return false // an element of a slice
+			}
+			addr = a.X
+		default:
+			return false
+		}
+	}
+}
+
+// wholeStore indexes a Store of a value that holds structs (a struct, or
+// an array of them) through an address that is not a local variable's:
+// *p = v replaces every field of the struct p points to, and of the
+// structs inside it, by those of another value. If v is a struct loaded
+// through a pointer (*p = *q), the store is a copy for each field of the
+// struct: the field gets what that field of *q holds. Otherwise, and for
+// the structs held by value inside it, the locations are marked
+// overwritten.
+func (ix *fieldIndex) wholeStore(st *ssa.Store) {
+	if freshAddr(st.Addr) {
+		return
+	}
+	t := types.Unalias(st.Val.Type())
+	u, isStruct := t.Underlying().(*types.Struct)
+	load, isLoad := st.Val.(*ssa.UnOp)
+	if _, param := t.(*types.TypeParam); !isStruct || param || !isLoad || load.Op != token.MUL || structOf(load.X.Type(), true) == nil {
+		ix.overwrite(t, 0)
+		return
+	}
+	for i := range u.NumFields() {
+		if _, inner := types.Unalias(u.Field(i).Type()).Underlying().(*types.Struct); inner {
+			if k, ok := fieldKeyOf(t, i); ok {
+				ix.rawAt(k, t, i).overwritten = true
+			}
+			ix.overwrite(u.Field(i).Type(), 1)
+			continue
+		}
+		if k, ok := fieldKeyOf(t, i); ok {
+			r := ix.rawAt(k, t, i)
+			r.copies = append(r.copies, st)
+		}
+	}
+}
+
+func (ix *fieldIndex) overwrite(t types.Type, depth int) {
+	if depth > 16 {
+		return
+	}
+	t = types.Unalias(t)
+	switch u := t.Underlying().(type) {
+	case *types.Array:
+		ix.overwrite(u.Elem(), depth+1)
+	case *types.Struct:
+		if _, param := t.(*types.TypeParam); param {
+			return
+		}
+		for i := range u.NumFields() {
+			if k, ok := fieldKeyOf(t, i); ok {
+				ix.rawAt(k, t, i).overwritten = true
+			}
+			ix.overwrite(u.Field(i).Type(), depth+1)
+		}
+	}
+}
+
+// fromReflect reports whether the interface value v may be the result of
+// a call to a function or method of reflect: in its own function, or, for
+// a parameter, as the argument of a call site of its function, or, for a
+// call of a function with a body, as what that function returns. A value
+// loaded from memory, captured, or returned by a dynamic call is not
+// followed.
+func (ix *fieldIndex) fromReflect(v ssa.Value, seen map[ssa.Value]bool, depth int) bool {
+	if depth > 16 || seen[v] {
 		return false
 	}
+	seen[v] = true
 	switch v := v.(type) {
 	case *ssa.Call:
 		callee := v.Common().StaticCallee()
-		return callee != nil && pkgPath(callee) == "reflect"
+		if callee == nil {
+			return false
+		}
+		if pkgPath(callee) == "reflect" {
+			return true
+		}
+		return ix.returnsReflect(callee, 0, seen, depth)
 	case *ssa.Extract:
-		return fromReflect(v.Tuple, depth+1)
-	case *ssa.ChangeInterface:
-		return fromReflect(v.X, depth+1)
-	case *ssa.Phi:
-		for _, e := range v.Edges {
-			if fromReflect(e, depth+1) {
+		if call, ok := v.Tuple.(*ssa.Call); ok {
+			callee := call.Common().StaticCallee()
+			if callee == nil {
+				return false
+			}
+			if pkgPath(callee) == "reflect" {
 				return true
 			}
+			return ix.returnsReflect(callee, v.Index, seen, depth)
+		}
+		if ta, ok := v.Tuple.(*ssa.TypeAssert); ok && v.Index == 0 {
+			return ix.fromReflect(ta.X, seen, depth+1)
+		}
+	case *ssa.TypeAssert:
+		return ix.fromReflect(v.X, seen, depth+1)
+	case *ssa.ChangeInterface:
+		return ix.fromReflect(v.X, seen, depth+1)
+	case *ssa.Phi:
+		for _, e := range v.Edges {
+			if ix.fromReflect(e, seen, depth+1) {
+				return true
+			}
+		}
+	case *ssa.Parameter:
+		fn := v.Parent()
+		index := paramIndex(v)
+		for _, site := range ix.callers[fn] {
+			if op := argument(site.Common(), fn, index); op != nil && ix.fromReflect(op, seen, depth+1) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// returnsReflect reports whether result index of fn may be a value that
+// came out of reflection (see fromReflect).
+func (ix *fieldIndex) returnsReflect(fn *ssa.Function, index int, seen map[ssa.Value]bool, depth int) bool {
+	for _, b := range fn.Blocks {
+		ret, ok := b.Instrs[len(b.Instrs)-1].(*ssa.Return)
+		if ok && index < len(ret.Results) && ix.fromReflect(ret.Results[index], seen, depth+1) {
+			return true
 		}
 	}
 	return false
@@ -1056,10 +1211,12 @@ func (ix *fieldIndex) call(site ssa.CallInstruction, safe bool) {
 
 // valueReaders are the methods of reflect.Value and reflect.Type that only
 // inspect, and valueSteps those that give another Value or Type to
-// inspect.
+// inspect. Value.Type is a step: the reflect.Type it gives can be handed
+// to reflect.New, which builds values of the type, so it has to be only
+// inspected too.
 var (
 	valueReaders = map[string]bool{
-		"Kind": true, "Type": true, "IsValid": true, "IsNil": true, "IsZero": true, "Len": true, "Cap": true,
+		"Kind": true, "IsValid": true, "IsNil": true, "IsZero": true, "Len": true, "Cap": true,
 		"Int": true, "Uint": true, "Float": true, "Complex": true, "Bool": true, "String": true,
 		"NumField": true, "NumMethod": true, "CanSet": true, "CanAddr": true, "CanInterface": true,
 		"CanInt": true, "CanUint": true, "CanFloat": true, "CanComplex": true, "Comparable": true, "Equal": true,
@@ -1068,7 +1225,7 @@ var (
 	}
 	valueSteps = map[string]bool{
 		"Elem": true, "Field": true, "FieldByName": true, "FieldByIndex": true, "Index": true, "MapIndex": true,
-		"Key": true, "In": true, "Out": true,
+		"Key": true, "In": true, "Out": true, "Type": true,
 	}
 )
 

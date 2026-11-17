@@ -10,6 +10,7 @@ import (
 	"golang.org/x/tools/go/ssa"
 
 	"github.com/KilledKenny/errtrace/internal/errset"
+	"github.com/KilledKenny/errtrace/internal/fmtverb"
 )
 
 // This file finds the guards that hold on a return path and decides what
@@ -103,7 +104,7 @@ func (gd *funcGuards) guardsAt(pt point) []guardUse {
 			if provesNonNil(g) {
 				nonNil = append(nonNil, cg.raw, cg.operand)
 			}
-			if g.Kind == errset.GuardNil && !g.Holds {
+			if g.Kind == errset.GuardNil && !g.Holds && g.Type == nil {
 				continue
 			}
 			id := 2 * cg.id
@@ -208,6 +209,11 @@ func recognise(cond ssa.Value, sents *Sentinels) []condGuard {
 			x, y = y, x
 		}
 		if !types.IsInterface(x.Type()) {
+			if _, ptr := x.Type().Underlying().(*types.Pointer); ptr && isNilConst(y) && IsErrorType(x.Type()) {
+				// p == nil for a pointer p of an error type: true of
+				// the typed nil that p is once it is converted.
+				return []condGuard{mk(x, errset.Guard{Kind: errset.GuardNil, Type: unalias(x.Type())}, pos)}
+			}
 			return nil
 		}
 		if isNilConst(y) {
@@ -460,9 +466,34 @@ const (
 func Decide(tbl *errset.Table, id errset.ValueID, g errset.Guard) (Verdict, string) {
 	switch g.Kind {
 	case errset.GuardNil:
+		if g.Type != nil {
+			// A pointer compared with nil before it is converted to an
+			// interface: true of a typed nil and of nothing else
+			// errtrace knows; of a pointer it could not follow it is
+			// not known.
+			switch v := tbl.Get(id); v.Kind {
+			case errset.Concrete:
+				if v.TypedNil {
+					return Yes, ""
+				}
+			case errset.Unresolved, errset.Truncated:
+				return Maybe, ""
+			case errset.Param, errset.FreeVar, errset.CallRef, errset.ErrorfLike, errset.Guarded, errset.StoreRef, errset.FieldRef, errset.FieldOf:
+				return Unknown, ""
+			}
+			return No, ""
+		}
 		// No abstract value is nil (a typed nil is a non-nil interface).
 		return No, ""
 	case errset.GuardHelper:
+		// Not decided for any value; on a symbolic value the guard
+		// waits, so that it is applied to the values a caller gives
+		// (the summaries note which values a check they cannot decide
+		// let through).
+		switch tbl.Get(id).Kind {
+		case errset.Param, errset.FreeVar, errset.CallRef, errset.ErrorfLike, errset.Guarded, errset.StoreRef, errset.FieldRef, errset.FieldOf:
+			return Unknown, ""
+		}
 		return Maybe, ""
 	case errset.GuardEqual:
 		return decideTop(tbl, id, func(v errset.Value) (Verdict, string) {
@@ -809,8 +840,11 @@ func typeVerdict(v errset.Value, target types.Type) (Verdict, string) {
 		if v.WrapKind == errset.WrapBraces {
 			// errtrace.Wrap's wrapper type is the library's own and its
 			// method set varies by version (Format, LogValue, TracePC,
-			// ...), so only Error is known.
+			// ...), so only Error and Unwrap() error are known.
 			if isIface && methodsWithin(iface, "Error") {
+				return Yes, ""
+			}
+			if single, multi := unwrapWanted(iface, isIface); single && !multi {
 				return Yes, ""
 			}
 			if isIface || inPackage(target, bracesErrtracePath) {
@@ -824,11 +858,80 @@ func typeVerdict(v errset.Value, target types.Type) (Verdict, string) {
 		if methodsWithin(iface, "Error") {
 			return Yes, ""
 		}
-		if methodsWithin(iface, "Error", "Unwrap") {
-			return Maybe, "wrapper type of " + string(v.WrapKind)
+		if single, multi := unwrapWanted(iface, true); single || multi {
+			// *fmt.wrapError (one %w) has Unwrap() error; *fmt.wrapErrors
+			// (several) and errors.Join's type have Unwrap() []error.
+			switch has := wrapUnwraps(v); {
+			case has == 0 || (single && multi):
+				return Maybe, "wrapper type of " + string(v.WrapKind)
+			case (has == 1) == single:
+				return Yes, ""
+			}
+			return No, ""
 		}
 	}
 	return No, ""
+}
+
+// unwrapWanted reports whether the interface iface, which has no methods
+// but Error and Unwrap, has an Unwrap() error method (single) or an
+// Unwrap() []error method (multi). Both are false if it has another
+// method, no Unwrap, or an Unwrap of another shape.
+func unwrapWanted(iface *types.Interface, isIface bool) (single, multi bool) {
+	if !isIface || !methodsWithin(iface, "Error", "Unwrap") {
+		return false, false
+	}
+	for i := range iface.NumMethods() {
+		m := iface.Method(i)
+		if m.Name() != "Unwrap" {
+			continue
+		}
+		sig, ok := m.Type().(*types.Signature)
+		if !ok || sig.Params().Len() != 0 || sig.Results().Len() != 1 {
+			return false, false
+		}
+		switch rt := sig.Results().At(0).Type(); {
+		case types.Identical(rt, types.Universe.Lookup("error").Type()):
+			single = true
+		case isErrorSlice(rt):
+			multi = true
+		}
+	}
+	return single, multi
+}
+
+// wrapUnwraps says which Unwrap method the type of the Wrap v has, for a
+// Wrap made by fmt.Errorf or errors.Join: 1 for Unwrap() error
+// (*fmt.wrapError: a constant format with one %w verb), 2 for Unwrap()
+// []error (errors.Join), and 0 if errtrace does not know (a format that is
+// not constant, or has several %w verbs, of which some may have no
+// operand).
+func wrapUnwraps(v errset.Value) int {
+	switch v.WrapKind {
+	case errset.WrapJoin:
+		return 2
+	case errset.WrapErrorf:
+		if SingleWrapFormat(v.Format) {
+			return 1
+		}
+	}
+	return 0
+}
+
+// SingleWrapFormat reports whether format is a constant format with
+// exactly one %w verb: fmt.Errorf then returns a *fmt.wrapError, whose
+// err field is the wrapped operand.
+func SingleWrapFormat(format string) bool {
+	if format == "" {
+		return false
+	}
+	n := 0
+	for _, verb := range fmtverb.Parse(format, -1) {
+		if verb.Verb == 'w' {
+			n++
+		}
+	}
+	return n == 1
 }
 
 // inPackage reports whether t, or the type it points to, is a named type
@@ -909,6 +1012,10 @@ func ApplyGuard(tbl *errset.Table, id errset.ValueID, g errset.Guard) (Outcome, 
 		return Keep, errset.GuardNote{}
 	case verdict == Yes:
 		return Remove, errset.GuardNote{}
+	case verdict == Maybe && g.Kind == errset.GuardNil:
+		// A pointer that may or may not be nil is not handled by the
+		// comparison.
+		return Keep, errset.GuardNote{}
 	case verdict == Maybe:
 		reason := g.String()
 		if why != "" {

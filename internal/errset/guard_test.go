@@ -43,14 +43,14 @@ func TestDedupIntersectsNotes(t *testing.T) {
 	got := Dedup(tbl, []Entry{
 		{Leaf: sa, PossiblyHandled: []GuardNote{n1, n2}},
 		{Leaf: sa, PossiblyHandled: []GuardNote{n2}},
-	})
+	}, nil)
 	if len(got) != 1 || !reflect.DeepEqual(got[0].PossiblyHandled, []GuardNote{n2}) {
 		t.Errorf("Dedup notes = %+v, want only the shared note", got)
 	}
 	got = Dedup(tbl, []Entry{
 		{Leaf: sa, PossiblyHandled: []GuardNote{n1}},
 		{Leaf: sa},
-	})
+	}, nil)
 	if len(got[0].PossiblyHandled) != 0 || CountPossiblyHandled(got) != 0 {
 		t.Errorf("an entry that also arrives unhandled is possibly handled: %+v", got)
 	}

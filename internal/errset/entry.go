@@ -97,16 +97,21 @@ func Flatten(t *Table, top ValueID) []Entry {
 	return out
 }
 
-// Dedup merges entries with the same leaf, Wrap Chain and truncation. Wrap
-// Chains are compared by what is shown of each Wrap (its place, kind,
-// format and type), not by its wrapped values: the same leaf under one
-// errors.Join is one entry whatever the Join's other operands are. The
-// first entry's Path and Chain are kept; every other distinct Path adds to
+// Dedup merges entries with the same leaf, Wrap Chain and truncation,
+// compared by what is shown of them. Wrap Chains are compared by what is
+// shown of each Wrap (its place, kind, format and type), not by its
+// wrapped values: the same leaf under one errors.Join is one entry
+// whatever the Join's other operands are. Leaves are compared by their
+// description and, if pos is not nil, the position it gives them: two
+// leaves that an Error Set would print as the same line (two values of
+// one Concrete Type that have no position of their own, say) are one
+// entry. With a nil pos, leaves are compared by identity. The first
+// entry's Path and Chain are kept; every other distinct Path adds to
 // MorePaths. A merged entry is via a field location only if every one of
 // its entries is. A merged entry is possibly handled only by the guards that
 // every one of its entries is possibly handled by. The order of first
 // occurrences is kept.
-func Dedup(t *Table, entries []Entry) []Entry {
+func Dedup(t *Table, entries []Entry, pos PosFunc) []Entry {
 	type group struct {
 		entry Entry
 		paths []Path
@@ -130,12 +135,32 @@ func Dedup(t *Table, entries []Entry) []Entry {
 		wrapShown[w] = n
 		return n
 	}
+	// leafShown numbers the distinct shown forms of leaves.
+	leaves := make(map[string]int)
+	leafShown := make(map[ValueID]int)
+	leafOf := func(l ValueID) int {
+		if pos == nil {
+			return int(l)
+		}
+		if n, ok := leafShown[l]; ok {
+			return n
+		}
+		file, offset := pos(l)
+		k := fmt.Sprintf("%s\x00%d\x00%s", file, offset, t.String(l))
+		n, ok := leaves[k]
+		if !ok {
+			n = len(leaves)
+			leaves[k] = n
+		}
+		leafShown[l] = n
+		return n
+	}
 	var groups []*group
 	index := make(map[string]*group)
 	var b strings.Builder
 	for _, e := range entries {
 		b.Reset()
-		fmt.Fprintf(&b, "%d %t %t", e.Leaf, e.Truncated, e.Repeats)
+		fmt.Fprintf(&b, "%d %t %t", leafOf(e.Leaf), e.Truncated, e.Repeats)
 		for _, w := range e.Chain {
 			fmt.Fprintf(&b, " %d", shownOf(w))
 		}

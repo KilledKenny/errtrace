@@ -73,6 +73,10 @@ type Solver struct {
 	// atTop is set while the values at the top of a Query are resolved
 	// (see ResolveTop).
 	atTop bool
+	// copies caches copyFacts.
+	copies map[copyKey][]flow.Fact
+	// unwraps caches unwrapPath.
+	unwraps map[types.Type]unwrapPath
 	// unsettledPass is set while the passes of one evaluation have not
 	// yet converged: an inner value of a Wrap that has no value then may
 	// still get one, so it is not yet taken as nil (see wrapOfNothing).
@@ -202,7 +206,7 @@ func (s *Solver) ResolveTop(facts []Fact) []Fact {
 		for _, sub := range s.mapTree(f.Value, func(id errset.ValueID, k int) []subst {
 			return []subst{{value: id, leaves: [][]Source{f.Leaves[k]}}}
 		}) {
-			fs.add(sub.value, sub.leaves, errset.AddNotes(slices.Clone(f.Notes), sub.notes...))
+			fs.add(sub.value, sub.leaves, errset.HandledNotes(errset.AddNotes(slices.Clone(f.Notes), sub.notes...)))
 		}
 	}
 	return fs.facts
@@ -210,50 +214,11 @@ func (s *Solver) ResolveTop(facts []Fact) []Fact {
 
 // ViaLocation returns the name of a field location if every source of
 // srcs, the sources of a leaf, goes through one: the leaf is then known
-// only as a value that the program stores to that field somewhere. It
-// returns "" if some source does not.
+// only as a value that the program stores to that field somewhere. Of
+// several locations on the way it names the one the value was loaded from
+// last. It returns "" if some source goes through no location.
 func (s *Solver) ViaLocation(srcs []Source) string {
-	if !locOnly(srcs) {
-		return ""
-	}
-	if n := s.fieldName(srcs, make(map[*Source]bool)); n != "" {
-		return n
-	}
-	return "a field"
-}
-
-// fieldName returns the name of a field location that the sources go
-// through, following them into the summaries of the callees, or "" if
-// there is none. Of several on one way it names the first the value went
-// through.
-func (s *Solver) fieldName(srcs []Source, seen map[*Source]bool) string {
-	if len(srcs) == 0 || seen[&srcs[0]] {
-		return ""
-	}
-	seen[&srcs[0]] = true
-	for _, src := range srcs {
-		if n := s.fieldName(src.ArgSources, seen); n != "" {
-			return n
-		}
-		if src.Kind == Via && s.sums[src.Callee] != nil {
-			if res := s.sums[src.Callee].Result(src.CalleeResult); res != nil {
-				for _, f := range res.Facts {
-					if f.Value == src.CalleeValue && src.CalleeLeaf < len(f.Leaves) {
-						if n := s.fieldName(f.Leaves[src.CalleeLeaf], seen); n != "" {
-							return n
-						}
-					}
-				}
-			}
-		}
-		if n := s.fieldName(src.Then, seen); n != "" {
-			return n
-		}
-		if src.Field != "" {
-			return src.Field
-		}
-	}
-	return ""
+	return viaOf(srcs)
 }
 
 // SiteFacts returns the values that error result index of the call site in
@@ -504,10 +469,15 @@ func (c *collector) value(fn *ssa.Function, id errset.ValueID) {
 			c.errorfs = append(c.errorfs, id)
 		}
 	case errset.FieldOf:
-		// The field's location is what the value falls back to.
-		if l := c.s.location(fn, v); l != nil && !c.seenLoc[l] {
-			c.seenLoc[l] = true
-			c.locs = append(c.locs, l)
+		// The field's location is what a value of the type that was
+		// not tracked holds, and its later writers what a tracked one
+		// may have been given since it was built.
+		l := c.s.location(fn, v)
+		for _, l := range []*location{l, c.s.laterWrites(l)} {
+			if l != nil && !c.seenLoc[l] {
+				c.seenLoc[l] = true
+				c.locs = append(c.locs, l)
+			}
 		}
 		c.value(fn, v.Inner[0])
 	case errset.Wrap, errset.Truncated, errset.Guarded:
@@ -766,17 +736,28 @@ func changedResults(old, next []ResultSummary) []bool {
 	return diff
 }
 
+// sameValues reports whether a and b hold the same values, each leaf of
+// which is known through a field location alone in both or in neither,
+// and then through the same one (see Source.via). A summary has converged
+// only when that has: a leaf first read from a location may get a way
+// around it in a later round.
 func sameValues(a, b []Fact) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	set := make(map[errset.ValueID]bool, len(a))
-	for _, f := range a {
-		set[f.Value] = true
+	set := make(map[errset.ValueID]int, len(a))
+	for i, f := range a {
+		set[f.Value] = i
 	}
 	for _, f := range b {
-		if !set[f.Value] {
+		i, ok := set[f.Value]
+		if !ok || len(a[i].Leaves) != len(f.Leaves) {
 			return false
+		}
+		for k, srcs := range f.Leaves {
+			if viaOf(a[i].Leaves[k]) != viaOf(srcs) {
+				return false
+			}
 		}
 	}
 	return true

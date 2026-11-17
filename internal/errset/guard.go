@@ -129,6 +129,13 @@ type GuardNote struct {
 	Pos token.Pos
 	// Reason says why the guard cannot be decided.
 	Reason string
+	// Assumed marks a note of another kind, which only exists inside
+	// summaries: the value is on a path that it only takes if the guard's
+	// check holds for it (the true branch of isTimeout(err), a type
+	// assertion that succeeded), and errtrace cannot decide the check.
+	// The value may then not be there at all, or not be of the type it
+	// seems to be. An entry is not possibly handled by such a guard.
+	Assumed bool
 }
 
 // NoteOf returns the GuardNote of guard g with the given reason.
@@ -136,7 +143,29 @@ func NoteOf(g Guard, reason string) GuardNote {
 	return GuardNote{Site: g.Site, Pos: g.Pos, Reason: reason}
 }
 
-func noteEqual(a, b GuardNote) bool { return a.Pos == b.Pos && a.Reason == b.Reason }
+func noteEqual(a, b GuardNote) bool {
+	return a.Pos == b.Pos && a.Reason == b.Reason && a.Assumed == b.Assumed
+}
+
+// HandledNotes returns the notes of notes that say a value is possibly
+// handled: those that are not Assumed.
+func HandledNotes(notes []GuardNote) []GuardNote {
+	if !slices.ContainsFunc(notes, func(n GuardNote) bool { return n.Assumed }) {
+		return notes
+	}
+	var out []GuardNote
+	for _, n := range notes {
+		if !n.Assumed {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// IsAssumed reports whether notes has an Assumed note.
+func IsAssumed(notes []GuardNote) bool {
+	return slices.ContainsFunc(notes, func(n GuardNote) bool { return n.Assumed })
+}
 
 // AddNotes returns notes with each of more added that is not there yet.
 func AddNotes(notes []GuardNote, more ...GuardNote) []GuardNote {

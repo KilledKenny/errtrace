@@ -79,10 +79,13 @@ const (
 	// value Inner[0], which is a pointer to (or a value of) the named
 	// struct type Type that implements error, loaded at Site in function
 	// Fn. Once Inner[0] is known, the summaries replace it: by the inner
-	// values of a Wrap that was built for that type with that field, by
-	// nothing for a value of another type, and otherwise by the field's
-	// location (as for a FieldRef). It has the leaves of its inner value
-	// and only exists inside summaries.
+	// values of a Wrap that was built for that type with that field (and
+	// what the program may have stored to the field since), by nothing
+	// for a value of another type, by the field's location (as for a
+	// FieldRef) for a value of the type that was not tracked, and by an
+	// Unresolved value for a value that is not known to be of the type.
+	// It has the leaves of its inner value and only exists inside
+	// summaries.
 	FieldOf
 )
 
@@ -281,7 +284,25 @@ type key struct {
 	guards      string
 }
 
-func keyOf(v Value) key {
+// typeKeys caches the strings of types, which name them in keys: a type
+// is asked for once per value interned.
+type typeKeys map[types.Type]string
+
+func (c typeKeys) of(t types.Type) string {
+	if c == nil {
+		return types.TypeString(t, nil)
+	}
+	s, ok := c[t]
+	if !ok {
+		s = types.TypeString(t, nil)
+		c[t] = s
+	}
+	return s
+}
+
+func keyOf(v Value) key { return keyWith(v, nil) }
+
+func keyWith(v Value, typs typeKeys) key {
 	k := key{
 		kind:        v.Kind,
 		pos:         v.Pos,
@@ -304,7 +325,7 @@ func keyOf(v Value) key {
 		guards:      guardsKey(v.Guards),
 	}
 	if v.Type != nil {
-		k.typ = types.TypeString(v.Type, nil)
+		k.typ = typs.of(v.Type)
 	}
 	if len(v.Inner) > 0 {
 		var b strings.Builder
@@ -327,11 +348,12 @@ type Table struct {
 	// leaves is the number of leaves of each value's tree.
 	leaves []int
 	index  map[key]ValueID
+	typs   typeKeys
 }
 
 // NewTable returns an empty Table.
 func NewTable() *Table {
-	return &Table{index: make(map[key]ValueID)}
+	return &Table{index: make(map[key]ValueID), typs: make(typeKeys)}
 }
 
 // Intern returns the ValueID of v, adding v to the table if no equal value
@@ -345,7 +367,7 @@ func (t *Table) Intern(v Value) ValueID {
 			panic(fmt.Sprintf("errset: Intern of a Value with unknown inner ValueID %d", id))
 		}
 	}
-	k := keyOf(v)
+	k := keyWith(v, t.typs)
 	if id, ok := t.index[k]; ok {
 		return id
 	}

@@ -278,8 +278,14 @@ func (a *analyzer) walk(v ssa.Value) {
 			return
 		}
 		if ta, ok := v.Tuple.(*ssa.TypeAssert); ok && v.Index == 0 {
-			// v, ok := x.(T): x where the assertion holds, else nil.
+			// v, ok := x.(T): x where the assertion holds, else nil: no
+			// error for an interface T, and for a concrete T a nil
+			// pointer, which is a non-nil error once it is converted
+			// (by a caller, for a result of type T).
 			a.typeAssert(ta)
+			if !types.IsInterface(ta.AssertedType) {
+				a.failedAssert(ta, v, v)
+			}
 			return
 		}
 		a.memory(v, extractDetail(v))
@@ -296,6 +302,11 @@ func (a *analyzer) walk(v ssa.Value) {
 		a.freeVar(v, v)
 		return
 	case *ssa.Field:
+		a.fieldLoad(v, v.X, v.Field)
+		return
+	case *ssa.FieldAddr:
+		// The address of a struct inside another (o.W for a method of
+		// the embedded W called on o): the struct that field holds.
 		a.fieldLoad(v, v.X, v.Field)
 		return
 	case *ssa.Index:
@@ -346,9 +357,36 @@ func (a *analyzer) typeAssert(ta *ssa.TypeAssert) {
 	a.walk(ta.X)
 }
 
+// failedAssert adds what the comma-ok type assertion ta to a concrete
+// type gives where it fails: the zero value of the type, which for a
+// pointer type is a typed nil, a non-nil error once converted to an
+// interface. Nothing is added where the assertion cannot fail: on a path
+// its ok result guards, or when its operand is a conversion of a value of
+// that very type. site is where the value is made and src where it enters
+// the function.
+func (a *analyzer) failedAssert(ta *ssa.TypeAssert, site ssa.Value, src any) {
+	if mi, ok := stripConv(ta.X).(*ssa.MakeInterface); ok && types.Identical(mi.X.Type(), ta.AssertedType) {
+		return
+	}
+	if a.fn != nil && a.fn.Blocks != nil {
+		for _, u := range a.funcGuards().guardsAt(a.pt) {
+			if u.g.Kind == errset.GuardAssert && u.g.Site == any(ta) && u.g.Holds {
+				return
+			}
+		}
+	}
+	// The zero value of a non-pointer type is a value like any other of
+	// that type.
+	_, ptr := ta.AssertedType.Underlying().(*types.Pointer)
+	a.add(a.concrete(ta.AssertedType, site, ptr), src)
+}
+
 // makeInterface classifies a conversion of a concrete value to an
 // interface: a pointer Sentinel, a typed nil, or a Concrete Type.
 func (a *analyzer) makeInterface(mi *ssa.MakeInterface) {
+	// The guards on the concrete value (p != nil) hold for what it is
+	// converted to.
+	a.matchGuards(mi.X)
 	switch x := mi.X.(type) {
 	case *ssa.UnOp:
 		if g, ok := x.X.(*ssa.Global); ok && x.Op == token.MUL {
@@ -389,8 +427,11 @@ func (a *analyzer) makeInterface(mi *ssa.MakeInterface) {
 		}
 		if ta, ok := x.Tuple.(*ssa.TypeAssert); ok && x.Index == 0 && types.IsInterface(ta.X.Type()) {
 			// e, ok := err.(*E); return e: the values of err that are
-			// of type *E, with what they wrap.
+			// of type *E, with what they wrap. Where the assertion
+			// fails, e is a nil *E, which the conversion makes a
+			// non-nil error.
 			a.typeAssert(ta)
+			a.failedAssert(ta, mi, mi)
 			return
 		}
 	case *ssa.TypeAssert:
@@ -458,6 +499,32 @@ func (a *analyzer) load(v *ssa.UnOp) bool {
 //   - any other load becomes a FieldRef, which the summaries resolve from
 //     every store to that field in the program.
 func (a *analyzer) fieldLoad(v ssa.Value, base ssa.Value, field int) {
+	// A field that holds a struct by value (v is that struct, or its
+	// address) has no field location of its own: its fields are stored
+	// one by one, to their own locations. Such a load is only followed
+	// as a FieldOf of an error value, from which the summaries build the
+	// struct (see Solver.fieldOf).
+	_, byValue := v.(*ssa.FieldAddr)
+	if _, isStruct := v.Type().Underlying().(*types.Struct); isStruct {
+		byValue = true
+	}
+	a.fieldValue(v, base, field, byValue)
+}
+
+// FieldFacts returns the local facts of field number field of the struct
+// that base points to, a value of fn used by the instruction at: what a
+// load of that field there would give (a FieldOf of base's values, or a
+// FieldRef; see fieldLoad). site is the value the facts are placed at.
+// The field must not hold a struct by value.
+func FieldFacts(tbl *errset.Table, fn *ssa.Function, site, base ssa.Value, field int, at ssa.Instruction, opts Options) []Fact {
+	a := &analyzer{tbl: tbl, fn: fn, at: at, pt: pointOf(at), seen: make(map[seenKey]bool), opts: opts}
+	a.fieldValue(site, base, field, false)
+	return a.facts
+}
+
+// fieldValue is fieldLoad for the load v, which gives a struct held by
+// value if byValue is set.
+func (a *analyzer) fieldValue(v ssa.Value, base ssa.Value, field int, byValue bool) {
 	recv := base.Type()
 	detail := fmt.Sprintf("load of field %s of %s", fieldName(recv, field), typeString(recv))
 	st := FieldStruct(recv, field)
@@ -475,9 +542,20 @@ func (a *analyzer) fieldLoad(v ssa.Value, base ssa.Value, field int) {
 		Fn:     a.fn.String(),
 		Detail: detail,
 	}
+	if byValue && (a.flat || !IsErrorType(recv)) {
+		a.memory(v, detail)
+		return
+	}
 	if a.flat || !IsErrorType(recv) {
 		a.add(a.tbl.Intern(val), v)
 		return
+	}
+	// The local copy that a method with a value receiver loads its
+	// receiver's fields through is the receiver.
+	if alloc, ok := base.(*ssa.Alloc); ok {
+		if p := copiedParam(alloc); p != nil {
+			base = p
+		}
 	}
 	// Walk base as the value it is, where the load is made.
 	c := &analyzer{tbl: a.tbl, fn: a.fn, at: a.at, pt: a.pt, gd: a.gd, seen: make(map[seenKey]bool), opts: a.opts, depth: a.depth, captured: a.captured, active: a.active}
@@ -491,7 +569,11 @@ func (a *analyzer) fieldLoad(v ssa.Value, base ssa.Value, field int) {
 			// here (a variable that errors.As filled through its
 			// address): it is some value of the struct type, whose field
 			// is what the program stores to that field.
-			a.add(a.tbl.Intern(val), v)
+			if byValue {
+				a.memory(v, detail)
+			} else {
+				a.add(a.tbl.Intern(val), v)
+			}
 			continue
 		}
 		of := val

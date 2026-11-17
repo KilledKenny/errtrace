@@ -161,7 +161,7 @@ func (s *Solver) captured(creator *ssa.Function, facts []flow.Fact, site any, st
 	for i, f := range fs.facts {
 		leaves := make([][]Source, len(f.Leaves))
 		for j, srcs := range f.Leaves {
-			leaves[j] = []Source{{Kind: Captured, Site: site, ArgFn: creator, ArgSources: srcs, viaField: locOnly(srcs)}}
+			leaves[j] = []Source{{Kind: Captured, Site: site, ArgFn: creator, ArgSources: srcs, via: viaOf(srcs)}}
 		}
 		out[i] = subst{value: f.Value, leaves: leaves, notes: f.Notes}
 	}
@@ -232,7 +232,7 @@ func (s *Solver) stored(fn *ssa.Function, store *ssa.Store, v errset.Value, site
 					})
 				}
 			}
-			return []subst{{value: id, leaves: [][]Source{{{Kind: Stored, Site: site, ArgFn: w, Store: store, ArgSources: f.Leaves[k], viaField: locOnly(f.Leaves[k])}}}}}
+			return []subst{{value: id, leaves: [][]Source{{{Kind: Stored, Site: site, ArgFn: w, Store: store, ArgSources: f.Leaves[k], via: viaOf(f.Leaves[k])}}}}}
 		}) {
 			out = append(out, subst{value: sub.value, leaves: sub.leaves, notes: errset.AddNotes(slices.Clone(f.Notes), sub.notes...)})
 		}
@@ -576,7 +576,7 @@ func (s *Solver) substitute(fn *ssa.Function, site ssa.CallInstruction, g *ssa.F
 		via := via
 		via.CalleeLeaf = k
 		if k < len(gf.Leaves) {
-			via.viaField = locOnly(gf.Leaves[k])
+			via.via = viaOf(gf.Leaves[k])
 		}
 		v := s.tbl.Get(id)
 		if v.Kind == errset.ErrorfLike && v.Fn == g.String() {
@@ -609,7 +609,7 @@ func (s *Solver) substitute(fn *ssa.Function, site ssa.CallInstruction, g *ssa.F
 			for j, srcs := range f.Leaves {
 				src := via
 				src.ArgSources = srcs
-				src.viaField = via.viaField || locOnly(srcs)
+				src.via = later(via.via, viaOf(srcs))
 				leaves[j] = []Source{src}
 			}
 			out[i] = subst{value: f.Value, leaves: leaves, notes: f.Notes}
@@ -654,7 +654,7 @@ func (s *Solver) forwardedErrorf(fn *ssa.Function, site ssa.CallInstruction, g *
 			if len(args) > 0 {
 				src := via
 				src.ArgSources = args
-				src.viaField = via.viaField || locOnly(args)
+				src.via = later(via.via, viaOf(args))
 				leaves[j] = addSource(leaves[j], src)
 			}
 		}
@@ -890,6 +890,16 @@ func (s *Solver) applyGuards(sub subst, guards []errset.Guard) (subst, bool) {
 			sub.notes = errset.AddNotes(slices.Clone(sub.notes), note)
 		case flow.Pending:
 			pending = append(pending, g)
+		case flow.Keep:
+			if !g.Holds || (g.Kind != errset.GuardHelper && g.Kind != errset.GuardAs && g.Kind != errset.GuardAssert) {
+				continue
+			}
+			// The value is kept on the path where a check holds that
+			// errtrace cannot decide for it: it may not be there, or
+			// not be what it seems (see errset.GuardNote.Assumed).
+			if verdict, _ := flow.Decide(s.tbl, sub.value, g); verdict == flow.Maybe {
+				sub.notes = errset.AddNotes(slices.Clone(sub.notes), errset.GuardNote{Site: g.Site, Pos: g.Pos, Reason: g.String(), Assumed: true})
+			}
 		}
 	}
 	if len(pending) > 0 {

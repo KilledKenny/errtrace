@@ -5,7 +5,7 @@ repeat", not "chain truncated".
 a.go:@q
 -- stdout --
 $WORK/a.go:23:12-14: Error Set of example.com/x.FT: 4 entries, 2 possibly handled
-$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat] [via field err of example.com/x.S]
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat] [via field err of example.com/x.T]
 	possibly handled:
 		$WORK/a.go:15:5-16: comparison with io.EOF: Wrap Chain truncated
 	path (origin → target):
@@ -20,7 +20,7 @@ $GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat] [via field err of exa
 		$WORK/a.go:14:7-12: in (*example.com/x.S).relay
 		$WORK/a.go:18:4-7: in (*example.com/x.S).relay
 		$WORK/a.go:23:36-41: in example.com/x.FT
-$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat] [via field err of example.com/x.S]
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat] [via field err of example.com/x.T]
 	wrap chain (origin → target):
 		$WORK/a.go:11:30-56: fmt.Errorf "w: %w"
 	path (origin → target):
@@ -31,7 +31,7 @@ $GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat] [via field err of exa
 		$WORK/a.go:14:7-12: in (*example.com/x.S).relay
 		$WORK/a.go:18:4-7: in (*example.com/x.S).relay
 		$WORK/a.go:23:36-41: in example.com/x.FT
-$WORK/a.go:11:30-56: opaque fmt.Errorf "w: %w" [chain may repeat] [via field err of example.com/x.S]
+$WORK/a.go:11:30-56: opaque fmt.Errorf "w: %w" [chain may repeat] [via field err of example.com/x.T]
 	possibly handled:
 		$WORK/a.go:15:5-16: comparison with io.EOF: Wrap Chain truncated
 	path (origin → target):
@@ -48,7 +48,7 @@ $WORK/a.go:11:30-56: opaque fmt.Errorf "w: %w" [chain may repeat] [via field err
 		$WORK/a.go:14:7-12: in (*example.com/x.S).relay
 		$WORK/a.go:18:4-7: in (*example.com/x.S).relay
 		$WORK/a.go:23:36-41: in example.com/x.FT
-$WORK/a.go:11:30-56: opaque fmt.Errorf "w: %w" [chain may repeat] [via field err of example.com/x.S]
+$WORK/a.go:11:30-56: opaque fmt.Errorf "w: %w" [chain may repeat] [via field err of example.com/x.T]
 	wrap chain (origin → target):
 		$WORK/a.go:11:30-56: fmt.Errorf "w: %w"
 	path (origin → target):

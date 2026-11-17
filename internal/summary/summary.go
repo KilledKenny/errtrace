@@ -95,17 +95,35 @@ type Source struct {
 	// location, the location's name ("field Err of io/fs.PathError"). It
 	// is empty for a variable that a closure stores to.
 	Field string
-	// viaField reports that every way the value comes through this source
-	// goes through a field location (see locOnly).
-	viaField bool
+	// via is set if every way the value comes through this source goes
+	// through a field location, and names the last such location on the
+	// way: the one the value was loaded from nearest to the function the
+	// source belongs to (see viaOf). It is empty for a source with a way
+	// that goes through no location.
+	via string
 }
 
-// locOnly reports whether every source of srcs goes through a field
-// location: the value they belong to is known only as "what the program
-// stores to that field". Lists are kept with the sources that do not
-// first (see addSource), so the first one decides.
-func locOnly(srcs []Source) bool {
-	return len(srcs) > 0 && srcs[0].viaField
+// viaOf returns the name of a field location if every source of srcs
+// goes through one: the value they belong to is known only as "what the
+// program stores to that field". It returns "" if some source does not.
+// Lists are kept with the sources that do not first (see addSource), so
+// the first one decides; it also gives the name.
+func viaOf(srcs []Source) string {
+	if len(srcs) == 0 {
+		return ""
+	}
+	return srcs[0].via
+}
+
+// later returns the name of the field location that a value went through
+// last, of two stretches of its way that each are, or are not, through
+// locations only (see Source.via): then is the later stretch and first
+// the earlier one. The whole way is through a location if either is.
+func later(then, first string) string {
+	if then != "" {
+		return then
+	}
+	return first
 }
 
 // rank orders sources: local first, then static calls, then dynamic calls.
@@ -120,7 +138,7 @@ func (s Source) rank() int {
 }
 
 func sourceEqual(a, b Source) bool {
-	return a.Kind == b.Kind && a.Site == b.Site && a.Callee == b.Callee && a.Field == b.Field && a.viaField == b.viaField &&
+	return a.Kind == b.Kind && a.Site == b.Site && a.Callee == b.Callee && a.Field == b.Field && a.via == b.via &&
 		a.CalleeResult == b.CalleeResult && a.CalleeValue == b.CalleeValue && a.CalleeLeaf == b.CalleeLeaf &&
 		a.Dynamic == b.Dynamic && a.ArgFn == b.ArgFn && a.Store == b.Store &&
 		sourcesEqual(a.ArgSources, b.ArgSources) && sourcesEqual(a.Then, b.Then)
@@ -148,8 +166,8 @@ func addSource(srcs []Source, src Source) []Source {
 		return srcs
 	}
 	after := func(a, b Source) bool {
-		if a.viaField != b.viaField {
-			return a.viaField
+		if (a.via != "") != (b.via != "") {
+			return a.via != ""
 		}
 		return a.rank() > b.rank()
 	}
