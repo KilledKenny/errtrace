@@ -177,7 +177,10 @@ const (
 	// parameter v of a function that are argument arrays of static
 	// variadic calls (directly, or passed on from parameter to
 	// parameter): memory only that function reads, unless it, or a
-	// function the slice is passed on to, lets the slice escape.
+	// function the slice is passed on to, lets the slice escape, or a
+	// call through reflection may run it (see closed and sealed). It is
+	// also the elements of the slices that a call through reflection
+	// passes to v (see reflectArgsMarked).
 	locVarargs
 )
 

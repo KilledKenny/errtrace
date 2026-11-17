@@ -74,7 +74,7 @@ func runMembership(ctx context.Context, opts Options, cfg *config, prog *load.Pr
 		Full:        cfg.full,
 	}
 	for _, rs := range res.ReflectStores {
-		in.NotFollowed = append(in.NotFollowed, render.ReflectStore{Site: rs.Site, Function: rs.Fn.String()})
+		in.NotFollowed = append(in.NotFollowed, render.ReflectStore{Site: rs.Site, Function: rs.Fn.String(), FloodOnly: rs.FloodOnly})
 	}
 	for _, c := range res.Carriers {
 		in.Carriers = append(in.Carriers, render.CarrierEntry{Entry: c.Entry, Unresolved: c.Unresolved, Trace: steps(c.Trace), Wrap: c.Wrap, HasWrap: c.HasWrap})

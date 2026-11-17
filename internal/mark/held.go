@@ -307,7 +307,10 @@ func (a *analysis) notFollowed(call ssa.CallInstruction, planes tags, why reason
 // memory of the element type as soon as one of them, however far, lets
 // the slice out of its hands (see passedOnEscapes, closed and
 // locMarkedHook), and that includes handing it to package reflect: its
-// loads then read the memory of the element type, which is flooded.
+// loads then read the memory of the element type, which is flooded. So
+// do the loads of a slice parameter of a function that a call through
+// reflection may run (see sealed): such a call may pass it a slice that
+// a store through reflection filled.
 func floodable(k locKind) bool {
 	switch k {
 	case locField, locTyped, locMapKey, locMapVal, locChan:

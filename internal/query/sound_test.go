@@ -169,6 +169,26 @@ func TestVerdictSoundSlices(t *testing.T) {
 	})
 }
 
+// TestVerdictSoundOperands does the same for a method that an intrinsic
+// calls on an operand (fmt.Errorf formats it, the error of errors.Join
+// asks it), without reflection: the bodies of the intrinsics are not
+// scanned, so the receiver of such a method gets the Mark at the call of
+// the intrinsic.
+func TestVerdictSoundOperands(t *testing.T) {
+	t.Parallel()
+	runSound(t, "sound_operands.txtar", []soundCase{
+		{fn: "ErrorfRecv", subject: "is ErrO1", truth: true},
+		{fn: "ErrorfPlain", subject: "is ErrO2", truth: true},
+		{fn: "ErrorfFormat", subject: "is ErrO3", truth: true},
+		{fn: "ErrorfChan", subject: "is ErrO4", truth: true},
+		{fn: "JoinThenError", subject: "is ErrO5", truth: true},
+		// The methods an intrinsic can call publish nothing; and an
+		// operand is not the receiver of a method of another type.
+		{fn: "Quiet", subject: "is ErrO6", wantNo: true},
+		{fn: "OtherType", subject: "is ErrO7", wantNo: true},
+	})
+}
+
 // TestVerdictSoundLibrary does the same for a program without a main
 // package, where the callers are not all loaded.
 func TestVerdictSoundLibrary(t *testing.T) {
@@ -349,10 +369,34 @@ func TestVerdictSoundFlood(t *testing.T) {
 	})
 }
 
+// TestVerdictSoundCalls does the same for a call that only a store
+// through reflection makes possible: a dynamic call on a value of a type
+// that reaches it through the store alone, and a call through
+// reflect.Value.Call of a function with a slice parameter that is also
+// called statically. The flooding pass follows the first over the CHA
+// callees of the call, and reads the slice parameter of the second as
+// memory of its element type.
+func TestVerdictSoundCalls(t *testing.T) {
+	t.Parallel()
+	runSound(t, "sound_calls.txtar", []soundCase{
+		{fn: "RegOp", subject: "is ErrC1", truth: true, wantApart: true},
+		{fn: "Causer", subject: "is ErrC2", truth: true, wantApart: true},
+		{fn: "SprintValue", subject: "is ErrC3", truth: true, wantApart: true},
+		{fn: "VaReflectCall", subject: "is ErrC4", truth: true, wantApart: true},
+		{fn: "SliceReflectCall", subject: "is ErrC6", truth: true, wantApart: true},
+		// Without a store: the argument of Value.Call reaches the
+		// elements of the variadic parameter.
+		{fn: "VaReflectCallDirect", subject: "is ErrC5", truth: true, wantMaybe: true},
+		// A recorded store, and nothing it could matter to.
+		{fn: "Clean", subject: "is ErrC1", wantNo: true},
+		{fn: "Clean", subject: "is ErrC4", wantNo: true},
+	})
+}
+
 // TestFloodingPass pins when the flooding pass runs and what the Verdict
 // lists: after a No with recorded stores it runs, and the stores are
-// listed if and only if it reaches the Target: all of them, with the
-// stores that only the flooding pass records (the stores of a value read
+// listed if and only if it reaches the Target: all of them, followed by
+// the stores that only the flooding pass records (the stores of a value read
 // through reflection, here the two of a value that reflection made, and
 // the second of two stores in a row); after a Maybe every recorded store
 // is listed and it does not run; without a recorded store it does not
@@ -396,6 +440,20 @@ func TestFloodingPass(t *testing.T) {
 			t.Errorf("%s, %s: apart from reflection %v, want %v", c.fn, c.subject, m.ApartFromReflection(), apart)
 		} else if apart && len(m.FloodTrace) == 0 {
 			t.Errorf("%s, %s: no trace of the flooding pass to the Target", c.fn, c.subject)
+		}
+		// The recorded stores come first, then those of the flooding
+		// pass alone.
+		first := 0
+		for i, rs := range m.ReflectStores {
+			if !rs.FloodOnly {
+				first++
+				if i > 0 && m.ReflectStores[i-1].FloodOnly {
+					t.Errorf("%s, %s: a recorded store is listed after one of the flooding pass", c.fn, c.subject)
+				}
+			}
+		}
+		if c.listed > 0 && first != c.recorded {
+			t.Errorf("%s, %s: %d listed stores are recorded ones, want %d", c.fn, c.subject, first, c.recorded)
 		}
 		found := c.lists == ""
 		for i, rs := range m.ReflectStores {

@@ -18,8 +18,10 @@
 // never behind a plain "no" if it could matter: a "no" is plain only if
 // no such store is recorded, or if a second, flooding pass, in which
 // every recorded store writes every memory location that a store through
-// reflection could write, and every read through reflection may read
-// what was written, does not reach the Target either. Otherwise the
+// reflection could write, every read through reflection may read what
+// was written, and every dynamic call may run any function or method of
+// the program that fits it (what was written may be its receiver or
+// function value), does not reach the Target either. Otherwise the
 // Verdict is "no, apart from reflection", with the stores listed as "not
 // followed". What the pass neither models nor records it cannot name
 // (see the end of Reflection, and Known limits).
@@ -53,7 +55,10 @@
 //     Where one of them lets it escape (copies into it, appends to it,
 //     stores or returns it, captures it, hands it to a call the pass does
 //     not follow), the elements are memory of their type as well, for
-//     all of them.
+//     all of them. So they are for a parameter of a function that a call
+//     through reflection may run (see Reflection), and for the
+//     parameters it is passed on to: such a call may pass a slice that
+//     is other memory.
 //
 // # Seeds
 //
@@ -144,6 +149,22 @@
 // is. (The operands of errors.Join and of a fmt.Errorf with several %w
 // are in no memory the pass saw a store to.)
 //
+// The intrinsics call methods on their operands, in bodies the pass does
+// not scan (see Which functions are scanned): fmt.Errorf formats every
+// operand, wrapped or not (Error, String, Format, GoString), and the
+// error that it, errors.Join or errtrace.Wrap returns passes the calls
+// of its own Error, Format, Unwrap, Is and As on to what it holds. So a
+// marked operand of an intrinsic (also one read from a slice, and of an
+// intrinsic called through a function value) is the receiver of every
+// scanned method of one of those seven names that a value of the
+// operand's static type may have: the receiver is marked as by a type
+// assertion of the operand to its type. (String only for a type without
+// an Error method: package fmt calls Error where there are both.) A
+// method that keeps its receiver (func (e *E) Error() string { last = e;
+// ... }) so puts the Subject where it stores it. Only the receiver is
+// connected; what the operand holds inside is not looked at (see the end
+// of Reflection).
+//
 // The callees of a call come from the Callees given to Run, less the
 // functions whose value is never taken at a call of a function value.
 //
@@ -197,7 +218,8 @@
 //
 // Static calls of fmt.Errorf, errors.Join, errors.New and errtrace.Wrap are
 // modelled (flow.Intrinsic) and their bodies are not scanned, so that
-// fmt.Errorf("%v", err) does not mark anything; nor are the bodies of
+// fmt.Errorf("%v", err) marks nothing but the receivers of the methods
+// it calls on err (see Calls); nor are the bodies of
 // package reflect: a call of it gives back what it is passed, in the
 // reflect.Values and empty interfaces it returns. (When the Subject is a
 // type of one of those packages, the bodies are followed instead.)
@@ -259,7 +281,13 @@
 //     MethodByName, and so text/template): the results, parameters and
 //     panics of the exported methods and of the functions whose value is
 //     taken (of the types the called Values were made from, when the pass
-//     can tell) are connected to those calls. Excepted are the methods
+//     can tell) are connected to those calls. A parameter of a slice
+//     type is connected by its elements (Value.Call makes the slice of a
+//     variadic parameter from its arguments), and is read as memory of
+//     its element type as well: it is never the memory of that function
+//     alone (see What a Mark means). A parameter of another composite
+//     type is connected only through the memory of its type. Excepted
+//     are the methods
 //     whose bodies the pass does not scan but models, the Store, Swap,
 //     CompareAndSwap and Load of the sync/atomic values and the
 //     intrinsics: one of those called through reflection
@@ -319,7 +347,15 @@
 // or a slice of them) hands out what was written: v.Interface(),
 // v.Elem(), v.Field(i), v.Index(i), v.MapIndex(k), v.Recv(),
 // it.Value(), reflect.Indirect(v), also where such a method is called
-// through an interface or a function value. A read through reflection
+// through an interface or a function value. And the call edges are
+// wider: where the pass itself takes, for a dynamic call, the callees
+// that the program's own instructions bring to it (the Candidates), the
+// flooding pass takes every function or method of the program that fits
+// the call (the Callees given to Flood: resolve.Upper.Wide), for callees
+// and callers alike, and scans what those edges reach. What a store
+// wrote may be the receiver or the function value of a call, of a type
+// (or a function) that reaches the call in no other way: a plugin that
+// is registered through reflection. A read through reflection
 // need not read a location the pass names: the Value may be made from
 // an interface value of unknown dynamic type (a helper that takes an
 // any), or name memory that package reflect made. A call that is passed no
@@ -343,14 +379,16 @@
 // store can put X where the Target finds it, as far as the pass models
 // the program: the Verdict is a plain "no", and nothing is listed. If it
 // does, the Verdict is "no, apart from reflection" and lists every
-// recorded store and the stores that only the flooding pass records (of
-// a value that another store wrote, or that is read through reflection:
-// such a store may be the one that writes what the Target reads), in
-// the order of the scan. (After a "maybe" every recorded store is listed
-// too; no flooding pass is needed.) The flooding pass is coarse: it
-// tells whether the stores can matter, not that they do, and a function
-// that reads through reflection is reached by it whenever a store is
-// recorded.
+// recorded store and, after them and under a line of their own, the
+// stores that only the flooding pass records (of a value that another
+// store wrote, or that is read through reflection: such a store may be
+// the one that writes what the Target reads), each part in the order of
+// the scan. (After a "maybe" every recorded store is listed too; no
+// flooding pass is needed.) The flooding pass is coarse: it tells
+// whether the stores can matter, not that they do; a function that
+// reads through reflection is reached by it whenever a store is
+// recorded, and so is one that a wider call edge alone leads the
+// Subject to.
 //
 // What is not modelled at all, and so neither followed nor listed (a "no"
 // can be wrong here without saying so), for example:
@@ -366,6 +404,26 @@
 //     (If a store is recorded anywhere in the scanned program, the
 //     flooding pass runs and reaches the read: "no, apart from
 //     reflection".)
+//   - a dynamic call whose callee the program's own instructions do not
+//     bring to it, when no store through reflection is recorded: a value
+//     of a type, or a function, that gets into a slice of interface
+//     values, an interface variable or a table of functions only by
+//     reflect.Value.Set, and is called there (op.Run() for an op that
+//     reflection registered). The store is recorded only if the value
+//     stored carries a Mark and the pass does not follow the store: not
+//     if it follows it to its destination, nor if the value is a
+//     function, or of a type whose method returns the Subject itself.
+//     (If a store is recorded anywhere in the scanned program, the
+//     flooding pass runs, with its wider call edges, and reaches the
+//     call: "no, apart from reflection".)
+//   - a reflect.Value that is converted to an interface value and
+//     asserted back to reflect.Value: the Mark of what it holds does not
+//     pass the assertion (fmt.Sprint(reflect.ValueOf(x)), which prints
+//     what the Value holds and calls its Error method);
+//   - the methods that package fmt calls on what an operand holds inside
+//     (fmt.Errorf("%v", s) and fmt.Sprint(s) for a struct or slice s with
+//     a marked value in it): package fmt finds the value through
+//     reflection, from an interface value (see the first point);
 //   - a method called through Value.Call or Value.Method whose result
 //     is in no memory the pass saw a store to: the []error of an
 //     Unwrap() []error of errors.Join called through reflection;
@@ -522,6 +580,9 @@ type Result struct {
 	// unfollowed are the stores through reflection that the Subject
 	// reaches and the pass did not follow (see ReflectStores).
 	unfollowed map[ssa.CallInstruction]bool
+	// floodOnly are those of unfollowed that only the flooding pass
+	// recorded, on the Result of Flood.
+	floodOnly map[ssa.CallInstruction]bool
 	// ctxRes are the Callees the pass ran with, for Flood.
 	ctxRes Callees
 }
@@ -579,9 +640,10 @@ func RunWith(ctx context.Context, prog *ssa.Program, res Callees, subj Subject, 
 // It is an upper bound of the pass it is called on, and coarse: it tells
 // whether the recorded stores can matter, not where the Subject is. Its
 // Marks and traces are of use only to show why a store can matter. Its
-// ReflectStores are those of the pass it is called on and the stores
-// that only the flood reaches: of a value that an earlier store wrote,
-// or that is read through reflection.
+// ReflectStores are those of the pass it is called on and, after them
+// and told apart (ReflectStore.FloodOnly), the stores that only the flood
+// reaches: of a value that an earlier store wrote, or that is read
+// through reflection.
 //
 // The call edges of the flooding pass are res (nil: those of the pass it
 // is called on). They must not limit a dynamic call to the callees that
@@ -606,10 +668,14 @@ func (r *Result) Flood(ctx context.Context, res Callees) (*Result, error) {
 	for site := range r.unfollowed {
 		stores[site] = true
 	}
+	only := make(map[ssa.CallInstruction]bool)
 	for site := range f.unfollowed {
 		stores[site] = true
+		if !r.unfollowed[site] {
+			only[site] = true
+		}
 	}
-	return &Result{a: f, unfollowed: stores, ctxRes: r.ctxRes}, nil
+	return &Result{a: f, unfollowed: stores, floodOnly: only, ctxRes: res}, nil
 }
 
 // Marked reports whether v may hold the Subject: v carries a Mark (for a

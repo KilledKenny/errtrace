@@ -108,9 +108,10 @@ type MembershipResult struct {
 	// reaches and the upward pass did not follow, because it cannot tell
 	// where they write (see mark.Result.ReflectStores), if they can
 	// matter to the Target: all of them after a Maybe, and after a No if
-	// the flooding pass (see Membership) reaches the Target, then with
-	// the stores that only the flooding pass records (of a value that
-	// one of the others wrote, or that is read through reflection).
+	// the flooding pass (see Membership) reaches the Target, then
+	// followed by the stores that only the flooding pass records (of a
+	// value that one of the others wrote, or that is read through
+	// reflection; their FloodOnly is set).
 	// They are reported with the Verdict (see ApartFromReflection). It
 	// is empty after a No that the flooding pass confirms.
 	ReflectStores []mark.ReflectStore
@@ -153,12 +154,13 @@ func (m *MembershipResult) ApartFromReflection() bool {
 //     recorded stores through reflection that it did not follow, it is
 //     run once more as the flooding pass (mark.Result.Flood), in which
 //     each of them writes every memory location a store through
-//     reflection could write, and every read through reflection may
-//     read what they wrote. If that does not reach the Target either,
-//     the stores cannot matter: a plain No. If it does, they are listed
-//     in ReflectStores, with the stores the flooding pass records
-//     besides: the No does not cover what they write
-//     (ApartFromReflection);
+//     reflection could write, every read through reflection may read
+//     what they wrote, and every dynamic call has the call edges of
+//     opts.FloodUpper (any function that fits it). If that does not
+//     reach the Target either, the stores cannot matter: a plain No.
+//     If it does, they are listed in ReflectStores, followed by the
+//     stores the flooding pass records besides: the No does not cover
+//     what they write (ApartFromReflection);
 //   - it does: Maybe, with the Carriers, and with every recorded store
 //     in ReflectStores. The Error Set is no proof that the Subject is
 //     absent: there may be no Carrier at all.

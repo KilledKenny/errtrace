@@ -1,0 +1,129 @@
+A whole program, without reflection, in which a method that fmt.Errorf or
+the error of errors.Join calls on an operand publishes its receiver: it
+stores it in a variable or sends it on a channel. The bodies of the
+intrinsics are not scanned, so the calls they make on an operand are
+modelled at the call of the intrinsic: a Membership Query must not answer
+"no" for the function that returns what the method published. Where the
+methods the intrinsic can call publish nothing, or the operand cannot be of
+the type whose method does, the answer stays "no". Each case has a Sentinel
+and a type of its own. The program prints what errors.Is says of each case
+when it runs.
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- main.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+)
+
+// The Error method stores its receiver; fmt.Errorf wraps the operand.
+
+type P1 struct{ n int }
+
+var last1 error
+
+func (p *P1) Error() string { last1 = p; return "p1" }
+
+var ErrO1 error = &P1{1}
+
+func ErrorfRecv() error { _ = fmt.Errorf("op: %w", ErrO1); return last1 }
+
+// The operand is only formatted, not wrapped.
+
+type P2 struct{ n int }
+
+var last2 error
+
+func (p *P2) Error() string { last2 = p; return "p2" }
+
+var ErrO2 error = &P2{1}
+
+func ErrorfPlain() error { _ = fmt.Errorf("op: %v", ErrO2); return last2 }
+
+// A Format method.
+
+type P3 struct{ n int }
+
+var last3 error
+
+func (p *P3) Error() string                 { return "p3" }
+func (p *P3) Format(s fmt.State, verb rune) { last3 = p }
+
+var ErrO3 error = &P3{1}
+
+func ErrorfFormat() error { _ = fmt.Errorf("op: %v", ErrO3); return last3 }
+
+// The receiver is sent on a channel.
+
+type P4 struct{ n int }
+
+var seen4 = make(chan error, 8)
+
+func (p *P4) Error() string {
+	select {
+	case seen4 <- p:
+	default:
+	}
+	return "p4"
+}
+
+var ErrO4 error = &P4{1}
+
+func ErrorfChan() error { _ = fmt.Errorf("op: %w", ErrO4); return <-seen4 }
+
+// The Error of a joined error calls the Error of its operands.
+
+type P5 struct{ n int }
+
+var last5 error
+
+func (p *P5) Error() string { last5 = p; return "p5" }
+
+var ErrO5 error = &P5{1}
+
+func JoinThenError() error { _ = errors.Join(ErrO5).Error(); return last5 }
+
+// The methods the intrinsic can call publish nothing; the method that
+// does is none of them, and is called on another value only.
+
+type Q6 struct{ n int }
+
+var last6 error
+
+func (q *Q6) Error() string { return "q6" }
+func (q *Q6) Keep()         { last6 = q }
+
+var ErrO6 error = &Q6{1}
+
+func Quiet() error { _ = fmt.Errorf("op: %w", ErrO6); return last6 }
+
+// The method that publishes its receiver is that of another type: the
+// operand that is the Sentinel cannot be its receiver.
+
+type P7 struct{ n int }
+type R7 struct{ n int }
+
+var last7 error
+
+func (p *P7) Error() string { return "p7" }
+func (r *R7) Error() string { last7 = r; return "r7" }
+
+var ErrO7 error = &P7{1}
+var other7 error = &R7{1}
+
+func OtherType() error { _ = fmt.Errorf("op: %w, %v", ErrO7, other7); return last7 }
+
+func main() {
+	(&Q6{2}).Keep()
+	fmt.Println("ErrorfRecv", errors.Is(ErrorfRecv(), ErrO1))
+	fmt.Println("ErrorfPlain", errors.Is(ErrorfPlain(), ErrO2))
+	fmt.Println("ErrorfFormat", errors.Is(ErrorfFormat(), ErrO3))
+	fmt.Println("ErrorfChan", errors.Is(ErrorfChan(), ErrO4))
+	fmt.Println("JoinThenError", errors.Is(JoinThenError(), ErrO5))
+	fmt.Println("Quiet", errors.Is(Quiet(), ErrO6))
+	fmt.Println("OtherType", errors.Is(OtherType(), ErrO7))
+}

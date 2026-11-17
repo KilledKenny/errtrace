@@ -167,8 +167,9 @@ func TestMembershipGroupSteps(t *testing.T) {
 }
 
 // TestMembershipHeaders pins the first line of a no, of a no that names
-// stores through reflection that were not followed, and of a maybe
-// without Carriers.
+// stores through reflection that were not followed (with the two parts of
+// that section, and how it is cut short), and of a maybe without
+// Carriers.
 func TestMembershipHeaders(t *testing.T) {
 	base := MembershipInput{
 		Input: Input{
@@ -184,6 +185,29 @@ func TestMembershipHeaders(t *testing.T) {
 	no.Verdict = "no"
 	apart := no
 	apart.NotFollowed = []ReflectStore{{Site: "8:2", Function: "example.com/fx.set"}}
+	// Two stores that the Subject reaches, and five that only the
+	// flooding pass records: five are printed in all, unless Full.
+	both := no
+	both.NotFollowed = []ReflectStore{{Site: "8:2", Function: "example.com/fx.set"}, {Site: "8:4", Function: "example.com/fx.set"}}
+	for range 5 {
+		both.NotFollowed = append(both.NotFollowed, ReflectStore{Site: "7:2", Function: "example.com/fx.copy", FloodOnly: true})
+	}
+	bothFull := both
+	bothFull.Full = true
+	// More stores that the Subject reaches than are printed.
+	many := no
+	for range 6 {
+		many.NotFollowed = append(many.NotFollowed, ReflectStore{Site: "8:2", Function: "example.com/fx.set"})
+	}
+	many.NotFollowed = append(many.NotFollowed, ReflectStore{Site: "7:2", Function: "example.com/fx.copy", FloodOnly: true})
+	const (
+		notFollowed2 = "\tnot followed: example.com/fx.ErrX reaches 2 reflective stores whose destination is unknown or only partly followed:\n" +
+			"\t\t/m/a.go:8:2-2: in example.com/fx.set\n" +
+			"\t\t/m/a.go:8:4-4: in example.com/fx.set\n" +
+			"\talso, once those are taken to write anywhere, 5 more:\n"
+		copyLine = "\t\t/m/a.go:7:2-2: in example.com/fx.copy\n"
+		setLine  = "\t\t/m/a.go:8:2-2: in example.com/fx.set\n"
+	)
 	maybe := base
 	maybe.Verdict = "maybe"
 	maybe.TargetTrace = []TraceStep{{Site: "1:1", Desc: "Sentinel example.com/fx.ErrX"}}
@@ -196,6 +220,15 @@ func TestMembershipHeaders(t *testing.T) {
 		{"no with stores not followed", apart, head + "no, apart from reflection\n" +
 			"\tnot followed: example.com/fx.ErrX reaches 1 reflective store whose destination is unknown or only partly followed:\n" +
 			"\t\t/m/a.go:8:2-2: in example.com/fx.set\n"},
+		{"no with stores of the flooding pass", both, head + "no, apart from reflection\n" +
+			notFollowed2 + strings.Repeat(copyLine, 3) + "\t\t… and 2 more\n"},
+		{"no with stores of the flooding pass, full", bothFull, head + "no, apart from reflection\n" +
+			notFollowed2 + strings.Repeat(copyLine, 5)},
+		{"no with more stores than are printed", many, head + "no, apart from reflection\n" +
+			"\tnot followed: example.com/fx.ErrX reaches 6 reflective stores whose destination is unknown or only partly followed:\n" +
+			strings.Repeat(setLine, 5) + "\t\t… and 1 more\n" +
+			"\talso, once those are taken to write anywhere, 1 more:\n" +
+			"\t\t… and 1 more\n"},
 		{"maybe without Carriers", maybe, head + "maybe: no entry of the Error Set shows how\n" +
 			"\tmarked via (origin of example.com/fx.ErrX → target):\n" +
 			"\t\t/m/a.go:1:1-1: Sentinel example.com/fx.ErrX\n"},

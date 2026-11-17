@@ -52,6 +52,10 @@ type ReflectStore struct {
 	Site ssa.CallInstruction
 	// Fn is the function the call is in.
 	Fn *ssa.Function
+	// FloodOnly says that only the flooding pass recorded the store
+	// (see Result.Flood): the Subject does not reach it, but what it
+	// stores may be what another store wrote.
+	FloodOnly bool
 }
 
 // ReflectStores returns the stores through reflection that the Subject
@@ -59,7 +63,8 @@ type ReflectStore struct {
 // the scanned program, in the order of the scan (the same on every run).
 // Whether they can matter to a Target is what the flooding pass tells
 // (see Flood). On the Result of the flooding pass they come with the
-// stores that only the flood reaches.
+// stores that only the flood reaches (FloodOnly), which are listed after
+// the others, in the order of the scan too.
 func (r *Result) ReflectStores() []ReflectStore {
 	a := r.a
 	sites := make([]ssa.CallInstruction, 0, len(r.unfollowed))
@@ -72,9 +77,16 @@ func (r *Result) ReflectStores() []ReflectStore {
 		}
 		return sites[i].Pos() < sites[j].Pos()
 	})
-	out := make([]ReflectStore, len(sites))
-	for i, site := range sites {
-		out[i] = ReflectStore{Site: site, Fn: site.Parent()}
+	out := make([]ReflectStore, 0, len(sites))
+	for _, site := range sites {
+		if !r.floodOnly[site] {
+			out = append(out, ReflectStore{Site: site, Fn: site.Parent()})
+		}
+	}
+	for _, site := range sites {
+		if r.floodOnly[site] {
+			out = append(out, ReflectStore{Site: site, Fn: site.Parent(), FloodOnly: true})
+		}
 	}
 	return out
 }

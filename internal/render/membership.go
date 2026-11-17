@@ -46,10 +46,14 @@ type ReflectStore struct {
 	Site any
 	// Function names the function the call is in.
 	Function string
+	// FloodOnly says that the Subject does not reach the store itself:
+	// it stores what it reads from memory that the other stores are
+	// taken to write. Such stores come after the others.
+	FloodOnly bool
 }
 
-// maxNotFollowed is how many stores the "not followed" section lists
-// unless Full is set.
+// maxNotFollowed is how many stores the "not followed" section lists, in
+// both of its parts together, unless Full is set.
 const maxNotFollowed = 5
 
 // MembershipInput is everything the renderer needs to print the Verdict
@@ -145,12 +149,19 @@ type MembershipInput struct {
 // every memory location a store through reflection could write, and
 // every read through reflection taken to read what they wrote, and if
 // that reaches the Target the no becomes "no, apart from reflection" and
-// is followed by every recorded store and the stores that second pass
-// records besides (a store of what another store wrote); if it does not,
-// the no is plain and nothing is listed. The stores come in the order of
-// the pass (the first 5, all with Full):
+// is followed by every recorded store, the N stores that X reaches, and
+// then, if there are any, by the M stores that only that second pass
+// records: X does not reach them, they store what they read from memory
+// that the recorded stores are taken to write (a store of what another
+// store wrote). If it does not reach the Target, the no is plain and
+// nothing is listed. The stores of each part come in the order of the
+// pass; of all of them, the first 5 are printed (all with Full), and a
+// part that is cut short ends with how many more it has:
 //
 //	<TAB>not followed: <X> reaches <N> reflective store[s] whose destination is unknown or only partly followed:
+//	<TAB><TAB><span>: in <function>
+//	<TAB><TAB>… and <K> more
+//	<TAB>also, once those are taken to write anywhere, <M> more:
 //	<TAB><TAB><span>: in <function>
 //	<TAB><TAB>… and <K> more
 //
@@ -256,24 +267,41 @@ func (in MembershipInput) members(b *strings.Builder, g pivotGroup) {
 // notFollowed writes the section of the stores through reflection that
 // the upward pass did not follow, if there are any.
 func (in MembershipInput) notFollowed(b *strings.Builder) {
-	n := len(in.NotFollowed)
-	if n == 0 {
+	if len(in.NotFollowed) == 0 {
 		return
 	}
+	// The stores the Subject reaches, then those it does not.
+	var reached, flooded []ReflectStore
+	for _, rs := range in.NotFollowed {
+		if rs.FloodOnly {
+			flooded = append(flooded, rs)
+		} else {
+			reached = append(reached, rs)
+		}
+	}
+	left := len(in.NotFollowed)
+	if !in.Full && left > maxNotFollowed {
+		left = maxNotFollowed
+	}
+	list := func(part []ReflectStore) {
+		shown := min(len(part), left)
+		left -= shown
+		for _, rs := range part[:shown] {
+			fmt.Fprintf(b, "\t\t%s: in %s\n", in.locate(rs.Site), rs.Function)
+		}
+		if shown < len(part) {
+			fmt.Fprintf(b, "\t\t… and %d more\n", len(part)-shown)
+		}
+	}
 	stores := "stores"
-	if n == 1 {
+	if len(reached) == 1 {
 		stores = "store"
 	}
-	fmt.Fprintf(b, "\tnot followed: %s reaches %d reflective %s whose destination is unknown or only partly followed:\n", in.Subject, n, stores)
-	shown := n
-	if !in.Full && shown > maxNotFollowed {
-		shown = maxNotFollowed
-	}
-	for _, rs := range in.NotFollowed[:shown] {
-		fmt.Fprintf(b, "\t\t%s: in %s\n", in.locate(rs.Site), rs.Function)
-	}
-	if shown < n {
-		fmt.Fprintf(b, "\t\t… and %d more\n", n-shown)
+	fmt.Fprintf(b, "\tnot followed: %s reaches %d reflective %s whose destination is unknown or only partly followed:\n", in.Subject, len(reached), stores)
+	list(reached)
+	if len(flooded) > 0 {
+		fmt.Fprintf(b, "\talso, once those are taken to write anywhere, %d more:\n", len(flooded))
+		list(flooded)
 	}
 }
 
