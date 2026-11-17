@@ -226,6 +226,15 @@ type Value struct {
 	// Wraps, those of the cycle among them. The chain was not cut at the
 	// chain depth limit.
 	Repeat bool
+	// Later marks a FieldRef that stands for what the field may come to
+	// hold after a value holding it was built (the values that are
+	// stored to it through a pointer to a value built before), not for
+	// everything the field holds anywhere; and the Wrap of a tracked
+	// value that holds such a FieldRef alone, until the FieldRef is
+	// resolved: with no value for it, there is no such Wrap. It also
+	// marks the Unresolved values that such a FieldRef resolves to: they
+	// stand, under the Wrap, for ways the field may be written later.
+	Later bool
 	// MayHoldNil marks a Wrap that, on some path, holds nothing for one of
 	// its operands, which was nil there: a %w operand of fmt.Errorf, an
 	// operand of errors.Join or the field a custom Unwrap returns. Such a
@@ -274,6 +283,7 @@ type key struct {
 	format      string
 	inner       string
 	mayHoldNil  bool
+	later       bool
 	repeat      bool
 	unresolved  UnresolvedKind
 	detail      string
@@ -314,6 +324,7 @@ func keyWith(v Value, typs typeKeys) key {
 		hasMessage:  v.HasMessage,
 		wrapKind:    v.WrapKind,
 		mayHoldNil:  v.MayHoldNil,
+		later:       v.Later,
 		repeat:      v.Repeat,
 		format:      v.Format,
 		unresolved:  v.Unresolved,
@@ -449,6 +460,9 @@ func (t *Table) String(id ValueID) string {
 	case StoreRef:
 		return fmt.Sprintf("storeref %s#%d %s", v.Fn, v.Index, v.Name)
 	case FieldRef:
+		if v.Later {
+			return fmt.Sprintf("fieldref later %s.%s", types.TypeString(v.Type, nil), v.Name)
+		}
 		return fmt.Sprintf("fieldref %s.%s", types.TypeString(v.Type, nil), v.Name)
 	case Guarded:
 		parts := make([]string, len(v.Guards))

@@ -1,7 +1,9 @@
-QA3 C5. The value that reflection built is asserted to its type in another
-function than the one that took it out of reflection: the asserted type is
-exposed all the same. (The registry holds reflect.Types, so no value of S
-reaches a reflect call.)
+QA3 C5, made runnable for QA4 m4. The value that reflection built is asserted
+to its type in another function than the one that took it out of reflection.
+The registry of reflect.Types is filled from a value of S, so S is exposed
+there already; the assertion in another function is a second reason for the
+same Unresolved entry (see reflect_type_kept_by_sync and the report of fix
+round 5 for why a runnable program cannot have the second reason alone).
 -- args --
 a.go:@q
 -- stdout --
@@ -37,5 +39,6 @@ func build(name string) any {
 }
 
 func main() {
+	registry["s"] = reflect.TypeOf(S{})
 	fmt.Println(F(conv(build("s"))))
 }

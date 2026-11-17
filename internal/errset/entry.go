@@ -3,6 +3,7 @@ package errset
 import (
 	"cmp"
 	"fmt"
+	"go/types"
 	"slices"
 	"strings"
 )
@@ -110,7 +111,8 @@ func Flatten(t *Table, top ValueID) []Entry {
 // MorePaths. A merged entry is via a field location only if every one of
 // its entries is. A merged entry is possibly handled only by the guards that
 // every one of its entries is possibly handled by. The order of first
-// occurrences is kept.
+// occurrences is kept. A leaf that is shown under the Wrap it is the
+// nil-inner form of is first taken out of that Wrap (see unnest).
 func Dedup(t *Table, entries []Entry, pos PosFunc) []Entry {
 	type group struct {
 		entry Entry
@@ -159,6 +161,7 @@ func Dedup(t *Table, entries []Entry, pos PosFunc) []Entry {
 	index := make(map[string]*group)
 	var b strings.Builder
 	for _, e := range entries {
+		e = t.unnest(e)
 		b.Reset()
 		fmt.Fprintf(&b, "%d %t %t", leafOf(e.Leaf), e.Truncated, e.Repeats)
 		for _, w := range e.Chain {
@@ -188,6 +191,33 @@ func Dedup(t *Table, entries []Entry, pos PosFunc) []Entry {
 		out[i] = g.entry
 	}
 	return out
+}
+
+// unnest returns e without the innermost Wrap of its Wrap Chain if the
+// leaf is that very Wrap wrapping nothing, read back around a cycle of
+// stores (err = fmt.Errorf("x: %w", err) with err nil at first: the
+// Opaque Error of the fmt.Errorf, under the same fmt.Errorf, chain may
+// repeat). The entry then shows the leaf once, as what it is; that it may
+// also be nested in itself says nothing errors.Is or errors.As could
+// tell. The values themselves keep the nesting: unwrapping one gives the
+// leaf.
+func (t *Table) unnest(e Entry) Entry {
+	if !e.Repeats || e.Truncated || len(e.Chain) == 0 {
+		return e
+	}
+	l, w := t.Get(e.Leaf), t.Get(e.Chain[0])
+	if w.Kind != Wrap || w.Pos != l.Pos {
+		return e
+	}
+	switch {
+	case w.WrapKind == WrapErrorf && l.Kind == Opaque && l.Constructor == "fmt.Errorf" && l.Message == w.Format && w.Format != "":
+	case w.WrapKind == WrapUnwrapMethod && l.Kind == Concrete && l.Allocated && !l.TypedNil && l.Type != nil && w.Type != nil && types.Identical(l.Type, w.Type):
+	default:
+		return e
+	}
+	e.Chain = e.Chain[1:]
+	e.Repeats = false
+	return e
 }
 
 // PosFunc returns the position of a value's span start as a file name and

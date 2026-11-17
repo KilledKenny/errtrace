@@ -1,11 +1,10 @@
-QA N1. A deferred closure wraps a nil named result in a wrapper literal.
+QA N1. A deferred closure wraps a nil named result in a wrapper literal: a
+Concrete Type that wraps nothing, listed once and plain (QA4 m3).
 -- args --
 a.go:@q
 -- stdout --
 $WORK/a.go:20:12-13: Error Set of example.com/x.C: 1 entries
-$WORK/a.go:21:23-37: concrete *example.com/x.W [chain may repeat] [+1 more paths]
-	wrap chain (origin → target):
-		$WORK/a.go:21:23-37: *example.com/x.W.Unwrap
+$WORK/a.go:21:23-37: concrete *example.com/x.W [+1 more paths]
 	path (origin → target):
 		$WORK/a.go:21:23-37: in example.com/x.C$1
 		$WORK/a.go:21:17-20: in example.com/x.C$1

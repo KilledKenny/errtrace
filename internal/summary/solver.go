@@ -75,6 +75,9 @@ type Solver struct {
 	atTop bool
 	// copies caches copyFacts.
 	copies map[copyKey][]flow.Fact
+	// embeds caches embedWays, and outerLocs outerLocations.
+	embeds    map[embedKey]embedWays
+	outerLocs map[types.Type][]*location
 	// unwraps caches unwrapPath.
 	unwraps map[types.Type]unwrapPath
 	// unsettledPass is set while the passes of one evaluation have not
@@ -214,11 +217,23 @@ func (s *Solver) ResolveTop(facts []Fact) []Fact {
 
 // ViaLocation returns the name of a field location if every source of
 // srcs, the sources of a leaf, goes through one: the leaf is then known
-// only as a value that the program stores to that field somewhere. Of
-// several locations on the way it names the one the value was loaded from
-// last. It returns "" if some source goes through no location.
-func (s *Solver) ViaLocation(srcs []Source) string {
-	return viaOf(srcs)
+// only as a value that the program stores to that field somewhere. The
+// name is that of the location on the Propagation Path that Path returns
+// for the same leaf of fn (of several on that path, the one the value
+// was loaded from last). It returns "" if some source goes through no
+// location.
+func (s *Solver) ViaLocation(fn *ssa.Function, srcs []Source) string {
+	name := viaOf(srcs)
+	if name == "" {
+		return ""
+	}
+	if s.paths == nil {
+		s.computePaths()
+	}
+	if b, ok := s.bestOf(fn, srcs); ok && b.via != "" {
+		return b.via
+	}
+	return name
 }
 
 // SiteFacts returns the values that error result index of the call site in
@@ -452,7 +467,14 @@ func (c *collector) value(fn *ssa.Function, id errset.ValueID) {
 			}
 		}
 	case errset.FieldRef:
-		if l := c.s.location(fn, v); l != nil && !c.seenLoc[l] {
+		l := c.s.location(fn, v)
+		if v.Later {
+			if c.s.feedsItself(l) {
+				return
+			}
+			l = c.s.laterWrites(l)
+		}
+		if l != nil && !c.seenLoc[l] {
 			c.seenLoc[l] = true
 			c.locs = append(c.locs, l)
 		}
@@ -475,6 +497,14 @@ func (c *collector) value(fn *ssa.Function, id errset.ValueID) {
 		l := c.s.location(fn, v)
 		for _, l := range []*location{l, c.s.laterWrites(l)} {
 			if l != nil && !c.seenLoc[l] {
+				c.seenLoc[l] = true
+				c.locs = append(c.locs, l)
+			}
+		}
+		// A method promoted to a type that embeds the struct runs the
+		// load on what the embedded field holds.
+		for _, l := range c.s.outerLocations(v.Type) {
+			if !c.seenLoc[l] {
 				c.seenLoc[l] = true
 				c.locs = append(c.locs, l)
 			}
@@ -580,6 +610,11 @@ func (s *Solver) solveSCC(scc []dnode) {
 		if len(locs) == 0 {
 			return
 		}
+		if len(scc) == 1 {
+			// A location that only feeds itself: a leaf that no
+			// writer wraps on its way around is the leaf itself.
+			locs[0].sum.facts = s.unrepeat(locs[0].sum.facts)
+		}
 		for _, n := range scc {
 			if n.fn != nil {
 				s.sums[n.fn].Results = s.finalResults(n.fn, s.capSize(n.fn, s.transfer(n.fn)))
@@ -661,6 +696,50 @@ func (s *Solver) solveSCC(scc []dnode) {
 	for _, l := range changedLocs {
 		l.sum.holes = append(l.sum.holes, locHole{errset.FixpointLimit, fmt.Sprintf("did not converge within %d rounds", maxRounds)})
 	}
+}
+
+// unrepeat returns the facts of a field location that is alone in its
+// SCC with every bare Repeat marker replaced by the leaf under it, where
+// no fact holds that leaf under a Repeat marker inside a Wrap: the
+// location's writers then only copy the leaf around (*p = *q), and
+// between it and what a reader puts around it there is no Wrap of the
+// cycle, which is all the marker would say.
+func (s *Solver) unrepeat(facts []Fact) []Fact {
+	wrapped := make(map[errset.ValueID]bool)
+	var mark func(id errset.ValueID, inWrap bool)
+	mark = func(id errset.ValueID, inWrap bool) {
+		v := s.tbl.Get(id)
+		switch v.Kind {
+		case errset.Wrap:
+			for _, in := range v.Inner {
+				mark(in, true)
+			}
+		case errset.Truncated:
+			if v.Repeat && inWrap {
+				wrapped[v.Inner[0]] = true
+			}
+		case errset.Guarded, errset.FieldOf:
+			mark(v.Inner[0], inWrap)
+		}
+	}
+	bare := false
+	for _, f := range facts {
+		mark(f.Value, false)
+		v := s.tbl.Get(f.Value)
+		bare = bare || (v.Kind == errset.Truncated && v.Repeat)
+	}
+	if !bare {
+		return facts
+	}
+	var fs factSet
+	for _, f := range facts {
+		id := f.Value
+		if v := s.tbl.Get(id); v.Kind == errset.Truncated && v.Repeat && !wrapped[v.Inner[0]] && s.tbl.Get(v.Inner[0]).Kind.IsLeaf() {
+			id = v.Inner[0]
+		}
+		fs.add(id, f.Leaves, f.Notes)
+	}
+	return fs.facts
 }
 
 func (s *Solver) selfEdge(n dnode) bool {

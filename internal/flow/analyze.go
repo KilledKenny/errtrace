@@ -240,6 +240,18 @@ func (a *analyzer) walk(v ssa.Value) {
 	switch v := v.(type) {
 	case *ssa.Const:
 		if v.IsNil() {
+			if _, ptr := v.Type().Underlying().(*types.Pointer); ptr && IsErrorType(v.Type()) && a.at != nil {
+				// A nil pointer of a concrete error type (return nil
+				// in a function returning *E): no error as it is, but
+				// a non-nil error once a caller converts it to an
+				// interface. A nil check of the pointer on the way
+				// removes it (see GuardNil).
+				var site any = a.at
+				if ref := a.debugRefAtUse(v); ref != nil {
+					site = ref
+				}
+				a.add(a.tbl.Intern(errset.Value{Kind: errset.Concrete, Site: site, Pos: a.at.Pos(), Type: unalias(v.Type()), TypedNil: true}), site)
+			}
 			return // no error
 		}
 	case *ssa.Phi:

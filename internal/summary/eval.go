@@ -745,6 +745,7 @@ func (s *Solver) mapTreeRaw(id errset.ValueID, base int, leaf func(errset.ValueI
 	var limits []subst
 	off := base
 	several := 0
+	vanished := false
 	for _, in := range v.Inner {
 		var subs []subst
 		for _, sub := range s.mapTreeRaw(in, off, leaf) {
@@ -759,12 +760,19 @@ func (s *Solver) mapTreeRaw(id errset.ValueID, base int, leaf func(errset.ValueI
 			// The inner value has no value here: it is nil. A Wrap
 			// holds nothing for it (fmt.Errorf drops a nil %w operand,
 			// errors.Join a nil error, a nil field is a nil Unwrap).
+			// Not so an inner value that stands for what a field is
+			// given later, and is given nothing: it is no value at
+			// all, and neither is a Wrap made of it.
+			vanished = vanished || s.laterTree(in)
 			continue
 		}
 		operands = append(operands, subs)
 		if len(subs) > 1 {
 			several++
 		}
+	}
+	if vanished {
+		return limits
 	}
 	if len(operands) == 0 {
 		// Every inner value is nil, unless a fixpoint is still running
@@ -805,6 +813,9 @@ func (s *Solver) mapTreeRaw(id errset.ValueID, base int, leaf func(errset.ValueI
 	for i := range combos {
 		w := v
 		w.Inner = inner[i]
+		// A Wrap made for what the field is given later is, with a
+		// value for it, a Wrap like any other.
+		w.Later = false
 		combos[i].value = s.tbl.Intern(w)
 	}
 	if cut && len(combos) > 0 {
@@ -850,7 +861,9 @@ func (s *Solver) mapTreeRaw(id errset.ValueID, base int, leaf func(errset.ValueI
 // Type. errors.Join of nil errors and errtrace.Wrap(nil) are nil, and a
 // marker over nothing is nothing: there is no value.
 func (s *Solver) wrapOfNothing(v errset.Value) (errset.ValueID, bool) {
-	if v.Kind != errset.Wrap {
+	if v.Kind != errset.Wrap || v.Later {
+		// A Wrap made only for what a field is given after its value
+		// was built: with no later writer, there is no such value.
 		return 0, false
 	}
 	switch v.WrapKind {
@@ -863,6 +876,25 @@ func (s *Solver) wrapOfNothing(v errset.Value) (errset.ValueID, bool) {
 		return s.tbl.Intern(errset.Value{Kind: errset.Concrete, Site: v.Site, Pos: v.Pos, Type: v.Type, Allocated: true}), true
 	}
 	return 0, false
+}
+
+// laterTree reports whether the value tree id is made for what a field
+// is given after its value was built (errset.Value.Later): a Later
+// FieldRef, the Wrap around one, or either under a marker or guards.
+func (s *Solver) laterTree(id errset.ValueID) bool {
+	for {
+		v := s.tbl.Get(id)
+		switch v.Kind {
+		case errset.FieldRef:
+			return v.Later
+		case errset.Wrap:
+			return v.Later
+		case errset.Truncated, errset.Guarded:
+			id = v.Inner[0]
+		default:
+			return false
+		}
+	}
 }
 
 // isLimit reports whether id is an Unresolved fixpoint-limit value (or

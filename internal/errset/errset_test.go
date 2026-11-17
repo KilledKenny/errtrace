@@ -160,6 +160,30 @@ func TestDedupMergesLeavesShownTheSame(t *testing.T) {
 	}
 }
 
+func TestDedupShowsWrapOfNothingOnce(t *testing.T) {
+	_, a, _ := testVars()
+	tbl := NewTable()
+	// err = fmt.Errorf("x: %w", err), starting from nil: the Opaque Error
+	// of the Errorf, read back around the cycle and wrapped by it again.
+	opaque := tbl.Intern(Value{Kind: Opaque, Pos: 10, Constructor: "fmt.Errorf", Message: "x: %w", HasMessage: true})
+	again := tbl.Intern(Value{Kind: Truncated, Pos: 10, Repeat: true, Inner: []ValueID{opaque}})
+	nested := tbl.Intern(Value{Kind: Wrap, Pos: 10, WrapKind: WrapErrorf, Format: "x: %w", Inner: []ValueID{again}})
+	// A Sentinel under the same Errorf is not the Errorf's own nil form.
+	sent := tbl.Intern(Value{Kind: Sentinel, Var: a})
+	sentAgain := tbl.Intern(Value{Kind: Truncated, Repeat: true, Inner: []ValueID{sent}})
+	wrapped := tbl.Intern(Value{Kind: Wrap, Pos: 10, WrapKind: WrapErrorf, Format: "x: %w", Inner: []ValueID{sentAgain}})
+	entries := append(Flatten(tbl, opaque), Flatten(tbl, nested)...)
+	entries = append(entries, Flatten(tbl, wrapped)...)
+	got := Dedup(tbl, entries, nil)
+	want := []Entry{
+		{Leaf: opaque, Chain: []ValueID{}},
+		{Leaf: sent, Chain: []ValueID{wrapped}, Repeats: true},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Dedup =\n%+v\nwant\n%+v", got, want)
+	}
+}
+
 func TestDedupComparesWrapsWithoutSiblings(t *testing.T) {
 	_, a, b := testVars()
 	tbl := NewTable()

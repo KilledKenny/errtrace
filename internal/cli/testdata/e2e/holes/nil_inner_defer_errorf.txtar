@@ -1,12 +1,11 @@
 QA N1. A deferred closure wraps a nil named result with fmt.Errorf("%w"):
-the result is an error that wraps nothing, an Opaque Error.
+the result is an error that wraps nothing, an Opaque Error, listed once and
+plain (QA4 m3: not again under its own fmt.Errorf).
 -- args --
 a.go:@q
 -- stdout --
 $WORK/a.go:25:12-13: Error Set of example.com/x.D: 1 entries
-$WORK/a.go:26:23-49: opaque fmt.Errorf "ctx: %w" [chain may repeat] [+1 more paths]
-	wrap chain (origin → target):
-		$WORK/a.go:26:23-49: fmt.Errorf "ctx: %w"
+$WORK/a.go:26:23-49: opaque fmt.Errorf "ctx: %w" [+1 more paths]
 	path (origin → target):
 		$WORK/a.go:26:23-49: in example.com/x.D$1
 		$WORK/a.go:26:17-20: in example.com/x.D$1

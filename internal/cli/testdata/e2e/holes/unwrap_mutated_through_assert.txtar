@@ -12,7 +12,7 @@ $GOROOT/src/io/io.go:*: sentinel io.EOF
 		$WORK/a.go:13:37-38: in (*example.com/x.W).Unwrap
 		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*example.com/x.W).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 1 of 1 candidates)
 		$WORK/a.go:22:9-27: in example.com/x.F, call to errors.Unwrap
-$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [via field inner of example.com/x.W]
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [via field inner of example.com/x.W] [+1 more paths]
 	path (origin → target):
 		$WORK/a.go:20:13-25: in example.com/x.F
 		$WORK/a.go:20:5-10: in example.com/x.F

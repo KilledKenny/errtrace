@@ -18,7 +18,7 @@ func TestAnalyze(t *testing.T) {
 	pkg := l.SSAPackage(l.Initial[0])
 	tests := map[string]string{
 		"Symbolic": "result 1: callref example.com/fx.g #1; param example.com/fx.Symbolic#1 err; callref os.Open #1",
-		"Two":      `result 0: opaque errors.New "one" | result 1: concrete *io/fs.PathError`,
+		"Two":      `result 0: opaque errors.New "one" | result 1: concrete *io/fs.PathError; wrap(unwrap-method *io/fs.PathError.Unwrap)[fieldref later io/fs.PathError.Err]`,
 		"Loop":     "result 0: sentinel io.EOF",
 		"NoError":  "",
 	}

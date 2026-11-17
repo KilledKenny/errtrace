@@ -471,6 +471,10 @@ func (a *analyzer) constructed(typ types.Type, alloc *ssa.Alloc) {
 	}
 	before, revisits := len(a.facts), a.revisits
 	var operands [][]wrapped
+	// What the field may be given after the literal is built, through a
+	// pointer to the value (a setter, a store by a caller): the Wrap
+	// holds that too, by the time it is unwrapped.
+	later, hasLater := a.laterField(typ, m, alloc, pos)
 	lit := openLiteral(alloc, m.path)
 	stores := lit.stores
 	// The field is nil on a path with no store to it. With more than one
@@ -532,20 +536,64 @@ func (a *analyzer) constructed(typ types.Type, alloc *ssa.Alloc) {
 		if len(a.facts) == before && a.revisits == revisits {
 			a.add(conc, alloc)
 		}
+		if hasLater {
+			a.addInner([]errset.ValueID{later}, alloc)
+		}
 		return
 	}
 	facts := a.wraps(base, operands)
-	if len(facts) == 0 {
+	switch {
+	case len(facts) == 0:
 		// Unwrap returns nil: the value wraps nothing.
 		a.add(conc, alloc)
-		return
+	default:
+		a.addFacts(facts)
+		if nilField {
+			// On a path where the field is nil, the value wraps
+			// nothing: that value is one of its own.
+			a.add(conc, alloc)
+		}
 	}
-	a.addFacts(facts)
-	if nilField {
-		// On a path where the field is nil, the value wraps nothing:
-		// that value is one of its own.
-		a.add(conc, alloc)
+	if hasLater {
+		// The same value, holding what a later writer stored: a Wrap
+		// that is there only if there is such a writer.
+		w := base
+		w.Later, w.MayHoldNil = true, true
+		a.addFacts(a.wraps(w, [][]wrapped{a.madeAt(alloc, later)}))
 	}
+}
+
+// laterField returns the Later FieldRef of the field that the Unwrap
+// method m of typ returns, for the value built by alloc: what the later
+// writers of that field store (see errset.Value.Later). It reports false
+// for an Unwrap that returns a slice, and for a field whose loads are not
+// modelled (see FieldStruct).
+func (a *analyzer) laterField(typ types.Type, m unwrapShape, alloc *ssa.Alloc, pos token.Pos) (errset.ValueID, bool) {
+	if m.kind != unwrapField || m.multi || len(m.path) == 0 {
+		return 0, false
+	}
+	t := typ
+	for _, i := range m.path[:len(m.path)-1] {
+		u := unalias(t)
+		if p, ok := u.Underlying().(*types.Pointer); ok {
+			u = unalias(p.Elem())
+		}
+		st, ok := u.Underlying().(*types.Struct)
+		if !ok || i >= st.NumFields() {
+			return 0, false
+		}
+		t = st.Field(i).Type()
+	}
+	field := m.path[len(m.path)-1]
+	st := FieldStruct(t, field)
+	if st == nil {
+		return 0, false
+	}
+	return a.tbl.Intern(errset.Value{
+		Kind: errset.FieldRef, Site: alloc, Pos: pos, Type: st, Index: field, Name: fieldName(st, field), Fn: a.fn.String(),
+		Detail: fmt.Sprintf("field %s of %s after the value is built", fieldName(st, field), typeString(st)),
+		Later:  true,
+	}), true
 }
 
 // TrackedAlloc reports whether alloc is a value whose fields the analysis

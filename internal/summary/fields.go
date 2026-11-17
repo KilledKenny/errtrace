@@ -61,6 +61,18 @@ import (
 // are marked (Source.via), and an entry whose every source is so marked
 // is reported as via the location (Solver.ViaLocation).
 //
+// Two struct types that the program converts to one another are one type
+// for a field load (Solver.sameStruct). A value of another type that
+// embeds the struct type, or an interface that may hold it, is stepped
+// through to what the embedded field holds (Solver.embedded): a promoted
+// method runs its loads there.
+//
+// The later writers also matter where a tracked value is not unwrapped
+// but returned: flow puts, in the Wrap of every tracked value, a Later
+// FieldRef, which stands for what the later writers of the Unwrap field
+// store (fieldValues). Where those writers feed on the field itself, one
+// Unresolved value under the Wrap says so instead (feedsItself).
+//
 // A store that wraps what it loads from its own location (s.err =
 // fmt.Errorf("...: %w", s.err)) is not iterated to the chain depth: while
 // a location is being solved, a load of it stands for the leaves of its
@@ -158,6 +170,12 @@ type location struct {
 	// unreached names a function outside the reachable program that
 	// reflection may call and that writes the field, or is empty.
 	unreached string
+	// fed caches feedsItself, once fedKnown is set.
+	fed, fedKnown bool
+	// unseen names, in an open world, a function outside the reachable
+	// program that writes the field, or is empty (see
+	// fieldIndex.openScan).
+	unseen string
 	// demand caches what the writers' stored values depend on.
 	demand *demand
 	// sum is the location's summary, or nil until it is solved.
@@ -563,6 +581,18 @@ func (r *paramResolver) fromCallers(callee *ssa.Function, depth int, passed func
 // fieldValues expands the FieldRef v, loaded at site in fn: the values of
 // its field location (see locationValues).
 func (s *Solver) fieldValues(fn *ssa.Function, v errset.Value, site any) []subst {
+	if v.Later {
+		// What a tracked value built here may be given later.
+		l := s.location(fn, v)
+		if s.feedsItself(l) {
+			detail := fmt.Sprintf("field %s of %s may be written after the value is built", v.Name, types.TypeString(v.Type, nil))
+			return []subst{{
+				value:  s.tbl.Intern(errset.Value{Kind: errset.Unresolved, Site: v.Site, Pos: v.Pos, Unresolved: errset.Memory, Detail: detail, Later: true}),
+				leaves: local(1, Source{Kind: Local, Site: site}),
+			}}
+		}
+		return s.laterValues(l, v, site, false)
+	}
 	return s.locationValues(s.location(fn, v), v, site)
 }
 
@@ -575,7 +605,11 @@ func (s *Solver) fieldValues(fn *ssa.Function, v errset.Value, site any) []subst
 func (s *Solver) locationValues(l *location, v errset.Value, site any) []subst {
 	hole := func(kind errset.UnresolvedKind, detail string) subst {
 		return subst{
-			value:  s.tbl.Intern(errset.Value{Kind: errset.Unresolved, Site: v.Site, Pos: v.Pos, Unresolved: kind, Detail: detail}),
+			// Under the Wrap of a tracked value (a Later FieldRef), the
+			// Unresolved values of the location are marked as standing
+			// for the later writers: a load made on the value lists
+			// them itself (see instanceField).
+			value:  s.tbl.Intern(errset.Value{Kind: errset.Unresolved, Site: v.Site, Pos: v.Pos, Unresolved: kind, Detail: detail, Later: v.Later}),
 			leaves: local(1, Source{Kind: Local, Site: site}),
 		}
 	}
@@ -628,11 +662,80 @@ func (s *Solver) laterWrites(l *location) *location {
 		switch {
 		case l.overwritten || (len(l.later) > 0 && len(l.later) == len(l.writers) && len(l.copies) == 0):
 			l.rest = l
-		case len(l.later) > 0 || len(l.copies) > 0 || l.flags != 0 || l.unreached != "":
+		case len(l.later) > 0 || len(l.copies) > 0 || l.flags&realFlags != 0 || l.unreached != "":
 			l.rest = &location{name: l.name, writers: l.later, copied: l.copies, of: l, flags: l.flags, unreached: l.unreached, restMade: true}
 		}
 	}
 	return l.rest
+}
+
+// laterValues returns what the field of a tracked value, loaded by ref (a
+// FieldRef of the location l) at site, may hold besides what its
+// composite literal stored: the values of the later writers of the field,
+// with the Unresolved values of every other way it may be written (see
+// laterWrites); and, in an open world, an Unresolved value if code
+// outside the reachable program may have got the value and can write the
+// field (see handedOut). throughLoc says that the tracked value was
+// itself loaded from a field location. Nothing is returned for a field
+// that only its literal writes.
+func (s *Solver) laterValues(l *location, ref errset.Value, site any, throughLoc bool) []subst {
+	if l == nil {
+		return nil
+	}
+	if later := s.laterWrites(l); later != nil {
+		return s.locationValues(later, ref, site)
+	}
+	if s.openWorld() && s.handedOut(l, ref, throughLoc) {
+		detail := fmt.Sprintf("field %s of %s %s", ref.Name, types.TypeString(ref.Type, nil), openWorldReason)
+		return []subst{{
+			value:  s.tbl.Intern(errset.Value{Kind: errset.Unresolved, Site: ref.Site, Pos: ref.Pos, Unresolved: errset.Memory, Detail: detail, Later: ref.Later}),
+			leaves: local(1, Source{Kind: Local, Site: site}),
+		}}
+	}
+	return nil
+}
+
+// handedOut reports whether, in an open world, code outside the reachable
+// program may have written the field of ref (location l) of a tracked
+// value: it can write the field (the field is exported, or a function
+// outside the reachable program writes it), and it may have got the
+// value (a value of the type is handed to a dynamic call or stored to
+// memory somewhere, or this one was loaded from a field location, where
+// it lay between two calls into the program).
+func (s *Solver) handedOut(l *location, ref errset.Value, throughLoc bool) bool {
+	s.fields.openScan(s.roots)
+	writable := l.unseen != ""
+	if st, ok := underlyingStruct(ref.Type); ok && ref.Index < st.NumFields() && st.Field(ref.Index).Exported() {
+		writable = true
+	}
+	return writable && (throughLoc || l.flags&holeOpen != 0)
+}
+
+// feedsItself reports whether the later writers of the field of l store
+// what they read from that very field (s.Err = wrap(s.Err)), or a struct
+// holding it is copied or overwritten whole. What a value built at one
+// place may then come to hold is whatever any value of the type holds,
+// around the cycle: where such a value is built, that is said by one
+// Unresolved value under its Wrap, not listed (a load of the field, made
+// on the value, still lists it: see fieldOf).
+func (s *Solver) feedsItself(l *location) bool {
+	later := s.laterWrites(l)
+	if later == nil {
+		return false
+	}
+	if !l.fedKnown {
+		l.fedKnown = true
+		l.fed = l.overwritten || len(l.copies) > 0
+		if !l.fed {
+			for _, dep := range s.locationDemand(later).locs {
+				if dep == l || dep == later {
+					l.fed = true
+					break
+				}
+			}
+		}
+	}
+	return l.fed
 }
 
 // fieldBase is what a value is to a field load made on it.
@@ -698,7 +801,7 @@ const (
 func (s *Solver) fieldOf(v errset.Value, bases []subst) []subst {
 	var out []subst
 	var unknown []subst
-	some, rest := false, false
+	some, rest, restVia := false, false, false
 	// untracked counts the values that are of the struct type but not
 	// tracked.
 	untracked := 0
@@ -760,6 +863,7 @@ func (s *Solver) fieldOf(v errset.Value, bases []subst) []subst {
 				out = append(out, sub)
 			}
 			rest = true
+			restVia = restVia || viaOf(mergeSources(b.leaves)) != ""
 		}
 	}
 	// A tracked value that holds a leaf read back around a cycle of
@@ -782,9 +886,7 @@ func (s *Solver) fieldOf(v errset.Value, bases []subst) []subst {
 	case some:
 		out = append(out, s.locationValues(l, ref, v.Site)...)
 	case rest && !byValue:
-		if later := s.laterWrites(l); later != nil {
-			out = append(out, s.locationValues(later, ref, v.Site)...)
-		}
+		out = append(out, s.laterValues(l, ref, v.Site, restVia)...)
 	}
 	if len(unknown) > 0 {
 		why := "the value loaded from is not known"
@@ -813,18 +915,31 @@ func (s *Solver) fieldOf(v errset.Value, bases []subst) []subst {
 }
 
 // embedded returns bases with every value replaced that is of a known
-// type other than the struct type T of the load v but embeds a T: by the
-// T inside it. A method of T promoted to the outer type is called on the
-// outer value (the Resolver names the method itself as the Candidate, not
-// the wrapper that loads the embedded struct first), so its loads are
-// made on the embedded T. That T is found by the loads of the embedded
-// fields on the way, each resolved like any other field load (fieldOf):
-// from a tracked outer value, the T that its composite literal built.
+// type other than the struct type T of the load v but embeds a T, or an
+// interface that may hold one: by the T inside it. A method of T promoted
+// to the outer type is called on the outer value (the Resolver names the
+// method itself as the Candidate, not the wrapper that loads the embedded
+// field first), so its loads are made on the embedded T. That T is found
+// by the loads of the embedded fields on the way, each resolved like any
+// other field load (fieldOf): from a tracked outer value, the T that its
+// composite literal built. An embedded interface is a step too: the load
+// is made on what that field holds, which may in turn embed the T.
 func (s *Solver) embedded(v errset.Value, bases []subst) []subst {
+	return s.embeddedAt(v, bases, 0)
+}
+
+// maxEmbedRounds is how many embedded interfaces in a row embedded steps
+// through; a value beyond is not known (see fieldBase).
+const maxEmbedRounds = 4
+
+func (s *Solver) embeddedAt(v errset.Value, bases []subst, round int) []subst {
+	if round >= maxEmbedRounds {
+		return bases
+	}
 	var out []subst
 	for i, b := range bases {
-		steps := s.embedSteps(v, s.tbl.Get(b.value))
-		if steps == nil {
+		paths := s.embedSteps(v, s.tbl.Get(b.value))
+		if paths == nil {
 			if out != nil {
 				out = append(out, b)
 			}
@@ -833,11 +948,17 @@ func (s *Solver) embedded(v errset.Value, bases []subst) []subst {
 		if out == nil {
 			out = append(out, bases[:i]...)
 		}
-		cur := []subst{b}
-		for _, step := range steps {
-			cur = s.fieldOf(step, cur)
+		for _, p := range paths {
+			cur := []subst{b}
+			for _, step := range p.steps {
+				cur = s.fieldOf(step, cur)
+			}
+			if p.iface {
+				// What the interface holds may itself embed the T.
+				cur = s.embeddedAt(v, cur, round+1)
+			}
+			out = append(out, cur...)
 		}
-		out = append(out, cur...)
 	}
 	if out == nil {
 		return bases
@@ -845,60 +966,216 @@ func (s *Solver) embedded(v errset.Value, bases []subst) []subst {
 	return out
 }
 
+// embedPath is a way from an outer value to a struct it embeds: the loads
+// of the embedded fields on the way.
+type embedPath struct {
+	steps []errset.Value
+	// iface reports that the last step loads an embedded interface.
+	iface bool
+}
+
+// embedStep is one embedded field on such a way: field index of the
+// struct type t.
+type embedStep struct {
+	t     types.Type
+	index int
+}
+
+// embedWays are the ways from one type to the struct type of a load, by
+// types alone.
+type embedWays struct {
+	ways [][]embedStep
+	// iface says, per way, that it ends at an embedded interface.
+	iface []bool
+	// unsure reports that there may be a way that was not found.
+	unsure bool
+}
+
+type embedKey struct{ from, to types.Type }
+
 // embedSteps returns the loads of embedded fields that lead from the
 // value bv, of a known dynamic type that is not the struct type of the
-// load v, to the one struct of that type it embeds (as Go's selectors
-// find it: at the shallowest depth, and alone there), or nil.
-func (s *Solver) embedSteps(v, bv errset.Value) []errset.Value {
+// load v, to what v may be made on when a method of that struct type is
+// called on bv by promotion: the one struct of that type it embeds (as
+// Go's selectors find it: at the shallowest depth, and alone there), and
+// every embedded interface that shares a method with the struct type, in
+// which a value of it (or one that embeds it) may be stored.
+func (s *Solver) embedSteps(v, bv errset.Value) []embedPath {
 	switch {
 	case bv.Type == nil, bv.Kind != errset.Concrete && bv.Kind != errset.Sentinel && (bv.Kind != errset.Wrap || bv.WrapKind != errset.WrapUnwrapMethod):
 		return nil
-	case bv.Kind == errset.Concrete && bv.TypedNil, sameStruct(bv.Type, v.Type):
+	case bv.Kind == errset.Concrete && bv.TypedNil, s.sameStruct(bv.Type, v.Type):
 		return nil
 	}
-	type at struct {
-		t     types.Type
-		steps []errset.Value
+	w := s.embedWays(bv.Type, v.Type)
+	var out []embedPath
+	for i, way := range w.ways {
+		p := embedPath{iface: w.iface[i]}
+		for _, st := range way {
+			f := st.t.Underlying().(*types.Struct).Field(st.index)
+			p.steps = append(p.steps, errset.Value{
+				Kind: errset.FieldOf, Site: v.Site, Pos: v.Pos, Type: st.t, Index: st.index, Name: f.Name(), Fn: v.Fn,
+				Detail: fmt.Sprintf("load of field %s of %s", f.Name(), types.TypeString(st.t, nil)),
+			})
+		}
+		out = append(out, p)
 	}
-	level := []at{{t: bv.Type}}
-	for depth := 0; depth < 8 && len(level) > 0; depth++ {
+	return out
+}
+
+// embedWays finds the ways from the type from to the struct type to (see
+// embedSteps), cached.
+func (s *Solver) embedWays(from, to types.Type) embedWays {
+	k := embedKey{from, to}
+	if w, ok := s.embeds[k]; ok {
+		return w
+	}
+	var w embedWays
+	type at struct {
+		t    types.Type
+		path []embedStep
+	}
+	seen := make(map[types.Type]bool)
+	level := []at{{t: from}}
+	structFound := false
+	for depth := 0; len(level) > 0; depth++ {
+		if depth == 8 {
+			w.unsure = true
+			break
+		}
 		var next []at
-		var found [][]errset.Value
+		var found [][]embedStep
 		for _, cur := range level {
 			t := types.Unalias(cur.t)
 			if p, ok := t.Underlying().(*types.Pointer); ok {
 				t = types.Unalias(p.Elem())
 			}
 			st, ok := t.Underlying().(*types.Struct)
-			if _, named := t.(*types.Named); !ok || !named {
+			if !ok {
 				continue
 			}
+			if _, isParam := t.(*types.TypeParam); isParam || seen[t] {
+				continue
+			}
+			seen[t] = true
+			_, named := t.(*types.Named)
 			for i := range st.NumFields() {
 				f := st.Field(i)
 				if !f.Embedded() {
 					continue
 				}
-				steps := append(cur.steps[:len(cur.steps):len(cur.steps)], errset.Value{
-					Kind: errset.FieldOf, Site: v.Site, Pos: v.Pos, Type: t, Index: i, Name: f.Name(), Fn: v.Fn,
-					Detail: fmt.Sprintf("load of field %s of %s", f.Name(), types.TypeString(cur.t, nil)),
-				})
-				if sameStruct(f.Type(), v.Type) {
-					found = append(found, steps)
-				} else {
-					next = append(next, at{t: f.Type(), steps: steps})
+				if !named {
+					// A field of an unnamed struct type has no load
+					// that is modelled.
+					w.unsure = true
+					continue
+				}
+				path := append(cur.path[:len(cur.path):len(cur.path)], embedStep{t, i})
+				switch {
+				case s.sameStruct(f.Type(), to):
+					found = append(found, path)
+				case types.IsInterface(f.Type()):
+					if s.sharesMethod(f.Type(), to) {
+						w.ways = append(w.ways, path)
+						w.iface = append(w.iface, true)
+					}
+				default:
+					next = append(next, at{t: f.Type(), path: path})
 				}
 			}
 		}
-		switch len(found) {
-		case 0:
-			level = next
-		case 1:
-			return found[0]
-		default:
-			return nil
+		if !structFound && len(found) > 0 {
+			// Deeper structs of the type are hidden by these; several
+			// at one depth are ambiguous, and promote nothing.
+			structFound = true
+			if len(found) == 1 {
+				w.ways = append(w.ways, found[0])
+				w.iface = append(w.iface, false)
+			}
+		}
+		level = next
+	}
+	if s.embeds == nil {
+		s.embeds = make(map[embedKey]embedWays)
+	}
+	s.embeds[k] = w
+	return w
+}
+
+// sharesMethod reports whether the interface type iface has a method that
+// the struct type st, or a pointer to it, has too, by name and signature:
+// a call of that method on the interface may then run st's.
+func (s *Solver) sharesMethod(iface, st types.Type) bool {
+	it, ok := types.Unalias(iface).Underlying().(*types.Interface)
+	if !ok || s.prog == nil {
+		return false
+	}
+	mset := s.prog.MethodSets.MethodSet(types.NewPointer(types.Unalias(st)))
+	for i := range it.NumMethods() {
+		m := it.Method(i)
+		sel := mset.Lookup(m.Pkg(), m.Name())
+		if sel == nil {
+			continue
+		}
+		a, okA := sel.Type().(*types.Signature)
+		b, okB := m.Type().(*types.Signature)
+		if okA && okB && types.Identical(a.Params(), b.Params()) && types.Identical(a.Results(), b.Results()) {
+			return true
 		}
 	}
-	return nil
+	return false
+}
+
+// mayEmbed reports whether a value of the known type t, which is not the
+// struct type st, may still be what a load of a field of st is made on:
+// it has a way to an embedded st (see embedSteps) that was not followed,
+// or may have one that was not found.
+func (s *Solver) mayEmbed(t, st types.Type) bool {
+	if t == nil || st == nil || s.prog == nil {
+		return false
+	}
+	w := s.embedWays(t, st)
+	return w.unsure || len(w.ways) > 0
+}
+
+// outerLocations returns the locations of the embedded fields (pointers
+// and interfaces) on the ways from the struct types that the program
+// allocates or converts to an interface to the struct type t they embed:
+// what a load of a field of t depends on when a promoted method makes it
+// on such an outer value (see embedded).
+func (s *Solver) outerLocations(t types.Type) []*location {
+	if t == nil || s.prog == nil {
+		return nil
+	}
+	if locs, ok := s.outerLocs[t]; ok {
+		return locs
+	}
+	var locs []*location
+	seen := make(map[*location]bool)
+	for _, outer := range s.index(s.prog).outers {
+		if sameStruct(outer, t) {
+			continue
+		}
+		for _, way := range s.embedWays(outer, t).ways {
+			for _, st := range way {
+				if _, byValue := underlyingStruct(fieldTypeOf(st.t, st.index)); byValue {
+					continue
+				}
+				l := s.location(nil, errset.Value{Type: st.t, Index: st.index})
+				for _, l := range []*location{l, s.laterWrites(l)} {
+					if l != nil && !seen[l] {
+						seen[l] = true
+						locs = append(locs, l)
+					}
+				}
+			}
+		}
+	}
+	if s.outerLocs == nil {
+		s.outerLocs = make(map[types.Type][]*location)
+	}
+	s.outerLocs[t] = locs
+	return locs
 }
 
 // holdsRepeat reports whether the value tree id has one of leaves under a
@@ -942,7 +1219,7 @@ func (s *Solver) fieldBase(v, bv errset.Value) fieldBase {
 		for bv.Kind == errset.Guarded {
 			bv = s.tbl.Get(bv.Inner[0])
 		}
-		if (bv.Kind == errset.Param || bv.Kind == errset.FreeVar) && sameStruct(bv.Type, v.Type) {
+		if (bv.Kind == errset.Param || bv.Kind == errset.FreeVar) && s.sameStruct(bv.Type, v.Type) {
 			return baseStatic
 		}
 		return baseUnknown
@@ -964,15 +1241,17 @@ func (s *Solver) fieldBase(v, bv errset.Value) fieldBase {
 		switch {
 		case bv.Type == nil:
 			return baseUnknown
-		case sameStruct(bv.Type, v.Type):
+		case s.sameStruct(bv.Type, v.Type):
 			return baseSome
 		}
-		return baseNot
+		return s.otherType(v, bv)
 	case errset.Concrete:
 		switch {
-		case !sameStruct(bv.Type, v.Type), bv.TypedNil:
+		case bv.TypedNil:
 			// A load from a nil pointer does not return.
 			return baseNot
+		case !s.sameStruct(bv.Type, v.Type):
+			return s.otherType(v, bv)
 		case s.emptyLiteral(v, bv):
 			return baseInstance
 		}
@@ -980,8 +1259,8 @@ func (s *Solver) fieldBase(v, bv errset.Value) fieldBase {
 	case errset.Wrap:
 		switch bv.WrapKind {
 		case errset.WrapUnwrapMethod:
-			if !sameStruct(bv.Type, v.Type) {
-				return baseNot
+			if !s.sameStruct(bv.Type, v.Type) {
+				return s.otherType(v, bv)
 			}
 			if path, ok := s.unwrapPath(bv.Type); ok && path[0] == v.Index && s.followsPath(v, path) {
 				return baseInstance
@@ -1017,6 +1296,19 @@ func (s *Solver) fieldBase(v, bv errset.Value) fieldBase {
 		return baseNot
 	}
 	return baseUnknown
+}
+
+// otherType says what the value bv, of a known dynamic type that is not
+// the struct type of the load v, is to v: not of the type, so that the
+// load does not run on it, unless it embeds the type in a way that was
+// not followed to the embedded struct (see embedded): a promoted method
+// may then run the load on a struct inside it that errtrace did not
+// find.
+func (s *Solver) otherType(v, bv errset.Value) fieldBase {
+	if s.mayEmbed(bv.Type, v.Type) {
+		return baseUnknown
+	}
+	return baseNot
 }
 
 // emptyLiteral reports whether the Concrete Type value bv is a composite
@@ -1084,7 +1376,12 @@ func (s *Solver) instanceField(v, bv errset.Value, b subst, ft types.Type) []sub
 	off := 0
 	for _, in := range bv.Inner {
 		n := s.tbl.Leaves(in)
-		out = append(out, subst{value: in, leaves: b.leaves[off : off+n : off+n], notes: b.notes})
+		// The Unresolved value that stands, under the Wrap, for what
+		// the later writers store is not a value of the field: the
+		// load lists those values itself (see laterValues).
+		if iv := s.tbl.Get(in); iv.Kind != errset.Unresolved || !iv.Later {
+			out = append(out, subst{value: in, leaves: b.leaves[off : off+n : off+n], notes: b.notes})
+		}
 		off += n
 	}
 	return out
@@ -1157,6 +1454,41 @@ func sameStruct(t, st types.Type) bool {
 		t = types.Unalias(p.Elem())
 	}
 	return types.Identical(t, types.Unalias(st))
+}
+
+// sameStruct reports whether t, or the type t points to, is the struct
+// type st or a struct type that the program converts to or from it
+// (type NotFound base; (*base)(n)): a value of the one is then a value of
+// the other, field for field, as the field index has it (see
+// fieldIndex.convert, which unites their locations). Two struct types of
+// the same shape that are never converted are different types: a load
+// made on the one does not run on a value of the other.
+func (s *Solver) sameStruct(t, st types.Type) bool {
+	if sameStruct(t, st) {
+		return true
+	}
+	if t == nil || st == nil || s.prog == nil {
+		return false
+	}
+	t = types.Unalias(t)
+	if p, ok := t.Underlying().(*types.Pointer); ok {
+		t = types.Unalias(p.Elem())
+	}
+	st = types.Unalias(st)
+	a, okA := t.Underlying().(*types.Struct)
+	b, okB := st.Underlying().(*types.Struct)
+	if !okA || !okB || a.NumFields() != b.NumFields() || a.NumFields() == 0 {
+		return false
+	}
+	ix := s.index(s.prog)
+	for i := range a.NumFields() {
+		ka, okA := fieldKeyOf(t, i)
+		kb, okB := fieldKeyOf(st, i)
+		if !okA || !okB || ix.find(ka) != ix.find(kb) {
+			return false
+		}
+	}
+	return true
 }
 
 // openWorld reports whether a function the Query was asked about is not

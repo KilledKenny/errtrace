@@ -127,7 +127,7 @@ func (r *Result) entries(solver *summary.Solver, fn *ssa.Function, facts []summa
 				entries[k].Path, _ = solver.Path(fn, f.Leaves[k])
 				entries[k].MorePaths = len(f.Leaves[k]) - 1
 				if r.Table.Get(entries[k].Leaf).Kind.IsOrigin() {
-					entries[k].ViaLocation = solver.ViaLocation(f.Leaves[k])
+					entries[k].ViaLocation = solver.ViaLocation(fn, f.Leaves[k])
 				}
 			}
 			entries[k].PossiblyHandled = notes

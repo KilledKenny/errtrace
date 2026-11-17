@@ -2,12 +2,13 @@ QA3 C2. A tracked wrapper overwritten whole with a copy of another (*p = *q):
 the copy is a later writer of every field, which stores what that field of *q
 holds. ErrClosed, which only the copied value holds, is reported "via field";
 ErrExist, held by a wrapper that is never copied, is not. (The copy reads the
-field it writes, a cycle of stores: hence the second, "chain may repeat"
-entry.)
+field it writes, a cycle of stores, but no writer wraps what it reads: the
+value read back is the value itself, listed once, with no "chain may repeat"
+entry. QA4 m3.)
 -- args --
 a.go:@q
 -- stdout --
-$WORK/a.go:19:12-13: Error Set of example.com/x.F: 3 entries
+$WORK/a.go:19:12-13: Error Set of example.com/x.F: 2 entries
 $GOROOT/src/io/io.go:*: sentinel io.EOF
 	path (origin → target):
 		$WORK/a.go:15:35-41: in example.com/x.newW
@@ -16,16 +17,9 @@ $GOROOT/src/io/io.go:*: sentinel io.EOF
 		$WORK/a.go:13:37-38: in (*example.com/x.W).Unwrap
 		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*example.com/x.W).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 1 of 1 candidates)
 		$WORK/a.go:23:9-25: in example.com/x.F, call to errors.Unwrap
-$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [via field inner of example.com/x.W]
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [via field inner of example.com/x.W] [+1 more paths]
 	path (origin → target):
 		$WORK/a.go:21:17-29: in example.com/x.F
-		$WORK/a.go:22:2-4: in example.com/x.F
-		$WORK/a.go:13:37-44: in example.com/x.F
-$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [chain may repeat] [via field inner of example.com/x.W]
-	path (origin → target):
-		$WORK/a.go:21:17-29: in example.com/x.F
-		$WORK/a.go:22:2-4: in example.com/x.F
-		$WORK/a.go:22:7-9: in example.com/x.F
 		$WORK/a.go:22:2-4: in example.com/x.F
 		$WORK/a.go:13:37-44: in example.com/x.F
 -- go.mod --

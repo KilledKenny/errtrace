@@ -22,6 +22,9 @@ type node struct {
 type best struct {
 	path    errset.Path
 	dynamic int
+	// via names the field location that the path goes through last
+	// (nearest to its end), or is empty if it goes through none.
+	via string
 }
 
 // less reports whether a is a cheaper path than b: fewer dynamic hops,
@@ -140,7 +143,7 @@ func (s *Solver) sourcePath(fn *ssa.Function, src Source) (best, bool) {
 			return best{}, false
 		}
 		path := slices.Concat(arg.path, errset.Path{{Site: src.Site, Func: fn.String()}})
-		return best{path: path, dynamic: arg.dynamic}, true
+		return best{path: path, dynamic: arg.dynamic, via: arg.via}, true
 	case Passed:
 		arg, ok := s.bestOf(src.ArgFn, src.ArgSources)
 		if !ok {
@@ -151,7 +154,7 @@ func (s *Solver) sourcePath(fn *ssa.Function, src Source) (best, bool) {
 			return best{}, false
 		}
 		hop := errset.Hop{Site: src.Site, Func: src.ArgFn.String(), Callee: src.Callee.String()}
-		return best{path: slices.Concat(arg.path, errset.Path{hop}, then.path), dynamic: arg.dynamic + then.dynamic}, true
+		return best{path: slices.Concat(arg.path, errset.Path{hop}, then.path), dynamic: arg.dynamic + then.dynamic, via: later(then.via, arg.via)}, true
 	case Stored:
 		arg, ok := s.bestOf(src.ArgFn, src.ArgSources)
 		if !ok {
@@ -161,7 +164,8 @@ func (s *Solver) sourcePath(fn *ssa.Function, src Source) (best, bool) {
 			{Site: src.Store, Func: src.ArgFn.String()},
 			{Site: src.Site, Func: fn.String()},
 		})
-		return best{path: path, dynamic: arg.dynamic}, true
+		// The store to a field location is the last one on this way.
+		return best{path: path, dynamic: arg.dynamic, via: later(src.Field, arg.via)}, true
 	}
 	callee, ok := s.paths[node{src.Callee, src.CalleeResult, src.CalleeValue, src.CalleeLeaf}]
 	if !ok {
@@ -202,5 +206,5 @@ func (s *Solver) sourcePath(fn *ssa.Function, src Source) (best, bool) {
 	if src.Dynamic {
 		dynamic++
 	}
-	return best{path: path, dynamic: dynamic}, true
+	return best{path: path, dynamic: dynamic, via: later(callee.via, arg.via)}, true
 }

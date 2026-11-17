@@ -61,10 +61,14 @@ import (
 //     whose result is only inspected where it is made (reflectReads);
 //   - unsafe conversions and functions without a body (assembly,
 //     linknamed, cgo) do not go on through the interface values stored in
-//     what they are given, and reflection does not get past an unexported
-//     field that is not embedded (reach), except in a function outside
-//     the standard library that itself calls reflect.NewAt or
-//     Value.UnsafeAddr, UnsafePointer or Pointer;
+//     what they are given, and reflection does not set an unexported
+//     field, nor what it reaches through one that is not embedded
+//     (reach), except in a function outside the standard library that
+//     itself calls reflect.NewAt or Value.UnsafeAddr, UnsafePointer or
+//     Pointer. It does get the types: those of unexported fields, of
+//     the parameters and results of function types, and of the methods
+//     of the types it reaches are exposed as types it may build new
+//     values of (discover);
 //   - reflect.TypeOf of an interface value of unknown dynamic type
 //     exposes the types it may hold but not what the interfaces inside
 //     them hold: it gives a type, of which reflection builds new values;
@@ -99,7 +103,9 @@ import (
 //
 // Open world. If a function the Query was asked about is not reachable
 // from main and the init functions, its callers are not seen and may
-// write any field: every location keeps an Unresolved value.
+// write any field: every location keeps an Unresolved value. A tracked
+// value is exact there only while code outside the reachable program
+// cannot have written it (see openScan).
 
 // holeFlags are the ways a field location may be written that the scan
 // does not attribute to a writer.
@@ -112,6 +118,13 @@ const (
 	// holeExposed: reflection, unsafe code or a function errtrace does not
 	// see may reach a struct holding the field.
 	holeExposed
+	// holeOpen: in an open world (see openScan), a struct holding the
+	// field may be handed to code outside the reachable program. It is
+	// not a hole of the location by itself: every load from a location
+	// has the open world's Unresolved value already. It says that a
+	// tracked value of the type is not known to have stayed among the
+	// functions the analysis sees.
+	holeOpen
 )
 
 // holeReasons are the details of the Unresolved values of holeFlags, after
@@ -147,6 +160,9 @@ type rawLocation struct {
 	// reflection may call and that writes the field, or is empty.
 	unreached string
 }
+
+// realFlags are the flags that are holes of a location.
+const realFlags = holeEscapes | holeExposed
 
 // sinkArg is a value handed to code that may write what it reaches.
 type sinkArg struct {
@@ -186,6 +202,9 @@ type reachMode struct {
 	// tag: the code is encoding/json, which also skips the fields
 	// tagged `json:"-"`.
 	tag string
+	// open: the code is outside the reachable program, in an open world
+	// (see openScan): what it reaches gets holeOpen, not holeExposed.
+	open bool
 }
 
 // fieldIndex is the index of the field locations of the reachable
@@ -215,6 +234,10 @@ type fieldIndex struct {
 	// functions.
 	entry map[*ssa.Function]bool
 
+	// outers are the named struct types with an embedded field that the
+	// program allocates or converts to an interface, in scan order.
+	outers    []types.Type
+	outerSeen map[types.Type]bool
 	// boxes are, per interface type (by its string), the concrete types
 	// converted to it; into are the interface types converted or
 	// asserted to it; ifaces are the interface types themselves.
@@ -226,6 +249,13 @@ type fieldIndex struct {
 	// an interface or asserts an interface for.
 	invoked map[string]bool
 
+	// openSinks are the values that non-standard-library code hands to
+	// a dynamic call or stores to memory: in an open world, code outside
+	// the reachable program may get them (see openScan). openDone is set
+	// once openScan has run, and tracedOpen are the values it followed.
+	openSinks  []sinkArg
+	openDone   bool
+	tracedOpen map[ssa.Value]bool
 	// asserts are the type assertions to a concrete type outside the
 	// standard library (see fromReflect).
 	asserts []*ssa.TypeAssert
@@ -294,8 +324,10 @@ func (s *Solver) index(prog *ssa.Program) *fieldIndex {
 		ifaces:          make(map[string]*types.Interface),
 		dynamic:         make(map[string][]types.Type),
 		invoked:         make(map[string]bool),
+		outerSeen:       make(map[types.Type]bool),
 		traced:          make(map[ssa.Value]bool),
 		tracedRead:      make(map[ssa.Value]bool),
+		tracedOpen:      make(map[ssa.Value]bool),
 		unsafeReflect:   make(map[*ssa.Function]bool),
 		stdPkgs:         make(map[string]bool),
 		reached:         make(map[reachMode]map[types.Type]bool),
@@ -372,6 +404,9 @@ func (s *Solver) index(prog *ssa.Program) *fieldIndex {
 		}
 	}
 	s.fields = ix
+	if s.openWorld() {
+		ix.openScan(s.roots)
+	}
 	return ix
 }
 
@@ -522,6 +557,9 @@ func (ix *fieldIndex) scan(fn *ssa.Function) {
 				ix.fieldAddr(instr)
 			case *ssa.MakeInterface:
 				ix.box(instr)
+				ix.outer(instr.X.Type())
+			case *ssa.Alloc:
+				ix.outer(instr.Type())
 			case *ssa.ChangeInterface:
 				ix.flow(instr.X.Type(), instr.Type())
 			case *ssa.TypeAssert:
@@ -541,6 +579,18 @@ func (ix *fieldIndex) scan(fn *ssa.Function) {
 				ix.closure(instr)
 			case *ssa.Store:
 				ix.wholeStore(instr)
+				if !safe && !freshAddr(instr.Addr) {
+					ix.openSink(fn, instr.Val)
+				}
+			case *ssa.Send:
+				if !safe {
+					ix.openSink(fn, instr.X)
+				}
+			case *ssa.MapUpdate:
+				if !safe {
+					ix.openSink(fn, instr.Key)
+					ix.openSink(fn, instr.Value)
+				}
 			case *ssa.DebugRef:
 				// Debug information names values without using them.
 				continue
@@ -600,6 +650,29 @@ func (ix *fieldIndex) fieldAddr(fa *ssa.FieldAddr) {
 		case *ssa.DebugRef:
 		default:
 			r.flags |= holeEscapes
+		}
+	}
+}
+
+// outer records the struct type that t is, or points to, if it is a named
+// struct type with an embedded field (see fieldIndex.outers).
+func (ix *fieldIndex) outer(t types.Type) {
+	t = types.Unalias(t)
+	if p, ok := t.Underlying().(*types.Pointer); ok {
+		t = types.Unalias(p.Elem())
+	}
+	if ix.outerSeen[t] {
+		return
+	}
+	ix.outerSeen[t] = true
+	st, ok := t.Underlying().(*types.Struct)
+	if _, named := t.(*types.Named); !ok || !named {
+		return
+	}
+	for i := range st.NumFields() {
+		if st.Field(i).Embedded() {
+			ix.outers = append(ix.outers, t)
+			return
 		}
 	}
 }
@@ -868,7 +941,7 @@ func (ix *fieldIndex) reach(t types.Type, m reachMode) {
 	if _, param := t.(*types.TypeParam); param {
 		return
 	}
-	if n, ok := t.(*types.Named); ok {
+	if n, ok := t.(*types.Named); ok && !m.open {
 		// 1: read, 2: may be written.
 		switch was := ix.named[n]; {
 		case m.write && was < 2:
@@ -878,15 +951,28 @@ func (ix *fieldIndex) reach(t types.Type, m reachMode) {
 			ix.named[n] = 1
 			ix.seenNamed = append(ix.seenNamed, n)
 		}
+		if _, iface := n.Underlying().(*types.Interface); m.write && m.exported && !iface && (n.TypeParams().Len() == 0 || n.TypeArgs().Len() > 0) {
+			// Reflection lists the exported methods of a type and of a
+			// pointer to it, with their types.
+			mset := ix.prog.MethodSets.MethodSet(types.NewPointer(n))
+			for i := range mset.Len() {
+				if sel := mset.At(i); sel.Obj().Exported() {
+					ix.discover(sel.Obj().Type(), m)
+				}
+			}
+		}
 	}
 	switch u := t.Underlying().(type) {
 	case *types.Struct:
 		for i := range u.NumFields() {
 			if m.exported && !u.Field(i).Exported() {
 				// Reflection cannot set the field, but it gets through
-				// an embedded one to the exported fields below it.
+				// an embedded one to the exported fields below it, and
+				// it gets the field's type whatever it is.
 				if u.Field(i).Embedded() {
 					ix.reach(u.Field(i).Type(), m)
+				} else {
+					ix.discover(u.Field(i).Type(), m)
 				}
 				continue
 			}
@@ -896,7 +982,11 @@ func (ix *fieldIndex) reach(t types.Type, m reachMode) {
 				}
 			}
 			if k, ok := fieldKeyOf(t, i); ok && m.write {
-				ix.rawAt(k, t, i).flags |= holeExposed
+				if m.open {
+					ix.at(k).flags |= holeOpen
+				} else {
+					ix.rawAt(k, t, i).flags |= holeExposed
+				}
 			}
 			ix.reach(u.Field(i).Type(), m)
 		}
@@ -917,12 +1007,43 @@ func (ix *fieldIndex) reach(t types.Type, m reachMode) {
 				ix.reach(x, m)
 			}
 		}
+		if m.write && m.exported {
+			// Reflection lists the methods of an interface type, with
+			// their types.
+			for i := range u.NumMethods() {
+				ix.discover(u.Method(i).Type(), m)
+			}
+		}
 	case *types.Signature:
 		if m.write && !ix.sigSeen[u] {
 			ix.sigSeen[u] = true
 			ix.boxedSigs = append(ix.boxedSigs, u)
 		}
+		if m.write && m.exported {
+			// Reflection gets the types of the parameters and results
+			// (Type.In, Type.Out), of which it can build values.
+			for _, tuple := range []*types.Tuple{u.Params(), u.Results()} {
+				for i := range tuple.Len() {
+					ix.discover(tuple.At(i).Type(), m)
+				}
+			}
+			if u.Recv() != nil {
+				ix.discover(u.Recv().Type(), m)
+			}
+		}
 	}
+}
+
+// discover reaches the type t as one that reflection found without
+// having a value of it: in a function type's parameters and results
+// (Type.In, Type.Out), in the type of a method (Type.Method) or of an
+// unexported struct field (Type.Field(i).Type works on any field; only
+// setting through one is refused). Reflection can build new values of
+// such a type (reflect.New) and set their exported fields. There is no
+// value whose interfaces it could go on through.
+func (ix *fieldIndex) discover(t types.Type, m reachMode) {
+	m.deep = false
+	ix.reach(t, m)
 }
 
 // anything is the mode of code that may write whatever it reaches.
@@ -956,10 +1077,37 @@ func (ix *fieldIndex) std(fn *ssa.Function) bool {
 	if o := fn.Origin(); o != nil {
 		fn = o
 	}
-	if ix.stdRoot == "" || !fn.Pos().IsValid() {
+	if ix.stdRoot == "" {
 		return false
 	}
-	is := strings.HasPrefix(ix.prog.Fset.Position(fn.Pos()).Filename, ix.stdRoot)
+	pos := fn.Pos()
+	if !pos.IsValid() {
+		// A function without a position (a package initializer, a
+		// synthetic wrapper): its package is where its other
+		// functions are.
+		pkg := fn.Pkg
+		if pkg == nil && path != "" {
+			pkg = ix.prog.ImportedPackage(path)
+		}
+		if pkg == nil {
+			return false
+		}
+		names := make([]string, 0, len(pkg.Members))
+		for name := range pkg.Members {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			if p := pkg.Members[name].Pos(); p.IsValid() {
+				pos = p
+				break
+			}
+		}
+		if !pos.IsValid() {
+			return false
+		}
+	}
+	is := strings.HasPrefix(ix.prog.Fset.Position(pos).Filename, ix.stdRoot)
 	ix.stdPkgs[path] = is
 	return is
 }
@@ -973,7 +1121,10 @@ func (ix *fieldIndex) std(fn *ssa.Function) bool {
 // sink only reads or is weak, nothing is (see the top of this file).
 func (ix *fieldIndex) trace(fn *ssa.Function, v ssa.Value, m reachMode, weak bool) {
 	done := ix.tracedRead
-	if m.write {
+	switch {
+	case m.open:
+		done = ix.tracedOpen
+	case m.write:
 		done = ix.traced
 	}
 	if done[v] {
@@ -990,11 +1141,13 @@ func (ix *fieldIndex) trace(fn *ssa.Function, v ssa.Value, m reachMode, weak boo
 	case *ssa.Function:
 		if m.write {
 			ix.funcBoxed[v] = true
+			ix.reach(v.Type(), m)
 		}
 		return
 	case *ssa.MakeClosure:
 		if f, ok := v.Fn.(*ssa.Function); ok && m.write {
 			ix.funcBoxed[f] = true
+			ix.reach(v.Type(), m)
 		}
 		for _, b := range v.Bindings {
 			ix.reach(b.Type(), m)
@@ -1025,7 +1178,7 @@ func (ix *fieldIndex) trace(fn *ssa.Function, v ssa.Value, m reachMode, weak boo
 		if !isIface {
 			break
 		}
-		if flood {
+		if flood && !m.open {
 			ix.tracedParams = append(ix.tracedParams, v)
 		}
 		sites := ix.callers[fn]
@@ -1037,7 +1190,7 @@ func (ix *fieldIndex) trace(fn *ssa.Function, v ssa.Value, m reachMode, weak boo
 			if op := argument(site.Common(), fn, index); op != nil {
 				ix.trace(site.Parent(), op, m, weak)
 			} else if flood {
-				ix.flood(v.Type())
+				ix.flood(v.Type(), m)
 			}
 		}
 		return
@@ -1045,7 +1198,7 @@ func (ix *fieldIndex) trace(fn *ssa.Function, v ssa.Value, m reachMode, weak boo
 	if isIface {
 		// The trace ends at an interface value of unknown dynamic type.
 		if flood {
-			ix.flood(v.Type())
+			ix.flood(v.Type(), m)
 		}
 		return
 	}
@@ -1059,13 +1212,159 @@ func (ix *fieldIndex) trace(fn *ssa.Function, v ssa.Value, m reachMode, weak boo
 // the end of a trace at a value of unknown dynamic type. For the argument
 // of reflect.TypeOf only the types are exposed, not what the interfaces
 // inside them hold.
-func (ix *fieldIndex) flood(t types.Type) {
+func (ix *fieldIndex) flood(t types.Type, m reachMode) {
+	if m.open {
+		ix.reach(t, m)
+		return
+	}
 	if !ix.typeOnly {
 		ix.reach(t, anything)
 		return
 	}
 	for _, x := range ix.dynamicTypes(t) {
 		ix.reach(x, reachMode{write: true})
+	}
+}
+
+// openSink records the value v of fn as one that code outside the
+// reachable program may get in an open world, unless its type holds no
+// pointer to follow.
+func (ix *fieldIndex) openSink(fn *ssa.Function, v ssa.Value) {
+	if _, basic := v.Type().Underlying().(*types.Basic); basic || ix.std(fn) {
+		return
+	}
+	if c, ok := v.(*ssa.Const); ok && c.IsNil() {
+		return
+	}
+	ix.openSinks = append(ix.openSinks, sinkArg{fn: fn, v: v})
+}
+
+// openMode is how code outside the reachable program goes on from a value
+// it got: through everything, the interfaces included. What it can write
+// there is decided per field (see Solver.handedOut).
+var openMode = reachMode{write: true, deep: true, open: true}
+
+// openScan finds, once, what an open world adds: the Query was asked
+// about a function that is not reachable from main and the init
+// functions, so code that the analysis does not see calls into the
+// program, and is called by it.
+//
+// A tracked value (a composite literal whose fields errtrace follows) is
+// exact only while no such code can have written it. Code outside the
+// program gets hold of a value in three ways: as an argument of a dynamic
+// call (the function value or the interface may be its own, whatever
+// Candidates the call has), from memory (a variable, a field, an element,
+// a channel) that the program stored it to, and through a field location
+// it was loaded from. The first two are the open sinks: what is handed
+// over there is followed like a value at a sink of reflection (trace),
+// and the fields of the structs it reaches get holeOpen. Only the sinks
+// in the functions reachable from roots, the functions the Query was
+// asked about, count: a value that reaches a load by calls and returns
+// alone lives within one call of such a function, and only the code that
+// runs then can hand it over. The third way, a value that lay in memory
+// between two calls into the program, is seen at the load
+// (Solver.fieldOf).
+//
+// Having the value, that code can set an exported field, and it can call
+// any function of the program, the ones outside the reachable program
+// included: the fields that such a function stores to (or takes the
+// address of, or overwrites with a whole struct) are recorded with the
+// function's name (location.unseen).
+//
+// Assumed: the standard library does not hand what it is given to code
+// outside the program, and a value that reached a load by calls and
+// returns alone, without being handed over as above, was not seen by
+// such code (it runs only when it is called).
+func (ix *fieldIndex) openScan(roots []*ssa.Function) {
+	if ix.openDone {
+		return
+	}
+	ix.openDone = true
+	during := make(map[*ssa.Function]bool)
+	work := append([]*ssa.Function(nil), roots...)
+	for _, fn := range roots {
+		during[fn] = true
+	}
+	for len(work) > 0 {
+		fn := work[len(work)-1]
+		work = work[:len(work)-1]
+		for _, g := range ix.refs[fn] {
+			if !during[g] {
+				during[g] = true
+				work = append(work, g)
+			}
+		}
+	}
+	for _, a := range ix.openSinks {
+		if during[a.fn] {
+			ix.trace(a.fn, a.v, openMode, false)
+		}
+	}
+	for fn := range ssautil.AllFunctions(ix.prog) {
+		if fn.Blocks == nil || ix.reachable[fn] {
+			continue
+		}
+		name := ""
+		mark := func(k fieldKey) {
+			if name == "" {
+				name = fn.String()
+			}
+			if l := ix.at(k); l.unseen == "" || name < l.unseen {
+				l.unseen = name
+			}
+		}
+		for _, b := range fn.Blocks {
+			for _, instr := range b.Instrs {
+				switch instr := instr.(type) {
+				case *ssa.FieldAddr:
+					st := structOf(instr.X.Type(), true)
+					if st == nil || instr.Referrers() == nil {
+						continue
+					}
+					k, ok := fieldKeyOf(st, instr.Field)
+					if !ok {
+						continue
+					}
+					for _, ref := range *instr.Referrers() {
+						if _, dbg := ref.(*ssa.DebugRef); dbg {
+							continue
+						}
+						if load, ok := ref.(*ssa.UnOp); ok && load.Op == token.MUL {
+							continue
+						}
+						mark(k)
+						break
+					}
+				case *ssa.Store:
+					if !freshAddr(instr.Addr) {
+						ix.eachField(instr.Val.Type(), 0, mark)
+					}
+				}
+			}
+		}
+	}
+}
+
+// eachField calls f for every field of the structs that a value of type
+// t holds by value.
+func (ix *fieldIndex) eachField(t types.Type, depth int, f func(fieldKey)) {
+	if depth > 16 {
+		return
+	}
+	t = types.Unalias(t)
+	switch u := t.Underlying().(type) {
+	case *types.Array:
+		ix.eachField(u.Elem(), depth+1, f)
+	case *types.Struct:
+		if _, param := t.(*types.TypeParam); param {
+			return
+		}
+		for i := range u.NumFields() {
+			if k, ok := fieldKeyOf(t, i); ok {
+				f(k)
+			}
+			ix.eachField(u.Field(i).Type(), depth+1, f)
+		}
 	}
 }
 
@@ -1144,6 +1443,14 @@ func (ix *fieldIndex) call(site ssa.CallInstruction, safe bool) {
 	bodiless, sink := false, false
 	fn := site.Parent()
 	callees := ix.res.Callees(site)
+	if dynamic && !safe {
+		// In an open world the function value or the interface may
+		// come from outside the reachable program, whatever Candidates
+		// it has inside.
+		for _, arg := range common.Args {
+			ix.openSink(fn, arg)
+		}
+	}
 	if len(callees) == 0 && !safe {
 		// A dynamic call with no Candidates: what it returns was built
 		// by a function that is not seen.
@@ -1317,9 +1624,14 @@ func onlyInspected(v ssa.Value, seen map[ssa.Value]bool) bool {
 	return true
 }
 
+// printingPkgs are the packages that only format what they are given.
+// The other trusted packages may keep it (sync.Map.Store, atomic.Value)
+// and hand it back.
+var printingPkgs = map[string]bool{"fmt": true, "log": true, "log/slog": true, "testing": true}
+
 // onlyTrustedArgs reports whether the interface value v is used only as
 // an argument (or a variadic operand) of calls to functions of the
-// trusted packages.
+// packages that print.
 func onlyTrustedArgs(v ssa.Value) bool {
 	trustedCall := func(instr ssa.Instruction) bool {
 		site, ok := instr.(ssa.CallInstruction)
@@ -1327,7 +1639,7 @@ func onlyTrustedArgs(v ssa.Value) bool {
 			return false
 		}
 		callee := site.Common().StaticCallee()
-		return callee != nil && trusted(callee) && !sinkCallee(callee)
+		return callee != nil && printingPkgs[pkgPath(callee)] && !sinkCallee(callee)
 	}
 	refs := v.Referrers()
 	if refs == nil {
