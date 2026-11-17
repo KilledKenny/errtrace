@@ -7,14 +7,14 @@ $WORK/a.go:11:12-13: Error Set of example.com/fx.F: 3 entries
 $GOROOT/src/io/io.go:*: sentinel io.EOF
 	path (origin → target):
 		$WORK/a.go:20:9-15: in example.com/fx.F
-$GOROOT/src/io/pipe.go:*: sentinel io.ErrClosedPipe [+2 more paths]
+$GOROOT/src/io/pipe.go:*: sentinel io.ErrClosedPipe [+1 more paths]
 	wrap chain (origin → target):
 		$WORK/a.go:14:10-39: fmt.Errorf "close: %w"
 	path (origin → target):
 		$WORK/a.go:9:31-47: in example.com/fx.closeIt
 		$WORK/a.go:13:14-23: in example.com/fx.F$1, call to example.com/fx.closeIt
 		$WORK/a.go:14:4-7: in example.com/fx.F$1
-		$WORK/a.go:11:22-25: in example.com/fx.F
+		$WORK/a.go:18:3-3: in example.com/fx.F
 $WORK/a.go:18:10-29: opaque errors.New "early"
 	path (origin → target):
 		$WORK/a.go:18:10-29: in example.com/fx.F

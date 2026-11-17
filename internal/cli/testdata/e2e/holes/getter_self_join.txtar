@@ -9,7 +9,7 @@ $GOROOT/src/io/io.go:*: sentinel io.EOF
 	path (origin → target):
 		$WORK/a.go:10:27-33: in example.com/x.src
 		$WORK/a.go:27:9-14: in example.com/x.B, call to example.com/x.src
-$GOROOT/src/io/io.go:*: sentinel io.EOF [+5 more paths]
+$GOROOT/src/io/io.go:*: sentinel io.EOF [+1 more paths]
 	wrap chain (origin → target):
 		$WORK/a.go:26:23-48: errors.Join
 	path (origin → target):
@@ -19,7 +19,7 @@ $GOROOT/src/io/io.go:*: sentinel io.EOF [+5 more paths]
 		$WORK/a.go:26:42-47: in example.com/x.B$2, call to example.com/x.B$1 (dynamic function value of type func() error: 1 of 1 candidates)
 		$WORK/a.go:26:17-20: in example.com/x.B$2
 		$WORK/a.go:27:2-2: in example.com/x.B
-$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat] [+8 more paths]
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat]
 	wrap chain (origin → target):
 		$WORK/a.go:26:23-48: errors.Join
 		$WORK/a.go:26:23-48: errors.Join

@@ -9,7 +9,7 @@ $GOROOT/src/io/io.go:*: sentinel io.EOF
 	path (origin → target):
 		$WORK/a.go:9:27-33: in example.com/x.src
 		$WORK/a.go:21:9-14: in example.com/x.B, call to example.com/x.src
-$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat] [+3 more paths]
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat] [+1 more paths]
 	wrap chain (origin → target):
 		$WORK/a.go:20:23-44: errors.Join
 	path (origin → target):

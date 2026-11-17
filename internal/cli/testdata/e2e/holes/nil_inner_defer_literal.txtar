@@ -4,7 +4,7 @@ Concrete Type that wraps nothing, listed once and plain (QA4 m3).
 a.go:@q
 -- stdout --
 $WORK/a.go:20:12-13: Error Set of example.com/x.C: 1 entries
-$WORK/a.go:21:23-37: concrete *example.com/x.W [+1 more paths]
+$WORK/a.go:21:23-37: concrete *example.com/x.W
 	path (origin → target):
 		$WORK/a.go:21:23-37: in example.com/x.C$1
 		$WORK/a.go:21:17-20: in example.com/x.C$1

@@ -3,14 +3,14 @@ QA N1. A deferred closure joins a named result that is otherwise nil.
 a.go:@q
 -- stdout --
 $WORK/a.go:21:12-13: Error Set of example.com/x.D: 2 entries
-$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [+1 more paths]
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed
 	wrap chain (origin → target):
 		$WORK/a.go:22:23-53: errors.Join
 	path (origin → target):
 		$WORK/a.go:22:40-52: in example.com/x.D$1
 		$WORK/a.go:22:17-20: in example.com/x.D$1
 		$WORK/a.go:23:2-2: in example.com/x.D
-$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [chain may repeat] [+1 more paths]
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [chain may repeat]
 	wrap chain (origin → target):
 		$WORK/a.go:22:23-53: errors.Join
 	path (origin → target):

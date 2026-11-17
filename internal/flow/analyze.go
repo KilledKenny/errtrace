@@ -84,7 +84,9 @@ func (o Options) chainDepth() int {
 // definitions of every returned value backwards. Values are interned in
 // tbl. Calls are not followed: their results become CallRef values, except
 // for intrinsics (errors.New, fmt.Errorf, errors.Join, errtrace.Wrap),
-// which become Error Origins and Wraps. A Concrete Type built from a
+// which become Error Origins and Wraps. The return that follows a
+// recovered panic is left out if no deferred call of fn can recover (see
+// mayRecover). A Concrete Type built from a
 // composite literal whose type has a modelled Unwrap method becomes a Wrap
 // of the value stored in the unwrapped field. A value under guards that
 // hold on its return path (err == io.EOF is false there, errors.Is
@@ -100,9 +102,15 @@ func Analyze(tbl *errset.Table, fn *ssa.Function, opts Options) *LocalFacts {
 		return lf
 	}
 	a := &analyzer{tbl: tbl, fn: fn, opts: opts}
+	recovers := fn.Recover != nil && mayRecover(fn)
 	for _, b := range fn.Blocks {
 		ret, ok := b.Instrs[len(b.Instrs)-1].(*ssa.Return)
 		if !ok {
+			continue
+		}
+		if b == fn.Recover && !recovers {
+			// The return after a recovered panic, in a function whose
+			// deferred calls never recover: it does not run.
 			continue
 		}
 		for i := range lf.Results {
@@ -699,7 +707,7 @@ func (a *analyzer) local(load *ssa.UnOp, alloc *ssa.Alloc) {
 	pt := a.pt
 	defer func() { a.pt = pt }()
 	w := variableWriters(alloc)
-	for _, st := range w.stores {
+	for _, st := range a.reaching(load, alloc, w.stores) {
 		switch {
 		case st.Parent() != a.fn:
 			a.pt = pt
@@ -719,6 +727,160 @@ func (a *analyzer) local(load *ssa.UnOp, alloc *ssa.Alloc) {
 		a.pt = pt
 		a.memory(load, escapedVariable(alloc))
 	}
+}
+
+// reaching returns the stores to the variable alloc, of stores, whose
+// value the load may read. A store of the analysed function is read only
+// if it can run before the load; if the function stores to the variable
+// in the load's own block before the load, the last such store has
+// overwritten what the function stored earlier. A store made by a closure
+// may run at any time, unless the closure is only ever deferred by the
+// function: it then runs when the function returns, and is read only by
+// a load that can follow a point where the deferred calls run. So the
+// value that "return fmt.Errorf("f: %w", err)" stores to a named result
+// is not read by the load of err it wraps, and the Wrap is not nested in
+// itself. A load after a recovered panic (in the function's recover
+// block) may read any store.
+func (a *analyzer) reaching(load *ssa.UnOp, alloc *ssa.Alloc, stores []*ssa.Store) []*ssa.Store {
+	lb := load.Block()
+	if lb == nil || a.fn == nil || load.Parent() != a.fn || afterRecover(a.fn, lb) {
+		return stores
+	}
+	var last *ssa.Store
+	for _, instr := range lb.Instrs {
+		if instr == ssa.Instruction(load) {
+			break
+		}
+		if st, ok := instr.(*ssa.Store); ok && st.Addr == ssa.Value(alloc) {
+			last = st
+		}
+	}
+	exit, exitKnown := false, false
+	var out []*ssa.Store
+	for _, st := range stores {
+		switch {
+		case st.Parent() == a.fn:
+			if st == last || (last == nil && mayFollow(st, load)) {
+				out = append(out, st)
+			}
+		case onlyDeferred(a.fn, st.Parent()):
+			if !exitKnown {
+				exit, exitKnown = followsRunDefers(a.fn, load), true
+			}
+			if exit {
+				out = append(out, st)
+			}
+		default:
+			out = append(out, st)
+		}
+	}
+	return out
+}
+
+// afterRecover reports whether block b of fn runs after a recovered
+// panic: it is fn's recover block, or reachable from it.
+func afterRecover(fn *ssa.Function, b *ssa.BasicBlock) bool {
+	if fn.Recover == nil {
+		return false
+	}
+	seen := make(map[*ssa.BasicBlock]bool)
+	work := []*ssa.BasicBlock{fn.Recover}
+	for len(work) > 0 {
+		c := work[len(work)-1]
+		work = work[:len(work)-1]
+		if c == b {
+			return true
+		}
+		if !seen[c] {
+			seen[c] = true
+			work = append(work, c.Succs...)
+		}
+	}
+	return false
+}
+
+// onlyDeferred reports whether the closure c (or the closure of fn that
+// c is nested in) is made by fn only to be deferred there: every
+// MakeClosure of it in fn is the callee of a defer statement and is used
+// in no other way. Its body, and the closures made in it, then run only
+// while fn's deferred calls run.
+func onlyDeferred(fn, c *ssa.Function) bool {
+	for c != nil && c.Parent() != fn {
+		c = c.Parent()
+	}
+	if c == nil {
+		return false
+	}
+	found := false
+	for _, b := range fn.Blocks {
+		for _, instr := range b.Instrs {
+			mc, ok := instr.(*ssa.MakeClosure)
+			if !ok || mc.Fn != ssa.Value(c) {
+				continue
+			}
+			found = true
+			for _, r := range *mc.Referrers() {
+				switch r := r.(type) {
+				case *ssa.DebugRef:
+				case *ssa.Defer:
+					if r.Call.Value != ssa.Value(mc) || slices.Contains(r.Call.Args, ssa.Value(mc)) {
+						return false
+					}
+				default:
+					return false
+				}
+			}
+		}
+	}
+	return found
+}
+
+// followsRunDefers reports whether the instruction at of fn can run after
+// a point where fn's deferred calls run.
+func followsRunDefers(fn *ssa.Function, at ssa.Instruction) bool {
+	for _, b := range fn.Blocks {
+		for _, instr := range b.Instrs {
+			if rd, ok := instr.(*ssa.RunDefers); ok && mayFollow(rd, at) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// mayRecover reports whether a deferred call of fn may recover from a
+// panic, after which fn returns through its recover block: unless every
+// defer statement of fn calls a function or closure with a body that does
+// not call recover itself (recover has no effect when a function called
+// by the deferred function calls it).
+func mayRecover(fn *ssa.Function) bool {
+	for _, b := range fn.Blocks {
+		for _, instr := range b.Instrs {
+			d, ok := instr.(*ssa.Defer)
+			if !ok {
+				continue
+			}
+			callee := d.Call.StaticCallee()
+			if callee == nil || callee.Blocks == nil || callsRecover(callee) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// callsRecover reports whether fn calls the builtin recover.
+func callsRecover(fn *ssa.Function) bool {
+	for _, b := range fn.Blocks {
+		for _, instr := range b.Instrs {
+			if c, ok := instr.(ssa.CallInstruction); ok {
+				if bi, ok := c.Common().Value.(*ssa.Builtin); ok && bi.Name() == "recover" {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // located returns the load v of the variable alloc as the place a value
