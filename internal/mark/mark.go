@@ -49,7 +49,13 @@
 // only fills it or passes it on towards the variable (var ErrX =
 // errors.New("x"), var ErrX error = &T{...}); a function that stores,
 // passes or captures the pointer before returning it (a registry) makes
-// every pointer of the type a seed. For a Concrete
+// every pointer of the type a seed. So does a conversion, anywhere in
+// the scanned program, of a pointer of another type to the type of the
+// Sentinel's pointer ((*T)(p) for a p of type *plain, of a named pointer
+// type, of unsafe.Pointer, or a slice converted to an array pointer):
+// the Sentinel's pointer may have been converted to that other type,
+// where a Mark does not follow it or a type assertion drops it, and come
+// back. For a Concrete
 // Type: every value of that type. Such a value is marked where it is
 // converted to an interface, and where package reflect makes a value of a
 // type it is told at run time (reflect.New(t), reflect.Zero(t),
@@ -333,9 +339,16 @@
 //     from the variable to the allocation (typeWalk): through
 //     conversions, phis and the results of static calls, twelve steps
 //     deep; where it gives up, every error type is a seed.
-//   - A value converted to another named type and back is followed only as
-//     far as its Mark goes: a type assertion to a type that is neither the
-//     Subject's nor a possible wrapper drops it.
+//   - A Mark does not go with a value through a conversion to a type that
+//     cannot be an error ((*plain)(p), int(code)), and a type assertion of
+//     a marked interface value to a type that is neither a type X's value
+//     may have nor a possible wrapper drops it (the value is then not X).
+//     What is converted back is covered by type: a value type that may
+//     equal X, a wrapper type and the Concrete Type are marked wherever
+//     they are converted to an interface, and a conversion to the type of
+//     a pointer Sentinel makes every pointer of that type a seed (see
+//     Seeds). The Verdict there is maybe, not no: func Target() error {
+//     return (*T)((*plain)(ErrX.(*T))) }.
 //   - Reflection is best effort (see Reflection): a "no" is a proof only
 //     for flows that do not pass through package reflect. Stores through
 //     reflection with an unknown destination are reported, not followed,

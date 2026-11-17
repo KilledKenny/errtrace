@@ -422,9 +422,12 @@ type analysis struct {
 	settled   bool
 	// dynNilable are the pointer types the Sentinel's value may have
 	// while another pointer of the type may be equal to it: it may be
-	// nil, or the program may have kept a copy of the pointer before it
-	// became the Sentinel (see typeWalk).
-	dynNilable []types.Type
+	// nil, the program may have kept a copy of the pointer before it
+	// became the Sentinel (see typeWalk), or the program converts
+	// pointers of another type to the type (convertedTo, the pointer
+	// types that are the result of such a conversion in scanned code).
+	dynNilable  []types.Type
+	convertedTo []types.Type
 
 	markableCache map[types.Type]bool
 	wrapperCache  map[types.Type]bool
@@ -833,12 +836,16 @@ func (a *analysis) scanAddresses() {
 				switch x := instr.(type) {
 				case *ssa.ChangeType:
 					a.ty.unify(x.X.Type(), x.Type(), 0)
+					a.noteConverted(x.X.Type(), x.Type())
 				case *ssa.Convert:
 					a.ty.unify(x.X.Type(), x.Type(), 0)
+					a.noteConverted(x.X.Type(), x.Type())
 				case *ssa.MultiConvert:
 					a.ty.unify(x.X.Type(), x.Type(), 0)
+					a.noteConverted(x.X.Type(), x.Type())
 				case *ssa.SliceToArrayPointer:
 					a.ty.unify(x.X.Type(), x.Type(), 0)
+					a.noteConverted(x.X.Type(), x.Type())
 				case *ssa.MakeClosure:
 					cl, _ := x.Fn.(*ssa.Function)
 					if cl == nil {
@@ -907,6 +914,25 @@ func (a *analysis) scanAddresses() {
 	for _, v := range members {
 		a.cellEsc[a.cellFind(v)] = true
 	}
+}
+
+// noteConverted records the result type to of a conversion from another
+// concrete type, if it is a pointer type: the pointer it makes is one the
+// program had before under a type whose values may carry no Mark (a
+// *plain, a named pointer type, a slice of the array it points to), or
+// whose Mark a type assertion on the way dropped. If the Sentinel's value
+// has that pointer type, every pointer of the type may be it (see
+// setupSubject).
+func (a *analysis) noteConverted(from, to types.Type) {
+	if _, isPtr := to.Underlying().(*types.Pointer); !isPtr || isInterface(from) || types.Identical(from, to) {
+		return
+	}
+	for _, t := range a.convertedTo {
+		if types.Identical(t, to) {
+			return
+		}
+	}
+	a.convertedTo = append(a.convertedTo, to)
 }
 
 func (a *analysis) cellFind(v ssa.Value) ssa.Value {
@@ -1608,6 +1634,19 @@ func (a *analysis) setupSubject() {
 		// no Mark comes to: every pointer of its type may be it.
 		for _, d := range w.types {
 			if _, isPtr := d.Underlying().(*types.Pointer); isPtr {
+				a.dynNilable = append(a.dynNilable, d)
+			}
+		}
+	}
+	// So too if the program converts a pointer of another type to the
+	// type of the Sentinel's pointer: the Sentinel's own pointer may have
+	// gone through that other type, where no Mark follows it
+	// ((*T)((*plain)(ErrX.(*T)))). The conversion makes a type seed, not
+	// a marked value: the scan is of the whole program, whether or not a
+	// Mark comes near the conversion.
+	for _, d := range w.types {
+		for _, t := range a.convertedTo {
+			if types.Identical(d, t) {
 				a.dynNilable = append(a.dynNilable, d)
 			}
 		}

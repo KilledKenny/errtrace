@@ -21,6 +21,15 @@ type soundCase struct {
 	// wantMaybe: the Verdict must be Maybe: the case pins a guard that
 	// must not apply although nothing shows at run time.
 	wantMaybe bool
+	// wantUnsure: the function can return the Subject, and no entry of
+	// its Error Set is the Subject: a Yes would be as wrong as a No. The
+	// Verdict must be Maybe, or a No apart from reflection.
+	wantUnsure bool
+	// wantApart: the Verdict must be a No apart from reflection: the
+	// Subject reaches the function only through a store through
+	// reflection that the upward pass did not follow, and the flooding
+	// second pass shows that such a store can matter.
+	wantApart bool
 	// notFollowed: the Subject reaches the function's result only by a
 	// store through reflection whose destination the upward pass cannot
 	// tell. That is its documented limit: if the Verdict is No, it is
@@ -45,6 +54,17 @@ func runSound(t *testing.T, file string, cases []soundCase) {
 			t.Errorf("%s, %s: %d stores through reflection were not followed, want none", c.fn, c.subject, len(m.ReflectStores))
 		}
 		switch {
+		case c.wantApart:
+			if !m.ApartFromReflection() {
+				t.Errorf("%s, %s: Verdict is %v with %d stores through reflection not followed, want no, apart from reflection", c.fn, c.subject, m.Verdict, len(m.ReflectStores))
+			}
+		case c.wantUnsure:
+			if !c.truth {
+				t.Errorf("%s, %s: a wantUnsure case is one the function can return", c.fn, c.subject)
+			}
+			if m.Verdict != query.Maybe && !m.ApartFromReflection() {
+				t.Errorf("%s, %s: Verdict is %v, want maybe or no, apart from reflection", c.fn, c.subject, m.Verdict)
+			}
 		case c.notFollowed:
 			if !c.truth {
 				t.Errorf("%s, %s: a notFollowed case is one the function can return", c.fn, c.subject)
@@ -268,6 +288,27 @@ func TestReflectStoresNearTarget(t *testing.T) {
 			t.Errorf("%s, %s: Verdict %v, %d stores not followed, apart from reflection %v; want no, %d stores", c.fn, c.subject, m.Verdict, len(m.ReflectStores), m.ApartFromReflection(), c.stores)
 		}
 	}
+}
+
+// TestVerdictSoundConvert does the same for a pointer Sentinel that the
+// program converts to another pointer type and back: where the Marks do
+// not follow the pointer, every pointer of the Sentinel's type is a seed.
+func TestVerdictSoundConvert(t *testing.T) {
+	t.Parallel()
+	runSound(t, "sound_convert.txtar", []soundCase{
+		{fn: "ConvLocal", subject: "is ErrL1", truth: true, wantUnsure: true},
+		{fn: "ConvField", subject: "is ErrL2", truth: true, wantUnsure: true},
+		{fn: "ConvNamedPtr", subject: "is ErrL3", truth: true, wantUnsure: true},
+		{fn: "ConvAnon", subject: "is ErrL4", truth: true, wantUnsure: true},
+		{fn: "ConvTwin", subject: "is ErrL5", truth: true, wantUnsure: true},
+		{fn: "ConvIs", subject: "is ErrL6", truth: true, wantUnsure: true},
+		{fn: "ConvTwinAssert", subject: "is ErrL7", truth: true, wantUnsure: true},
+		{fn: "ConvSlice", subject: "is ErrL8", truth: true, wantUnsure: true},
+		// A pointer type the program converts from but never to, and one
+		// it does not convert, are the Sentinel's pointer alone.
+		{fn: "ConvAway", subject: "is ErrK1", wantNo: true},
+		{fn: "ConvNone", subject: "is ErrK2", wantNo: true},
+	})
 }
 
 // TestVerdictSoundValues does the same for what a value holds: a
