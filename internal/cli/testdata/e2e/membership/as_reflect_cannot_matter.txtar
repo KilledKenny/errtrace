@@ -1,0 +1,41 @@
+-as with a recorded store through reflection that cannot matter to the Target: the flooding pass, in which the store writes every memory location reflection could write, does not reach Other, which reads no memory. The Verdict is a plain no.
+-- args --
+-as example.com/fx.CodeErr a.go:@g
+-- stdout --
+$WORK/a.go:24:12-17: example.com/fx.CodeErr in Error Set of example.com/fx.Other: no
+-- exit --
+1
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"reflect"
+)
+
+type CodeErr struct{ n int }
+
+func (CodeErr) Error() string { return "code" }
+
+var slot any
+var dest = reflect.ValueOf(&slot).Elem()
+var types = []reflect.Type{reflect.TypeOf(CodeErr{})}
+
+func store() { dest.Set(reflect.New(types[0]).Elem()) }
+
+func /*@f*/Get() error {
+	e, _ := slot.(error)
+	return e
+}
+
+func /*@g*/Other() error { return errors.New("other") }
+
+func main() {
+	store()
+	fmt.Println(Get(), Other())
+}

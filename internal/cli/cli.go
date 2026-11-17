@@ -370,7 +370,7 @@ func newFlagSet() (*flag.FlagSet, *config) {
 	fs.IntVar(&cfg.fanout, "fanout", DefaultFanout, "group entries under dynamic call sites with at least `N` Candidates (0 = never group)")
 	fs.StringVar(&cfg.is, "is", "", "Membership Query: is the Sentinel `pkgpath.Name` (such as io.EOF) in the Error Set?")
 	fs.StringVar(&cfg.as, "as", "", "Membership Query: is the Concrete Type `type` (such as '*io/fs.PathError') in the Error Set?")
-	fs.BoolVar(&cfg.full, "full", false, "Membership Query: print every entry that could carry the error in full, instead of grouping those whose traces share a pivot, and every reflective store that was not followed")
+	fs.BoolVar(&cfg.full, "full", false, "Membership Query: print every entry that could carry the error in full, instead of grouping those whose traces share a pivot, and every listed reflective store")
 	fs.String("debug", "", "comma-separated `list` of "+strings.Join(debugModes, ",")+" (stderr only)")
 	return fs, cfg
 }
@@ -399,8 +399,12 @@ With -is or -as, %[1]s answers a Membership Query: whether that error is in
 the Target's Error Set. The exit status is then the Verdict:
   0 yes | 1 no | 2 error
   3 maybe, or no apart from reflective stores that are not followed
-A no is a proof only for flows that do not pass through package reflect;
-reflective flows are followed where the analysis can, and otherwise not.
+In a program whose main reaches the Target, a no (exit 1) is a proof for
+flows that do not pass through package reflect (nor unsafe, cgo, assembly,
+linkname). Reflective flows are followed where the analysis can. A
+reflective store it cannot follow is listed, with exit 3, unless a second
+pass, in which that store writes all memory reflection could write, shows
+that it cannot matter to the Target.
 An internal package counts as closed (no callers outside the loaded program)
 only when the default -p ./... is run from the root of its module.
 `, BinaryName)

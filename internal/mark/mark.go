@@ -5,16 +5,23 @@
 // Unresolved places, the upward pass is an upper bound: when it is unsure it
 // keeps the Mark, so what it does not reach cannot hold X.
 //
-// That is a proof for the ways a value travels that do not pass through
-// package reflect. Reflection is followed where the pass can (see
-// Reflection) and otherwise not: a "no" is no proof about a value that
-// goes through package reflect in a way the pass does not model. Some of
-// what it does not follow it records: the stores through reflection
-// whose destination it cannot tell. A "no" is plain only if none is
-// recorded, or if a second, flooding pass shows that none of them can
-// matter to the Target; otherwise it is "no, apart from reflection",
-// with the stores listed as "not followed". The rest it cannot name (see
-// Known limits).
+// What that proves: in a closed world (see Closed and open worlds), for
+// a Target that the program's main reaches, a plain "no" is a proof for
+// every way a value travels that does not pass through package reflect
+// (nor through unsafe, cgo, assembly or //go:linkname, see Known limits).
+//
+// Reflection is best effort. It is followed where the pass has a model
+// (see Reflection) and otherwise not: a "no" is no proof about a value
+// that goes through package reflect in a way the pass does not model.
+// One thing holds even there. A store through reflection that the pass
+// recorded as not followed (it cannot tell where the store writes) is
+// never behind a plain "no" if it could matter: a "no" is plain only if
+// no such store is recorded, or if a second, flooding pass, in which
+// every recorded store writes every memory location that a store through
+// reflection could write, does not reach the Target either. Otherwise the
+// Verdict is "no, apart from reflection", with the stores listed as "not
+// followed". What the pass neither models nor records it cannot name
+// (see the end of Reflection, and Known limits).
 //
 // # What a Mark means
 //
@@ -320,13 +327,22 @@
 //     Unwrap() []error of errors.Join called through reflection;
 //   - a value read out of existing memory through reflection and handed
 //     out by Value.Interface(), when it is marked only by its type (a type
-//     seed, a wrapper type) and the composite it is read from goes into
-//     reflection in another function: reflect.ValueOf(a).Field(0)
-//     .Interface() in a helper that is passed a struct with a field of
-//     the Subject's type. The conversion to an interface happens inside
-//     package reflect, where no seed is applied. So too a value of a
-//     wrapper type that reflection makes (reflect.New of a type with an
-//     Is method), and the result of a function called by Value.Call;
+//     seed, a wrapper type): the conversion to an interface happens
+//     inside package reflect, where no seed is applied. That is so when
+//     the composite it is read from goes into reflection in another
+//     function (reflect.ValueOf(a).Field(0).Interface() in a helper that
+//     is passed a struct with a field of the Subject's type), and also
+//     within one function when the value is reached through a pointer
+//     (c := code(0); reflect.ValueOf(&c).Elem().Interface()) or is a
+//     field of a wrapper type read through Value.Field
+//     (reflect.ValueOf(H{}).Field(0).Interface(), for a field whose type
+//     has an Is method). So too the keys of a map that Value.MapRange or
+//     Value.MapKeys hand out (it.Key().Interface()), a value of a wrapper
+//     type that reflection makes (reflect.New of a type with an Is
+//     method), and the result of a function called by Value.Call;
+//   - the arguments of a function made by reflect.MakeFunc: they come to
+//     its implementation in a []reflect.Value that no store the pass saw
+//     filled (reflect.MakeFunc(t, impl).Interface().(func(error))(X));
 //   - a typed pointer made by Value.Addr to a field of program memory
 //     (v.Field(0).Addr().Interface().(*error)) and stored through
 //     afterwards: the field is not joined with the memory of its type.
@@ -337,7 +353,12 @@
 //     cannot see. Modelled are only errors.As (its target is marked), the
 //     contents of sync/atomic.Value and atomic.Pointer, and a function
 //     without a body (its results are marked when an argument is). An
-//     address converted to unsafe.Pointer is not followed.
+//     address converted to unsafe.Pointer is not followed. That includes
+//     the standard library where it keeps a value behind such a pointer:
+//     a weak.Pointer does (weak.Make(p).Value() is p again); what comes
+//     back out is covered by its type only (a type seed, a wrapper type,
+//     the Concrete Type, and a pointer Sentinel's type through the
+//     conversion in Value, see Seeds).
 //   - An Is or As method that the pass cannot see at all is the one gap
 //     of the wrapper rule: a method reached only through reflection or
 //     from code that is not loaded, whose type is never converted to an

@@ -1,0 +1,43 @@
+-as with a store through reflection that is not followed: the value stored is one that reflection makes of a type chosen at run time, which may be the Concrete Type, and the variable it is stored into holds an interface. The store is recorded; the flooding pass reaches Get, which reads the variable: a no apart from reflection, with the exit status of a maybe.
+-- args --
+-as example.com/fx.CodeErr a.go:@f
+-- stdout --
+$WORK/a.go:19:12-15: example.com/fx.CodeErr in Error Set of example.com/fx.Get: no, apart from reflection
+	not followed: example.com/fx.CodeErr reaches 1 reflective store whose destination is unknown or only partly followed:
+		$WORK/a.go:17:16-54: in example.com/fx.store
+-- exit --
+3
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"reflect"
+)
+
+type CodeErr struct{ n int }
+
+func (CodeErr) Error() string { return "code" }
+
+var slot any
+var dest = reflect.ValueOf(&slot).Elem()
+var types = []reflect.Type{reflect.TypeOf(CodeErr{})}
+
+func store() { dest.Set(reflect.New(types[0]).Elem()) }
+
+func /*@f*/Get() error {
+	e, _ := slot.(error)
+	return e
+}
+
+func /*@g*/Other() error { return errors.New("other") }
+
+func main() {
+	store()
+	fmt.Println(Get(), Other())
+}
