@@ -1,0 +1,74 @@
+QA4 C4. A library package with no main: the Target's callers are not seen. A
+tracked wrapper is handed, as an error, to a function value that comes from
+outside before it is unwrapped; its field is exported, so that code can set it
+(e.(*lib.W).Inner = ...). The literal's value is listed with one Unresolved
+entry for what that code may have stored.
+-- args --
+a.go:@a
+-- stdout --
+$WORK/a.go:26:12-13: Error Set of example.com/lib.A: 2 entries, 1 unresolved
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:27:26-32: in example.com/lib.A
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap
+		$WORK/a.go:11:37-38: in (*example.com/lib.W).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*example.com/lib.W).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 1 of 1 candidates)
+		$WORK/a.go:29:9-25: in example.com/lib.A, call to errors.Unwrap
+$WORK/a.go:11:37-44: unresolved(memory): field Inner of example.com/lib.W may be written by code that is not reachable from the Query's roots
+	path (origin → target):
+		$WORK/a.go:11:37-44: in example.com/lib.A
+-- stderr --
+errtrace: warning: target not reachable from main/init; parameters may lack candidates
+-- go.mod --
+module example.com/lib
+
+go 1.24
+-- a.go --
+package lib
+
+import (
+	"errors"
+	"io"
+)
+
+type W struct{ Inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.Inner }
+
+type U struct{ inner error }
+
+func (u *U) Error() string { return "u" }
+func (u *U) Unwrap() error { return u.inner }
+
+// Set is not called in this package.
+func (u *U) Set(e error) { u.inner = e }
+
+type V struct{ inner error }
+
+func (v *V) Error() string { return "v" }
+func (v *V) Unwrap() error { return v.inner }
+
+func /*@a*/A(sink func(error)) error {
+	var e error = &W{Inner: io.EOF}
+	sink(e)
+	return errors.Unwrap(e)
+}
+
+func /*@b*/B(sink func(error)) error {
+	var e error = &U{inner: io.EOF}
+	sink(e)
+	return errors.Unwrap(e)
+}
+
+func /*@c*/C(sink func(error)) error {
+	var e error = &V{inner: io.EOF}
+	sink(e)
+	return errors.Unwrap(e)
+}
+
+func /*@r*/R(sink func(error)) error {
+	var e error = &W{Inner: io.EOF}
+	sink(e)
+	return e
+}

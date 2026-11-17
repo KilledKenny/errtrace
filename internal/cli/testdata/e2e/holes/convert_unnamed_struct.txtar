@@ -1,0 +1,38 @@
+QA4 C1. A value built as an unnamed struct type and converted to a named
+wrapper type: the conversion unites the two types' fields, so the load in
+(*W).Unwrap finds what the literal of the unnamed type stored, flagged as a
+location value.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:18:12-13: Error Set of example.com/x.F: 1 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF [via field inner of example.com/x.W]
+	path (origin → target):
+		$WORK/a.go:14:66-72: in example.com/x.mk
+		$WORK/a.go:14:66-68: in example.com/x.mk
+		$WORK/a.go:12:37-44: in example.com/x.F
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+)
+
+type W struct{ inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.inner }
+
+func mk() *struct{ inner error } { return &struct{ inner error }{io.EOF} }
+
+func wrap() error { return (*W)(mk()) }
+
+func /*@q*/F() error { return errors.Unwrap(wrap()) }
+
+func main() { fmt.Println(F()) }

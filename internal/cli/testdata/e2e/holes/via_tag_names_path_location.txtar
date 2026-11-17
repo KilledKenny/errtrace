@@ -1,0 +1,43 @@
+QA4 m1. The leaf reaches the Target through two field locations. The tag names
+the location that is on the Propagation Path shown (the shorter one, through
+B), not the one of the first source found (through A).
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:16:12-13: Error Set of example.com/x.F: 1 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF [via field err of example.com/x.B] [+1 more paths]
+	path (origin → target):
+		$WORK/a.go:24:41-47: in example.com/x.main
+		$WORK/a.go:24:36-47: in example.com/x.main
+		$WORK/a.go:14:32-37: in example.com/x.viaB
+		$WORK/a.go:20:9-16: in example.com/x.F, call to example.com/x.viaB
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+)
+
+type A struct{ err error }
+type B struct{ err error }
+
+func viaA(a *A) error { return a.err }
+func hop1(a *A) error { return viaA(a) }
+func hop2(a *A) error { return hop1(a) }
+func viaB(b *B) error { return b.err }
+
+func /*@q*/F(a *A, b *B, c bool) error {
+	if c {
+		return hop2(a)
+	}
+	return viaB(b)
+}
+
+func main() {
+	fmt.Println(F(&A{err: io.EOF}, &B{err: io.EOF}, true))
+}

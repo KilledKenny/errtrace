@@ -1,0 +1,48 @@
+QA4 pre-existing 2. return nil in a function whose result type is a pointer to
+an error type: the caller converts the nil pointer to error, which is a non-
+nil error holding a nil *E.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:19:12-13: Error Set of example.com/x.F: 2 entries
+$WORK/a.go:14:10-14: concrete *example.com/x.E
+	path (origin → target):
+		$WORK/a.go:14:10-14: in example.com/x.find
+		$WORK/a.go:19:31-42: in example.com/x.F, call to example.com/x.find
+$WORK/a.go:16:2-2: concrete *example.com/x.E [typed nil]
+	path (origin → target):
+		$WORK/a.go:16:2-2: in example.com/x.find
+		$WORK/a.go:19:31-42: in example.com/x.F, call to example.com/x.find
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+)
+
+type E struct{}
+
+func (e *E) Error() string { return "e" }
+
+func find(ok bool) *E {
+	if ok {
+		return &E{}
+	}
+	return nil
+}
+
+func /*@q*/F() error { return find(false) }
+
+func /*@g*/G() error {
+	if e := find(false); e != nil {
+		return e
+	}
+	return io.EOF
+}
+
+func main() { fmt.Println(F() != nil, G()) }

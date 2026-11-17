@@ -1,0 +1,39 @@
+QA4 C1. The same with value receivers: base(n).Unwrap() loads the field from a
+copy of a NotFound value converted to base.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:21:12-13: Error Set of example.com/x.F: 1 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF [via field err of example.com/x.base]
+	path (origin → target):
+		$WORK/a.go:19:40-46: in example.com/x.mk
+		$WORK/a.go:19:35-46: in example.com/x.mk
+		$WORK/a.go:12:39-44: in example.com/x.F
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+)
+
+type base struct{ err error }
+
+func (b base) Error() string { return "b" }
+func (b base) Unwrap() error { return b.err }
+
+type NotFound base
+
+func (n NotFound) Error() string { return "nf" }
+func (n NotFound) Unwrap() error { return base(n).Unwrap() }
+
+func mk() error { return NotFound{err: io.EOF} }
+
+func /*@q*/F() error { return errors.Unwrap(mk()) }
+
+func main() { fmt.Println(F()) }

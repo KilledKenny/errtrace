@@ -1,0 +1,53 @@
+QA4 C2. A struct embeds an interface that has Unwrap; the method is promoted
+from the interface. The Candidate under errors.Unwrap is (*W).Unwrap, called
+on the Outer value: the load is made on what the embedded interface field
+holds. That field is read from its location (Outer's own Unwrap is not a field
+return, so Outer is not opened as a tracked value): the entry is flagged with
+it.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:28:12-13: Error Set of example.com/x.F: 1 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF [via field Coder of example.com/x.Outer]
+	path (origin → target):
+		$WORK/a.go:29:35-41: in example.com/x.F
+		$WORK/a.go:29:25-42: in example.com/x.F
+		$WORK/a.go:18:37-44: in example.com/x.F
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+)
+
+type Coder interface {
+	error
+	Unwrap() error
+	Code() int
+}
+
+type W struct{ inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.inner }
+func (w *W) Code() int     { return 1 }
+
+type Outer struct {
+	Coder
+	msg string
+}
+
+func (o *Outer) Error() string { return o.msg }
+
+func /*@q*/F() error {
+	var err error = &Outer{&W{inner: io.EOF}, "ctx"}
+	return errors.Unwrap(err)
+}
+
+func main() { fmt.Println(F()) }

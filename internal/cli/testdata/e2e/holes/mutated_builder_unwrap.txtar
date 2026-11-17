@@ -1,0 +1,42 @@
+QA4 pre-existing 1. The program of mutated_builder, with the wrapper
+unwrapped: the same values as under the Wrap of the returned wrapper.
+-- args --
+a.go:@u
+-- stdout --
+$WORK/a.go:22:12-13: Error Set of example.com/x.U: 1 entries
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [via field Err of example.com/x.W] [+1 more paths]
+	path (origin → target):
+		$WORK/a.go:20:50-62: in example.com/x.F
+		$WORK/a.go:20:31-63: in example.com/x.F, call to (*example.com/x.W).WithCause
+		$WORK/a.go:18:45-46: in (*example.com/x.W).WithCause
+		$WORK/a.go:18:39-42: in (*example.com/x.W).WithCause
+		$WORK/a.go:15:37-42: in example.com/x.U
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"os"
+)
+
+type W struct {
+	msg string
+	Err error
+}
+
+func (w *W) Error() string { return w.msg }
+func (w *W) Unwrap() error { return w.Err }
+
+func New(msg string) *W           { return &W{msg: msg} }
+func (w *W) WithCause(e error) *W { w.Err = e; return w }
+
+func /*@t*/F() error { return New("x").WithCause(os.ErrClosed) }
+
+func /*@u*/U() error { return errors.Unwrap(F()) }
+
+func main() { fmt.Println(F(), U()) }

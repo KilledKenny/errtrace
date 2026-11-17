@@ -1,0 +1,49 @@
+QA4 C2. Two embedded interfaces in a row: Outer embeds an interface holding a
+Mid, which embeds one holding the wrapper. The Mid is known only as what
+Outer's field holds somewhere, so its own field is not expanded: one
+Unresolved entry says that the value loaded from is not known.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:26:12-13: Error Set of example.com/x.F: 1 entries, 1 unresolved
+$WORK/a.go:17:37-44: unresolved(memory): load of field inner of *example.com/x.W: the value loaded from is not known
+	path (origin → target):
+		$WORK/a.go:27:25-47: in example.com/x.F
+		$WORK/a.go:27:25-28: in example.com/x.F
+		$WORK/a.go:17:37-44: in example.com/x.F
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+)
+
+type Coder interface {
+	error
+	Unwrap() error
+}
+
+type W struct{ inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.inner }
+
+type Mid struct{ Coder }
+
+type Outer struct {
+	Coder
+	msg string
+}
+
+func /*@q*/F() error {
+	var err error = &Outer{Mid{&W{inner: io.EOF}}, "x"}
+	return errors.Unwrap(err)
+}
+
+func main() { fmt.Println(F()) }
