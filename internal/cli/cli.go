@@ -155,6 +155,9 @@ func runQuery(ctx context.Context, opts Options, fs *flag.FlagSet, cfg *config) 
 	if cfg.is != "" && cfg.as != "" {
 		return 0, usageError{errors.New("-is and -as are mutually exclusive")}
 	}
+	if cfg.full && !membership {
+		return 0, usageError{errors.New("-full needs -is or -as: it prints a Membership Query in full")}
+	}
 	debug, err := parseDebug(fs.Lookup("debug").Value.String())
 	if err != nil {
 		return 0, usageError{err}

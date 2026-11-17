@@ -32,6 +32,11 @@ type CarrierEntry struct {
 	// Trace are the steps from an origin of the Subject to the entry's
 	// place; it may be empty.
 	Trace []TraceStep
+	// Wrap is the Wrap of the entry's chain that makes it a Carrier,
+	// when its leaf alone does not hold the Subject; HasWrap says there
+	// is one.
+	Wrap    errset.ValueID
+	HasWrap bool
 }
 
 // ReflectStore is a store through reflection that the Subject of a
@@ -79,6 +84,7 @@ type MembershipInput struct {
 //	<target-span>: <X> in Error Set of <target>: yes
 //	<target-span>: <X> in Error Set of <target>: no
 //	<target-span>: <X> in Error Set of <target>: maybe: <K> entries could carry it (<U> unresolved)
+//	<target-span>: <X> in Error Set of <target>: maybe: 1 entry could carry it (<U> unresolved)
 //	<target-span>: <X> in Error Set of <target>: maybe: possibly handled
 //
 // After a yes, and after a maybe that is possibly handled, come the
@@ -96,14 +102,21 @@ type MembershipInput struct {
 // Mark is on a whole type or on shared memory, such as "value of type T,
 // which may wrap X" or "loaded from field f of T") are printed together,
 // after the others, smallest group first, unless Full is set: the steps
-// that all their traces start with once (at least those up to the pivot),
-// then one line per entry.
+// that all their traces start with once (at least those up to the pivot
+// of the first), then one line per entry. A pivot is the same by what it
+// says, wherever it happens: the header has the span of the group's
+// first.
 //
 //	<pivot-span>: group of <M> entries via: <pivot step description>
 //		marked via (origin of <X> → here):
 //			<span>: <step description>
-//		<entry-span>: <label>
+//		<entry-span>: <label>[ [typed nil]][ [chain truncated]][ [+K more paths]][ under <wrap description>][ (<N> entries)]
 //		...
+//
+// An entry line is as the first line Text prints for the entry. "under"
+// names the Wrap of the entry's chain that makes it a Carrier, when its
+// leaf alone would not be one. Entries of a group whose lines are the
+// same are printed once, with their number.
 //
 // A maybe with 0 Carriers means that X can reach the Target (the upward
 // pass, an upper bound, says so) while no entry of the Error Set shows
@@ -122,7 +135,7 @@ type MembershipInput struct {
 // possibly handled, end with them (the first 5, all with Full), in the
 // order of the pass:
 //
-//	<TAB>not followed: <X> reaches <N> reflective store[s] whose destination is unknown:
+//	<TAB>not followed: <X> reaches <N> reflective store[s] whose destination is unknown or only partly followed:
 //	<TAB><TAB><span>: in <function>
 //	<TAB><TAB>… and <K> more
 //
@@ -143,7 +156,11 @@ func Membership(w io.Writer, in MembershipInput) error {
 				unresolved++
 			}
 		}
-		fmt.Fprintf(&b, ": %d entries could carry it (%d unresolved)\n", len(in.Carriers), unresolved)
+		entries := "entries"
+		if len(in.Carriers) == 1 {
+			entries = "entry"
+		}
+		fmt.Fprintf(&b, ": %d %s could carry it (%d unresolved)\n", len(in.Carriers), entries, unresolved)
 		if len(in.Carriers) == 0 {
 			fmt.Fprintf(&b, "\t%s may reach the target, but no entry of the Error Set shows how\n", in.Subject)
 			if len(in.TargetTrace) > 0 {
@@ -169,10 +186,7 @@ func Membership(w io.Writer, in MembershipInput) error {
 			fmt.Fprintf(&b, "%s: group of %d entries via: %s\n", in.locate(pivot.Site), len(g.members), pivot.Desc)
 			fmt.Fprintf(&b, "\tmarked via (origin of %s → here):\n", in.Subject)
 			in.steps(&b, first.Trace[:in.shared(g)])
-			for _, i := range g.members {
-				e := in.Carriers[i].Entry
-				fmt.Fprintf(&b, "\t%s: %s\n", in.locate(in.Table.Get(e.Leaf).Site), Label(in.Table, e.Leaf))
-			}
+			in.members(&b, g)
 		}
 		in.notFollowed(&b)
 	case in.Verdict == "no":
@@ -188,6 +202,32 @@ func Membership(w io.Writer, in MembershipInput) error {
 	return err
 }
 
+// members writes the entry lines of the group g: one line per entry, the
+// entries whose lines are the same once, with their number.
+func (in MembershipInput) members(b *strings.Builder, g pivotGroup) {
+	var lines []string
+	count := make(map[string]int)
+	for _, i := range g.members {
+		c := in.Carriers[i]
+		line := in.head(c.Entry)
+		if c.HasWrap {
+			line += " under " + in.Table.WrapDescription(c.Wrap)
+		}
+		if count[line] == 0 {
+			lines = append(lines, line)
+		}
+		count[line]++
+	}
+	for _, line := range lines {
+		b.WriteByte('\t')
+		b.WriteString(line)
+		if n := count[line]; n > 1 {
+			fmt.Fprintf(b, " (%d entries)", n)
+		}
+		b.WriteByte('\n')
+	}
+}
+
 // notFollowed writes the section of the stores through reflection that
 // the upward pass did not follow, if there are any.
 func (in MembershipInput) notFollowed(b *strings.Builder) {
@@ -199,7 +239,7 @@ func (in MembershipInput) notFollowed(b *strings.Builder) {
 	if n == 1 {
 		stores = "store"
 	}
-	fmt.Fprintf(b, "\tnot followed: %s reaches %d reflective %s whose destination is unknown:\n", in.Subject, n, stores)
+	fmt.Fprintf(b, "\tnot followed: %s reaches %d reflective %s whose destination is unknown or only partly followed:\n", in.Subject, n, stores)
 	shown := n
 	if !in.Full && shown > maxNotFollowed {
 		shown = maxNotFollowed
@@ -244,7 +284,7 @@ type pivotGroup struct {
 }
 
 // pivotGroups groups the Carriers by the pivot of their trace: its first
-// wide step. It returns the groups of two or more, smallest first (then in
+// wide step, by its description. It returns the groups of two or more, smallest first (then in
 // the order of their first Carriers), and which Carriers are grouped.
 // With Full nothing is grouped.
 func (in MembershipInput) pivotGroups() ([]pivotGroup, []bool) {
@@ -259,7 +299,9 @@ func (in MembershipInput) pivotGroups() ([]pivotGroup, []bool) {
 			if !s.Wide {
 				continue
 			}
-			key := in.locate(s.Site) + ": " + s.Desc
+			// By what the pivot says: the same type or memory is one
+			// pivot, wherever the step happens.
+			key := s.Desc
 			g := byKey[key]
 			if g == nil {
 				g = &pivotGroup{pivot: j}

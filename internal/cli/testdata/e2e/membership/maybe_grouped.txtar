@@ -10,9 +10,9 @@ $WORK/a.go:10:37-44: group of 4 entries via: loaded from field inner of example.
 		$WORK/a.go:12:30-41: stored to field inner of example.com/fx.W
 		$WORK/a.go:10:37-44: loaded from field inner of example.com/fx.W
 	$WORK/a.go:18:5-11: sentinel example.com/fx.stored
-	$WORK/a.go:14:35-50: opaque errors.New "a"
-	$WORK/a.go:15:35-50: opaque errors.New "b"
-	$WORK/a.go:16:35-50: opaque errors.New "c"
+	$WORK/a.go:14:35-50: opaque errors.New "a" under *example.com/fx.W.Unwrap
+	$WORK/a.go:15:35-50: opaque errors.New "b" under *example.com/fx.W.Unwrap
+	$WORK/a.go:16:35-50: opaque errors.New "c" under *example.com/fx.W.Unwrap
 -- exit --
 3
 -- go.mod --

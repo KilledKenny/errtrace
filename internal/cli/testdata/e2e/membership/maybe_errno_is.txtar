@@ -2,7 +2,7 @@ os.Open with -is io/fs.ErrNotExist: syscall.Errno has an Is method that reports 
 -- args --
 -fanout=0 -is io/fs.ErrNotExist a.go:@f
 -- stdout --
-$WORK/a.go:5:12-13: io/fs.ErrNotExist in Error Set of example.com/fx.F: maybe: 1 entries could carry it (1 unresolved)
+$WORK/a.go:5:12-13: io/fs.ErrNotExist in Error Set of example.com/fx.F: maybe: 1 entry could carry it (1 unresolved)
 $GOROOT/src/os/file_unix.go:*: unresolved(memory): load of escaping variable e
 	wrap chain (origin → target):
 		$GOROOT/src/os/file_unix.go:*: *io/fs.PathError.Unwrap

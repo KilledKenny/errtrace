@@ -2,7 +2,7 @@ The Error Set resolves the result to another Sentinel, ErrY, whose value wraps E
 -- args --
 -is example.com/fx.ErrX a.go:@f
 -- stdout --
-$WORK/a.go:11:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: 1 entries could carry it (0 unresolved)
+$WORK/a.go:11:12-13: example.com/fx.ErrX in Error Set of example.com/fx.F: maybe: 1 entry could carry it (0 unresolved)
 $WORK/a.go:9:5-9: sentinel example.com/fx.ErrY
 	path (origin → target):
 		$WORK/a.go:11:31-35: in example.com/fx.F

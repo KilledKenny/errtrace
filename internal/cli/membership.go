@@ -60,7 +60,7 @@ func runMembership(ctx context.Context, opts Options, cfg *config, prog *load.Pr
 		in.NotFollowed = append(in.NotFollowed, render.ReflectStore{Site: rs.Site, Function: rs.Fn.String()})
 	}
 	for _, c := range res.Carriers {
-		in.Carriers = append(in.Carriers, render.CarrierEntry{Entry: c.Entry, Unresolved: c.Unresolved, Trace: steps(c.Trace)})
+		in.Carriers = append(in.Carriers, render.CarrierEntry{Entry: c.Entry, Unresolved: c.Unresolved, Trace: steps(c.Trace), Wrap: c.Wrap, HasWrap: c.HasWrap})
 	}
 	if err := render.Membership(opts.Stdout, in); err != nil {
 		return 0, err

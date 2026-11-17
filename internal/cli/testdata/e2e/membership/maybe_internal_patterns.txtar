@@ -2,7 +2,7 @@ With any other -p an internal package is open like any other package: the code t
 -- args --
 -p ./cmd/...,./internal/... -is io.EOF internal/store/store.go:@f
 -- stdout --
-$WORK/internal/store/store.go:6:12-15: io.EOF in Error Set of example.com/fx/internal/store.Run: maybe: 1 entries could carry it (1 unresolved)
+$WORK/internal/store/store.go:6:12-15: io.EOF in Error Set of example.com/fx/internal/store.Run: maybe: 1 entry could carry it (1 unresolved)
 $WORK/internal/store/store.go:10:9-15: unresolved(no-candidates): dynamic call to function value example.com/fx/internal/store.Hook
 	path (origin → target):
 		$WORK/internal/store/store.go:10:9-15: in example.com/fx/internal/store.Run

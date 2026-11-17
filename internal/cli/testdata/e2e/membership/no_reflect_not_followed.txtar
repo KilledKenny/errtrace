@@ -3,7 +3,7 @@ A store through reflection whose destination the upward pass cannot tell (the Va
 -is example.com/fx.ErrX a.go:@f
 -- stdout --
 $WORK/a.go:16:12-15: example.com/fx.ErrX in Error Set of example.com/fx.Get: no
-	not followed: example.com/fx.ErrX reaches 1 reflective store whose destination is unknown:
+	not followed: example.com/fx.ErrX reaches 1 reflective store whose destination is unknown or only partly followed:
 		$WORK/a.go:14:16-47: in example.com/fx.store
 -- exit --
 1

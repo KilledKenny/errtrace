@@ -3,7 +3,7 @@ Only the first 5 stores through reflection that were not followed are listed.
 -is example.com/fx.ErrX a.go:@f
 -- stdout --
 $WORK/a.go:22:12-15: example.com/fx.ErrX in Error Set of example.com/fx.Get: no
-	not followed: example.com/fx.ErrX reaches 7 reflective stores whose destination is unknown:
+	not followed: example.com/fx.ErrX reaches 7 reflective stores whose destination is unknown or only partly followed:
 		$WORK/a.go:14:13-44: in example.com/fx.s1
 		$WORK/a.go:15:13-44: in example.com/fx.s2
 		$WORK/a.go:16:13-44: in example.com/fx.s3

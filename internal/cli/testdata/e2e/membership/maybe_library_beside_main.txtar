@@ -2,7 +2,7 @@ A library package is open even when the module also has a main package that does
 -- args --
 -is example.com/fx/lib.ErrNotFound lib/lib.go:@f
 -- stdout --
-$WORK/lib/lib.go:9:12-18: example.com/fx/lib.ErrNotFound in Error Set of example.com/fx/lib.Lookup: maybe: 1 entries could carry it (1 unresolved)
+$WORK/lib/lib.go:9:12-18: example.com/fx/lib.ErrNotFound in Error Set of example.com/fx/lib.Lookup: maybe: 1 entry could carry it (1 unresolved)
 $WORK/lib/lib.go:10:12-20: unresolved(no-candidates): dynamic call to (example.com/fx/lib.Store).Get
 	path (origin → target):
 		$WORK/lib/lib.go:10:12-20: in example.com/fx/lib.Lookup

@@ -2,7 +2,7 @@ An Is method that answers without looking at its target reports every error.
 -- args --
 -is io.EOF a.go:@f
 -- stdout --
-$WORK/a.go:10:12-13: io.EOF in Error Set of example.com/fx.F: maybe: 1 entries could carry it (0 unresolved)
+$WORK/a.go:10:12-13: io.EOF in Error Set of example.com/fx.F: maybe: 1 entry could carry it (0 unresolved)
 $WORK/a.go:10:24-24: concrete example.com/fx.Any
 	path (origin → target):
 		$WORK/a.go:10:24-24: in example.com/fx.F

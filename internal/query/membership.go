@@ -57,6 +57,11 @@ type Carrier struct {
 	// the Subject; it is empty for an entry that is a Carrier only
 	// because its place cannot be mapped to a value.
 	Trace []mark.Step
+	// Wrap is the Wrap of the entry's chain whose type makes the entry
+	// a Carrier, when the leaf alone does not; HasWrap says there is
+	// one.
+	Wrap    errset.ValueID
+	HasWrap bool
 }
 
 // MembershipOptions configures a Membership Query.
@@ -156,12 +161,16 @@ func Membership(ctx context.Context, prog *load.Program, tgt *target.Target, opt
 	m.Reached, m.TargetTrace = targetMarked(marks, tgt)
 	c := carriers{marks: marks, tbl: res.Table, prog: prog.SSA, open: len(opts.Open) > 0, reached: m.Reached}
 	for _, e := range res.Entries {
-		if ok, trace := c.carrier(e); ok {
-			m.Carriers = append(m.Carriers, Carrier{
+		if ok, trace, wrap := c.carrier(e); ok {
+			cr := Carrier{
 				Entry:      e,
 				Unresolved: res.Table.Get(e.Leaf).Kind == errset.Unresolved,
 				Trace:      trace,
-			})
+			}
+			if wrap >= 0 {
+				cr.Wrap, cr.HasWrap = e.Chain[wrap], true
+			}
+			m.Carriers = append(m.Carriers, cr)
 		}
 	}
 	sort.SliceStable(m.Carriers, func(i, j int) bool {
@@ -268,76 +277,77 @@ type carriers struct {
 }
 
 // carrier reports whether the entry e is a Carrier, with the trace of the
-// Mark that makes it one. If the upward pass did not reach the Target,
+// Mark that makes it one, and the index in e.Chain of the Wrap whose type
+// makes it one when the leaf alone does not (or -1). If the upward pass did not reach the Target,
 // only an entry of an open program that depends on the caller, or is a
 // dynamic call without Candidates of a value that may come from outside,
 // is one.
-func (c carriers) carrier(e errset.Entry) (bool, []mark.Step) {
+func (c carriers) carrier(e errset.Entry) (bool, []mark.Step, int) {
 	v := c.tbl.Get(e.Leaf)
 	if c.open && v.Kind == errset.Unresolved {
 		switch v.Unresolved {
 		case errset.DependsOnCaller:
 			// A caller outside the program may pass the Subject.
 			if site, ok := v.Site.(ssa.Value); ok {
-				return true, c.marks.Trace(site)
+				return true, c.marks.Trace(site), -1
 			}
-			return true, nil
+			return true, nil, -1
 		case errset.NoCandidates:
 			// The function or implementation called may come from
 			// outside the program, and return the Subject.
 			if site, ok := v.Site.(ssa.CallInstruction); !ok || c.marks.FromOutside(site.Common().Value) {
-				return true, nil
+				return true, nil, -1
 			}
 		}
 	}
 	if !c.reached {
-		return false, nil
+		return false, nil, -1
 	}
 	if e.Truncated {
 		// What lies below the cut is not known.
-		return true, nil
+		return true, nil, -1
 	}
 	if v.Kind == errset.Unresolved {
 		switch v.Unresolved {
 		case errset.FixpointLimit, errset.NoInstances:
-			return true, nil
+			return true, nil, -1
 		}
 		site, ok := v.Site.(ssa.Value)
 		if !ok {
 			// A go or defer call, or no site: not a value.
-			return true, nil
+			return true, nil, -1
 		}
 		if !c.marks.Marked(site) {
-			return false, nil
+			return false, nil, -1
 		}
-		return true, c.marks.Trace(site)
+		return true, c.marks.Trace(site), -1
 	}
 	// A resolved entry: its leaf may hold the Subject without being it.
 	switch v.Kind {
 	case errset.Sentinel:
 		if g := c.global(v.Var); g == nil {
-			return true, nil
+			return true, nil, -1
 		} else if c.marks.GlobalMarked(g) {
-			return true, c.marks.TraceGlobal(g)
+			return true, c.marks.TraceGlobal(g), -1
 		}
 	case errset.Concrete:
 		if v.Type != nil && c.marks.TypeMarked(v.Type) {
-			return true, c.marks.TraceType(v.Type)
+			return true, c.marks.TraceType(v.Type), -1
 		}
 	}
 	switch site := v.Site.(type) {
 	case *ssa.Function, *ssa.Global, *ssa.Const, *ssa.Builtin:
 	case ssa.Value:
 		if c.marks.Marked(site) {
-			return true, c.marks.Trace(site)
+			return true, c.marks.Trace(site), -1
 		}
 	}
-	for _, wid := range e.Chain {
+	for i, wid := range e.Chain {
 		if w := c.tbl.Get(wid); w.Type != nil && c.marks.TypeMarked(w.Type) {
-			return true, c.marks.TraceType(w.Type)
+			return true, c.marks.TraceType(w.Type), i
 		}
 	}
-	return false, nil
+	return false, nil, -1
 }
 
 // global returns the SSA variable of the package-level variable v.
