@@ -1,4 +1,4 @@
-A store through reflection whose destination the upward pass cannot tell (the Value comes out of a variable) is not followed: the Verdict is a no apart from reflection, with the exit status of a maybe, and names the store. The store is not in a function the Target runs; it is listed because the Target reads a variable whose address is taken, which the store may have written.
+A store through reflection whose destination the upward pass cannot tell (the Value comes out of a variable) is not followed: the Verdict is a no apart from reflection, with the exit status of a maybe, and names the store. The store is listed because the flooding pass reaches the Target: Get reads a variable whose address is taken, which the store may have written.
 -- args --
 -is example.com/fx.ErrX a.go:@f
 -- stdout --

@@ -38,8 +38,8 @@ const (
 	// no; a yes Verdict returns ExitOK.
 	ExitNo = 1
 	// ExitMaybe is returned by a Membership Query whose Verdict is maybe,
-	// or is a no apart from stores through reflection near the Target
-	// that the upward pass did not follow.
+	// or is a no apart from stores through reflection that the upward
+	// pass did not follow and that can matter to the Target.
 	ExitMaybe = 3
 )
 

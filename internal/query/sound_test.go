@@ -258,34 +258,80 @@ func TestVerdictSoundReflect(t *testing.T) {
 		// run time is not one the Subject reaches.
 		{fn: "ReadsMemory", subject: "as *CT8", wantNo: true},
 		{fn: "ReadsMemory", subject: "is ErrE1", wantNo: true},
-		// A store that is not followed is not near a function that
-		// neither runs it nor reads memory.
+		// A store that is not followed cannot matter to a function that
+		// reads no memory; it can to one that reads a field.
 		{fn: "Clean", subject: "is ErrO", wantNo: true},
+		{fn: "ReadsMemory", subject: "is ErrO", wantApart: true},
 	})
 }
 
-// TestReflectStoresNearTarget pins which stores through reflection that
-// were not followed a Verdict names: those in functions the Target
-// reaches or is reached from, and every one if the Target reads memory
-// that such a store can write. A No that names one is a No apart from
-// reflection.
-func TestReflectStoresNearTarget(t *testing.T) {
+// TestVerdictSoundFlood does the same for functions that the Subject
+// reaches only through a store through reflection that the upward pass
+// does not follow: the flooding pass must reach each of them (a No apart
+// from reflection, never a plain No), and must not reach a function that
+// no such store can matter to.
+func TestVerdictSoundFlood(t *testing.T) {
 	t.Parallel()
-	p := loadProgram(t, "sound_reflect.txtar")
+	runSound(t, "sound_flood.txtar", []soundCase{
+		// A comma-ok receive, and a range over the channel.
+		{fn: "ChanRange", subject: "is ErrF1", truth: true, wantApart: true},
+		{fn: "ChanCommaOK", subject: "is ErrF1", truth: true, wantApart: true},
+		// The function returns a composite the store filled, and reads
+		// nothing itself.
+		{fn: "WrapperFilled", subject: "is ErrF2", truth: true, wantApart: true},
+		{fn: "WrapperFilledFar", subject: "is ErrF2", truth: true, wantApart: true},
+		{fn: "ErrorMethodStore", subject: "is ErrF3", truth: true, wantApart: true},
+		{fn: "JoinSlice", subject: "is ErrF4", truth: true, wantUnsure: true},
+		{fn: "MapWhole", subject: "is ErrF5", truth: true, wantApart: true},
+		// The value comes in an argument.
+		{fn: "ArgRoute", subject: "is ErrF6", truth: true, wantApart: true},
+		// A recorded store that cannot matter: the function reads no
+		// memory, or only a variable whose address is never taken.
+		{fn: "Clean", subject: "is ErrF1", wantNo: true},
+		{fn: "QuietVar", subject: "is ErrF1", wantNo: true},
+		{fn: "Clean", subject: "is ErrF5", wantNo: true},
+	})
+}
+
+// TestFloodingPass pins when the flooding pass runs and what the Verdict
+// lists: after a No with recorded stores it runs, and the stores are
+// listed, all of them, if and only if it reaches the Target; after a
+// Maybe every recorded store is listed and it does not run; without a
+// recorded store it does not run.
+func TestFloodingPass(t *testing.T) {
+	t.Parallel()
+	p := loadProgram(t, "sound_flood.txtar")
 	for _, c := range []struct {
 		fn, subject string
-		stores      int
+		verdict     query.Verdict
+		recorded    int
+		flood       bool
+		listed      int
 	}{
-		// The store is in the Target.
-		{"UnknownGlobal", "is ErrO", 1},
-		// The Target reads a field: the store may have written it.
-		{"ReadsMemory", "is ErrO", 1},
-		// The Target reads nothing and does not run the store.
-		{"Clean", "is ErrO", 0},
+		// Two stores (the two Sends) are recorded for ErrF1.
+		{"ChanCommaOK", "is ErrF1", query.No, 2, true, 2},
+		{"Clean", "is ErrF1", query.No, 2, true, 0},
+		{"QuietVar", "is ErrF1", query.No, 2, true, 0},
+		// The Subject also reaches the function without reflection.
+		{"Direct", "is ErrF2", query.Maybe, 1, false, 1},
+		// The store is in a method that only fmt calls.
+		{"ErrorMethodStore", "is ErrF3", query.No, 1, true, 1},
+		// The flood does not ask where a store could write: the store of
+		// ErrF3 into one wrapper's field counts for the other wrapper.
+		{"WrapperFilled", "is ErrF3", query.No, 1, true, 1},
+		{"Clean", "is ErrF3", query.No, 1, true, 0},
+		// Nothing recorded.
+		{"Clean", "is io.EOF", query.No, 0, false, 0},
 	} {
 		m := p.membership(t, c.fn, p.subject(t, c.subject))
-		if m.Verdict != query.No || len(m.ReflectStores) != c.stores || m.ApartFromReflection() != (c.stores > 0) {
-			t.Errorf("%s, %s: Verdict %v, %d stores not followed, apart from reflection %v; want no, %d stores", c.fn, c.subject, m.Verdict, len(m.ReflectStores), m.ApartFromReflection(), c.stores)
+		if m.Verdict != c.verdict || m.MarkStats.ReflectStores != c.recorded || m.FloodRan != c.flood || len(m.ReflectStores) != c.listed {
+			t.Errorf("%s, %s: Verdict %v, %d stores recorded, flooding pass ran %v, %d stores listed; want %v, %d, %v, %d",
+				c.fn, c.subject, m.Verdict, m.MarkStats.ReflectStores, m.FloodRan, len(m.ReflectStores), c.verdict, c.recorded, c.flood, c.listed)
+		}
+		if apart := c.verdict == query.No && c.listed > 0; m.ApartFromReflection() != apart {
+			t.Errorf("%s, %s: apart from reflection %v, want %v", c.fn, c.subject, m.ApartFromReflection(), apart)
+		} else if apart && len(m.FloodTrace) == 0 {
+			t.Errorf("%s, %s: no trace of the flooding pass to the Target", c.fn, c.subject)
 		}
 	}
 }

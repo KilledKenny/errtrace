@@ -39,9 +39,24 @@ func runMembership(ctx context.Context, opts Options, cfg *config, prog *load.Pr
 			fmt.Fprintf(opts.Stderr, "mark: functions=%d marked=%d values=%d locations=%d reflectstores=%d\n", st.Functions, st.MarkedFunctions, st.Values, st.Locations, st.ReflectStores)
 		}
 	}
+	if cfg.debug["summary"] && res.FloodRan {
+		// The flooding pass: can the stores that were not followed
+		// matter to the Target?
+		fmt.Fprintf(opts.Stderr, "flood: reached=%t\n", res.ApartFromReflection())
+		for _, s := range res.FloodTrace {
+			where := "-"
+			if sp, ok := res.Locate(s.Site); ok {
+				where = sp.String()
+			}
+			fmt.Fprintf(opts.Stderr, "flood:\t%s: %s\n", where, s.Desc)
+		}
+	}
 	if cfg.debug["timing"] {
 		// The upward pass is skipped when an entry settles the Verdict.
 		fmt.Fprintf(opts.Stderr, "timing: mark=%s\n", res.MarkTime)
+		if res.FloodRan {
+			fmt.Fprintf(opts.Stderr, "timing: flood=%s (in mark)\n", res.FloodTime)
+		}
 	}
 	in := render.MembershipInput{
 		Input: render.Input{

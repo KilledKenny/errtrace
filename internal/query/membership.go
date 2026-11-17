@@ -99,25 +99,35 @@ type MembershipResult struct {
 	// result, and TargetTrace how the Mark got there (it may be empty).
 	Reached     bool
 	TargetTrace []mark.Step
-	// ReflectStores are the stores through reflection near the Target
-	// that the Subject reaches and the upward pass did not follow,
-	// because it cannot tell where they write (see
-	// mark.Result.ReflectStores). A No or Maybe Verdict holds only as
-	// far as none of them puts the Subject where the Target reads it;
-	// they are reported with the Verdict (see ApartFromReflection).
+	// ReflectStores are the stores through reflection that the Subject
+	// reaches and the upward pass did not follow, because it cannot tell
+	// where they write (see mark.Result.ReflectStores), if they can
+	// matter to the Target: all of them after a Maybe, and after a No if
+	// the flooding pass (see Membership) reaches the Target. They are
+	// reported with the Verdict (see ApartFromReflection). It is empty
+	// after a No that the flooding pass confirms.
 	ReflectStores []mark.ReflectStore
 	// MarkRan reports whether the upward pass ran; MarkTime is how long
-	// it took and MarkStats what it did.
+	// it took (with the flooding pass, if that ran) and MarkStats what
+	// it did.
 	MarkRan   bool
 	MarkTime  time.Duration
 	MarkStats mark.Stats
+	// FloodRan reports whether the flooding pass ran: the upward pass
+	// did not reach the Target and recorded stores through reflection
+	// that it did not follow. FloodTime is how long it took, and
+	// FloodTrace how its Mark reached the Target, if it did (it may be
+	// empty): why the stores of ReflectStores can matter.
+	FloodRan   bool
+	FloodTime  time.Duration
+	FloodTrace []mark.Step
 }
 
 // ApartFromReflection reports whether the Verdict is a No that does not
-// cover everything: the Subject reaches stores through reflection near
-// the Target that the upward pass did not follow (ReflectStores). Such a
-// No is no proof; the CLI prints it as "no, apart from reflection" and
-// exits as for a Maybe.
+// cover everything: the Subject reaches stores through reflection that
+// the upward pass did not follow, and what they write can reach the
+// Target (ReflectStores). Such a No is no proof; the CLI prints it as
+// "no, apart from reflection" and exits as for a Maybe.
 func (m *MembershipResult) ApartFromReflection() bool {
 	return m.Verdict == No && len(m.ReflectStores) > 0
 }
@@ -132,12 +142,17 @@ func (m *MembershipResult) ApartFromReflection() bool {
 //   - only possibly handled entries that are the Subject: Maybe;
 //   - the upward pass does not reach the Target's error result: No,
 //     whatever Unresolved entries the Error Set has (but Maybe if the
-//     program is open and an entry depends on the caller). The stores
-//     through reflection near the Target that the pass did not follow
-//     are listed in ReflectStores: the No does not cover what they
-//     write (ApartFromReflection);
-//   - it does: Maybe, with the Carriers. The Error Set is no proof that
-//     the Subject is absent: there may be no Carrier at all.
+//     program is open and an entry depends on the caller). If the pass
+//     recorded stores through reflection that it did not follow, it is
+//     run once more as the flooding pass (mark.Result.Flood), in which
+//     each of them writes every memory location a store through
+//     reflection could write. If that does not reach the Target either,
+//     the stores cannot matter: a plain No. If it does, they are listed
+//     in ReflectStores: the No does not cover what they write
+//     (ApartFromReflection);
+//   - it does: Maybe, with the Carriers, and with every recorded store
+//     in ReflectStores. The Error Set is no proof that the Subject is
+//     absent: there may be no Carrier at all.
 func Membership(ctx context.Context, prog *load.Program, tgt *target.Target, opts MembershipOptions) (*MembershipResult, error) {
 	res, err := Run(ctx, prog, tgt, opts.Options)
 	if err != nil {
@@ -169,7 +184,6 @@ func Membership(ctx context.Context, prog *load.Program, tgt *target.Target, opt
 		return nil, err
 	}
 	m.MarkRan, m.MarkTime, m.MarkStats = true, time.Since(start), marks.Stats()
-	m.ReflectStores = marks.ReflectStores(tgt.Funcs)
 	m.Reached, m.TargetTrace = targetMarked(marks, tgt)
 	c := carriers{marks: marks, tbl: res.Table, prog: prog.SSA, open: len(opts.Open) > 0, reached: m.Reached}
 	for _, e := range res.Entries {
@@ -188,8 +202,26 @@ func Membership(ctx context.Context, prog *load.Program, tgt *target.Target, opt
 	sort.SliceStable(m.Carriers, func(i, j int) bool {
 		return len(m.Carriers[i].Entry.Path) < len(m.Carriers[j].Entry.Path)
 	})
+	stores := marks.ReflectStores()
 	if m.Reached || len(m.Carriers) > 0 {
 		m.Verdict = Maybe
+		m.ReflectStores = stores
+		return m, nil
+	}
+	if len(stores) == 0 {
+		return m, nil
+	}
+	// A No, and stores through reflection that were not followed: can
+	// what they write reach the Target?
+	floodStart := time.Now()
+	flood, err := marks.Flood(ctx)
+	if err != nil {
+		return nil, err
+	}
+	m.FloodRan, m.FloodTime = true, time.Since(floodStart)
+	m.MarkTime += m.FloodTime
+	if reached, trace := targetMarked(flood, tgt); reached {
+		m.ReflectStores, m.FloodTrace = stores, trace
 	}
 	return m, nil
 }

@@ -70,9 +70,10 @@ type MembershipInput struct {
 	// TargetTrace is how the Mark reached the Target's error result; it
 	// is printed when there is no Carrier.
 	TargetTrace []TraceStep
-	// NotFollowed are the stores through reflection near the Target
-	// that the Subject reaches and the upward pass did not follow; they
-	// are printed after a no and after a maybe with Carriers.
+	// NotFollowed are the stores through reflection that the Subject
+	// reaches, that the upward pass did not follow and that can matter
+	// to the Target; they are printed after a no and after a maybe with
+	// Carriers.
 	NotFollowed []ReflectStore
 	// Full prints every Carrier with its whole trace instead of grouping
 	// the Carriers that share a pivot, and every store of NotFollowed.
@@ -137,18 +138,15 @@ type MembershipInput struct {
 //
 // The upward pass does not follow a store through reflection whose
 // destination it cannot tell (or, into fresh memory, whose destination it
-// loses sight of). A store is listed if all of this holds:
-//
-//   - the value stored carries a Mark that comes from X (it is not marked
-//     only because reflection made it, of a type chosen at run time);
-//   - the pass did not follow the store, or not all the way;
-//   - the function the store is in can be reached from the Target over
-//     the call edges of the upward pass, or can reach the Target. A store
-//     anywhere else in the program is not listed.
-//
-// If there are such stores, a maybe that is not possibly handled ends
-// with them, and a no becomes "no, apart from reflection" and is followed
-// by them (the first 5, all with Full), in the order of the pass:
+// loses sight of). It records the store if the value stored carries a
+// Mark. A maybe that is not possibly handled ends with the recorded
+// stores. After a no they are listed only if they can matter to the
+// Target: the upward pass is run again with each of them taken to write
+// every memory location a store through reflection could write, and if
+// that reaches the Target the no becomes "no, apart from reflection" and
+// is followed by every recorded store; if it does not, the no is plain
+// and nothing is listed. The stores come in the order of the pass (the
+// first 5, all with Full):
 //
 //	<TAB>not followed: <X> reaches <N> reflective store[s] whose destination is unknown or only partly followed:
 //	<TAB><TAB><span>: in <function>

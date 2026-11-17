@@ -1,0 +1,230 @@
+Stores through reflection that the upward pass does not follow, each
+case with a Sentinel or type of its own, and functions that the stored
+value reaches only through such a store: the flooding pass, in which a
+recorded store writes every memory location a store through reflection
+could write, decides whether the stores can matter to the function.
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- main.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"reflect"
+)
+
+// Each case has a Sentinel of its own and one store through reflection
+// of it whose destination comes out of a variable: the store is recorded,
+// not followed. The stores run in init.
+
+// The destination is a channel; the function receives with a range, and
+// with a comma-ok receive.
+
+var ErrF1 = errors.New("f1")
+
+var ch1 = make(chan error, 2)
+var dest1 = reflect.ValueOf(ch1)
+
+func store1() {
+	dest1.Send(reflect.ValueOf(ErrF1))
+	dest1.Send(reflect.ValueOf(ErrF1))
+}
+
+func ChanRange() error {
+	for e := range ch1 {
+		return e
+	}
+	return nil
+}
+
+func ChanCommaOK() error {
+	e, _ := <-ch1
+	return e
+}
+
+// The destination is a field of a wrapper; the function returns the
+// wrapper and reads nothing.
+
+var ErrF2 = errors.New("f2")
+
+type W2 struct{ Err error }
+
+func (w *W2) Error() string { return "w2" }
+func (w *W2) Unwrap() error { return w.Err }
+
+var cur2 = &W2{}
+var dests2 = []reflect.Value{reflect.ValueOf(cur2).Elem().Field(0)}
+
+func store2() { dests2[0].Set(reflect.ValueOf(ErrF2)) }
+
+func WrapperFilled() error { return cur2 }
+
+func WrapperFilledFar() error { return fmt.Errorf("ctx: %w", cur2) }
+
+// The store is in an Error method that only fmt runs.
+
+var ErrF3 = errors.New("f3")
+
+type W3 struct{ Err error }
+
+func (w *W3) Error() string { return "w3" }
+func (w *W3) Unwrap() error { return w.Err }
+
+var cur3 = &W3{}
+var dest3 = reflect.ValueOf(cur3).Elem().Field(0)
+
+type E3 struct{}
+
+func (E3) Error() string {
+	dest3.Set(reflect.ValueOf(ErrF3))
+	return "e3"
+}
+
+func ErrorMethodStore() error {
+	_ = fmt.Errorf("%v", E3{})
+	return cur3
+}
+
+// The destination is an element of a slice that errors.Join reads.
+
+var ErrF4 = errors.New("f4")
+
+type err4 error
+
+var errs4 = make([]err4, 1)
+var dest4 = reflect.ValueOf(errs4).Index(0)
+
+func store4() { dest4.Set(reflect.ValueOf(ErrF4)) }
+
+func JoinSlice() error {
+	es := make([]error, len(errs4))
+	for i := range errs4 {
+		es[i] = errs4[i]
+	}
+	return errors.Join(es...)
+}
+
+// The destination is a map that is an error with Unwrap() []error.
+
+var ErrF5 = errors.New("f5")
+
+type merr5 map[string]error
+
+func (m merr5) Error() string { return "m5" }
+func (m merr5) Unwrap() []error {
+	var out []error
+	for _, e := range m {
+		out = append(out, e)
+	}
+	return out
+}
+
+var m5 = merr5{}
+var dest5 = reflect.ValueOf(m5)
+
+func store5() { dest5.SetMapIndex(reflect.ValueOf("k"), reflect.ValueOf(ErrF5)) }
+
+func MapWhole() error { return m5 }
+
+// The value comes to the function in an argument, read from the variable
+// by its caller.
+
+var ErrF6 = errors.New("f6")
+
+type err6 error
+
+var slot6 err6
+var dest6 = reflect.ValueOf(&slot6).Elem()
+
+func store6() { dest6.Set(reflect.ValueOf(ErrF6)) }
+
+func ArgRoute(e error) error { return e }
+
+// A value that reflection makes of a type chosen at run time, equal to a
+// Sentinel of a comparable type, stored by reflection into an interface
+// variable and read back by a plain load: no scanned code converts it to
+// an interface.
+
+type code7 int
+
+func (code7) Error() string { return "c7" }
+
+var ErrF7 error = code7(5)
+
+var slot7 any
+var dest7 = reflect.ValueOf(&slot7).Elem()
+var types7 = []reflect.Type{reflect.TypeOf(code7(0))}
+
+func store7() {
+	v := reflect.New(types7[0]).Elem()
+	v.SetInt(5)
+	dest7.Set(v)
+}
+
+func MadeSentinel() error {
+	e, _ := slot7.(error)
+	return e
+}
+
+// So too for a Concrete Type.
+
+type CT8 struct{ n int }
+
+func (CT8) Error() string { return "ct8" }
+
+type box8 struct{ v any }
+
+var held8 = &box8{}
+var dest8 = reflect.ValueOf(&held8.v).Elem()
+var types8 = []reflect.Type{reflect.TypeOf(CT8{})}
+
+func store8() { dest8.Set(reflect.New(types8[0]).Elem()) }
+
+func MadeConcrete() error {
+	e, _ := held8.v.(error)
+	return e
+}
+
+// A function the Subject reaches without reflection: the Verdict is a
+// maybe, with the recorded store listed.
+
+type box9 struct{ err error }
+
+var held9 = &box9{err: ErrF2}
+
+func Direct() error { return held9.err }
+
+// Functions that no store through reflection can matter to: one that
+// reads no memory, and one that reads a variable whose address is never
+// taken (reflection needs the address of a variable to write it).
+
+func Clean() error { return errors.New("clean") }
+
+var quiet error = errors.New("quiet")
+
+func QuietVar() error { return quiet }
+
+func init() {
+	store1()
+	store2()
+	store4()
+	store5()
+	store6()
+	store7()
+	store8()
+}
+
+func main() {
+	var ct CT8
+	e3 := ErrorMethodStore()
+	fmt.Println(
+		errors.Is(ChanRange(), ErrF1), errors.Is(ChanCommaOK(), ErrF1),
+		errors.Is(WrapperFilled(), ErrF2), errors.Is(WrapperFilledFar(), ErrF2),
+		errors.Is(e3, ErrF3), errors.Is(JoinSlice(), ErrF4), errors.Is(MapWhole(), ErrF5),
+		errors.Is(ArgRoute(slot6), ErrF6), errors.Is(MadeSentinel(), ErrF7), errors.As(MadeConcrete(), &ct),
+		errors.Is(Direct(), ErrF2),
+		errors.Is(Clean(), ErrF1), errors.Is(QuietVar(), ErrF1), errors.Is(Clean(), ErrF7), errors.As(QuietVar(), &ct))
+}

@@ -16,6 +16,11 @@ import (
 // plane: what is loaded from one of an interface type may be such a
 // composite again.
 func (a *analysis) markHeld(t types.Type, why reason) {
+	if a.flooded&freeH != 0 {
+		// Every location it would mark is one the flood marked, or
+		// marks when it is first named (see floodLocs).
+		return
+	}
 	a.markHeldIn(t, freeH, why, make(map[types.Type]bool), 0)
 }
 
@@ -119,7 +124,7 @@ func (a *analysis) reachesIn(t types.Type, r *reach, seen map[types.Type]bool, d
 		}
 		if a.markable(e) {
 			for _, l := range locs {
-				if li := a.locs[l]; li != nil && li.marked != 0 {
+				if li := a.lookLoc(l); li != nil && li.marked != 0 {
 					if r.planes == 0 {
 						r.by = ref{kind: refLoc, l: l}
 					}
@@ -257,11 +262,82 @@ func (a *analysis) reflectStored(call ssa.CallInstruction, dst ssa.Value, planes
 		// followed only where the Value stays in sight.
 		a.mark(key{f.call, 0}, toT(planes), why)
 		if !a.typedReads(f.call, why) {
-			a.unfollowed[call] = true
+			a.notFollowed(call, planes, why)
 		}
 	}
 	if d.unknown {
-		a.unfollowed[call] = true
+		a.notFollowed(call, planes, why)
+	}
+}
+
+// notFollowed records the store through reflection at call, of a value
+// marked in planes, as one the pass did not follow (all the way). In the
+// flooding pass it is followed instead, to everywhere it could write
+// (see floodLocs).
+func (a *analysis) notFollowed(call ssa.CallInstruction, planes tags, why reason) {
+	a.unfollowed[call] = true
+	if a.flood {
+		a.floodLocs(planes, reason{kind: kFlood, from: why.from, site: why.site})
+	}
+}
+
+// floodable reports whether a store through reflection can write a
+// location of the kind k, wherever the store is: the kinds that are
+// keyed by a type, which every part of the program shares. They are the
+// fields of a struct type, the memory of a type behind pointers and in
+// slices and arrays, the keys and values of a map type, and the elements
+// of the channels of a type.
+//
+// The other kinds are not flooded. A local or package-level variable
+// (locCell, locGlobal) can be written through reflection only through
+// its address (reflect.ValueOf(&v).Elem()), and a variable whose address
+// is used for anything but loads and stores is also the memory of its
+// type (see addrLocs), which is flooded. What a variable of a slice, map
+// or channel type refers to needs no address to be written
+// (reflect.ValueOf(ch).Send, SetMapIndex, Index(i).Set): that is the
+// memory of the element type, the map type or the channel, which is
+// flooded, not the variable. The contents of a sync/atomic value
+// (locAtomic) are behind unexported fields, which package reflect does
+// not set: they are written by the Store, Swap and CompareAndSwap
+// methods only, which are modelled, and a store through reflection of a
+// whole struct with such a value inside copies contents from one
+// location of the type to the same location. The value of a panic is
+// not memory. The argument array of a variadic call that only its
+// callee reads (locVarargs) is memory of the element type as soon as the
+// callee lets the slice out of its hands (see locMarkedHook), and that
+// includes handing it to package reflect.
+func floodable(k locKind) bool {
+	switch k {
+	case locField, locTyped, locMapKey, locMapVal, locChan:
+		return true
+	}
+	return false
+}
+
+// floodLocs marks, for a store through reflection that is not followed,
+// every location that a store through reflection can write (see
+// floodable), of whatever type: the stored value is behind a
+// reflect.Value, its type is not known. The locations are marked in the
+// planes of the stored value (what is loaded from one may be that value
+// as it was stored) and in the held plane (it may be a composite the
+// store, or an earlier one, put the value inside of, as markHeld takes
+// it for a store whose destination is known). Locations named later are
+// marked as they are named (see locInfo).
+func (a *analysis) floodLocs(planes tags, why reason) {
+	fresh := (planes | freeH) & anyFree &^ a.flooded
+	if fresh == 0 {
+		return
+	}
+	if a.flooded == 0 {
+		a.floodWhy = why
+	}
+	a.flooded |= fresh
+	// (Marking a location may name new ones: they are appended, and
+	// flooded as they are made.)
+	for i := 0; i < len(a.locOrder); i++ {
+		if l := a.locOrder[i]; floodable(l.kind) {
+			a.markLoc(l, fresh, a.floodWhy)
+		}
 	}
 }
 

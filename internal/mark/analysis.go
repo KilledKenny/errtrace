@@ -239,6 +239,7 @@ const (
 	kOutside
 	kReflectFresh
 	kSeedReflect
+	kFlood
 )
 
 // reason is the first way a Mark was found.
@@ -383,6 +384,13 @@ type analysis struct {
 	// caches the walks back from destinations and destIDs numbers the
 	// values they look at.
 	unfollowed map[ssa.CallInstruction]bool
+	// flood says that this is the flooding pass (see Result.Flood): a
+	// store that is not followed marks every location such a store can
+	// write. flooded are the planes in which that happened, and floodWhy
+	// is the first store that did it.
+	flood    bool
+	flooded  tags
+	floodWhy reason
 	// boxes are the calls of package reflect that return a composite
 	// around what they are passed (see reflectBoxes).
 	boxes map[*ssa.Call]bool
@@ -1107,12 +1115,26 @@ func (a *analysis) locInfo(l loc) *locInfo {
 		li = new(locInfo)
 		a.locs[l] = li
 		a.locOrder = append(a.locOrder, l)
+		if a.flooded != 0 && floodable(l.kind) {
+			// A location first named after the flood is flooded too.
+			a.markLoc(l, a.flooded, a.floodWhy)
+		}
 	}
 	return li
 }
 
+// lookLoc returns the state of the location l, or nil if nothing is
+// known of it. (After a flood, a location that a store through
+// reflection can write is marked even if the pass never named it.)
+func (a *analysis) lookLoc(l loc) *locInfo {
+	if a.flooded != 0 && floodable(l.kind) {
+		return a.locInfo(l)
+	}
+	return a.locs[l]
+}
+
 func (a *analysis) locMarked(l loc) bool {
-	li := a.locs[l]
+	li := a.lookLoc(l)
 	return li != nil && li.marked != 0
 }
 

@@ -9,8 +9,12 @@
 // package reflect. Reflection is followed where the pass can (see
 // Reflection) and otherwise not: a "no" is no proof about a value that
 // goes through package reflect in a way the pass does not model. Some of
-// what it does not follow it can name (the stores listed as "not
-// followed"); the rest it cannot (see Known limits).
+// what it does not follow it records: the stores through reflection
+// whose destination it cannot tell. A "no" is plain only if none is
+// recorded, or if a second, flooding pass shows that none of them can
+// matter to the Target; otherwise it is "no, apart from reflection",
+// with the stores listed as "not followed". The rest it cannot name (see
+// Known limits).
 //
 // # What a Mark means
 //
@@ -262,9 +266,10 @@
 //     (v.Interface().(*T).F) is seen only next to the store, and one
 //     through reflect.TypeAssert[T] or a pointer made by Value.Addr only
 //     as far as the type asserted is concerned. Both are
-//     reported instead: Result.ReflectStores lists these stores, and the
-//     Verdict names them ("not followed"). A "no" does not cover what
-//     they write: it is printed as "no, apart from reflection".
+//     recorded instead: Result.ReflectStores lists these stores, and the
+//     Verdict names them ("not followed") if what they write can reach
+//     the Target (see below). A "no" does not cover what they write
+//     then: it is printed as "no, apart from reflection".
 //
 // Which stores are listed. A store through reflection is recorded if the
 // value stored carries a Mark that comes from X and the pass did not
@@ -275,24 +280,35 @@
 // marked by its type again. So the stores of a decoder (encoding/json,
 // fmt.Sscan) into what it allocates are not recorded for every Concrete
 // Type Subject. (The pass runs a second time without those seeds to tell
-// the two apart.) Of the recorded stores, a Verdict lists those that can
-// matter to its Target:
+// the two apart.)
 //
-//   - the stores in a function that a Target function reaches, or that
-//     reaches a Target function, over the call edges of the pass (a
-//     reference to a function, the callees of a dynamic call, and from a
-//     function that calls through reflection to the functions such a
-//     call may run), through scanned functions;
-//   - every recorded store, if a Target function or a scanned function it
-//     reaches reads a value that can carry a Mark from memory a store
-//     through reflection can write: through a pointer, from a field, an
-//     element, a map or a channel (anything but a local or package-level
-//     variable whose address is never taken), or by a call of package
-//     reflect or a load of a sync/atomic value.
+// Whether the recorded stores can matter to a Target is decided by a
+// flooding pass (Result.Flood), which the Membership Query runs when the
+// pass does not reach the Target and at least one store is recorded. It
+// is the pass again, with one change: every store through reflection
+// that it does not follow (all the way) writes every memory location
+// that a store through reflection could write, with the Marks of the
+// value it stores (by value, by type) and held. Those are the locations
+// keyed by a type, of whatever type (the stored value is behind a
+// reflect.Value): the fields of every struct type, the memory of every
+// type behind pointers and in slices and arrays (which is also every
+// variable and field whose address is taken), the keys and values of
+// every map type and the elements of every channel. Not flooded are the
+// variables whose address is never taken (reflection needs the address;
+// what a slice, map or channel in such a variable refers to is flooded),
+// the contents of sync/atomic values (they are behind unexported
+// fields), panic values, and argument arrays only their callee reads. A
+// flooded field makes its type a wrapper as a store by the program
+// would.
 //
-// A store that is neither is not listed. That is a bound and not a proof:
-// what it writes can still come to the Target in an argument, read by a
-// function the Target does not reach.
+// If the flooding pass does not reach the Target either, no recorded
+// store can put X where the Target finds it, as far as the pass models
+// the program: the Verdict is a plain "no", and nothing is listed. If it
+// does, the Verdict is "no, apart from reflection" and lists every
+// recorded store, in the order of the scan. (After a "maybe" every
+// recorded store is listed too; no flooding pass is needed.) The
+// flooding pass is coarse: it tells whether the stores can matter, not
+// that they do.
 //
 // What is not modelled at all, and so neither followed nor listed (a "no"
 // can be wrong here without saying so), for example:
@@ -351,10 +367,11 @@
 //     return (*T)((*plain)(ErrX.(*T))) }.
 //   - Reflection is best effort (see Reflection): a "no" is a proof only
 //     for flows that do not pass through package reflect. Stores through
-//     reflection with an unknown destination are reported, not followed,
-//     and only those that can matter to the Target are listed; reads and
-//     calls through reflection that the pass does not model are not
-//     reported at all. A store through a known composite
+//     reflection with an unknown destination are recorded, not followed,
+//     and listed unless the flooding pass shows that they cannot matter
+//     to the Target; reads and calls through reflection that the pass
+//     does not model are not reported at all. A store through a known
+//     composite
 //     marks what its static type can hold; what an interface value inside
 //     it points to is only found where that value is later asserted to a
 //     composite type.
@@ -428,7 +445,7 @@ type Stats struct {
 	Locations int
 	// ReflectStores is how many stores through reflection the Subject
 	// reaches that the pass did not follow, anywhere in the program
-	// (Result.ReflectStores lists those near a Target).
+	// (Result.ReflectStores lists them).
 	ReflectStores int
 }
 
@@ -438,6 +455,8 @@ type Result struct {
 	// unfollowed are the stores through reflection that the Subject
 	// reaches and the pass did not follow (see ReflectStores).
 	unfollowed map[ssa.CallInstruction]bool
+	// ctxRes are the Callees the pass ran with, for Flood.
+	ctxRes Callees
 }
 
 // Options configures the upward pass.
@@ -476,7 +495,7 @@ func RunWith(ctx context.Context, prog *ssa.Program, res Callees, subj Subject, 
 	if err := a.run(ctx); err != nil {
 		return nil, err
 	}
-	r := &Result{a: a, unfollowed: a.unfollowed}
+	r := &Result{a: a, unfollowed: a.unfollowed, ctxRes: res}
 	if len(a.unfollowed) > 0 && a.madeSeeded {
 		// Which of those stores does the Subject itself reach? A value
 		// that is marked only because reflection made it of a type
@@ -495,6 +514,30 @@ func RunWith(ctx context.Context, prog *ssa.Program, res Callees, subj Subject, 
 		r.unfollowed = b.unfollowed
 	}
 	return r, nil
+}
+
+// Flood runs the pass again as the flooding pass and returns its
+// outcome: every store through reflection that the pass does not follow
+// (all the way) is taken to write every memory location that a store
+// through reflection could write, the type-keyed locations of whatever
+// type (see floodable), with the Marks of the value it stores. What the
+// flooding pass does not reach, no recorded store can put the Subject
+// in, as far as the pass models the program: if it does not reach a
+// Target, the stores that ReflectStores lists do not matter to that
+// Target.
+//
+// It is an upper bound of the pass it is called on, and coarse: it tells
+// whether the recorded stores can matter, not where the Subject is. Its
+// Marks and traces are of use only to show why a store can matter.
+func (r *Result) Flood(ctx context.Context) (*Result, error) {
+	a := r.a
+	f := newAnalysis(a.prog, r.ctxRes, a.subj)
+	f.open = a.open
+	f.flood = true
+	if err := f.run(ctx); err != nil {
+		return nil, err
+	}
+	return &Result{a: f, unfollowed: f.unfollowed, ctxRes: r.ctxRes}, nil
 }
 
 // Marked reports whether v may hold the Subject: v carries a Mark (for a

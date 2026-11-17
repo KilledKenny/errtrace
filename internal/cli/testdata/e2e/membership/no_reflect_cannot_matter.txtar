@@ -1,4 +1,4 @@
-A store through reflection that was not followed is not named for a Target that neither runs it (it is not in a function the Target reaches or is reached from) nor reads memory such a store can write: the Verdict is a plain no. Get, which reads the variable, names it.
+A store through reflection that was not followed is not named for a Target it cannot matter to: the flooding pass, in which the store writes every memory location reflection could write, does not reach Other, which reads no memory. The Verdict is a plain no. Get, which reads the variable, names it.
 -- args --
 -is example.com/fx.ErrX a.go:@f
 -- stdout --
