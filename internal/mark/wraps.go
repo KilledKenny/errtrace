@@ -227,20 +227,134 @@ func (a *analysis) indexIntrinsic(call *ssa.Call, name string) {
 			return
 		}
 	}
-	if !wraps {
+	st, ok := slice.Type().Underlying().(*types.Slice)
+	if !ok {
 		return
 	}
 	// The operands may be a slice parameter of the caller
 	// (fmt.Errorf(format, args...)), whose elements may be in no other
-	// memory.
+	// memory. An operand that is not wrapped is read too: the intrinsic
+	// calls its methods (see operandMethods).
 	if l, ok := sliceParam(slice); ok {
-		a.addReader(l, key{call, 0})
+		a.operandsFrom(l, st.Elem(), call, name)
+		if wraps {
+			a.addReader(l, key{call, 0})
+		}
 		if a.closed(l) {
 			return
 		}
 	}
-	if st, ok := slice.Type().Underlying().(*types.Slice); ok {
+	a.operandsFrom(a.typedLoc(st.Elem()), st.Elem(), call, name)
+	if wraps {
 		a.addReader(a.typedLoc(st.Elem()), key{call, 0})
+	}
+}
+
+// operandRead is a call of the intrinsic name that reads operands of the
+// type typ from a location.
+type operandRead struct {
+	typ  types.Type
+	call ssa.CallInstruction
+	name string
+}
+
+// operandsFrom records that the call of the intrinsic name reads its
+// operands, of type typ, from the location l: when l is marked, the
+// methods the intrinsic may call on an operand get the Mark on their
+// receiver (see operandMethods). One call per operand type is enough:
+// the methods are the same.
+func (a *analysis) operandsFrom(l loc, typ types.Type, call ssa.CallInstruction, name string) {
+	li := a.locInfo(l)
+	for _, o := range li.operands {
+		if types.Identical(o.typ, typ) {
+			return
+		}
+	}
+	li.operands = append(li.operands, operandRead{typ, call, name})
+}
+
+// operandMethod reports whether the intrinsics, and the errors they
+// make, may call a method of this name on an operand: fmt.Errorf formats
+// every operand (Error, String, Format, GoString), and the error it or
+// errors.Join or errtrace.Wrap returns hands the calls of its own Error,
+// Format, Unwrap, Is and As on to what it holds, as errors.Is, errors.As
+// and errors.Unwrap do.
+func operandMethod(name string) bool {
+	switch name {
+	case "Error", "String", "Format", "GoString", "Unwrap", "Is", "As":
+		return true
+	}
+	return false
+}
+
+// operandMethods handles an operand of a call of the intrinsic name,
+// whose static type is typ and which has the tags t (from is the operand,
+// or the location it is read from). The bodies of the intrinsics are not
+// scanned, so the calls they make on an operand are modelled here: the
+// operand is the receiver of every method named Error, String, Format,
+// GoString, Unwrap, Is or As that a value of its type may have, as at a
+// dynamic call of each (String only where the type has no Error method:
+// package fmt prefers that). That holds for every operand, wrapped or not
+// (fmt.Errorf("%v", err) calls err.Error()), and it covers the calls
+// that the returned error makes later (the Error of an errors.Join calls
+// that of its operands). The receiver gets the Mark as the operand of a
+// type assertion to the receiver's type would: if that type can hold the
+// Subject at all, and with what a held or boxed operand says about the
+// memory of a composite type. Only the receiver is linked; what such a
+// method returns is the intrinsic's business (see evalIntrinsic).
+func (a *analysis) operandMethods(typ types.Type, t tags, from ref, site ssa.CallInstruction, name string) {
+	seed := paramSeed(0, t)
+	if seed == 0 || !a.markable(typ) {
+		return
+	}
+	memo := typ
+	iface, _ := typ.Underlying().(*types.Interface)
+	if iface != nil && iface.Empty() {
+		// (One entry for every spelling of any.)
+		memo = nil
+	}
+	if a.opSeeded[memo]&seed == seed {
+		return
+	}
+	a.opSeeded[memo] |= seed
+	if !a.opMethodsSet {
+		a.opMethodsSet = true
+		for _, g := range a.fns {
+			if g.Signature.Recv() != nil && len(g.Params) > 0 && operandMethod(g.Name()) {
+				a.opMethods = append(a.opMethods, g)
+			}
+		}
+	}
+	var instr ssa.Instruction
+	if site != nil {
+		instr = site
+	}
+	for _, g := range a.opMethods {
+		recv := g.Params[0]
+		rt := recv.Type()
+		if iface != nil {
+			if !types.Implements(rt, iface) {
+				continue
+			}
+		} else if !types.Identical(rt, typ) {
+			continue
+		}
+		if g.Name() == "String" && flow.IsErrorType(rt) {
+			// Package fmt calls Error on a value that has both.
+			continue
+		}
+		if a.assertable(rt) {
+			a.mark(key{recv, 0}, seed, reason{kind: kOperand, from: from, site: instr, fn: g, text: name})
+		}
+		if iface == nil || isInterface(rt) {
+			continue
+		}
+		why := reason{kind: kAssert, from: from, site: instr, typ: rt}
+		if t&planeH != 0 {
+			a.markHeld(rt, why)
+		} else if t&boxed != 0 {
+			a.markBoxed(rt, why)
+		}
 	}
 }
 
@@ -275,7 +389,9 @@ func constFormat(v ssa.Value) (string, bool) {
 // evalIntrinsic marks the result of a static call of an intrinsic from
 // its operands: errtrace.Wrap and errors.Join hold every operand,
 // fmt.Errorf the operands at its %w verbs (every operand if its format is
-// not a constant). errors.New holds nothing.
+// not a constant). errors.New holds nothing. Every marked operand, held
+// or not, is also the receiver of the methods the intrinsic may call on
+// it (see operandMethods).
 func (a *analysis) evalIntrinsic(call *ssa.Call) {
 	name, _ := a.intrinsic(call.Call.StaticCallee())
 	args := call.Call.Args
@@ -292,9 +408,19 @@ func (a *analysis) evalIntrinsic(call *ssa.Call) {
 			t |= ot
 		}
 	}
+	// Whether it holds the operand or not, it may call its methods.
+	called := func(op ssa.Value) {
+		if op == nil {
+			return
+		}
+		if ot := a.tagsOf(op); ot != 0 {
+			a.operandMethods(op.Type(), ot, valueRef(key{op, 0}, ot), call, name)
+		}
+	}
 	switch name {
 	case "errtrace.Wrap":
 		if len(args) > 0 {
+			called(args[0])
 			use(args[0])
 		}
 	case "errors.Join":
@@ -303,6 +429,7 @@ func (a *analysis) evalIntrinsic(call *ssa.Call) {
 		}
 		ops, _ := flow.VarargsOperands(args[0])
 		for _, op := range ops {
+			called(op)
 			use(op)
 		}
 	case "fmt.Errorf":
@@ -310,6 +437,9 @@ func (a *analysis) evalIntrinsic(call *ssa.Call) {
 			return
 		}
 		ops, _ := flow.VarargsOperands(args[1])
+		for _, op := range ops {
+			called(op)
+		}
 		if format, ok := constFormat(args[0]); ok {
 			for _, i := range fmtverb.Wrapped(fmtverb.Parse(format, len(ops))) {
 				if i < len(ops) {

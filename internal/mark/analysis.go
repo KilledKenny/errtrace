@@ -240,6 +240,7 @@ const (
 	kReflectFresh
 	kSeedReflect
 	kFlood
+	kOperand
 )
 
 // reason is the first way a Mark was found.
@@ -268,6 +269,9 @@ type locInfo struct {
 	marked  tags
 	why     reason
 	readers []key
+	// operands are the calls of intrinsics that read their operands
+	// from the location (see operandsFrom).
+	operands []operandRead
 }
 
 // candidate is a possible wrapper type that the program converts to an
@@ -417,6 +421,13 @@ type analysis struct {
 	reflectCallers []*ssa.Function
 	reflectValues  loc
 	reflectSeeded  tags
+	// opMethods are the scanned methods that the intrinsics may call on
+	// an operand (see operandMethods), in the order of the scan, once
+	// opMethodsSet; opSeeded are the tags their receivers already have
+	// from operands, by the type of the operand.
+	opMethods    []*ssa.Function
+	opMethodsSet bool
+	opSeeded     map[types.Type]tags
 	// reflectArgs are the types of the composite values passed to
 	// reflect.ValueOf.
 	reflectArgs []reflectArg
@@ -497,6 +508,7 @@ func newAnalysis(prog *ssa.Program, res Callees, subj Subject) *analysis {
 		reflectTargets: make(map[*ssa.Function]bool),
 		unfollowed:     make(map[ssa.CallInstruction]bool),
 		boxes:          make(map[*ssa.Call]bool),
+		opSeeded:       make(map[types.Type]tags),
 		typedRead:      make(map[*ssa.Call]bool),
 		dests:          make(map[destKey]*reflectDest),
 		destIDs:        make(map[ssa.Value]uint32),
@@ -1166,6 +1178,9 @@ func (a *analysis) markLoc(l loc, planes tags, why reason) {
 			why.site = instr
 		}
 		a.mark(k, fresh, why)
+	}
+	for _, o := range li.operands {
+		a.operandMethods(o.typ, fresh, ref{kind: refLoc, l: l, free: true}, o.call, o.name)
 	}
 	a.locMarkedHook(l, fresh)
 }

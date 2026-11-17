@@ -105,6 +105,7 @@ func (a *analysis) indexCallees(site ssa.CallInstruction) {
 		}
 		if st, ok := params.At(params.Len() - 1).Type().Underlying().(*types.Slice); ok {
 			a.addReader(a.typedLoc(st.Elem()), key{call, 0})
+			a.operandsFrom(a.typedLoc(st.Elem()), st.Elem(), call, name)
 		}
 	}
 }
@@ -171,6 +172,11 @@ func (a *analysis) linkArgs(k key, delta tags, site ssa.CallInstruction) {
 	from := valueRef(k, delta)
 	for _, g := range a.callees(site) {
 		if !a.known(g) {
+			if name, ok := a.intrinsic(g); ok {
+				// An intrinsic called dynamically calls the methods of
+				// its operand as one called statically does.
+				a.operandMethods(v.Type(), delta, from, site, name)
+			}
 			// A callee without a body (or an intrinsic called
 			// dynamically) may return any of its arguments.
 			if call != nil && a.opaqueCallee(g) {

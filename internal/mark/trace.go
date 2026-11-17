@@ -225,6 +225,8 @@ func (a *analysis) describe(why reason, at ref) (Step, bool) {
 			name = "parameter " + p.Name()
 		}
 		return Step{Site: site(why.site), Desc: fmt.Sprintf("passed as %s of %s (this caller passes it)", name, why.fn)}, true
+	case kOperand:
+		return Step{Site: site(why.site), Desc: fmt.Sprintf("operand of %s, which may call %s on it", why.text, why.fn)}, true
 	case kThrough:
 		return Step{Site: site(why.site), Desc: fmt.Sprintf("passed to %s, which returns it", why.fn)}, true
 	case kReturn:
