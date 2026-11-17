@@ -1,0 +1,45 @@
+QA3 m1. The instances of a generic struct type share the location of a field:
+the tag names the generic type, not one instance.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:17:12-13: Error Set of example.com/x.F: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF [via field inner of example.com/x.G]
+	path (origin → target):
+		$WORK/a.go:14:39-45: in example.com/x.setInt
+		$WORK/a.go:14:31-36: in example.com/x.setInt
+		$WORK/a.go:17:43-50: in example.com/x.F
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [via field inner of example.com/x.G]
+	path (origin → target):
+		$WORK/a.go:15:39-51: in example.com/x.setStr
+		$WORK/a.go:15:31-36: in example.com/x.setStr
+		$WORK/a.go:17:43-50: in example.com/x.F
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+	"os"
+)
+
+type G[T any] struct {
+	inner error
+	v     T
+}
+
+func setInt(g *G[int])    { g.inner = io.EOF }
+func setStr(g *G[string]) { g.inner = os.ErrClosed }
+
+func /*@q*/F(g *G[string]) error { return g.inner }
+
+func main() {
+	a, b := &G[int]{}, &G[string]{}
+	setInt(a)
+	setStr(b)
+	fmt.Println(F(b))
+}

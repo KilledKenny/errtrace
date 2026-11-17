@@ -1,0 +1,35 @@
+QA3 C1. The Unwrap method of a fmt.Errorf Wrap called through an interface the
+value was asserted to: the assertion holds for a *fmt.wrapError (one %w), and
+the call gives what it wraps.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:10:12-13: Error Set of example.com/x.F: 1 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:8:47-53: in example.com/x.src
+		$WORK/a.go:11:14-19: in example.com/x.F, call to example.com/x.src
+		$GOROOT/src/fmt/errors.go:*: in (*fmt.wrapError).Unwrap
+		$WORK/a.go:12:10-20: in example.com/x.F, call to (*fmt.wrapError).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 1 of 1 candidates)
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+)
+
+func src() error { return fmt.Errorf("x: %w", io.EOF) }
+
+func /*@q*/F() error {
+	if u, ok := src().(interface{ Unwrap() error }); ok {
+		return u.Unwrap()
+	}
+	return nil
+}
+
+func main() { fmt.Println(F()) }

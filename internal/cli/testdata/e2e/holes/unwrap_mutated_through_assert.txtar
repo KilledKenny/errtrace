@@ -1,0 +1,49 @@
+QA3 C2. A tracked wrapper mutated through the pointer a type assertion gave:
+the later writer's value is reported next to the literal's.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:17:12-13: Error Set of example.com/x.F: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:15:38-44: in example.com/x.newE
+		$WORK/a.go:18:9-15: in example.com/x.F, call to example.com/x.newE
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap
+		$WORK/a.go:13:37-38: in (*example.com/x.W).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*example.com/x.W).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 1 of 1 candidates)
+		$WORK/a.go:22:9-27: in example.com/x.F, call to errors.Unwrap
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [via field inner of example.com/x.W]
+	path (origin → target):
+		$WORK/a.go:20:13-25: in example.com/x.F
+		$WORK/a.go:20:5-10: in example.com/x.F
+		$WORK/a.go:13:37-44: in example.com/x.F
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"os"
+)
+
+type W struct{ inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.inner }
+
+func newE() error { return &W{inner: io.EOF} }
+
+func /*@q*/F() error {
+	err := newE()
+	if w, ok := err.(*W); ok {
+		w.inner = os.ErrClosed
+	}
+	return errors.Unwrap(err)
+}
+
+func main() { fmt.Println(F()) }

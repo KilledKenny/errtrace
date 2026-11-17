@@ -1,0 +1,31 @@
+QA3 m3. A forwarding wrapper: nil is not seen to reach the %w operand (it is a
+parameter, and the caller passes io.EOF), so there is no entry for a
+fmt.Errorf that wraps nothing.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:10:12-13: Error Set of example.com/x.F: 1 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	wrap chain (origin → target):
+		$WORK/a.go:8:37-61: fmt.Errorf "w: %w"
+	path (origin → target):
+		$WORK/a.go:10:36-42: in example.com/x.F
+		$WORK/a.go:8:57-60: in example.com/x.wrap
+		$WORK/a.go:10:31-43: in example.com/x.F, call to example.com/x.wrap
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+)
+
+func wrap(err error) error { return fmt.Errorf("w: %w", err) }
+
+func /*@q*/F() error { return wrap(io.EOF) }
+
+func main() { fmt.Println(F()) }

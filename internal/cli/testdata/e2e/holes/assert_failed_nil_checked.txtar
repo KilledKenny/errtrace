@@ -1,0 +1,48 @@
+QA3 C4. The caller checks the pointer against nil before it returns it: the
+typed nil does not get out, and the *E does.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:24:12-13: Error Set of example.com/x.F: 1 entries
+$WORK/a.go:16:9-21: concrete *example.com/x.E
+	path (origin → target):
+		$WORK/a.go:16:9-21: in example.com/x.src
+		$WORK/a.go:25:15-21: in example.com/x.F, call to example.com/x.src
+		$WORK/a.go:20:10-13: in example.com/x.find
+		$WORK/a.go:25:10-22: in example.com/x.F, call to example.com/x.find
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+)
+
+type E struct{ msg string }
+
+func (e *E) Error() string { return "e" }
+
+func src(n int) error {
+	if n == 0 {
+		return io.EOF
+	}
+	return &E{msg: "m"}
+}
+
+func find(err error) *E {
+	e, _ := err.(*E)
+	return e
+}
+
+func /*@q*/F(n int) error {
+	if e := find(src(n)); e != nil {
+		return e
+	}
+	return nil
+}
+
+func main() { fmt.Println(F(0), F(1)) }

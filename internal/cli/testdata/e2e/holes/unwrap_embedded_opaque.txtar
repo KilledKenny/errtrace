@@ -1,0 +1,40 @@
+QA3 C3. The embedded wrapper is not built by the outer composite literal (it
+comes from a parameter): what its field holds is not known. The load keeps an
+Unresolved entry; it is never taken as "another type".
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:18:12-13: Error Set of example.com/x.F: 1 entries, 1 unresolved
+$WORK/a.go:16:32-43: unresolved(memory): embedded struct of example.com/x.Outer is not built by the composite literal
+	path (origin → target):
+		$WORK/a.go:16:32-43: in example.com/x.wrap
+		$WORK/a.go:18:49-56: in example.com/x.F, call to example.com/x.wrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap
+		$WORK/a.go:12:37-38: in (*example.com/x.W).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*example.com/x.W).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 1 of 1 candidates)
+		$WORK/a.go:18:35-57: in example.com/x.F, call to errors.Unwrap
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+)
+
+type W struct{ inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.inner }
+
+type Outer struct{ *W }
+
+func wrap(w *W) error { return Outer{W: w} }
+
+func /*@q*/F(w *W) error { return errors.Unwrap(wrap(w)) }
+
+func main() { fmt.Println(F(&W{inner: io.EOF})) }

@@ -1,0 +1,47 @@
+QA3 C2. A tracked wrapper overwritten whole with a struct that a call returned
+(*p = mk()): errtrace does not follow that value to a field, so the field may
+hold what any value of the type holds: the whole location, "via field".
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:19:12-13: Error Set of example.com/x.F: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF [+1 more paths]
+	path (origin → target):
+		$WORK/a.go:15:35-41: in example.com/x.newW
+		$WORK/a.go:15:28-41: in example.com/x.newW
+		$WORK/a.go:13:37-44: in example.com/x.F
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [via field inner of example.com/x.W]
+	path (origin → target):
+		$WORK/a.go:17:31-43: in example.com/x.mk
+		$WORK/a.go:17:24-43: in example.com/x.mk
+		$WORK/a.go:13:37-44: in example.com/x.F
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"os"
+)
+
+type W struct{ inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.inner }
+
+func newW() *W { return &W{inner: io.EOF} }
+
+func mk() W { return W{inner: os.ErrClosed} }
+
+func /*@q*/F() error {
+	p := newW()
+	*p = mk()
+	return errors.Unwrap(p)
+}
+
+func main() { fmt.Println(F()) }

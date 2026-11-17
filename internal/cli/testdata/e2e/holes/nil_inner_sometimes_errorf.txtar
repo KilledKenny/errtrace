@@ -1,0 +1,47 @@
+QA3 m3. The %w operand is nil on one path of the callee: the fmt.Errorf that
+wraps nothing is returned (errors.Is does not find io.EOF in it). It is an
+entry of its own, an Opaque Error, next to the Wrap of io.EOF.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:16:12-13: Error Set of example.com/x.F: 2 entries, 1 possibly handled
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	wrap chain (origin → target):
+		$WORK/a.go:17:9-41: fmt.Errorf "x: %w"
+	possibly handled:
+		$WORK/a.go:18:5-27: errors.Is with io.EOF: wrapped value may be nil
+	path (origin → target):
+		$WORK/a.go:11:10-16: in example.com/x.maybeNil
+		$WORK/a.go:17:29-40: in example.com/x.F, call to example.com/x.maybeNil
+$WORK/a.go:17:9-41: opaque fmt.Errorf "x: %w"
+	path (origin → target):
+		$WORK/a.go:17:9-41: in example.com/x.F
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+)
+
+func maybeNil(c bool) error {
+	if c {
+		return io.EOF
+	}
+	return nil
+}
+
+func /*@q*/F(c bool) error {
+	err := fmt.Errorf("x: %w", maybeNil(c))
+	if errors.Is(err, io.EOF) {
+		return nil
+	}
+	return err
+}
+
+func main() { fmt.Println(F(false)) }
