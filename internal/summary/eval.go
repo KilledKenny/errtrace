@@ -771,8 +771,14 @@ func (s *Solver) mapTreeRaw(id errset.ValueID, base int, leaf func(errset.ValueI
 			several++
 		}
 	}
+	// The value of a Later Wrap whose field a later writer may set to
+	// nil: the wrapper, wrapping nothing.
+	var emptied []subst
+	if alone, ok := s.laterEmptied(v); ok {
+		emptied = []subst{{value: alone, leaves: local(1, Source{Kind: Local, Site: v.Site})}}
+	}
 	if vanished {
-		return limits
+		return append(emptied, limits...)
 	}
 	if len(operands) == 0 {
 		// Every inner value is nil, unless a fixpoint is still running
@@ -844,6 +850,7 @@ func (s *Solver) mapTreeRaw(id errset.ValueID, base int, leaf func(errset.ValueI
 			}
 		}
 	}
+	combos = append(combos, emptied...)
 	seenLimit := make(map[errset.ValueID]bool)
 	for _, l := range limits {
 		if !seenLimit[l.value] {
@@ -876,6 +883,25 @@ func (s *Solver) wrapOfNothing(v errset.Value) (errset.ValueID, bool) {
 		return s.tbl.Intern(errset.Value{Kind: errset.Concrete, Site: v.Site, Pos: v.Pos, Type: v.Type, Allocated: true}), true
 	}
 	return 0, false
+}
+
+// laterEmptied returns what the Wrap v, made by flow for what the later
+// writers of a tracked value's field store (errset.Value.Later), is where
+// such a writer stores nil: the value with a nil field, a Concrete Type.
+// It is a value of its own beside the Wraps of the tracked value: a guard
+// on what the composite literal stored (errors.Is with it) removes those,
+// but not the value whose field was set to nil since. It reports false
+// if no later writer may store nil, and for the value of a Sentinel,
+// which is listed as the Sentinel.
+func (s *Solver) laterEmptied(v errset.Value) (errset.ValueID, bool) {
+	if v.Kind != errset.Wrap || !v.Later || v.WrapKind != errset.WrapUnwrapMethod || v.Var != nil || len(v.Inner) != 1 {
+		return 0, false
+	}
+	ref := s.tbl.Get(v.Inner[0])
+	if ref.Kind != errset.FieldRef || !ref.Later || !s.laterNil(s.location(nil, ref)) {
+		return 0, false
+	}
+	return s.tbl.Intern(errset.Value{Kind: errset.Concrete, Site: v.Site, Pos: v.Pos, Type: v.Type, Allocated: true}), true
 }
 
 // laterTree reports whether the value tree id holds what a field is

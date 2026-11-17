@@ -172,6 +172,8 @@ type location struct {
 	unreached string
 	// fed caches feedsItself, once fedKnown is set.
 	fed, fedKnown bool
+	// nilLater caches laterNil, once nilKnown is set.
+	nilLater, nilKnown bool
 	// unseen names, in an open world, a function outside the reachable
 	// program that writes the field, or is empty (see
 	// fieldIndex.openScan).
@@ -736,6 +738,54 @@ func (s *Solver) feedsItself(l *location) bool {
 		}
 	}
 	return l.fed
+}
+
+// laterNil reports whether a later writer of the field of l may store
+// nil: a tracked value whose field was written by its composite literal
+// may then hold nothing by the time it is returned, whatever the literal
+// stored. A stored parameter is followed to the arguments of the
+// writer's callers, as far as a location follows them (maxCallerDepth);
+// what cannot be followed may be nil.
+func (s *Solver) laterNil(l *location) bool {
+	later := s.laterWrites(l)
+	if later == nil {
+		return false
+	}
+	if !l.nilKnown {
+		l.nilKnown = true
+		for _, st := range later.writers {
+			if s.mayPassNil(st.Parent(), st.Val, st, 0) {
+				l.nilLater = true
+				break
+			}
+		}
+	}
+	return l.nilLater
+}
+
+// mayPassNil reports whether v, a value of fn used by the instruction at,
+// may be nil (see flow.MayBeNil); a parameter of fn may be if an argument
+// of one of fn's callers may be.
+func (s *Solver) mayPassNil(fn *ssa.Function, v ssa.Value, at ssa.Instruction, depth int) bool {
+	if ci, ok := v.(*ssa.ChangeInterface); ok {
+		v = ci.X
+	}
+	p, ok := v.(*ssa.Parameter)
+	if !ok {
+		return flow.MayBeNil(s.tbl, fn, v, at, s.opts)
+	}
+	sites, ok := s.index(fn.Prog).callersSeen(fn)
+	index := slices.Index(fn.Params, p)
+	if !ok || index < 0 || depth >= maxCallerDepth {
+		return true
+	}
+	for _, site := range sites {
+		arg := argument(site.Common(), fn, index)
+		if arg == nil || s.mayPassNil(site.Parent(), arg, site, depth+1) {
+			return true
+		}
+	}
+	return false
 }
 
 // fieldBase is what a value is to a field load made on it.

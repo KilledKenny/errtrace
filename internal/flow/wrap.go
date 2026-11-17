@@ -969,6 +969,13 @@ func (a *analyzer) mayBeNil(v ssa.Value, pt point) bool {
 	return a.nilWalk(v, pt, make(map[nilKey]bool), 0)
 }
 
+// MayBeNil reports whether v, a value of fn used by the instruction at,
+// may be nil there, unless errtrace can prove it is not (see mayBeNil).
+func MayBeNil(tbl *errset.Table, fn *ssa.Function, v ssa.Value, at ssa.Instruction, opts Options) bool {
+	a := &analyzer{tbl: tbl, fn: fn, at: at, pt: pointOf(at), opts: opts}
+	return a.mayBeNil(v, a.pt)
+}
+
 type nilKey struct {
 	v  ssa.Value
 	pt point
