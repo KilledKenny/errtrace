@@ -878,23 +878,27 @@ func (s *Solver) wrapOfNothing(v errset.Value) (errset.ValueID, bool) {
 	return 0, false
 }
 
-// laterTree reports whether the value tree id is made for what a field
-// is given after its value was built (errset.Value.Later): a Later
-// FieldRef, the Wrap around one, or either under a marker or guards.
+// laterTree reports whether the value tree id holds what a field is
+// given after its value was built (errset.Value.Later): a Later FieldRef,
+// under any Wraps, markers and guards. Such a tree has no value at all
+// where the FieldRef has none: the Wrap that flow made for the FieldRef
+// is not there, and neither is a Wrap around that one.
 func (s *Solver) laterTree(id errset.ValueID) bool {
-	for {
-		v := s.tbl.Get(id)
-		switch v.Kind {
-		case errset.FieldRef:
-			return v.Later
-		case errset.Wrap:
-			return v.Later
-		case errset.Truncated, errset.Guarded:
-			id = v.Inner[0]
-		default:
-			return false
+	v := s.tbl.Get(id)
+	switch v.Kind {
+	case errset.FieldRef:
+		return v.Later
+	case errset.Wrap, errset.Truncated, errset.Guarded:
+		if v.Later {
+			return true
+		}
+		for _, in := range v.Inner {
+			if s.laterTree(in) {
+				return true
+			}
 		}
 	}
+	return false
 }
 
 // isLimit reports whether id is an Unresolved fixpoint-limit value (or
