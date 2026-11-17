@@ -23,11 +23,13 @@ func runMembership(ctx context.Context, opts Options, cfg *config, prog *load.Pr
 	if g := subj.Sentinel; g != nil && flow.NewSentinels().Info(g).Unstable {
 		fmt.Fprintf(opts.Stderr, "%s: warning: %s is assigned outside its initialization (or its address is used); the Verdict assumes it keeps its initial value\n", BinaryName, subj)
 	}
+	upper := resolver.Upper()
 	res, err := query.Membership(ctx, prog, tgt, query.MembershipOptions{
-		Options: query.Options{ChainDepth: cfg.chainDepth, Resolver: resolver},
-		Subject: subj,
-		Upper:   resolver.Upper(),
-		Open:    open,
+		Options:    query.Options{ChainDepth: cfg.chainDepth, Resolver: resolver},
+		Subject:    subj,
+		Upper:      upper,
+		FloodUpper: upper.Wide(),
+		Open:       open,
 	})
 	if err != nil {
 		return 0, err

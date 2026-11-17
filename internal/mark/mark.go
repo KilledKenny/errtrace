@@ -582,9 +582,18 @@ func RunWith(ctx context.Context, prog *ssa.Program, res Callees, subj Subject, 
 // ReflectStores are those of the pass it is called on and the stores
 // that only the flood reaches: of a value that an earlier store wrote,
 // or that is read through reflection.
-func (r *Result) Flood(ctx context.Context) (*Result, error) {
+//
+// The call edges of the flooding pass are res (nil: those of the pass it
+// is called on). They must not limit a dynamic call to the callees that
+// the program's own instructions bring to it: a store through reflection
+// may put a value of any type, or any function, where the call finds its
+// receiver or function value (resolve.Upper.Wide).
+func (r *Result) Flood(ctx context.Context, res Callees) (*Result, error) {
 	a := r.a
-	f := newAnalysis(a.prog, r.ctxRes, a.subj)
+	if res == nil {
+		res = r.ctxRes
+	}
+	f := newAnalysis(a.prog, res, a.subj)
 	f.open = a.open
 	f.flood = true
 	if err := f.run(ctx); err != nil {

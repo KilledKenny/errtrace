@@ -73,6 +73,11 @@ type MembershipOptions struct {
 	Subject mark.Subject
 	// Upper gives the call edges of the upward pass (resolve.Upper).
 	Upper mark.Callees
+	// FloodUpper gives the call edges of the flooding pass
+	// (resolve.Upper.Wide): those of Upper, with every dynamic call
+	// open to the callees that only a store through reflection brings
+	// to it. Nil means Upper.
+	FloodUpper mark.Callees
 	// Open are the loaded packages of a program without a main package
 	// (see mark.Options.Open): code outside the program calls them. An
 	// entry that depends on the caller, and a dynamic call without
@@ -218,7 +223,7 @@ func Membership(ctx context.Context, prog *load.Program, tgt *target.Target, opt
 	// A No, and stores through reflection that were not followed: can
 	// what they write reach the Target?
 	floodStart := time.Now()
-	flood, err := marks.Flood(ctx)
+	flood, err := marks.Flood(ctx, opts.FloodUpper)
 	if err != nil {
 		return nil, err
 	}

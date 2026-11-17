@@ -18,9 +18,18 @@ import (
 // graph: every function or method of the loaded program that matches the
 // call, whether or not the roots reach it.
 //
+// VTA sees the types and functions that reach a call through the program's
+// own instructions. One that reaches it only through memory that package
+// reflect wrote (reflect.Value.Set of a value into a slice of interface
+// values) it does not see. Wide gives the view for a caller that takes
+// such writes into account.
+//
 // An Upper is not safe for concurrent use.
 type Upper struct {
 	v *VTA
+	// wide says that the Candidates of VTA do not limit a dynamic call
+	// (see Wide).
+	wide bool
 	// out are the CHA callees of the dynamic call sites of a function,
 	// built when one of its sites is first asked about.
 	out map[*ssa.Function]map[ssa.CallInstruction][]*ssa.Function
@@ -28,6 +37,8 @@ type Upper struct {
 	// Candidates; it is built on first use, for a whole program only.
 	vtaCallers map[*ssa.Function][]ssa.CallInstruction
 	names      map[*ssa.Function]string
+	// merged caches withCandidates.
+	merged map[ssa.CallInstruction][]*ssa.Function
 }
 
 // Upper returns the upper-bound call edges of v's program.
@@ -37,6 +48,20 @@ func (v *VTA) Upper() *Upper {
 		out:   make(map[*ssa.Function]map[ssa.CallInstruction][]*ssa.Function),
 		names: make(map[*ssa.Function]string),
 	}
+}
+
+// Wide returns the call edges of u's program without the trust in VTA: a
+// dynamic call has its CHA callees (and the Candidates of VTA, should CHA
+// lack one), whether or not VTA found Candidates for it. It is for the
+// flooding pass of a Membership Query, in which a store through
+// reflection may have put a value of any type, or any function, where a
+// dynamic call finds its receiver or function value. Which functions the
+// roots reach (Reachable) is the same as for u.
+func (u *Upper) Wide() *Upper {
+	if u.wide {
+		return u
+	}
+	return &Upper{v: u.v, wide: true, out: u.out, names: u.names}
 }
 
 // WholeProgram reports whether v's roots are only the main and init
@@ -66,7 +91,7 @@ func (u *Upper) WholeProgram() bool { return u.v.WholeProgram() }
 // promoted or bound method is the callee, not the method it calls, so that
 // the operands of the call are the parameters of the callee.
 func (u *Upper) trusted(site ssa.CallInstruction) []*ssa.Function {
-	if !u.v.WholeProgram() {
+	if u.wide || !u.v.WholeProgram() {
 		return nil
 	}
 	return u.v.raw[site]
@@ -74,8 +99,9 @@ func (u *Upper) trusted(site ssa.CallInstruction) []*ssa.Function {
 
 // Callees returns the functions that may run at site, sorted by name: the
 // static callee, the VTA Candidates of a dynamic call in a whole program,
-// or else its CHA callees. It returns nothing for a call of a builtin, and
-// for a dynamic call that no function of the program matches.
+// or else its CHA callees (for a wide Upper, always those, see Wide). It
+// returns nothing for a call of a builtin, and for a dynamic call that no
+// function of the program matches.
 func (u *Upper) Callees(site ssa.CallInstruction) []*ssa.Function {
 	common := site.Common()
 	if callee := common.StaticCallee(); callee != nil {
@@ -93,7 +119,48 @@ func (u *Upper) Callees(site ssa.CallInstruction) []*ssa.Function {
 		bySite = u.chaCallees(parent)
 		u.out[parent] = bySite
 	}
-	return bySite[site]
+	fns := bySite[site]
+	if u.wide {
+		fns = u.withCandidates(site, fns)
+	}
+	return fns
+}
+
+// withCandidates returns the CHA callees fns of site with the Candidates
+// VTA found for it that are not among them, sorted by name.
+func (u *Upper) withCandidates(site ssa.CallInstruction, fns []*ssa.Function) []*ssa.Function {
+	if !u.v.WholeProgram() {
+		return fns
+	}
+	raw := u.v.raw[site]
+	if len(raw) == 0 {
+		return fns
+	}
+	if w, ok := u.merged[site]; ok {
+		return w
+	}
+	has := make(map[*ssa.Function]bool, len(fns))
+	for _, g := range fns {
+		has[g] = true
+	}
+	w := fns
+	for _, g := range raw {
+		if !has[g] {
+			has[g] = true
+			if len(w) == len(fns) {
+				w = append([]*ssa.Function(nil), fns...)
+			}
+			w = append(w, g)
+		}
+	}
+	if len(w) != len(fns) {
+		sort.SliceStable(w, func(i, j int) bool { return u.name(w[i]) < u.name(w[j]) })
+	}
+	if u.merged == nil {
+		u.merged = make(map[ssa.CallInstruction][]*ssa.Function)
+	}
+	u.merged[site] = w
+	return w
 }
 
 // chaCallees groups the CHA callees of the dynamic call sites of fn by

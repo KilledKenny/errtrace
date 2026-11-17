@@ -111,11 +111,13 @@ func (p *program) membership(t *testing.T, fn string, subj mark.Subject) *query.
 			open = []*ssa.Package{p.pkg}
 		}
 	}
+	upper := v.Upper()
 	m, err := query.Membership(t.Context(), p.l.Program, tgt, query.MembershipOptions{
-		Options: query.Options{Resolver: v},
-		Subject: subj,
-		Upper:   v.Upper(),
-		Open:    open,
+		Options:    query.Options{Resolver: v},
+		Subject:    subj,
+		Upper:      upper,
+		FloodUpper: upper.Wide(),
+		Open:       open,
 	})
 	if err != nil {
 		t.Fatal(err)
