@@ -1,0 +1,112 @@
+QA M1. A deferred closure wraps the named result once. The entries are the
+returned value and the value under the closure's Wrap, marked chain may
+repeat (the closure's store reads the variable it writes).
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:27:12-13: Error Set of example.com/x.C: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:9:27-33: in example.com/x.src
+		$WORK/a.go:33:9-14: in example.com/x.C, call to example.com/x.src
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat]
+	wrap chain (origin → target):
+		$WORK/a.go:30:10-36: fmt.Errorf "ctx: %w"
+	path (origin → target):
+		$WORK/a.go:9:27-33: in example.com/x.src
+		$WORK/a.go:33:9-14: in example.com/x.C, call to example.com/x.src
+		$WORK/a.go:30:32-35: in example.com/x.C$1
+		$WORK/a.go:30:4-7: in example.com/x.C$1
+		$WORK/a.go:33:2-2: in example.com/x.C
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+	"os"
+)
+
+func src() error { return io.EOF }
+
+func A() error {
+	var err error
+	w := func() { err = io.ErrShortBuffer }
+	r := func() error { return err }
+	w()
+	return r()
+}
+
+func inner(e error) error {
+	var err error
+	func() { err = e }()
+	return err
+}
+
+func B() error { return inner(os.ErrClosed) }
+
+func /*@q*/C() (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("ctx: %w", err)
+		}
+	}()
+	return src()
+}
+
+// nested: inner closure writes var of the grandparent; middle one returned and called later
+func D() error {
+	var err error
+	mid := func() func() {
+		return func() { err = io.ErrNoProgress }
+	}
+	mid()()
+	return err
+}
+
+// closure writes a struct local's field
+type R struct{ err error }
+
+func E() error {
+	var r R
+	func() { r.err = io.ErrClosedPipe }()
+	return r.err
+}
+
+// multiple assignment from a call tuple in closure
+func two() (int, error) { return 0, os.ErrDeadlineExceeded }
+
+func G() error {
+	var err error
+	func() { _, err = two() }()
+	return err
+}
+
+// range/select/chan stores in closure
+func H() error {
+	var err error
+	ch := make(chan error, 1)
+	ch <- os.ErrInvalid
+	func() { err = <-ch }()
+	return err
+}
+
+// captured variable is pointer to a struct; err var captured by method value closure
+type T struct{ p *error }
+
+func (t T) set() { *t.p = io.ErrShortWrite }
+
+func I() error {
+	var err error
+	t := T{&err}
+	t.set()
+	return err
+}
+
+func main() {
+	fmt.Println(A(), B(), C(), D(), E(), G(), H(), I())
+}

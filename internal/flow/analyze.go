@@ -84,7 +84,9 @@ func (o Options) chainDepth() int {
 // definitions of every returned value backwards. Values are interned in
 // tbl. Calls are not followed: their results become CallRef values, except
 // for intrinsics (errors.New, fmt.Errorf, errors.Join, errtrace.Wrap),
-// which become Error Origins and Wraps. A Concrete Type built from a
+// which become Error Origins and Wraps. The return that follows a
+// recovered panic is left out if no deferred call of fn can recover (see
+// mayRecover). A Concrete Type built from a
 // composite literal whose type has a modelled Unwrap method becomes a Wrap
 // of the value stored in the unwrapped field. A value under guards that
 // hold on its return path (err == io.EOF is false there, errors.Is
@@ -100,9 +102,15 @@ func Analyze(tbl *errset.Table, fn *ssa.Function, opts Options) *LocalFacts {
 		return lf
 	}
 	a := &analyzer{tbl: tbl, fn: fn, opts: opts}
+	recovers := fn.Recover != nil && mayRecover(fn)
 	for _, b := range fn.Blocks {
 		ret, ok := b.Instrs[len(b.Instrs)-1].(*ssa.Return)
 		if !ok {
+			continue
+		}
+		if b == fn.Recover && !recovers {
+			// The return after a recovered panic, in a function whose
+			// deferred calls never recover: it does not run.
 			continue
 		}
 		for i := range lf.Results {
@@ -157,6 +165,10 @@ type analyzer struct {
 	// shared with child analyzers), which cuts err = wrap(err) cycles.
 	captured *ssa.Alloc
 	active   map[*ssa.Store]bool
+	// initStore, if set, is the store that gives a package-level variable
+	// its value, whose stored composite literal the analyzer opens (see
+	// sentinelWraps).
+	initStore *ssa.Store
 
 	// pt is the point where the walked value is used, which says which
 	// guards hold for it (see guardsAt); gd are the function's guards,
@@ -240,6 +252,18 @@ func (a *analyzer) walk(v ssa.Value) {
 	switch v := v.(type) {
 	case *ssa.Const:
 		if v.IsNil() {
+			if _, ptr := v.Type().Underlying().(*types.Pointer); ptr && IsErrorType(v.Type()) && a.at != nil {
+				// A nil pointer of a concrete error type (return nil
+				// in a function returning *E): no error as it is, but
+				// a non-nil error once a caller converts it to an
+				// interface. A nil check of the pointer on the way
+				// removes it (see GuardNil).
+				var site any = a.at
+				if ref := a.debugRefAtUse(v); ref != nil {
+					site = ref
+				}
+				a.add(a.tbl.Intern(errset.Value{Kind: errset.Concrete, Site: site, Pos: a.at.Pos(), Type: unalias(v.Type()), TypedNil: true, Index: a.failingCompanions(v)}), site)
+			}
 			return // no error
 		}
 	case *ssa.Phi:
@@ -277,8 +301,24 @@ func (a *analyzer) walk(v ssa.Value) {
 			a.call(call, v.Index)
 			return
 		}
+		if ta, ok := v.Tuple.(*ssa.TypeAssert); ok && v.Index == 0 {
+			// v, ok := x.(T): x where the assertion holds, else nil: no
+			// error for an interface T, and for a concrete T a nil
+			// pointer, which is a non-nil error once it is converted
+			// (by a caller, for a result of type T).
+			a.typeAssert(ta)
+			if !types.IsInterface(ta.AssertedType) {
+				a.failedAssert(ta, v, v)
+			}
+			return
+		}
 		a.memory(v, extractDetail(v))
 		return
+	case *ssa.TypeAssert:
+		if !v.CommaOk {
+			a.typeAssert(v)
+			return
+		}
 	case *ssa.Parameter:
 		a.param(v)
 		return
@@ -286,7 +326,12 @@ func (a *analyzer) walk(v ssa.Value) {
 		a.freeVar(v, v)
 		return
 	case *ssa.Field:
-		a.memory(v, fmt.Sprintf("load of field %s of %s", fieldName(v.X.Type(), v.Field), typeString(v.X.Type())))
+		a.fieldLoad(v, v.X, v.Field)
+		return
+	case *ssa.FieldAddr:
+		// The address of a struct inside another (o.W for a method of
+		// the embedded W called on o): the struct that field holds.
+		a.fieldLoad(v, v.X, v.Field)
 		return
 	case *ssa.Index:
 		a.memory(v, "load of array element")
@@ -298,13 +343,130 @@ func (a *analyzer) walk(v ssa.Value) {
 	a.memory(v, fmt.Sprintf("value of %s not modelled", ssaOp(v)))
 }
 
+// failingCompanions returns the results that the return statement the
+// analyzer walks for gives a failing value together with its operand c, a
+// nil pointer: an error that is never nil there, or the constant false
+// (return nil, err; return nil, false), as a set with bit i for result
+// i. A caller that has checked such a result (err == nil, ok) before it
+// uses the pointer does not get this nil (see errset.GuardCompanion). The
+// set is empty if c is not an operand of that return itself (it reached
+// it through a Phi), or if the results are loaded from named results
+// after the deferred calls, which may have changed them.
+func (a *analyzer) failingCompanions(c *ssa.Const) int {
+	ret, ok := a.at.(*ssa.Return)
+	if !ok || a.pt != pointOf(ret) {
+		return 0
+	}
+	at := -1
+	for i, r := range ret.Results {
+		if r == ssa.Value(c) {
+			if at >= 0 {
+				return 0
+			}
+			at = i
+		}
+	}
+	if at < 0 {
+		return 0
+	}
+	set := 0
+	for j, r := range ret.Results {
+		if j == at || j >= 30 {
+			continue
+		}
+		switch {
+		case types.IsInterface(r.Type()) && IsErrorType(r.Type()):
+			if !a.mayBeNil(r, a.pt) {
+				set |= 1 << j
+			}
+		case isFalseConst(r):
+			set |= 1 << j
+		}
+	}
+	return set
+}
+
+// isFalseConst reports whether v is the boolean constant false.
+func isFalseConst(v ssa.Value) bool {
+	c, ok := v.(*ssa.Const)
+	if !ok || c.Value == nil || c.Value.Kind() != constant.Bool {
+		return false
+	}
+	return !constant.BoolVal(c.Value)
+}
+
+// typeAssert follows the value of the type assertion ta, x.(T), to its
+// operand: the result is x where x's dynamic type is (or implements) T,
+// and otherwise nil (comma-ok) or a panic. The operand's values are walked
+// under a guard saying the assertion holds, which removes the Sentinels,
+// Concrete Types, Opaque Errors and Wraps whose dynamic type cannot be T
+// (see typeVerdict), keeps Unresolved values and those errtrace cannot
+// decide, and stays pending on symbolic values (Param, FreeVar, CallRef)
+// until a caller or a callee's summary gives their values. A case of a
+// type switch is such a comma-ok assertion; where its own If guard
+// already holds for the operand (see guardsAt) no second guard is added.
+func (a *analyzer) typeAssert(ta *ssa.TypeAssert) {
+	saved := a.guards
+	defer func() { a.guards = saved }()
+	held := false
+	if a.fn != nil && a.fn.Blocks != nil {
+		for _, u := range a.funcGuards().guardsAt(a.pt) {
+			held = held || (u.g.Kind == errset.GuardAssert && u.g.Site == any(ta) && u.g.Holds && u.raw == ta.X)
+		}
+	}
+	if !held && a.fn != nil && a.fn.Blocks != nil {
+		gd := a.funcGuards()
+		id, ok := gd.asserts[ta]
+		if !ok {
+			// Negative ids keep these guards apart from those of Ifs.
+			id = -1 - len(gd.asserts)
+			gd.asserts[ta] = id
+		}
+		u := guardUse{raw: ta.X, operand: stripConv(ta.X), id: id, g: errset.Guard{
+			Kind: errset.GuardAssert, Site: ta, Pos: ta.Pos(), Type: unalias(ta.AssertedType), Holds: true,
+		}}
+		i, found := slices.BinarySearchFunc(a.guards, u.id, func(x guardUse, id int) int { return x.id - id })
+		if !found {
+			a.guards = slices.Insert(slices.Clip(a.guards), i, u)
+		}
+	}
+	a.walk(ta.X)
+}
+
+// failedAssert adds what the comma-ok type assertion ta to a concrete
+// type gives where it fails: the zero value of the type, which for a
+// pointer type is a typed nil, a non-nil error once converted to an
+// interface. Nothing is added where the assertion cannot fail: on a path
+// its ok result guards, or when its operand is a conversion of a value of
+// that very type. site is where the value is made and src where it enters
+// the function.
+func (a *analyzer) failedAssert(ta *ssa.TypeAssert, site ssa.Value, src any) {
+	if mi, ok := stripConv(ta.X).(*ssa.MakeInterface); ok && types.Identical(mi.X.Type(), ta.AssertedType) {
+		return
+	}
+	if a.fn != nil && a.fn.Blocks != nil {
+		for _, u := range a.funcGuards().guardsAt(a.pt) {
+			if u.g.Kind == errset.GuardAssert && u.g.Site == any(ta) && u.g.Holds {
+				return
+			}
+		}
+	}
+	// The zero value of a non-pointer type is a value like any other of
+	// that type.
+	_, ptr := ta.AssertedType.Underlying().(*types.Pointer)
+	a.add(a.concrete(ta.AssertedType, site, ptr), src)
+}
+
 // makeInterface classifies a conversion of a concrete value to an
 // interface: a pointer Sentinel, a typed nil, or a Concrete Type.
 func (a *analyzer) makeInterface(mi *ssa.MakeInterface) {
+	// The guards on the concrete value (p != nil) hold for what it is
+	// converted to.
+	a.matchGuards(mi.X)
 	switch x := mi.X.(type) {
 	case *ssa.UnOp:
 		if g, ok := x.X.(*ssa.Global); ok && x.Op == token.MUL {
-			a.add(a.sentinel(g, x.Type()), x)
+			a.addSentinel(g, x.Type(), x)
 			return
 		}
 		if alloc, ok := x.X.(*ssa.Alloc); ok && x.Op == token.MUL && alloc.Comment == "complit" {
@@ -339,8 +501,25 @@ func (a *analyzer) makeInterface(mi *ssa.MakeInterface) {
 			a.call(call, x.Index)
 			return
 		}
+		if ta, ok := x.Tuple.(*ssa.TypeAssert); ok && x.Index == 0 && types.IsInterface(ta.X.Type()) {
+			// e, ok := err.(*E); return e: the values of err that are
+			// of type *E, with what they wrap. Where the assertion
+			// fails, e is a nil *E, which the conversion makes a
+			// non-nil error.
+			a.typeAssert(ta)
+			a.failedAssert(ta, mi, mi)
+			return
+		}
+	case *ssa.TypeAssert:
+		if !x.CommaOk && types.IsInterface(x.X.Type()) {
+			a.typeAssert(x)
+			return
+		}
 	}
+	// A value got from elsewhere (a parameter, a load, a Phi, an
+	// errors.As target): not a tracked one.
 	a.add(a.concrete(mi.X.Type(), mi, false), mi)
+	a.untracked(errset.Value{Site: mi, Pos: a.posOf(mi), Type: unalias(mi.X.Type())}, mi)
 }
 
 // debugRefAtUse returns the first DebugRef of v at or after the position
@@ -371,9 +550,9 @@ func (a *analyzer) load(v *ssa.UnOp) bool {
 		if !types.IsInterface(v.Type()) {
 			typ = v.Type() // a pointer Sentinel returned as a concrete error result
 		}
-		a.add(a.sentinel(x, typ), v)
+		a.addSentinel(x, typ, v)
 	case *ssa.FieldAddr:
-		a.memory(v, fmt.Sprintf("load of field %s of %s", fieldName(x.X.Type(), x.Field), typeString(x.X.Type())))
+		a.fieldLoad(v, x.X, x.Field)
 	case *ssa.IndexAddr:
 		a.memory(v, "load of slice or array element")
 	case *ssa.FreeVar:
@@ -386,11 +565,140 @@ func (a *analyzer) load(v *ssa.UnOp) bool {
 	return true
 }
 
+// fieldLoad records the load v of field number field of base, a struct
+// or a pointer to one. A field of an unnamed struct type, of a type
+// parameter, or whose type depends on a type parameter of its generic
+// struct is Unresolved. Otherwise:
+//
+//   - if base is itself an error value (its type implements error: the
+//     receiver of an Unwrap method, a wrapper got from a type assertion),
+//     the load becomes a FieldOf of each value base can carry. The
+//     summaries resolve it once that value is known: to the inner values
+//     of the very Wrap it loads from, where there is one;
+//   - any other load becomes a FieldRef, which the summaries resolve from
+//     every store to that field in the program.
+func (a *analyzer) fieldLoad(v ssa.Value, base ssa.Value, field int) {
+	// A field that holds a struct by value (v is that struct, or its
+	// address) has no field location of its own: its fields are stored
+	// one by one, to their own locations. Such a load is only followed
+	// as a FieldOf of an error value, from which the summaries build the
+	// struct (see Solver.fieldOf).
+	_, byValue := v.(*ssa.FieldAddr)
+	if _, isStruct := v.Type().Underlying().(*types.Struct); isStruct {
+		byValue = true
+	}
+	a.fieldValue(v, base, field, byValue)
+}
+
+// FieldFacts returns the local facts of field number field of the struct
+// that base points to, a value of fn used by the instruction at: what a
+// load of that field there would give (a FieldOf of base's values, or a
+// FieldRef; see fieldLoad). site is the value the facts are placed at.
+// The field must not hold a struct by value.
+func FieldFacts(tbl *errset.Table, fn *ssa.Function, site, base ssa.Value, field int, at ssa.Instruction, opts Options) []Fact {
+	a := &analyzer{tbl: tbl, fn: fn, at: at, pt: pointOf(at), seen: make(map[seenKey]bool), opts: opts}
+	a.fieldValue(site, base, field, false)
+	return a.facts
+}
+
+// fieldValue is fieldLoad for the load v, which gives a struct held by
+// value if byValue is set.
+func (a *analyzer) fieldValue(v ssa.Value, base ssa.Value, field int, byValue bool) {
+	recv := base.Type()
+	detail := fmt.Sprintf("load of field %s of %s", fieldName(recv, field), typeString(recv))
+	st := FieldStruct(recv, field)
+	if st == nil {
+		a.memory(v, detail)
+		return
+	}
+	val := errset.Value{
+		Kind:   errset.FieldRef,
+		Site:   v,
+		Pos:    a.posOf(v),
+		Type:   st,
+		Index:  field,
+		Name:   fieldName(recv, field),
+		Fn:     a.fn.String(),
+		Detail: detail,
+	}
+	if byValue && (a.flat || !IsErrorType(recv)) {
+		a.memory(v, detail)
+		return
+	}
+	if a.flat || !IsErrorType(recv) {
+		a.add(a.tbl.Intern(val), v)
+		return
+	}
+	// The local copy that a method with a value receiver loads its
+	// receiver's fields through is the receiver.
+	if alloc, ok := base.(*ssa.Alloc); ok {
+		if p := copiedParam(alloc); p != nil {
+			base = p
+		}
+	}
+	// Walk base as the value it is, where the load is made.
+	c := &analyzer{tbl: a.tbl, fn: a.fn, at: a.at, pt: a.pt, gd: a.gd, seen: make(map[seenKey]bool), opts: a.opts, depth: a.depth, captured: a.captured, active: a.active}
+	if instr, ok := v.(ssa.Instruction); ok && instr.Block() != nil {
+		c.pt = pointOf(instr)
+	}
+	c.walk(base)
+	for _, f := range c.facts {
+		if a.tbl.Get(f.Value).Kind == errset.Unresolved {
+			// The base is a place the analysis could not see through
+			// here (a variable that errors.As filled through its
+			// address): it is some value of the struct type, whose field
+			// is what the program stores to that field.
+			if byValue {
+				a.memory(v, detail)
+			} else {
+				a.add(a.tbl.Intern(val), v)
+			}
+			continue
+		}
+		of := val
+		of.Kind = errset.FieldOf
+		of.Inner = []errset.ValueID{f.Value}
+		leaves := make([]any, a.tbl.Leaves(f.Value))
+		for k := range leaves {
+			leaves[k] = f.LeafSource(k)
+		}
+		a.addFact(Fact{Value: a.tbl.Intern(of), Source: v, Leaves: leaves})
+	}
+}
+
+// FieldStruct returns the named struct type that recv (a struct or a
+// pointer to one) is, if a load of its field number field is modelled as
+// a FieldRef: the type is a named struct type, and the field's type does
+// not depend on a type parameter of the type. Otherwise it returns nil.
+func FieldStruct(recv types.Type, field int) types.Type {
+	t := types.Unalias(recv)
+	if p, ok := t.Underlying().(*types.Pointer); ok {
+		t = types.Unalias(p.Elem())
+	}
+	n, ok := t.(*types.Named)
+	if !ok {
+		return nil
+	}
+	st, ok := n.Underlying().(*types.Struct)
+	if !ok || field >= st.NumFields() {
+		return nil
+	}
+	orig, ok := n.Origin().Underlying().(*types.Struct)
+	if !ok || field >= orig.NumFields() || !types.Identical(orig.Field(field).Type(), st.Field(field).Type()) {
+		return nil
+	}
+	return n
+}
+
 // local follows a load of a local variable that was not lifted to a
-// register (such as a named result in a function with defers) to the
-// values stored into it. If the variable's address escapes, or it is a
-// composite literal of a concrete error type, the load is classified
-// accordingly.
+// register (a named result in a function with defers, a variable a closure
+// captures) to the values stored into it: the stores of the analysed
+// function are walked where they are, and a store made by a closure that
+// captured the variable becomes a StoreRef, which the summaries resolve in
+// the closure. If the variable can be written in a way errtrace does not
+// follow to a store (its address is passed to a call, stored, converted
+// ...), an Unresolved value is added to the values found. A composite
+// literal of a concrete error type is classified as such.
 func (a *analyzer) local(load *ssa.UnOp, alloc *ssa.Alloc) {
 	if alloc.Comment == "complit" {
 		a.constructed(load.Type(), alloc)
@@ -398,39 +706,341 @@ func (a *analyzer) local(load *ssa.UnOp, alloc *ssa.Alloc) {
 	}
 	pt := a.pt
 	defer func() { a.pt = pt }()
-	if alloc == a.captured {
-		for _, r := range *alloc.Referrers() {
-			if st, ok := r.(*ssa.Store); ok && st.Addr == alloc && !a.active[st] {
-				a.active[st] = true
-				a.pt = pointOf(st)
-				a.walk(st.Val)
-				delete(a.active, st)
-			}
+	w := variableWriters(alloc)
+	for _, st := range a.reaching(load, alloc, w.stores) {
+		switch {
+		case st.Parent() != a.fn:
+			a.pt = pt
+			a.storeRef(st, alloc, a.located(load, alloc))
+		case alloc != a.captured:
+			// A stored value is used at its store.
+			a.pt = pointOf(st)
+			a.walk(st.Val)
+		case !a.active[st]:
+			a.active[st] = true
+			a.pt = pointOf(st)
+			a.walk(st.Val)
+			delete(a.active, st)
 		}
-		return
 	}
-	if alloc.Heap {
-		a.memory(load, "load of escaping variable "+alloc.Comment)
-		return
+	if w.escapes {
+		a.pt = pt
+		a.memory(load, escapedVariable(alloc))
 	}
-	escapes := false
-	for _, r := range *alloc.Referrers() {
-		switch r := r.(type) {
-		case *ssa.Store:
-			if r.Addr == alloc {
-				// A stored value is used at its store.
-				a.pt = pointOf(r)
-				a.walk(r.Val)
+}
+
+// reaching returns the stores to the variable alloc, of stores, whose
+// value the load may read. A store of the analysed function is read only
+// if it can run before the load; if the function stores to the variable
+// in the load's own block before the load, the last such store has
+// overwritten what the function stored earlier. A store made by a closure
+// may run at any time, unless the closure is only ever deferred by the
+// function: it then runs when the function returns, and is read only by
+// a load that can follow a point where the deferred calls run. So the
+// value that "return fmt.Errorf("f: %w", err)" stores to a named result
+// is not read by the load of err it wraps, and the Wrap is not nested in
+// itself. A load after a recovered panic (in the function's recover
+// block) may read any store.
+func (a *analyzer) reaching(load *ssa.UnOp, alloc *ssa.Alloc, stores []*ssa.Store) []*ssa.Store {
+	lb := load.Block()
+	if lb == nil || a.fn == nil || load.Parent() != a.fn || afterRecover(a.fn, lb) {
+		return stores
+	}
+	var last *ssa.Store
+	for _, instr := range lb.Instrs {
+		if instr == ssa.Instruction(load) {
+			break
+		}
+		if st, ok := instr.(*ssa.Store); ok && st.Addr == ssa.Value(alloc) {
+			last = st
+		}
+	}
+	exit, exitKnown := false, false
+	var out []*ssa.Store
+	for _, st := range stores {
+		switch {
+		case st.Parent() == a.fn:
+			if st == last || (last == nil && mayFollow(st, load)) {
+				out = append(out, st)
+			}
+		case onlyDeferred(a.fn, st.Parent()):
+			if !exitKnown {
+				exit, exitKnown = followsRunDefers(a.fn, load), true
+			}
+			if exit {
+				out = append(out, st)
+			}
+		default:
+			out = append(out, st)
+		}
+	}
+	return out
+}
+
+// afterRecover reports whether block b of fn runs after a recovered
+// panic: it is fn's recover block, or reachable from it.
+func afterRecover(fn *ssa.Function, b *ssa.BasicBlock) bool {
+	if fn.Recover == nil {
+		return false
+	}
+	seen := make(map[*ssa.BasicBlock]bool)
+	work := []*ssa.BasicBlock{fn.Recover}
+	for len(work) > 0 {
+		c := work[len(work)-1]
+		work = work[:len(work)-1]
+		if c == b {
+			return true
+		}
+		if !seen[c] {
+			seen[c] = true
+			work = append(work, c.Succs...)
+		}
+	}
+	return false
+}
+
+// onlyDeferred reports whether the closure c (or the closure of fn that
+// c is nested in) is made by fn only to be deferred there: every
+// MakeClosure of it in fn is the callee of a defer statement and is used
+// in no other way. Its body, and the closures made in it, then run only
+// while fn's deferred calls run.
+func onlyDeferred(fn, c *ssa.Function) bool {
+	for c != nil && c.Parent() != fn {
+		c = c.Parent()
+	}
+	if c == nil {
+		return false
+	}
+	found := false
+	for _, b := range fn.Blocks {
+		for _, instr := range b.Instrs {
+			mc, ok := instr.(*ssa.MakeClosure)
+			if !ok || mc.Fn != ssa.Value(c) {
 				continue
 			}
-			escapes = true
-		case *ssa.UnOp, *ssa.DebugRef:
-		default:
-			escapes = true
+			found = true
+			for _, r := range *mc.Referrers() {
+				switch r := r.(type) {
+				case *ssa.DebugRef:
+				case *ssa.Defer:
+					if r.Call.Value != ssa.Value(mc) || slices.Contains(r.Call.Args, ssa.Value(mc)) {
+						return false
+					}
+				default:
+					return false
+				}
+			}
 		}
 	}
-	if escapes {
-		a.memory(load, "load of variable "+alloc.Comment+" whose address escapes")
+	return found
+}
+
+// followsRunDefers reports whether the instruction at of fn can run after
+// a point where fn's deferred calls run.
+func followsRunDefers(fn *ssa.Function, at ssa.Instruction) bool {
+	for _, b := range fn.Blocks {
+		for _, instr := range b.Instrs {
+			if rd, ok := instr.(*ssa.RunDefers); ok && mayFollow(rd, at) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// mayRecover reports whether a deferred call of fn may recover from a
+// panic, after which fn returns through its recover block. It says no
+// only if every deferred call that can run in fn's frame is seen and
+// cannot recover (see deferMayRecover): fn has a defer statement in its
+// own blocks, and no anonymous function of fn defers into an enclosing
+// frame (the body of a range-over-func loop defers into the frame of the
+// function the loop is in; its Defer has a DeferStack).
+func mayRecover(fn *ssa.Function) bool {
+	found := false
+	for _, b := range fn.Blocks {
+		for _, instr := range b.Instrs {
+			if d, ok := instr.(*ssa.Defer); ok {
+				found = true
+				if deferMayRecover(d) {
+					return true
+				}
+			}
+		}
+	}
+	// A recover block without a defer statement of fn's own: the deferred
+	// calls are not seen.
+	return !found || defersOutward(fn)
+}
+
+// deferMayRecover reports whether the call that d defers may recover
+// from a panic: unless it calls a function or closure of the source with
+// a body that does not call recover itself. recover has no effect when a
+// function called by the deferred function calls it, but it works through
+// the wrappers of a method value, a method expression and a promoted
+// method, which errtrace does not look through: any synthetic callee may
+// recover, as may a function value, an interface method, a function
+// without a body and a builtin (defer recover() does not recover when it
+// runs; it is counted as if it did, which only keeps values).
+func deferMayRecover(d *ssa.Defer) bool {
+	if d.Call.IsInvoke() {
+		return true
+	}
+	callee := d.Call.StaticCallee()
+	return callee == nil || callee.Synthetic != "" || callee.Blocks == nil || callsRecover(callee)
+}
+
+// defersOutward reports whether an anonymous function of fn, at any
+// depth, has a defer statement that defers into the frame of an enclosing
+// function.
+func defersOutward(fn *ssa.Function) bool {
+	for _, anon := range fn.AnonFuncs {
+		for _, b := range anon.Blocks {
+			for _, instr := range b.Instrs {
+				if d, ok := instr.(*ssa.Defer); ok && d.DeferStack != nil {
+					return true
+				}
+			}
+		}
+		if defersOutward(anon) {
+			return true
+		}
+	}
+	return false
+}
+
+// callsRecover reports whether fn calls the builtin recover.
+func callsRecover(fn *ssa.Function) bool {
+	for _, b := range fn.Blocks {
+		for _, instr := range b.Instrs {
+			if c, ok := instr.(ssa.CallInstruction); ok {
+				if bi, ok := c.Common().Value.(*ssa.Builtin); ok && bi.Name() == "recover" {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// located returns the load v of the variable alloc as the place a value
+// enters the function, or, if v has no position (the load of a named
+// result that a return makes after the deferred calls), the instruction
+// the analyzer walks for, or else (the return after a recovered panic)
+// the variable.
+func (a *analyzer) located(v ssa.Value, alloc *ssa.Alloc) any {
+	switch {
+	case v.Pos().IsValid():
+		return v
+	case a.at != nil && a.at.Pos().IsValid():
+		return a.at
+	case alloc.Pos().IsValid():
+		return alloc
+	}
+	return v
+}
+
+// escapedVariable is the detail of the Unresolved value of a local
+// variable that may be written other than by the stores errtrace found.
+func escapedVariable(alloc *ssa.Alloc) string {
+	return "variable " + alloc.Comment + " may be written through an escaped pointer"
+}
+
+// storeRef records the StoreRef of st, a store that a closure makes to
+// the captured variable alloc, loaded at src.
+func (a *analyzer) storeRef(st *ssa.Store, alloc *ssa.Alloc, src any) {
+	a.add(a.tbl.Intern(errset.Value{
+		Kind:  errset.StoreRef,
+		Site:  st,
+		Pos:   st.Pos(),
+		Fn:    st.Parent().String(),
+		Index: instrNumber(st),
+		Name:  alloc.Comment,
+	}), src)
+}
+
+// instrNumber returns the number of instr among the instructions of its
+// function, in block order.
+func instrNumber(instr ssa.Instruction) int {
+	n := 0
+	for _, b := range instr.Parent().Blocks {
+		if b != instr.Block() {
+			n += len(b.Instrs)
+			continue
+		}
+		for _, i := range b.Instrs {
+			if i == instr {
+				return n
+			}
+			n++
+		}
+	}
+	return n
+}
+
+// varWriters are the ways a local variable is written.
+type varWriters struct {
+	// stores are the Store instructions that write the variable: those of
+	// the function that declares it and those of every closure that
+	// captured it by reference (nested closures included), in the order
+	// of the variable's referrers.
+	stores []*ssa.Store
+	// escapes reports that the variable's address is used other than to
+	// load it, to store to it or to bind it into a closure: it may then be
+	// written by code errtrace does not attribute to it.
+	escapes bool
+}
+
+// variableWriters finds the writers of the local variable alloc. A
+// closure's body is always known, so however the closure itself is used
+// (called, deferred, run as a goroutine, passed on or stored), its writes
+// to the variable are its Stores through its FreeVar.
+func variableWriters(alloc *ssa.Alloc) varWriters {
+	var w varWriters
+	w.collect(alloc, make(map[ssa.Value]bool))
+	return w
+}
+
+func (w *varWriters) collect(addr ssa.Value, seen map[ssa.Value]bool) {
+	if seen[addr] {
+		return
+	}
+	seen[addr] = true
+	refs := addr.Referrers()
+	if refs == nil {
+		return
+	}
+	for _, r := range *refs {
+		switch r := r.(type) {
+		case *ssa.Store:
+			if r.Addr != addr || r.Val == addr {
+				w.escapes = true
+				continue
+			}
+			w.stores = append(w.stores, r)
+		case *ssa.UnOp:
+			if r.Op != token.MUL {
+				w.escapes = true
+			}
+		case *ssa.DebugRef:
+		case *ssa.MakeClosure:
+			fn, ok := r.Fn.(*ssa.Function)
+			if !ok {
+				w.escapes = true
+				continue
+			}
+			for i, b := range r.Bindings {
+				if b != addr {
+					continue
+				}
+				if i >= len(fn.FreeVars) {
+					w.escapes = true
+					continue
+				}
+				w.collect(fn.FreeVars[i], seen)
+			}
+		default:
+			w.escapes = true
+		}
 	}
 }
 
@@ -526,6 +1136,15 @@ func (a *analyzer) sentinels() *Sentinels {
 		a.opts.Sentinels = NewSentinels()
 	}
 	return a.opts.Sentinels
+}
+
+// addSentinel adds the Sentinel of the variable g, loaded at src with the
+// dynamic type typ (nil if the load does not say), and what its value
+// wraps (see sentinelWraps).
+func (a *analyzer) addSentinel(g *ssa.Global, typ types.Type, src ssa.Value) {
+	id := a.sentinel(g, typ)
+	a.add(id, src)
+	a.sentinelWraps(g, a.tbl.Get(id), src)
 }
 
 func (a *analyzer) sentinel(g *ssa.Global, typ types.Type) errset.ValueID {

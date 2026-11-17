@@ -1,0 +1,76 @@
+QA3 M2. Two deferred closures wrap the named result, one in a *W3 and one with
+fmt.Errorf; at run time F1 returns the Errorf Wrap of the *W3 of io.EOF, and
+errors.Unwrap of it is the *W3. The value read back around the cycle of stores
+is io.EOF under "any number of the cycle's Wraps": unwrapping it gives that
+leaf under each Wrap of the cycle, so *W3.Unwrap shows in a Wrap Chain.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:20:12-14: Error Set of example.com/x.G1: 3 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat] [+1 more paths]
+	path (origin → target):
+		$WORK/a.go:17:9-15: in example.com/x.F1
+		$WORK/a.go:16:34-37: in example.com/x.F1$2
+		$WORK/a.go:16:17-20: in example.com/x.F1$2
+		$WORK/a.go:17:2-2: in example.com/x.F1
+		$WORK/a.go:20:46-50: in example.com/x.G1, call to example.com/x.F1
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap
+		$WORK/a.go:12:38-39: in (*example.com/x.W3).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*example.com/x.W3).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 2 of 2 candidates)
+		$WORK/a.go:20:32-51: in example.com/x.G1, call to errors.Unwrap
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:15:23-47: fmt.Errorf "x: %w"
+	path (origin → target):
+		$WORK/a.go:17:9-15: in example.com/x.F1
+		$WORK/a.go:15:43-46: in example.com/x.F1$1
+		$WORK/a.go:15:17-20: in example.com/x.F1$1
+		$WORK/a.go:17:2-2: in example.com/x.F1
+		$WORK/a.go:20:46-50: in example.com/x.G1, call to example.com/x.F1
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap
+		$WORK/a.go:12:38-39: in (*example.com/x.W3).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*example.com/x.W3).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 2 of 2 candidates)
+		$WORK/a.go:20:32-51: in example.com/x.G1, call to errors.Unwrap
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:16:23-38: *example.com/x.W3.Unwrap
+	path (origin → target):
+		$WORK/a.go:17:9-15: in example.com/x.F1
+		$WORK/a.go:16:34-37: in example.com/x.F1$2
+		$WORK/a.go:16:17-20: in example.com/x.F1$2
+		$WORK/a.go:17:2-2: in example.com/x.F1
+		$WORK/a.go:20:46-50: in example.com/x.G1, call to example.com/x.F1
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap
+		$WORK/a.go:12:38-39: in (*example.com/x.W3).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*example.com/x.W3).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 2 of 2 candidates)
+		$WORK/a.go:20:32-51: in example.com/x.G1, call to errors.Unwrap
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+)
+
+type W3 struct{ inner error }
+
+func (w *W3) Error() string { return "w3" }
+func (w *W3) Unwrap() error { return w.inner }
+
+func F1() (err error) {
+	defer func() { err = fmt.Errorf("x: %w", err) }()
+	defer func() { err = &W3{inner: err} }()
+	return io.EOF
+}
+
+func /*@q*/G1() error { return errors.Unwrap(F1()) }
+
+func main() {
+	var w3 *W3
+	fmt.Println(errors.As(G1(), &w3))
+}

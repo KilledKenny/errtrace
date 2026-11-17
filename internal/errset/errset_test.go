@@ -110,10 +110,74 @@ func TestDedup(t *testing.T) {
 		{Leaf: sb, Path: p1},
 		{Leaf: sa, Path: p2},
 		{Leaf: sa, Path: p1}, // the same path again: not another path
-	})
+	}, nil)
 	want := []Entry{
 		{Leaf: sa, Path: p1, MorePaths: 1},
 		{Leaf: sb, Path: p1},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Dedup =\n%+v\nwant\n%+v", got, want)
+	}
+}
+
+// Two leaves that are shown the same (the same description at the same
+// position, here none) are one entry when Dedup is given positions, and
+// two when it compares leaves by identity. A leaf that is shown at
+// another position stays apart, and a merged entry is via a field
+// location only if every one of its entries is.
+func TestDedupMergesLeavesShownTheSame(t *testing.T) {
+	tbl := NewTable()
+	typ := types.Typ[types.Int]
+	c1 := tbl.Intern(Value{Kind: Concrete, Type: typ, Pos: 10})
+	c2 := tbl.Intern(Value{Kind: Concrete, Type: typ, Pos: 20})
+	c3 := tbl.Intern(Value{Kind: Concrete, Type: typ, Pos: 30})
+	if c1 == c2 {
+		t.Fatal("values at different positions were interned as one")
+	}
+	p1 := Path{{Site: "one", Func: "F"}}
+	p2 := Path{{Site: "two", Func: "F"}}
+	entries := []Entry{
+		{Leaf: c1, Path: p1, ViaLocation: "field f of T"},
+		{Leaf: c2, Path: p2},
+		{Leaf: c3, Path: p1},
+	}
+	pos := func(id ValueID) (string, int) {
+		if id == c3 {
+			return "a.go", 7
+		}
+		return "", -1
+	}
+	got := Dedup(tbl, entries, pos)
+	want := []Entry{
+		{Leaf: c1, Path: p1, MorePaths: 1},
+		{Leaf: c3, Path: p1},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Dedup with positions =\n%+v\nwant\n%+v", got, want)
+	}
+	if got := Dedup(tbl, entries, nil); len(got) != 3 {
+		t.Errorf("Dedup by identity = %d entries, want 3", len(got))
+	}
+}
+
+func TestDedupShowsWrapOfNothingOnce(t *testing.T) {
+	_, a, _ := testVars()
+	tbl := NewTable()
+	// err = fmt.Errorf("x: %w", err), starting from nil: the Opaque Error
+	// of the Errorf, read back around the cycle and wrapped by it again.
+	opaque := tbl.Intern(Value{Kind: Opaque, Pos: 10, Constructor: "fmt.Errorf", Message: "x: %w", HasMessage: true})
+	again := tbl.Intern(Value{Kind: Truncated, Pos: 10, Repeat: true, Inner: []ValueID{opaque}})
+	nested := tbl.Intern(Value{Kind: Wrap, Pos: 10, WrapKind: WrapErrorf, Format: "x: %w", Inner: []ValueID{again}})
+	// A Sentinel under the same Errorf is not the Errorf's own nil form.
+	sent := tbl.Intern(Value{Kind: Sentinel, Var: a})
+	sentAgain := tbl.Intern(Value{Kind: Truncated, Repeat: true, Inner: []ValueID{sent}})
+	wrapped := tbl.Intern(Value{Kind: Wrap, Pos: 10, WrapKind: WrapErrorf, Format: "x: %w", Inner: []ValueID{sentAgain}})
+	entries := append(Flatten(tbl, opaque), Flatten(tbl, nested)...)
+	entries = append(entries, Flatten(tbl, wrapped)...)
+	got := Dedup(tbl, entries, nil)
+	want := []Entry{
+		{Leaf: opaque, Chain: []ValueID{}},
+		{Leaf: sent, Chain: []ValueID{wrapped}, Repeats: true},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Dedup =\n%+v\nwant\n%+v", got, want)
@@ -138,7 +202,7 @@ func TestDedupComparesWrapsWithoutSiblings(t *testing.T) {
 			entries = append(entries, e)
 		}
 	}
-	got := Dedup(tbl, entries)
+	got := Dedup(tbl, entries, nil)
 	want := []Entry{
 		{Leaf: sa, Chain: []ValueID{w1}, Path: p},
 		{Leaf: sb, Chain: []ValueID{w2}, Path: p},

@@ -1,0 +1,64 @@
+QA5 M4, control. The closure that writes the named result is also called by
+the function, not only deferred: it may run before the load that the
+fmt.Errorf wraps, so its value is listed under the Wrap too. (Run time: T(0)
+is ErrClose under "f".)
+-- args --
+a.go:@t
+-- stdout --
+$WORK/a.go:18:12-13: Error Set of example.com/x.T: 3 entries
+$WORK/a.go:8:5-11: sentinel example.com/x.ErrGet
+	wrap chain (origin → target):
+		$WORK/a.go:28:10-34: fmt.Errorf "f: %w"
+	path (origin → target):
+		$WORK/a.go:13:10-16: in example.com/x.get
+		$WORK/a.go:25:8-14: in example.com/x.T, call to example.com/x.get
+$WORK/a.go:9:5-13: sentinel example.com/x.ErrClose [+1 more paths]
+	path (origin → target):
+		$WORK/a.go:21:10-18: in example.com/x.T$1
+		$WORK/a.go:21:4-7: in example.com/x.T$1
+		$WORK/a.go:28:3-3: in example.com/x.T
+$WORK/a.go:9:5-13: sentinel example.com/x.ErrClose
+	wrap chain (origin → target):
+		$WORK/a.go:28:10-34: fmt.Errorf "f: %w"
+	path (origin → target):
+		$WORK/a.go:21:10-18: in example.com/x.T$1
+		$WORK/a.go:21:4-7: in example.com/x.T$1
+		$WORK/a.go:28:30-33: in example.com/x.T
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrGet = errors.New("get")
+var ErrClose = errors.New("close")
+
+func get(n int) error {
+	if n > 0 {
+		return ErrGet
+	}
+	return nil
+}
+
+func /*@t*/T(n int) (err error) {
+	fix := func() {
+		if err == nil {
+			err = ErrClose
+		}
+	}
+	defer fix()
+	err = get(n)
+	fix()
+	if err != nil {
+		return fmt.Errorf("f: %w", err)
+	}
+	return nil
+}
+
+func main() { fmt.Println(T(0), T(1)) }

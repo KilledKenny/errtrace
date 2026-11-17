@@ -1,0 +1,65 @@
+QA5 M5, control. The later writer never stores nil (its parameter is followed
+to the one argument, a Sentinel): there is no wrapper with a nil field, and
+the guard on the later value leaves only what the literal stored.
+-- args --
+a.go:@v
+-- stdout --
+$WORK/a.go:26:12-13: Error Set of example.com/x.V: 2 entries, 1 possibly handled
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	wrap chain (origin → target):
+		$WORK/a.go:18:26-43: *example.com/x.W.Unwrap
+	path (origin → target):
+		$WORK/a.go:18:36-42: in example.com/x.mk
+		$WORK/a.go:27:9-13: in example.com/x.V, call to example.com/x.mk
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [via field inner of example.com/x.W]
+	wrap chain (origin → target):
+		$WORK/a.go:18:26-43: *example.com/x.W.Unwrap
+	possibly handled:
+		$WORK/a.go:29:5-33: errors.Is with os.ErrClosed: wrapped value may be nil
+	path (origin → target):
+		$WORK/a.go:22:9-21: in example.com/x.set
+		$WORK/a.go:22:3-22: in example.com/x.set, call to (*example.com/x.W).Set
+		$WORK/a.go:14:40-41: in (*example.com/x.W).Set
+		$WORK/a.go:14:32-37: in (*example.com/x.W).Set
+		$WORK/a.go:18:26-43: in example.com/x.mk
+		$WORK/a.go:27:9-13: in example.com/x.V, call to example.com/x.mk
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"os"
+)
+
+type W struct{ inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.inner }
+func (w *W) Set(e error)   { w.inner = e }
+
+type setter interface{ Set(error) }
+
+func mk() error { return &W{inner: io.EOF} }
+
+func set(err error) {
+	if s, ok := err.(setter); ok {
+		s.Set(os.ErrClosed)
+	}
+}
+
+func /*@v*/V() error {
+	err := mk()
+	set(err)
+	if errors.Is(err, os.ErrClosed) {
+		return nil
+	}
+	return err
+}
+
+func main() { fmt.Println(V()) }

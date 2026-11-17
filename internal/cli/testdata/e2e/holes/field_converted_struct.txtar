@@ -1,0 +1,31 @@
+Two struct types converted to one another hold the same fields: a store
+through one type is a writer of the field loaded through the other.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:8:12-13: Error Set of example.com/fx.F: 1 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF [via field err of example.com/fx.B]
+	path (origin → target):
+		$WORK/a.go:13:15-21: in example.com/fx.main
+		$WORK/a.go:13:10-21: in example.com/fx.main
+		$WORK/a.go:9:9-14: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import "io"
+
+type A struct{ err error }
+type B struct{ err error }
+
+func /*@f*/F(b *B) error {
+	return b.err
+}
+
+func main() {
+	a := &A{err: io.EOF}
+	_ = F((*B)(a))
+}

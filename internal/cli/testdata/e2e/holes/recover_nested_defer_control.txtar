@@ -1,0 +1,39 @@
+QA6 C1, control. The deferred closure defers a closure that calls recover:
+that recovers a panic of the deferred closure, not the one of T, which goes
+on. T never returns the ErrHalf its named result held. (Run time: T(1)
+panics.)
+-- args --
+a.go:@t
+-- stdout --
+$WORK/a.go:16:12-13: Error Set of example.com/x.T: 0 entries
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrHalf = errors.New("half done")
+
+func step(n int) {
+	if n > 0 {
+		panic("boom")
+	}
+}
+
+func /*@t*/T(n int) (err error) {
+	defer func() {
+		defer func() { recover() }()
+	}()
+	err = ErrHalf
+	step(n)
+	err = nil
+	return
+}
+
+func main() { fmt.Println(T(1)) }

@@ -1,0 +1,50 @@
+The wrapper is loaded from a package-level variable: the analysis does not
+know which value of the type it is, so its field is what the program stores to
+that field of any value of the type. The entries carry the "via field" tag.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:23:12-13: Error Set of example.com/x.F: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF [via field Err of example.com/x.E]
+	path (origin → target):
+		$WORK/a.go:26:19-25: in example.com/x.main
+		$WORK/a.go:26:14-25: in example.com/x.main
+		$WORK/a.go:11:37-42: in example.com/x.F
+$WORK/a.go:15:2-6: sentinel example.com/x.ErrB [via field Err of example.com/x.E]
+	path (origin → target):
+		$WORK/a.go:19:35-39: in example.com/x.mkB
+		$WORK/a.go:19:30-39: in example.com/x.mkB
+		$WORK/a.go:11:37-42: in example.com/x.F
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"io"
+)
+
+type E struct{ Err error }
+
+func (e *E) Error() string { return "e" }
+func (e *E) Unwrap() error { return e.Err }
+
+var (
+	ErrA = errors.New("a")
+	ErrB = errors.New("b")
+)
+
+func mkA() error { return &E{Err: ErrA} }
+func mkB() error { return &E{Err: ErrB} }
+
+var stored *E
+
+func /*@q*/F() error { return errors.Unwrap(stored) }
+
+func main() {
+	stored = &E{Err: io.EOF}
+	_, _ = mkB(), F()
+}

@@ -1,0 +1,48 @@
+QA5 M1. A Sentinel whose value is a wrapper that a function writes later,
+through the pointer the variable holds: the Wrap of the Sentinel's value holds
+what the literal stored and one Unresolved value for the later writers. Their
+values are not listed under a Sentinel, which the whole program shares. (Run
+time: os.ErrClosed.)
+-- args --
+a.go:@t
+-- stdout --
+$WORK/a.go:16:12-13: Error Set of example.com/x.T: 3 entries, 1 unresolved
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	wrap chain (origin → target):
+		$WORK/a.go:14:5-9: *example.com/x.W.Unwrap
+	path (origin → target):
+		$WORK/a.go:18:9-13: in example.com/x.T
+$WORK/a.go:14:5-9: sentinel example.com/x.ErrX
+	path (origin → target):
+		$WORK/a.go:18:9-13: in example.com/x.T
+$WORK/a.go:14:12-29: unresolved(memory): field inner of example.com/x.W may be written after the value is built
+	wrap chain (origin → target):
+		$WORK/a.go:14:5-9: *example.com/x.W.Unwrap
+	path (origin → target):
+		$WORK/a.go:18:9-13: in example.com/x.T
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+	"os"
+)
+
+type W struct{ inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.inner }
+
+var ErrX = &W{inner: io.EOF}
+
+func /*@t*/T() error {
+	ErrX.inner = os.ErrClosed
+	return ErrX
+}
+
+func main() { fmt.Println(T()) }

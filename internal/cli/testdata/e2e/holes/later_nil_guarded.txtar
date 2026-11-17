@@ -1,0 +1,52 @@
+QA5 M5. A later writer sets the field of a tracked wrapper to nil, through an
+interface setter. The Wrap of what the literal stored holds io.EOF for sure
+and errors.Is with io.EOF removes it; the wrapper whose field was set to nil
+since is a value of its own, a Concrete Type, which that guard does not
+remove. (Run time: the bare wrapper.)
+-- args --
+a.go:@v
+-- stdout --
+$WORK/a.go:25:12-13: Error Set of example.com/x.V: 1 entries
+$WORK/a.go:17:26-43: concrete *example.com/x.W
+	path (origin → target):
+		$WORK/a.go:17:26-43: in example.com/x.mk
+		$WORK/a.go:26:9-13: in example.com/x.V, call to example.com/x.mk
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+)
+
+type W struct{ inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.inner }
+func (w *W) Set(e error)   { w.inner = e }
+
+type setter interface{ Set(error) }
+
+func mk() error { return &W{inner: io.EOF} }
+
+func clear(err error) {
+	if s, ok := err.(setter); ok {
+		s.Set(nil)
+	}
+}
+
+func /*@v*/V() error {
+	err := mk()
+	clear(err)
+	if errors.Is(err, io.EOF) {
+		return nil
+	}
+	return err
+}
+
+func main() { fmt.Println(V()) }

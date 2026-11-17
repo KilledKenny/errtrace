@@ -101,3 +101,34 @@ func TestApplyGuard(t *testing.T) {
 		}
 	}
 }
+
+// TestCompanionGuard checks that a check of another result of a call
+// removes the typed nil that the callee returns only with a failing value
+// of that result, and nothing else.
+func TestCompanionGuard(t *testing.T) {
+	t.Parallel()
+	tbl := errset.NewTable()
+	typ := types.NewPointer(types.NewNamed(types.NewTypeName(0, nil, "E", nil), types.NewStruct(nil, nil), nil))
+	marked := tbl.Intern(errset.Value{Kind: errset.Concrete, Type: typ, TypedNil: true, Index: 1 << 1})
+	plain := tbl.Intern(errset.Value{Kind: errset.Concrete, Type: typ, TypedNil: true})
+	value := tbl.Intern(errset.Value{Kind: errset.Concrete, Type: typ, Allocated: true})
+	param := tbl.Intern(errset.Value{Kind: errset.Param, Fn: "f", Name: "p"})
+	checked := errset.Guard{Kind: errset.GuardCompanion, Index: 1, Holds: true}
+	tests := []struct {
+		name string
+		id   errset.ValueID
+		g    errset.Guard
+		want flow.Outcome
+	}{
+		{"typed nil returned with a failing result 1", marked, checked, flow.Remove},
+		{"the same, result 0 checked", marked, errset.Guard{Kind: errset.GuardCompanion, Index: 0, Holds: true}, flow.Keep},
+		{"typed nil that is not marked", plain, checked, flow.Keep},
+		{"a value", value, checked, flow.Keep},
+		{"a parameter", param, checked, flow.Pending},
+	}
+	for _, tc := range tests {
+		if got, _ := flow.ApplyGuard(tbl, tc.id, tc.g); got != tc.want {
+			t.Errorf("%s: ApplyGuard = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}

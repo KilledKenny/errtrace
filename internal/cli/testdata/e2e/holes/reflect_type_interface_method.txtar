@@ -1,0 +1,36 @@
+QA4 C3. Reflection gets the struct type from the result of a method of an
+interface type (Type.Method(i).Type.Out).
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:15:12-13: Error Set of example.com/x.F: 1 entries, 1 unresolved
+$WORK/a.go:15:31-41: unresolved(memory): field Err of example.com/x.S may be written by reflection, unsafe code or a function that is not seen
+	path (origin → target):
+		$WORK/a.go:15:31-41: in example.com/x.F
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+	"reflect"
+)
+
+type S struct{ Err error }
+
+type I interface{ M() *S }
+
+var g any
+
+func /*@q*/F() error { return g.(*S).Err }
+
+func main() {
+	v := reflect.New(reflect.TypeOf((*I)(nil)).Elem().Method(0).Type.Out(0).Elem())
+	v.Elem().Field(0).Set(reflect.ValueOf(&io.EOF).Elem())
+	g = v.Interface()
+	fmt.Println(F())
+}

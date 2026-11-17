@@ -1,0 +1,56 @@
+QA N1. A deferred closure wraps a nil named result in a wrapper literal: a
+Concrete Type that wraps nothing, listed once and plain (QA4 m3).
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:20:12-13: Error Set of example.com/x.C: 1 entries
+$WORK/a.go:21:23-37: concrete *example.com/x.W
+	path (origin → target):
+		$WORK/a.go:21:23-37: in example.com/x.C$1
+		$WORK/a.go:21:17-20: in example.com/x.C$1
+		$WORK/a.go:20:17-20: in example.com/x.C
+		$WORK/a.go:21:33-36: in example.com/x.C$1
+		$WORK/a.go:21:17-20: in example.com/x.C$1
+		$WORK/a.go:20:17-20: in example.com/x.C
+		$WORK/a.go:21:33-36: in example.com/x.C$1
+		$WORK/a.go:21:17-20: in example.com/x.C$1
+		$WORK/a.go:22:2-2: in example.com/x.C
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import "fmt"
+
+type W struct{ inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.inner }
+
+func none() error { return nil }
+
+type S struct{ err error }
+
+func (s *S) wrap() { s.err = &W{inner: s.err} }
+
+func A() error { return &W{inner: none()} }
+
+func B(s *S) error { return s.err }
+
+func /*@q*/C() (err error) {
+	defer func() { err = &W{inner: err} }()
+	return nil
+}
+
+func D() (err error) {
+	defer func() { err = fmt.Errorf("ctx: %w", err) }()
+	return nil
+}
+
+func main() {
+	s := &S{}
+	s.wrap()
+	fmt.Println(A(), B(s), C(), D())
+}

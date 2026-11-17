@@ -99,7 +99,7 @@ func Run(ctx context.Context, prog *load.Program, tgt *target.Target, opts Optio
 		return nil, fmt.Errorf("unknown Target kind %v", tgt.Kind)
 	}
 	r.Stats = solver.Stats()
-	entries = errset.Dedup(r.Table, entries)
+	entries = errset.Dedup(r.Table, entries, r.position)
 	errset.Sort(r.Table, entries, r.position)
 	r.Entries = entries
 	return r, nil
@@ -110,7 +110,7 @@ func Run(ctx context.Context, prog *load.Program, tgt *target.Target, opts Optio
 // a count of the leaf's other sources.
 func (r *Result) entries(solver *summary.Solver, fn *ssa.Function, facts []summary.Fact) []errset.Entry {
 	var out []errset.Entry
-	for _, f := range facts {
+	for _, f := range solver.ResolveTop(facts) {
 		top, notes, ok := r.top(f.Value)
 		if !ok {
 			continue
@@ -126,6 +126,9 @@ func (r *Result) entries(solver *summary.Solver, fn *ssa.Function, facts []summa
 			if k < len(f.Leaves) {
 				entries[k].Path, _ = solver.Path(fn, f.Leaves[k])
 				entries[k].MorePaths = len(f.Leaves[k]) - 1
+				if r.Table.Get(entries[k].Leaf).Kind.IsOrigin() {
+					entries[k].ViaLocation = solver.ViaLocation(fn, f.Leaves[k])
+				}
 			}
 			entries[k].PossiblyHandled = notes
 		}
@@ -200,6 +203,20 @@ func (r *Result) leafTop(v errset.Value) errset.ValueID {
 			Kind: errset.Unresolved, Site: v.Site, Pos: v.Pos,
 			Unresolved: errset.DynamicFormat,
 			Detail:     fmt.Sprintf("format of fmt.Errorf comes from parameter %s of %s", v.Name, v.Fn),
+		})
+	case errset.StoreRef:
+		// The summaries resolve these; one that is left is a place the
+		// analysis did not see through.
+		return r.Table.Intern(errset.Value{
+			Kind: errset.Unresolved, Site: v.Site, Pos: v.Pos,
+			Unresolved: errset.Memory,
+			Detail:     fmt.Sprintf("variable %s written by %s", v.Name, v.Fn),
+		})
+	case errset.FieldRef:
+		return r.Table.Intern(errset.Value{
+			Kind: errset.Unresolved, Site: v.Site, Pos: v.Pos,
+			Unresolved: errset.Memory,
+			Detail:     v.Detail,
 		})
 	}
 	return r.Table.Intern(v)

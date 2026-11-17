@@ -22,6 +22,9 @@ type node struct {
 type best struct {
 	path    errset.Path
 	dynamic int
+	// via names the field location that the path goes through last
+	// (nearest to its end), or is empty if it goes through none.
+	via string
 }
 
 // less reports whether a is a cheaper path than b: fewer dynamic hops,
@@ -123,7 +126,10 @@ func (s *Solver) bestOf(fn *ssa.Function, srcs []Source) (best, bool) {
 
 // sourcePath returns the path through one source of a value in fn: hop 0
 // for a local source; for a captured variable, the path of the bound value
-// in the closure's creator, then the read in fn; for a source through a
+// in the closure's creator, then the read in fn; for a stored value, its
+// path in the function that stores it, then the store, then the load in
+// fn; for a value passed to a parameter, its path in the caller, the
+// call, then the parameter's path on from there; for a source through a
 // call, the path of the argument substituted into the callee (if any),
 // then the callee's path, then the call (with the method and Candidate
 // count of a dynamic call).
@@ -137,7 +143,29 @@ func (s *Solver) sourcePath(fn *ssa.Function, src Source) (best, bool) {
 			return best{}, false
 		}
 		path := slices.Concat(arg.path, errset.Path{{Site: src.Site, Func: fn.String()}})
-		return best{path: path, dynamic: arg.dynamic}, true
+		return best{path: path, dynamic: arg.dynamic, via: arg.via}, true
+	case Passed:
+		arg, ok := s.bestOf(src.ArgFn, src.ArgSources)
+		if !ok {
+			return best{}, false
+		}
+		then, ok := s.bestOf(fn, src.Then)
+		if !ok {
+			return best{}, false
+		}
+		hop := errset.Hop{Site: src.Site, Func: src.ArgFn.String(), Callee: src.Callee.String()}
+		return best{path: slices.Concat(arg.path, errset.Path{hop}, then.path), dynamic: arg.dynamic + then.dynamic, via: later(then.via, arg.via)}, true
+	case Stored:
+		arg, ok := s.bestOf(src.ArgFn, src.ArgSources)
+		if !ok {
+			return best{}, false
+		}
+		path := slices.Concat(arg.path, errset.Path{
+			{Site: src.Store, Func: src.ArgFn.String()},
+			{Site: src.Site, Func: fn.String()},
+		})
+		// The store to a field location is the last one on this way.
+		return best{path: path, dynamic: arg.dynamic, via: later(src.Field, arg.via)}, true
 	}
 	callee, ok := s.paths[node{src.Callee, src.CalleeResult, src.CalleeValue, src.CalleeLeaf}]
 	if !ok {
@@ -178,5 +206,5 @@ func (s *Solver) sourcePath(fn *ssa.Function, src Source) (best, bool) {
 	if src.Dynamic {
 		dynamic++
 	}
-	return best{path: path, dynamic: dynamic}, true
+	return best{path: path, dynamic: dynamic, via: later(callee.via, arg.via)}, true
 }

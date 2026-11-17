@@ -1,0 +1,34 @@
+QA3 C4. e, _ := err.(*E); return e: where the assertion fails, e is a nil *E,
+which is a non-nil error once returned. The operand is never an *E here, so
+the typed nil is the only entry.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:14:12-13: Error Set of example.com/x.F: 1 entries
+$WORK/a.go:15:2-3: concrete *example.com/x.E [typed nil]
+	path (origin → target):
+		$WORK/a.go:15:2-3: in example.com/x.F
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+)
+
+type E struct{ msg string }
+
+func (e *E) Error() string { return "e" }
+
+func src() error { return io.EOF }
+
+func /*@q*/F() error {
+	e, _ := src().(*E)
+	return e
+}
+
+func main() { fmt.Println(F() != nil) }

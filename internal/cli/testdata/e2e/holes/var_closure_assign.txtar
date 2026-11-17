@@ -1,0 +1,51 @@
+A variable that a closure assigns and its function returns: the load is the
+join of the function's own stores and the closure's, and the Propagation Path
+goes through the closure's store.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:17:12-13: Error Set of example.com/fx.F: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:23:9-15: in example.com/fx.F
+$WORK/a.go:10:10-28: opaque errors.New "step"
+	path (origin → target):
+		$WORK/a.go:10:10-28: in example.com/fx.step
+		$WORK/a.go:20:9-16: in example.com/fx.F$1, call to example.com/fx.step
+		$WORK/a.go:20:3-6: in example.com/fx.F$1
+		$WORK/a.go:25:9-12: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"io"
+)
+
+func step(n int) error {
+	if n > 0 {
+		return errors.New("step")
+	}
+	return nil
+}
+
+func run(f func()) { f() }
+
+func /*@f*/F(n int) error {
+	var err error
+	run(func() {
+		err = step(n)
+	})
+	if n == 7 {
+		err = io.EOF
+	}
+	return err
+}
+
+func main() {
+	_ = F(0)
+}

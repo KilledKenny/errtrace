@@ -1,0 +1,46 @@
+QA5 M1, control. The Wrap that is a Sentinel's value is equal to what the
+Sentinel is equal to: errors.Is with the Sentinel removes both.
+-- args --
+a.go:@t
+-- stdout --
+$WORK/a.go:23:12-13: Error Set of example.com/x.T: 1 entries
+$GOROOT/src/io/io.go:*: sentinel io.ErrUnexpectedEOF
+	path (origin → target):
+		$WORK/a.go:20:9-28: in example.com/x.src
+		$WORK/a.go:24:9-15: in example.com/x.T, call to example.com/x.src
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+)
+
+type W struct{ inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.inner }
+
+var ErrX error = &W{inner: io.EOF}
+
+func src(n int) error {
+	if n > 0 {
+		return ErrX
+	}
+	return io.ErrUnexpectedEOF
+}
+
+func /*@t*/T(n int) error {
+	err := src(n)
+	if errors.Is(err, ErrX) {
+		return nil
+	}
+	return err
+}
+
+func main() { fmt.Println(T(0), T(1)) }

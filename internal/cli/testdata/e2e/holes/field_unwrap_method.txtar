@@ -1,0 +1,55 @@
+errors.Unwrap calls the Unwrap method of every Candidate; E's returns the
+receiver's field, which holds what the two places that build an E store.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:22:12-13: Error Set of example.com/fx.F: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.ErrUnexpectedEOF
+	path (origin → target):
+		$WORK/a.go:19:17-36: in example.com/fx.build
+		$WORK/a.go:23:23-31: in example.com/fx.F, call to example.com/fx.build
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap
+		$WORK/a.go:11:37-38: in (*example.com/fx.E).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*example.com/fx.E).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 1 of 1 candidates)
+		$WORK/a.go:23:9-32: in example.com/fx.F, call to errors.Unwrap
+$WORK/a.go:13:5-13: sentinel example.com/fx.ErrInner
+	path (origin → target):
+		$WORK/a.go:17:18-26: in example.com/fx.build
+		$WORK/a.go:23:23-31: in example.com/fx.F, call to example.com/fx.build
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap
+		$WORK/a.go:11:37-38: in (*example.com/fx.E).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*example.com/fx.E).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 1 of 1 candidates)
+		$WORK/a.go:23:9-32: in example.com/fx.F, call to errors.Unwrap
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"io"
+)
+
+type E struct{ Err error }
+
+func (e *E) Error() string { return "e: " + e.Err.Error() }
+func (e *E) Unwrap() error { return e.Err }
+
+var ErrInner = errors.New("inner")
+
+func build(n int) error {
+	if n > 0 {
+		return &E{Err: ErrInner}
+	}
+	return &E{Err: io.ErrUnexpectedEOF}
+}
+
+func /*@f*/F(n int) error {
+	return errors.Unwrap(build(n))
+}
+
+func main() {
+	_ = F(0)
+}

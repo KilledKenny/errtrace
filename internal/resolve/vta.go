@@ -137,6 +137,22 @@ func (v *VTA) IsDynamic(site ssa.CallInstruction) bool {
 	return site.Common().StaticCallee() == nil
 }
 
+// Functions returns the functions that Reachable reports true for, sorted
+// by SSA name, then by position.
+func (v *VTA) Functions() []*ssa.Function {
+	out := make([]*ssa.Function, 0, len(v.reachable))
+	for fn := range v.reachable {
+		out = append(out, fn)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if a, b := out[i].String(), out[j].String(); a != b {
+			return a < b
+		}
+		return out[i].Pos() < out[j].Pos()
+	})
+	return out
+}
+
 // Reachable reports whether fn is in the forward slice of the roots in
 // the first VTA call graph: the functions the second pass analysed.
 func (v *VTA) Reachable(fn *ssa.Function) bool { return v.reachable[fn] }

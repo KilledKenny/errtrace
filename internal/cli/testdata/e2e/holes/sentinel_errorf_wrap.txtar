@@ -1,0 +1,33 @@
+QA5 M1. A Sentinel made by fmt.Errorf with %w: the initializer's operands are
+resolved, and the wrapped Sentinel is listed under the fmt.Errorf Wrap that is
+the value of the wrapping Sentinel.
+-- args --
+a.go:@t
+-- stdout --
+$WORK/a.go:11:12-13: Error Set of example.com/x.T: 2 entries
+$WORK/a.go:8:5-12: sentinel example.com/x.ErrBase
+	wrap chain (origin → target):
+		$WORK/a.go:9:5-11: fmt.Errorf "foo: %w"
+	path (origin → target):
+		$WORK/a.go:11:31-37: in example.com/x.T
+$WORK/a.go:9:5-11: sentinel example.com/x.ErrFoo
+	path (origin → target):
+		$WORK/a.go:11:31-37: in example.com/x.T
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrBase = errors.New("base")
+var ErrFoo = fmt.Errorf("foo: %w", ErrBase)
+
+func /*@t*/T() error { return ErrFoo }
+
+func main() { fmt.Println(T(), errors.Is(T(), ErrBase)) }

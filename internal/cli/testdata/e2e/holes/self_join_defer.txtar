@@ -1,0 +1,49 @@
+QA C6 (was a hang). A deferred closure joins the named result with itself. A
+load of the variable inside a value stored to it stands for the leaves of its
+values with the Wrap Chain cut, so the store is not unrolled.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:19:12-13: Error Set of example.com/x.B: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:9:27-33: in example.com/x.src
+		$WORK/a.go:21:9-14: in example.com/x.B, call to example.com/x.src
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat] [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:20:23-44: errors.Join
+	path (origin → target):
+		$WORK/a.go:9:27-33: in example.com/x.src
+		$WORK/a.go:21:9-14: in example.com/x.B, call to example.com/x.src
+		$WORK/a.go:20:35-38: in example.com/x.B$1
+		$WORK/a.go:20:17-20: in example.com/x.B$1
+		$WORK/a.go:21:2-2: in example.com/x.B
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+)
+
+func src() error { return io.EOF }
+
+func A(n int) error {
+	err := src()
+	for i := 0; i < n; i++ {
+		err = errors.Join(err, err)
+	}
+	return err
+}
+
+func /*@q*/B(n int) (err error) {
+	defer func() { err = errors.Join(err, err) }()
+	return src()
+}
+
+func main() { fmt.Println(A(2), B(1)) }

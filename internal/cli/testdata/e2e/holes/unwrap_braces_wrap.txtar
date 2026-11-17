@@ -1,0 +1,57 @@
+QA3 C1. errors.Unwrap of an errtrace.Wrap value: the Wrap is errtrace's
+wrapper, and the load of its field in the wrapper's Unwrap is resolved from
+that very Wrap.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:13:12-13: Error Set of example.com/x.F: 1 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:11:41-47: in example.com/x.src
+		$WORK/a.go:13:45-50: in example.com/x.F, call to example.com/x.src
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap
+		$WORK/errtrace/errtrace.go:6:7-8: in (*braces.dev/errtrace.wrapped).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*braces.dev/errtrace.wrapped).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 1 of 1 candidates)
+		$WORK/a.go:13:31-51: in example.com/x.F, call to errors.Unwrap
+-- go.mod --
+module example.com/x
+
+go 1.24
+
+require braces.dev/errtrace v0.0.0
+
+replace braces.dev/errtrace => ./errtrace
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+
+	"braces.dev/errtrace"
+)
+
+func src() error { return errtrace.Wrap(io.EOF) }
+
+func /*@q*/F() error { return errors.Unwrap(src()) }
+
+func main() { fmt.Println(F()) }
+-- errtrace/go.mod --
+module braces.dev/errtrace
+
+go 1.24
+-- errtrace/errtrace.go --
+package errtrace
+
+type wrapped struct{ err error }
+
+func (w *wrapped) Error() string { return w.err.Error() }
+func (w *wrapped) Unwrap() error { return w.err }
+
+func Wrap(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &wrapped{err}
+}

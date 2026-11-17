@@ -34,7 +34,9 @@ const (
 	// Wrap is a node of a Wrap Chain: an error that keeps its Inner errors
 	// reachable through errors.Is and errors.As.
 	Wrap
-	// Truncated marks a Wrap Chain that was cut at the chain depth limit.
+	// Truncated marks a Wrap Chain that was cut: at the chain depth limit,
+	// or, with Repeat set, where a value went around a cycle of stores
+	// (see Value.Repeat).
 	Truncated
 	// Unresolved is a place the analysis could not see through. It is
 	// never dropped from an Error Set.
@@ -60,6 +62,31 @@ const (
 	// substitutes its argument). It has the leaves of its inner value and
 	// only exists inside summaries.
 	Guarded
+	// StoreRef is symbolic: the value that the Store instruction at Site,
+	// in closure Fn, writes to the local variable Name, which Fn captured
+	// by reference and another function loads. Index numbers the store
+	// within Fn. The summaries replace it by the stored value's facts in
+	// Fn; it only exists inside summaries.
+	StoreRef
+	// FieldRef is symbolic: the value loaded at Site, in function Fn, from
+	// field Index (named Name) of the named struct type Type, through a
+	// pointer or value that was not built where it is loaded. The
+	// summaries replace it by what the program stores to that field
+	// anywhere (its field location); Detail describes the load, for when
+	// it stays Unresolved. It only exists inside summaries.
+	FieldRef
+	// FieldOf is symbolic: the value of field Index (named Name) of the
+	// value Inner[0], which is a pointer to (or a value of) the named
+	// struct type Type that implements error, loaded at Site in function
+	// Fn. Once Inner[0] is known, the summaries replace it: by the inner
+	// values of a Wrap that was built for that type with that field (and
+	// what the program may have stored to the field since), by nothing
+	// for a value of another type, by the field's location (as for a
+	// FieldRef) for a value of the type that was not tracked, and by an
+	// Unresolved value for a value that is not known to be of the type.
+	// It has the leaves of its inner value and only exists inside
+	// summaries.
+	FieldOf
 )
 
 var kindNames = [...]string{
@@ -74,6 +101,9 @@ var kindNames = [...]string{
 	CallRef:    "callref",
 	ErrorfLike: "errorf-like",
 	Guarded:    "guarded",
+	StoreRef:   "storeref",
+	FieldRef:   "fieldref",
+	FieldOf:    "fieldof",
 }
 
 // String returns the lower-case name of k.
@@ -90,7 +120,7 @@ func (k Kind) IsOrigin() bool { return k == Sentinel || k == Concrete || k == Op
 // IsLeaf reports whether a value of kind k is a leaf of a value tree: an
 // Error Origin, an Unresolved place, or (only inside summaries) a symbolic
 // value.
-func (k Kind) IsLeaf() bool { return k != Wrap && k != Truncated && k != Guarded }
+func (k Kind) IsLeaf() bool { return k != Wrap && k != Truncated && k != Guarded && k != FieldOf }
 
 // UnresolvedKind says why a value is Unresolved. The set is closed.
 type UnresolvedKind string
@@ -151,7 +181,11 @@ type Value struct {
 	// different Origins).
 	Pos token.Pos
 
-	// Var is the variable of a Sentinel.
+	// Var is the variable of a Sentinel, and of a Wrap that is the value
+	// of a Sentinel (var ErrX = &W{inner: io.EOF}, or one made by
+	// fmt.Errorf with %w): such a Wrap is equal to what the Sentinel is
+	// equal to. It also marks the Later FieldRef of such a Wrap (see
+	// Later).
 	Var *types.Var
 	// Canon is the variable whose value a Sentinel's Var holds (Var
 	// itself, or io.EOF for var ErrX = io.EOF), and Fresh reports that
@@ -161,8 +195,8 @@ type Value struct {
 	Fresh bool
 	// Type is the type of a Concrete Type Origin, the dynamic type of a
 	// Sentinel when errtrace knows it (its declared type, or that of its
-	// initializer), the wrapper type of a custom-Unwrap Wrap, and the type
-	// of a Param or FreeVar.
+	// initializer), the wrapper type of a custom-Unwrap Wrap, the type of
+	// a Param or FreeVar, and the struct type of a FieldRef.
 	Type types.Type
 	// TypedNil marks a Concrete Type Origin that is a nil pointer in a
 	// non-nil interface.
@@ -190,6 +224,32 @@ type Value struct {
 	// Inner are the wrapped values of a Wrap, or the single value under a
 	// Truncated marker.
 	Inner []ValueID
+	// Repeat marks a Truncated marker that stands for a value that went
+	// around a cycle of stores (s.err = wrap(s.err)): between the leaf and
+	// the Wraps above the marker there may be any number of further
+	// Wraps, those of the cycle among them. The chain was not cut at the
+	// chain depth limit.
+	Repeat bool
+	// Later marks a FieldRef that stands for what the field may come to
+	// hold after a value holding it was built (the values that are
+	// stored to it through a pointer to a value built before), not for
+	// everything the field holds anywhere; and the Wrap of a tracked
+	// value that holds such a FieldRef alone, until the FieldRef is
+	// resolved: with no value for it, there is no such Wrap. It also
+	// marks the Unresolved values that such a FieldRef resolves to: they
+	// stand, under the Wrap, for ways the field may be written later. A
+	// Later FieldRef with Var set is that of a Sentinel's value: if the
+	// field has later writers, it resolves to one Unresolved value, not
+	// to what they store.
+	Later bool
+	// Untracked marks a custom-Unwrap Wrap that stands for a value of the
+	// wrapper type that is not a tracked value (a parameter, a load, an
+	// errors.As target, a variable written field by field): what its
+	// field holds is not known, and its single inner value is an
+	// Unresolved value saying so. Such a value is not a new allocation,
+	// and a load of its field is resolved as for a Concrete Type Origin
+	// of the type, from the field's location.
+	Untracked bool
 	// MayHoldNil marks a Wrap that, on some path, holds nothing for one of
 	// its operands, which was nil there: a %w operand of fmt.Errorf, an
 	// operand of errors.Join or the field a custom Unwrap returns. Such a
@@ -199,19 +259,29 @@ type Value struct {
 
 	// Unresolved is the kind of an Unresolved value.
 	Unresolved UnresolvedKind
-	// Detail describes an Unresolved value, or the callee of a CallRef.
+	// Detail describes an Unresolved value, the callee of a CallRef, or
+	// the load of a FieldRef.
 	Detail string
 
-	// Fn is the SSA name of the function a Param or FreeVar belongs to.
+	// Fn is the SSA name of the function a Param or FreeVar belongs to,
+	// of the closure that makes the store of a StoreRef, or of the
+	// function that makes the load of a FieldRef.
 	Fn string
 	// Index is the parameter index of a Param, the free variable index of
-	// a FreeVar, the result index of a CallRef, or the format parameter
-	// index of an ErrorfLike.
+	// a FreeVar, the result index of a CallRef, the format parameter
+	// index of an ErrorfLike, the number of a StoreRef's store in Fn, or
+	// the field index of a FieldRef. For a typed nil made by a return
+	// statement that gives another result a failing value (return nil,
+	// err with a non-nil err; return nil, false), it is the set of those
+	// results, bit i for result i: the typed nil is returned only
+	// together with them (see GuardCompanion). The summaries clear it
+	// where the value is passed on by another function.
 	Index int
 	// ArgIndex is the index of the variadic operands parameter of an
 	// ErrorfLike.
 	ArgIndex int
-	// Name is the source name of a Param or FreeVar.
+	// Name is the source name of a Param or FreeVar, of the variable a
+	// StoreRef's store writes, or of the field of a FieldRef.
 	Name string
 	// Guards are the pending guards of a Guarded value.
 	Guards []Guard
@@ -233,6 +303,9 @@ type key struct {
 	format      string
 	inner       string
 	mayHoldNil  bool
+	untracked   bool
+	later       bool
+	repeat      bool
 	unresolved  UnresolvedKind
 	detail      string
 	fn          string
@@ -242,7 +315,25 @@ type key struct {
 	guards      string
 }
 
-func keyOf(v Value) key {
+// typeKeys caches the strings of types, which name them in keys: a type
+// is asked for once per value interned.
+type typeKeys map[types.Type]string
+
+func (c typeKeys) of(t types.Type) string {
+	if c == nil {
+		return types.TypeString(t, nil)
+	}
+	s, ok := c[t]
+	if !ok {
+		s = types.TypeString(t, nil)
+		c[t] = s
+	}
+	return s
+}
+
+func keyOf(v Value) key { return keyWith(v, nil) }
+
+func keyWith(v Value, typs typeKeys) key {
 	k := key{
 		kind:        v.Kind,
 		pos:         v.Pos,
@@ -254,6 +345,9 @@ func keyOf(v Value) key {
 		hasMessage:  v.HasMessage,
 		wrapKind:    v.WrapKind,
 		mayHoldNil:  v.MayHoldNil,
+		untracked:   v.Untracked,
+		later:       v.Later,
+		repeat:      v.Repeat,
 		format:      v.Format,
 		unresolved:  v.Unresolved,
 		detail:      v.Detail,
@@ -264,7 +358,7 @@ func keyOf(v Value) key {
 		guards:      guardsKey(v.Guards),
 	}
 	if v.Type != nil {
-		k.typ = types.TypeString(v.Type, nil)
+		k.typ = typs.of(v.Type)
 	}
 	if len(v.Inner) > 0 {
 		var b strings.Builder
@@ -287,11 +381,12 @@ type Table struct {
 	// leaves is the number of leaves of each value's tree.
 	leaves []int
 	index  map[key]ValueID
+	typs   typeKeys
 }
 
 // NewTable returns an empty Table.
 func NewTable() *Table {
-	return &Table{index: make(map[key]ValueID)}
+	return &Table{index: make(map[key]ValueID), typs: make(typeKeys)}
 }
 
 // Intern returns the ValueID of v, adding v to the table if no equal value
@@ -305,7 +400,7 @@ func (t *Table) Intern(v Value) ValueID {
 			panic(fmt.Sprintf("errset: Intern of a Value with unknown inner ValueID %d", id))
 		}
 	}
-	k := keyOf(v)
+	k := keyWith(v, t.typs)
 	if id, ok := t.index[k]; ok {
 		return id
 	}
@@ -368,7 +463,12 @@ func (t *Table) String(id ValueID) string {
 		}
 		return fmt.Sprintf("wrap(%s %s)[%s]", v.WrapKind, t.WrapDescription(id), strings.Join(parts, "; "))
 	case Truncated:
+		if v.Repeat {
+			return "repeat[" + t.String(v.Inner[0]) + "]"
+		}
 		return "truncated[" + t.String(v.Inner[0]) + "]"
+	case FieldOf:
+		return fmt.Sprintf("fieldof %s.%s[%s]", types.TypeString(v.Type, nil), v.Name, t.String(v.Inner[0]))
 	case Unresolved:
 		return fmt.Sprintf("unresolved(%s): %s", v.Unresolved, v.Detail)
 	case Param:
@@ -379,6 +479,13 @@ func (t *Table) String(id ValueID) string {
 		return fmt.Sprintf("callref %s #%d", v.Detail, v.Index)
 	case ErrorfLike:
 		return fmt.Sprintf("errorf-like %s format#%d args#%d", v.Fn, v.Index, v.ArgIndex)
+	case StoreRef:
+		return fmt.Sprintf("storeref %s#%d %s", v.Fn, v.Index, v.Name)
+	case FieldRef:
+		if v.Later {
+			return fmt.Sprintf("fieldref later %s.%s", types.TypeString(v.Type, nil), v.Name)
+		}
+		return fmt.Sprintf("fieldref %s.%s", types.TypeString(v.Type, nil), v.Name)
 	case Guarded:
 		parts := make([]string, len(v.Guards))
 		for i, g := range v.Guards {
@@ -483,13 +590,26 @@ func (t *Table) capAt(id ValueID, level, limit, base int) []Capped {
 		}
 		return []Capped{{Value: t.Intern(v), From: from}}
 	case Truncated:
-		if t.Get(v.Inner[0]).Kind.IsLeaf() {
+		if in := t.Get(v.Inner[0]); in.Kind.IsLeaf() {
 			return []Capped{{Value: id, From: [][]int{{base}}}}
+		} else if in.Kind == FieldOf {
+			return []Capped{{Value: id, From: seq(base, t.leaves[id])}}
+		}
+		if v.Repeat {
+			// The marker of a cycle stays one: push it down to the
+			// leaves.
+			inner := t.capAt(v.Inner[0], level, limit, base)
+			var out []Capped
+			for _, c := range inner {
+				out = append(out, t.repeatLeaves(c)...)
+			}
+			return out
 		}
 		return t.truncateLeaves(v.Inner[0], base)
-	case Guarded:
+	case Guarded, FieldOf:
 		// Guards don't count as Wraps: cap the inner value and keep the
-		// guards over each capped value.
+		// guards over each capped value. So for the value a FieldOf
+		// loads a field of.
 		inner := t.capAt(v.Inner[0], level, limit, base)
 		if len(inner) == 1 && inner[0].Value == v.Inner[0] {
 			return []Capped{{Value: id, From: seq(base, t.leaves[id])}}
@@ -502,6 +622,33 @@ func (t *Table) capAt(id ValueID, level, limit, base int) []Capped {
 		return inner
 	}
 	return []Capped{{Value: id, From: [][]int{{base}}}}
+}
+
+// repeatLeaves returns the capped value c with a Repeat marker over each
+// of its leaves (those already under a Truncated marker keep theirs),
+// Wraps kept.
+func (t *Table) repeatLeaves(c Capped) []Capped {
+	return []Capped{{Value: t.RepeatLeaves(c.Value), From: c.From}}
+}
+
+// RepeatLeaves returns the value tree id with a Repeat marker directly
+// above each of its leaves (and above each FieldOf): the tree of a value
+// that went around a cycle of stores. A leaf already under a Truncated
+// marker keeps that marker. The tree keeps its shape and leaf order.
+func (t *Table) RepeatLeaves(id ValueID) ValueID {
+	v := t.Get(id)
+	switch {
+	case v.Kind == Truncated:
+		return id
+	case v.Kind.IsLeaf(), v.Kind == FieldOf:
+		return t.Intern(Value{Kind: Truncated, Repeat: true, Site: v.Site, Pos: v.Pos, Inner: []ValueID{id}})
+	}
+	inner := make([]ValueID, len(v.Inner))
+	for i, in := range v.Inner {
+		inner[i] = t.RepeatLeaves(in)
+	}
+	v.Inner = inner
+	return t.Intern(v)
 }
 
 // seq returns n consecutive indices from base, one per leaf.
@@ -518,19 +665,46 @@ func seq(base, n int) [][]int {
 // values in the cut part are dropped, which keeps more values, never
 // fewer.
 func (t *Table) truncateLeaves(id ValueID, base int) []Capped {
+	return t.cutLeaves(id, base, false)
+}
+
+// RepeatCut returns a Repeat marker over each distinct leaf of the tree
+// id (see Value.Repeat), with the indices of the leaves it stands for: the
+// tree as it is read back inside a cycle of stores, its Wrap Chains
+// dropped. A leaf that is the whole tree is marked too.
+func (t *Table) RepeatCut(id ValueID) []Capped {
+	return t.cutLeaves(id, 0, true)
+}
+
+func (t *Table) cutLeaves(id ValueID, base int, repeat bool) []Capped {
 	var out []Capped
 	seen := make(map[ValueID]int)
 	next := base
 	var walk func(ValueID)
 	walk = func(id ValueID) {
 		v := t.Get(id)
+		if v.Kind == FieldOf {
+			// A field of a value still to come: cut as one unit, with
+			// all its leaves.
+			n := t.leaves[id]
+			from := make([][]int, n)
+			for i := range from {
+				from[i] = []int{next + i}
+			}
+			out = append(out, Capped{
+				Value: t.Intern(Value{Kind: Truncated, Repeat: repeat, Site: v.Site, Pos: v.Pos, Inner: []ValueID{id}}),
+				From:  from,
+			})
+			next += n
+			return
+		}
 		if v.Kind.IsLeaf() {
 			if at, ok := seen[id]; ok {
 				out[at].From[0] = append(out[at].From[0], next)
 			} else {
 				seen[id] = len(out)
 				out = append(out, Capped{
-					Value: t.Intern(Value{Kind: Truncated, Site: v.Site, Pos: v.Pos, Inner: []ValueID{id}}),
+					Value: t.Intern(Value{Kind: Truncated, Repeat: repeat, Site: v.Site, Pos: v.Pos, Inner: []ValueID{id}}),
 					From:  [][]int{{next}},
 				})
 			}

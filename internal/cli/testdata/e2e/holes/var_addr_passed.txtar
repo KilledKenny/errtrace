@@ -1,0 +1,51 @@
+A variable whose address is passed to a call may be written through the
+pointer: the load keeps an Unresolved entry next to the values of the stores
+that are seen (the function's own and the closure's).
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:12:12-13: Error Set of example.com/fx.F: 3 entries, 1 unresolved
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:17:10-16: in example.com/fx.F$1
+		$WORK/a.go:17:4-7: in example.com/fx.F$1
+		$WORK/a.go:23:9-12: in example.com/fx.F
+$GOROOT/src/io/io.go:*: sentinel io.ErrUnexpectedEOF
+	path (origin → target):
+		$WORK/a.go:21:9-28: in example.com/fx.F
+$WORK/a.go:23:9-12: unresolved(memory): variable err may be written through an escaped pointer
+	path (origin → target):
+		$WORK/a.go:23:9-12: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"io"
+)
+
+var ErrP = errors.New("p")
+
+func setp(p *error) { *p = ErrP }
+
+func /*@f*/F(n int) error {
+	var err error
+	setp(&err)
+	func() {
+		if n > 1 {
+			err = io.EOF
+		}
+	}()
+	if n > 2 {
+		err = io.ErrUnexpectedEOF
+	}
+	return err
+}
+
+func main() {
+	_ = F(0)
+}

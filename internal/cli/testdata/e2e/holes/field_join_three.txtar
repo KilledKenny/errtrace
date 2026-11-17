@@ -1,0 +1,172 @@
+QA M1. A method joins a field with other errors in three stores.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:20:12-13: Error Set of example.com/x.F: 16 entries
+$GOROOT/src/io/io.go:*: sentinel io.ErrShortWrite [chain may repeat] [via field a of example.com/x.S]
+	wrap chain (origin → target):
+		$WORK/a.go:15:8-39: errors.Join
+	path (origin → target):
+		$WORK/a.go:16:25-41: in (*example.com/x.S).step
+		$WORK/a.go:16:4-5: in (*example.com/x.S).step
+		$WORK/a.go:15:20-23: in (*example.com/x.S).step
+		$WORK/a.go:15:4-5: in (*example.com/x.S).step
+		$WORK/a.go:20:35-38: in example.com/x.F
+$GOROOT/src/io/io.go:*: sentinel io.ErrShortWrite [via field a of example.com/x.S]
+	wrap chain (origin → target):
+		$WORK/a.go:16:8-42: errors.Join
+	path (origin → target):
+		$WORK/a.go:16:25-41: in (*example.com/x.S).step
+		$WORK/a.go:16:4-5: in (*example.com/x.S).step
+		$WORK/a.go:20:35-38: in example.com/x.F
+$GOROOT/src/io/io.go:*: sentinel io.ErrShortWrite [chain may repeat] [via field a of example.com/x.S]
+	wrap chain (origin → target):
+		$WORK/a.go:16:8-42: errors.Join
+	path (origin → target):
+		$WORK/a.go:16:25-41: in (*example.com/x.S).step
+		$WORK/a.go:16:4-5: in (*example.com/x.S).step
+		$WORK/a.go:16:20-23: in (*example.com/x.S).step
+		$WORK/a.go:16:4-5: in (*example.com/x.S).step
+		$WORK/a.go:20:35-38: in example.com/x.F
+$GOROOT/src/io/io.go:*: sentinel io.ErrShortWrite [chain may repeat] [via field a of example.com/x.S]
+	wrap chain (origin → target):
+		$WORK/a.go:17:8-42: errors.Join
+	path (origin → target):
+		$WORK/a.go:16:25-41: in (*example.com/x.S).step
+		$WORK/a.go:16:4-5: in (*example.com/x.S).step
+		$WORK/a.go:17:20-23: in (*example.com/x.S).step
+		$WORK/a.go:17:4-5: in (*example.com/x.S).step
+		$WORK/a.go:20:35-38: in example.com/x.F
+$GOROOT/src/io/io.go:*: sentinel io.EOF [via field a of example.com/x.S]
+	path (origin → target):
+		$WORK/a.go:23:13-19: in example.com/x.main
+		$WORK/a.go:23:10-19: in example.com/x.main
+		$WORK/a.go:20:35-38: in example.com/x.F
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat] [via field a of example.com/x.S]
+	wrap chain (origin → target):
+		$WORK/a.go:15:8-39: errors.Join
+	path (origin → target):
+		$WORK/a.go:23:13-19: in example.com/x.main
+		$WORK/a.go:23:10-19: in example.com/x.main
+		$WORK/a.go:15:20-23: in (*example.com/x.S).step
+		$WORK/a.go:15:4-5: in (*example.com/x.S).step
+		$WORK/a.go:20:35-38: in example.com/x.F
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat] [via field a of example.com/x.S]
+	wrap chain (origin → target):
+		$WORK/a.go:16:8-42: errors.Join
+	path (origin → target):
+		$WORK/a.go:23:13-19: in example.com/x.main
+		$WORK/a.go:23:10-19: in example.com/x.main
+		$WORK/a.go:16:20-23: in (*example.com/x.S).step
+		$WORK/a.go:16:4-5: in (*example.com/x.S).step
+		$WORK/a.go:20:35-38: in example.com/x.F
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat] [via field a of example.com/x.S]
+	wrap chain (origin → target):
+		$WORK/a.go:17:8-42: errors.Join
+	path (origin → target):
+		$WORK/a.go:23:13-19: in example.com/x.main
+		$WORK/a.go:23:10-19: in example.com/x.main
+		$WORK/a.go:17:20-23: in (*example.com/x.S).step
+		$WORK/a.go:17:4-5: in (*example.com/x.S).step
+		$WORK/a.go:20:35-38: in example.com/x.F
+$GOROOT/src/io/io.go:*: sentinel io.ErrNoProgress [chain may repeat] [via field a of example.com/x.S]
+	wrap chain (origin → target):
+		$WORK/a.go:15:8-39: errors.Join
+	path (origin → target):
+		$WORK/a.go:17:25-41: in (*example.com/x.S).step
+		$WORK/a.go:17:4-5: in (*example.com/x.S).step
+		$WORK/a.go:15:20-23: in (*example.com/x.S).step
+		$WORK/a.go:15:4-5: in (*example.com/x.S).step
+		$WORK/a.go:20:35-38: in example.com/x.F
+$GOROOT/src/io/io.go:*: sentinel io.ErrNoProgress [chain may repeat] [via field a of example.com/x.S]
+	wrap chain (origin → target):
+		$WORK/a.go:16:8-42: errors.Join
+	path (origin → target):
+		$WORK/a.go:17:25-41: in (*example.com/x.S).step
+		$WORK/a.go:17:4-5: in (*example.com/x.S).step
+		$WORK/a.go:16:20-23: in (*example.com/x.S).step
+		$WORK/a.go:16:4-5: in (*example.com/x.S).step
+		$WORK/a.go:20:35-38: in example.com/x.F
+$GOROOT/src/io/io.go:*: sentinel io.ErrNoProgress [via field a of example.com/x.S]
+	wrap chain (origin → target):
+		$WORK/a.go:17:8-42: errors.Join
+	path (origin → target):
+		$WORK/a.go:17:25-41: in (*example.com/x.S).step
+		$WORK/a.go:17:4-5: in (*example.com/x.S).step
+		$WORK/a.go:20:35-38: in example.com/x.F
+$GOROOT/src/io/io.go:*: sentinel io.ErrNoProgress [chain may repeat] [via field a of example.com/x.S]
+	wrap chain (origin → target):
+		$WORK/a.go:17:8-42: errors.Join
+	path (origin → target):
+		$WORK/a.go:17:25-41: in (*example.com/x.S).step
+		$WORK/a.go:17:4-5: in (*example.com/x.S).step
+		$WORK/a.go:17:20-23: in (*example.com/x.S).step
+		$WORK/a.go:17:4-5: in (*example.com/x.S).step
+		$WORK/a.go:20:35-38: in example.com/x.F
+$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid [via field a of example.com/x.S]
+	wrap chain (origin → target):
+		$WORK/a.go:15:8-39: errors.Join
+	path (origin → target):
+		$WORK/a.go:15:25-38: in (*example.com/x.S).step
+		$WORK/a.go:15:4-5: in (*example.com/x.S).step
+		$WORK/a.go:20:35-38: in example.com/x.F
+$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid [chain may repeat] [via field a of example.com/x.S]
+	wrap chain (origin → target):
+		$WORK/a.go:15:8-39: errors.Join
+	path (origin → target):
+		$WORK/a.go:15:25-38: in (*example.com/x.S).step
+		$WORK/a.go:15:4-5: in (*example.com/x.S).step
+		$WORK/a.go:15:20-23: in (*example.com/x.S).step
+		$WORK/a.go:15:4-5: in (*example.com/x.S).step
+		$WORK/a.go:20:35-38: in example.com/x.F
+$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid [chain may repeat] [via field a of example.com/x.S]
+	wrap chain (origin → target):
+		$WORK/a.go:16:8-42: errors.Join
+	path (origin → target):
+		$WORK/a.go:15:25-38: in (*example.com/x.S).step
+		$WORK/a.go:15:4-5: in (*example.com/x.S).step
+		$WORK/a.go:16:20-23: in (*example.com/x.S).step
+		$WORK/a.go:16:4-5: in (*example.com/x.S).step
+		$WORK/a.go:20:35-38: in example.com/x.F
+$GOROOT/src/os/error.go:*: sentinel os.ErrInvalid [chain may repeat] [via field a of example.com/x.S]
+	wrap chain (origin → target):
+		$WORK/a.go:17:8-42: errors.Join
+	path (origin → target):
+		$WORK/a.go:15:25-38: in (*example.com/x.S).step
+		$WORK/a.go:15:4-5: in (*example.com/x.S).step
+		$WORK/a.go:17:20-23: in (*example.com/x.S).step
+		$WORK/a.go:17:4-5: in (*example.com/x.S).step
+		$WORK/a.go:20:35-38: in example.com/x.F
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"os"
+)
+
+var _ = errors.Join
+
+type S struct{ a, b, c error }
+
+func (s *S) step() {
+	s.a = errors.Join(s.a, os.ErrInvalid)
+	s.a = errors.Join(s.a, io.ErrShortWrite)
+	s.a = errors.Join(s.a, io.ErrNoProgress)
+}
+
+func /*@q*/F(s *S) error { return s.a }
+
+func main() {
+	s := &S{a: io.EOF, b: os.ErrClosed, c: os.ErrExist}
+	for i := 0; i < 3; i++ {
+		s.step()
+	}
+	fmt.Println(F(s) != nil)
+}

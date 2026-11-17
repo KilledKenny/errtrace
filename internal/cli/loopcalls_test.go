@@ -21,9 +21,11 @@ import (
 // source list, so the work does not multiply with their number.
 //
 // A loop through three helpers has more than maxValues Wrap Chains at the
-// default depth: both forms are cut to the same number of entries with an
-// Unresolved fixpoint-limit value, though not to the same entries (which
-// ones are kept is the order the values are found in).
+// default depth: both forms are cut, with an Unresolved fixpoint-limit
+// value, though not to the same entries (which ones are kept is the order
+// the values are found in) nor to exactly the same number (a cut keeps the
+// Unresolved values of what it drops, and the two forms are cut at
+// different places).
 func TestLoopCallsMatchInline(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -42,8 +44,8 @@ func TestLoopCallsMatchInline(t *testing.T) {
 						return strings.HasPrefix(e, "unresolved(fixpoint-limit)")
 					})
 				}
-				if len(calls) != len(inline) || !limit(calls) || !limit(inline) {
-					t.Errorf("%s: %d entries (fixpoint limit %v), inline %d (fixpoint limit %v); want the same number, both at the limit",
+				if !limit(calls) || !limit(inline) {
+					t.Errorf("%s: %d entries (fixpoint limit %v), inline %d (fixpoint limit %v); want both at the limit",
 						tc.name, len(calls), limit(calls), len(inline), limit(inline))
 				}
 				return

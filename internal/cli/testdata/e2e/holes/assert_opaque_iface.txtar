@@ -1,0 +1,164 @@
+QA m2. An Opaque Error made by errors.New does not pass an assertion to an
+interface that needs more than Error: its type has no other method.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:84:12-21: Error Set of example.com/x.AsTimeout: 6 entries, 1 unresolved
+$GOROOT/src/os/error.go:*: sentinel os.ErrPermission
+	wrap chain (origin → target):
+		$WORK/a.go:46:10-55: *io/fs.PathError.Unwrap
+	path (origin → target):
+		$WORK/a.go:46:38-54: in example.com/x.src
+		$WORK/a.go:85:7-13: in example.com/x.AsTimeout, call to example.com/x.src
+$WORK/a.go:24:5-9: sentinel example.com/x.ErrD
+	path (origin → target):
+		$WORK/a.go:38:10-14: in example.com/x.src
+		$WORK/a.go:85:7-13: in example.com/x.AsTimeout, call to example.com/x.src
+$WORK/a.go:25:5-12: sentinel example.com/x.ErrInit
+	path (origin → target):
+		$WORK/a.go:40:10-17: in example.com/x.src
+		$WORK/a.go:85:7-13: in example.com/x.AsTimeout, call to example.com/x.src
+$WORK/a.go:48:10-16: concrete example.com/x.V
+	path (origin → target):
+		$WORK/a.go:48:10-16: in example.com/x.src
+		$WORK/a.go:85:7-13: in example.com/x.AsTimeout, call to example.com/x.src
+$WORK/a.go:50:10-18: concrete *example.com/x.V
+	path (origin → target):
+		$WORK/a.go:50:10-18: in example.com/x.src
+		$WORK/a.go:85:7-13: in example.com/x.AsTimeout, call to example.com/x.src
+$WORK/a.go:25:5-12: unresolved(memory): value of Sentinel main.ErrInit may wrap other errors: its dynamic type is not known
+	path (origin → target):
+		$WORK/a.go:40:10-17: in example.com/x.src
+		$WORK/a.go:85:7-13: in example.com/x.AsTimeout, call to example.com/x.src
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"io/fs"
+	"os"
+)
+
+type E struct{ msg string }
+
+func (e *E) Error() string { return e.msg }
+
+type V struct{ msg string }
+
+func (e V) Error() string   { return e.msg }
+func (e V) Timeout() bool   { return true }
+func (e *E) Is(error) bool  { return false }
+
+var ErrA = errors.New("a")
+var ErrB error = &E{"b"}
+var ErrC = &E{"c"}
+var ErrD error = V{"d"}
+var ErrInit = errors.New("init")
+
+func init() { ErrInit = &E{"reassigned"} }
+
+func src(n int) error {
+	switch n {
+	case 0:
+		return ErrA
+	case 1:
+		return ErrB
+	case 2:
+		return ErrC
+	case 3:
+		return ErrD
+	case 4:
+		return ErrInit
+	case 5:
+		return fmt.Errorf("w: %w", io.EOF)
+	case 6:
+		return fmt.Errorf("w: %w %w", io.EOF, os.ErrNotExist)
+	case 7:
+		return &fs.PathError{Op: "x", Err: os.ErrPermission}
+	case 8:
+		return V{"v"}
+	case 9:
+		return &V{"pv"}
+	case 10:
+		return errors.Join(io.ErrClosedPipe, io.ErrShortWrite)
+	case 11:
+		var e *E
+		return e
+	}
+	return errors.New("opaque")
+}
+
+func AsE(n int) error {
+	e := src(n)
+	if x, ok := e.(*E); ok {
+		return x
+	}
+	return nil
+}
+
+func AsUnwrap(n int) error {
+	e := src(n)
+	if x, ok := e.(interface{ Unwrap() error }); ok {
+		return x.Unwrap()
+	}
+	return nil
+}
+
+func AsUnwrapMulti(n int) error {
+	e := src(n)
+	if x, ok := e.(interface{ Unwrap() []error }); ok {
+		return x.Unwrap()[0]
+	}
+	return nil
+}
+
+func /*@q*/AsTimeout(n int) error {
+	e := src(n)
+	if x, ok := e.(interface {
+		error
+		Timeout() bool
+	}); ok {
+		return x
+	}
+	return nil
+}
+
+func AsIs(n int) error {
+	e := src(n)
+	if x, ok := e.(interface{ Is(error) bool }); ok {
+		return x.(error)
+	}
+	return nil
+}
+
+func AsV(n int) error {
+	e := src(n)
+	switch x := e.(type) {
+	case V:
+		return x
+	case *V:
+		return x
+	}
+	return nil
+}
+
+func Not(n int) error {
+	e := src(n)
+	if _, ok := e.(*E); !ok {
+		return e
+	}
+	return nil
+}
+
+func main() {
+	for n := 0; n < 13; n++ {
+		fmt.Printf("%d E:%v | U:%v | T:%v | Is:%v | V:%v | not:%v\n", n, AsE(n), AsUnwrap(n), AsTimeout(n), AsIs(n), AsV(n), Not(n))
+	}
+	fmt.Println(AsUnwrapMulti(6), AsUnwrapMulti(10))
+}

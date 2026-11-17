@@ -1,0 +1,43 @@
+A goroutine's closure writes the variable: its store is found like any other
+closure's.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:10:12-13: Error Set of example.com/fx.F: 1 entries
+$WORK/a.go:8:28-46: opaque errors.New "work"
+	path (origin → target):
+		$WORK/a.go:8:28-46: in example.com/fx.work
+		$WORK/a.go:18:9-15: in example.com/fx.F$1, call to example.com/fx.work
+		$WORK/a.go:18:3-6: in example.com/fx.F$1
+		$WORK/a.go:21:9-12: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"sync"
+)
+
+func work() error { return errors.New("work") }
+
+func /*@f*/F() error {
+	var (
+		wg  sync.WaitGroup
+		err error
+	)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err = work()
+	}()
+	wg.Wait()
+	return err
+}
+
+func main() {
+	_ = F()
+}

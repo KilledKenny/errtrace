@@ -1,0 +1,45 @@
+A field loaded through a pointer that was not built where it is loaded: its
+values are what the program stores to that field anywhere. Here the only
+writer is the composite literal in the constructor, which stores a call
+result. The Propagation Path starts where the value enters the writer, then
+has the writer's store, the load, and the calls up to the Target.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:18:12-13: Error Set of example.com/fx.F: 1 entries
+$WORK/a.go:10:31-53: opaque errors.New "computed" [via field err of example.com/fx.S]
+	path (origin → target):
+		$WORK/a.go:10:31-53: in example.com/fx.compute
+		$WORK/a.go:13:28-37: in example.com/fx.NewS, call to example.com/fx.compute
+		$WORK/a.go:13:23-37: in example.com/fx.NewS
+		$WORK/a.go:16:34-39: in (*example.com/fx.S).Err
+		$WORK/a.go:19:9-16: in example.com/fx.F, call to (*example.com/fx.S).Err
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import "errors"
+
+type S struct {
+	name string
+	err  error
+}
+
+func compute() error { return errors.New("computed") }
+
+func NewS() *S {
+	return &S{name: "s", err: compute()}
+}
+
+func (s *S) Err() error { return s.err }
+
+func /*@f*/F(s *S) error {
+	return s.Err()
+}
+
+func main() {
+	_ = F(NewS())
+}

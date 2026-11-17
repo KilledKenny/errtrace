@@ -5,6 +5,7 @@ import (
 	"go/constant"
 	"go/token"
 	"go/types"
+	"math"
 
 	"golang.org/x/tools/go/ssa"
 
@@ -244,8 +245,29 @@ func (a *analyzer) wraps(base errset.Value, operands [][]wrapped) []Fact {
 	if dropped {
 		out = append(out, Fact{Value: a.unresolvedAt(base.Site, base.Pos, errset.FixpointLimit,
 			fmt.Sprintf("more than %d combinations of wrapped values", maxCombos)), Source: base.Site})
+		// No Unresolved or symbolic value may be lost with the
+		// combinations that were dropped: the operand values that hold
+		// one are kept as values of their own, without the Wrap.
+		for _, op := range operands {
+			for _, w := range op {
+				if a.holey(w.id) {
+					out = append(out, Fact{Value: w.id, Source: base.Site, Leaves: w.leaves})
+				}
+			}
+		}
 	}
 	return out
+}
+
+// holey reports whether the value tree id has a leaf that is not an Error
+// Origin.
+func (a *analyzer) holey(id errset.ValueID) bool {
+	for _, e := range errset.Flatten(a.tbl, id) {
+		if !a.tbl.Get(e.Leaf).Kind.IsOrigin() {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *analyzer) addFacts(facts []Fact) {
@@ -335,13 +357,16 @@ func (a *analyzer) constErrorf(site any, pos token.Pos, format string, args ssa.
 		return
 	}
 	var operands [][]wrapped
-	mayNil := false
+	// mayNil: some operand may be nil, as far as errtrace can tell;
+	// allNil: nil is seen to reach each of them.
+	mayNil, allNil := false, true
 	for _, i := range verbs {
 		if op := ops[i]; op != nil && MayCarryError(op) && !isNilConst(op) {
 			operands = append(operands, a.operand(op, site))
 			// fmt.Errorf drops a nil %w operand: the Wrap then holds
 			// nothing for it.
 			mayNil = mayNil || a.mayBeNil(op, a.sitePoint(site))
+			allNil = allNil && a.nilReaches(op, a.sitePoint(site))
 		}
 	}
 	if a.flat {
@@ -359,6 +384,11 @@ func (a *analyzer) constErrorf(site any, pos token.Pos, format string, args ssa.
 		return
 	}
 	a.addFacts(facts)
+	if allNil {
+		// On a path where every %w operand is nil, the result wraps
+		// nothing: that error is a value of its own.
+		a.add(opaque, site)
+	}
 }
 
 func isNilConst(v ssa.Value) bool {
@@ -420,8 +450,11 @@ func (a *analyzer) bracesWrap(call *ssa.Call, err ssa.Value) {
 func (a *analyzer) constructed(typ types.Type, alloc *ssa.Alloc) {
 	typ = unalias(typ)
 	conc := a.tbl.Intern(errset.Value{Kind: errset.Concrete, Site: alloc, Pos: a.posOf(alloc), Type: typ, Allocated: true})
-	if alloc.Comment != "complit" {
+	if !TrackedAlloc(alloc) {
+		// A variable of the type (var w W; ...; return &w): its fields
+		// are not followed.
 		a.add(conc, alloc)
+		a.untracked(errset.Value{Site: alloc, Pos: a.posOf(alloc), Type: typ}, alloc)
 		return
 	}
 	m := unwrapMethod(a.fn.Prog, typ)
@@ -442,27 +475,43 @@ func (a *analyzer) constructed(typ types.Type, alloc *ssa.Alloc) {
 	}
 	before, revisits := len(a.facts), a.revisits
 	var operands [][]wrapped
-	stores := fieldStores(alloc, m.field)
+	// What the field may be given after the literal is built, through a
+	// pointer to the value (a setter, a store by a caller): the Wrap
+	// holds that too, by the time it is unwrapped.
+	later, hasLater := a.laterField(typ, m, alloc, pos)
+	var lit literalField
+	lit.open(alloc, m.path, a.initStore)
+	stores := lit.stores
 	// The field is nil on a path with no store to it. With more than one
 	// store, the slice of Unwrap() []error is one of them, not all.
 	base.MayHoldNil = !a.storedOnEveryPath(stores) || (m.multi && len(stores) > 1)
 	// A pointer to the value, or to the field, that escapes (to a call,
 	// a closure, memory) may be used to write the field: it may then hold
-	// nil or a value errtrace does not track.
+	// nil or a value errtrace does not track. So may the field of an
+	// embedded struct that the literal does not build itself (a promoted
+	// Unwrap): errtrace does not know what that struct holds.
 	var escaped []wrapped
-	if fieldMayBeWritten(alloc, m.field) {
+	if lit.escaped || lit.opaque {
 		base.MayHoldNil = true
-		u := a.unresolvedAt(alloc, pos, errset.Memory, "field of "+typeString(unalias(typ))+" may be written through an escaped pointer")
+		detail := "field of " + typeString(unalias(typ)) + " may be written through an escaped pointer"
+		if lit.opaque {
+			detail = "embedded struct of " + typeString(unalias(typ)) + " is not built by the composite literal"
+		}
+		u := a.unresolvedAt(alloc, pos, errset.Memory, detail)
 		if a.flat {
 			a.addInner([]errset.ValueID{u}, alloc)
 		}
 		escaped = a.madeAt(alloc, u)
 	}
+	// nilField: on some path the field holds nil: no store is made on
+	// it, or a store of a value that nil is seen to reach.
+	nilField := !m.multi && !lit.opaque && !a.storedOnEveryPath(stores)
 	if !m.multi {
 		var vals []wrapped
 		for _, st := range stores {
 			vals = append(vals, a.operand(st.Val, alloc)...)
 			base.MayHoldNil = base.MayHoldNil || a.mayBeNil(st.Val, pointOf(st))
+			nilField = nilField || a.nilReaches(st.Val, pointOf(st))
 		}
 		operands = append(operands, append(vals, escaped...))
 	} else {
@@ -492,82 +541,400 @@ func (a *analyzer) constructed(typ types.Type, alloc *ssa.Alloc) {
 		if len(a.facts) == before && a.revisits == revisits {
 			a.add(conc, alloc)
 		}
+		if hasLater {
+			a.addInner([]errset.ValueID{later}, alloc)
+		}
 		return
 	}
 	facts := a.wraps(base, operands)
-	if len(facts) == 0 {
+	switch {
+	case len(facts) == 0:
 		// Unwrap returns nil: the value wraps nothing.
 		a.add(conc, alloc)
-		return
+	default:
+		a.addFacts(facts)
+		if nilField {
+			// On a path where the field is nil, the value wraps
+			// nothing: that value is one of its own.
+			a.add(conc, alloc)
+		}
 	}
-	a.addFacts(facts)
+	if hasLater {
+		// The same value, holding what a later writer stored: a Wrap
+		// that is there only if there is such a writer.
+		w := base
+		w.Later, w.MayHoldNil = true, true
+		a.addFacts(a.wraps(w, [][]wrapped{a.madeAt(alloc, later)}))
+	}
 }
 
-// fieldMayBeWritten reports whether field f of the struct that alloc
-// allocates may be written other than by a direct store to its address:
-// alloc, or the field's address, is used other than to load it, to make
-// an interface of it or return it (the error value, directly or through
-// a ChangeType), or by a DebugRef. A call (a method like w.clear() or a helper taking w), a
-// store of the pointer, a closure capture or a Phi lets the pointer
-// escape; a store to *alloc overwrites the whole struct.
-func fieldMayBeWritten(alloc *ssa.Alloc, f int) bool {
-	for _, r := range *alloc.Referrers() {
+// untracked adds what a value of a type with a custom Unwrap method may
+// wrap when the value is not a tracked one (a parameter, a load, an
+// errors.As target, a variable written field by field, a Sentinel whose
+// initializer is not opened): errtrace does not know what its field
+// holds, so the value is also a Wrap of base's type, marked Untracked,
+// that holds one Unresolved value. base gives the Wrap's Site, Pos and
+// Type (and the variable of a Sentinel); src is where the value enters
+// the function. The Concrete Type Origin or Sentinel that the caller adds
+// stands for the value whose field is nil. Nothing is added for a type
+// without an Unwrap method.
+func (a *analyzer) untracked(base errset.Value, src any) {
+	if a.fn == nil || base.Type == nil || types.IsInterface(base.Type) {
+		return
+	}
+	if _, ok := types.Unalias(base.Type).(*types.TypeParam); ok {
+		return
+	}
+	m := unwrapMethod(a.fn.Prog, base.Type)
+	var detail string
+	switch m.kind {
+	case unwrapNone:
+		return
+	case unwrapOther:
+		detail = typeString(base.Type) + ".Unwrap not modelled"
+	default:
+		st, field, ok := unwrappedField(base.Type, m.path)
+		if !ok {
+			return
+		}
+		detail = fmt.Sprintf("field %s of %s: the wrapper is not a tracked value", fieldName(st, field), typeString(st))
+	}
+	u := a.unresolvedAt(base.Site, base.Pos, errset.Memory, detail)
+	if a.flat {
+		a.addInner([]errset.ValueID{u}, src)
+		return
+	}
+	base.Kind, base.WrapKind = errset.Wrap, errset.WrapUnwrapMethod
+	base.Untracked, base.MayHoldNil = true, true
+	base.Inner = []errset.ValueID{u}
+	a.addFact(Fact{Value: a.tbl.Intern(base), Source: src})
+}
+
+// sentinelWraps adds what the value of the Sentinel sv, the variable g
+// loaded at src, wraps: a Sentinel is an Error Origin, but its value may
+// be a wrapper (var ErrX = &W{inner: io.EOF}, var ErrFoo =
+// fmt.Errorf("foo: %w", ErrBase)), in which errors.Is and errors.As find
+// more. Where the variable has one initializing store and no other, of a
+// composite literal of a type with a custom Unwrap method or of a call of
+// fmt.Errorf, errors.Join or errtrace.Wrap, the Wraps that the
+// initializer makes are added, each marked as the value of the Sentinel
+// (errset.Value.Var), so that the guards that remove the Sentinel remove
+// them. What the later writers of such a literal's field store is not
+// listed there: a Sentinel is shared by the whole program, and one
+// Unresolved value says that its field is written after it was built.
+// An initializer that cannot be opened so (its values depend on
+// calls or other symbolic values of the init function) gives one such
+// Wrap holding an Unresolved value; so does, by untracked, any other
+// Sentinel whose dynamic type is known and has an Unwrap method. The
+// Sentinel itself, which the caller adds, stands for the value that
+// wraps nothing.
+func (a *analyzer) sentinelWraps(g *ssa.Global, sv errset.Value, src any) {
+	if sv.Kind != errset.Sentinel || a.fn == nil {
+		return
+	}
+	base := errset.Value{Site: sv.Site, Pos: sv.Pos, Var: sv.Var, Canon: sv.Canon, Fresh: sv.Fresh}
+	st := a.sentinels().initStore(g)
+	if st == nil || st.Parent() == nil {
+		base.Type = sv.Type
+		a.untracked(base, src)
+		a.unknownSentinel(sv, src)
+		return
+	}
+	// The store of the literal's address to the variable is not an
+	// escape of its own: whoever loads the pointer from the variable and
+	// writes the field through it is a later writer of the field, which
+	// the Wrap of a tracked value holds already (see laterField).
+	c := &analyzer{tbl: a.tbl, fn: st.Parent(), at: st, pt: pointOf(st), seen: make(map[seenKey]bool), opts: a.opts, initStore: st}
+	val := stripConv(st.Val)
+	if mi, ok := val.(*ssa.MakeInterface); ok {
+		val = mi.X
+	}
+	opened := false
+	switch x := val.(type) {
+	case *ssa.Alloc:
+		if TrackedAlloc(x) {
+			c.constructed(x.Type(), x)
+			opened = true
+		}
+	case *ssa.UnOp:
+		if alloc, ok := x.X.(*ssa.Alloc); ok && x.Op == token.MUL && alloc.Comment == "complit" {
+			c.constructed(x.Type(), alloc)
+			opened = true
+		}
+	case *ssa.Call:
+		if _, ok := Intrinsic(x.Common().StaticCallee()); ok {
+			c.call(x, 0)
+			opened = true
+		}
+	}
+	if !opened {
+		base.Type = sv.Type
+		a.untracked(base, src)
+		a.unknownSentinel(sv, src)
+		return
+	}
+	var wraps []errset.ValueID
+	closed := true
+	for _, f := range c.facts {
+		v := a.tbl.Get(f.Value)
+		if v.Kind != errset.Wrap {
+			// The value that wraps nothing: the Sentinel itself.
+			closed = closed && v.Kind.IsOrigin()
+			continue
+		}
+		for _, e := range errset.Flatten(a.tbl, f.Value) {
+			l := a.tbl.Get(e.Leaf)
+			closed = closed && (l.Kind.IsOrigin() || l.Kind == errset.Unresolved || (l.Kind == errset.FieldRef && l.Later))
+		}
+		if v.Later && len(v.Inner) == 1 {
+			// What the later writers of the field store is not listed
+			// under a Sentinel (see errset.Value.Later): the FieldRef
+			// carries the variable to say so.
+			ref := a.tbl.Get(v.Inner[0])
+			if ref.Kind == errset.FieldRef && ref.Later {
+				ref.Var = base.Var
+				v.Inner = []errset.ValueID{a.tbl.Intern(ref)}
+			}
+		}
+		v.Site, v.Pos, v.Var, v.Canon, v.Fresh = base.Site, base.Pos, base.Var, base.Canon, base.Fresh
+		wraps = append(wraps, a.tbl.Intern(v))
+	}
+	if !closed {
+		detail := fmt.Sprintf("value of Sentinel %s may wrap other errors: its initializer is not followed", qualifiedName(sv.Var))
+		u := a.unresolvedAt(base.Site, base.Pos, errset.Memory, detail)
+		wraps = wraps[:0]
+		for _, f := range c.facts {
+			// One Wrap of the kind the initializer makes, holding the
+			// Unresolved value alone.
+			if v := a.tbl.Get(f.Value); v.Kind == errset.Wrap && len(wraps) == 0 {
+				w := base
+				w.Kind, w.WrapKind, w.Format, w.Type = errset.Wrap, v.WrapKind, v.Format, v.Type
+				w.MayHoldNil, w.Untracked = true, v.WrapKind == errset.WrapUnwrapMethod
+				w.Inner = []errset.ValueID{u}
+				wraps = append(wraps, a.tbl.Intern(w))
+			}
+		}
+		if len(wraps) == 0 {
+			if a.flat {
+				a.addInner([]errset.ValueID{u}, src)
+			} else {
+				a.add(u, src)
+			}
+			return
+		}
+	}
+	for _, w := range wraps {
+		if !a.flat {
+			a.add(w, src)
+			continue
+		}
+		// Below the chain depth limit: the leaves, cut.
+		for _, e := range errset.Flatten(a.tbl, w) {
+			a.addInner([]errset.ValueID{e.Leaf}, src)
+		}
+	}
+}
+
+// unknownSentinel adds an Unresolved value for the Sentinel sv, loaded at
+// src, if errtrace does not know the dynamic type of its value: the value
+// may be a wrapper of any kind.
+func (a *analyzer) unknownSentinel(sv errset.Value, src any) {
+	if sv.Type != nil {
+		return
+	}
+	detail := fmt.Sprintf("value of Sentinel %s may wrap other errors: its dynamic type is not known", qualifiedName(sv.Var))
+	u := a.unresolvedAt(sv.Site, sv.Pos, errset.Memory, detail)
+	if a.flat {
+		a.addInner([]errset.ValueID{u}, src)
+		return
+	}
+	a.add(u, src)
+}
+
+// unwrappedField returns the struct type that declares the field at path
+// (see unwrapShape.path) from typ, and the field's index in it.
+func unwrappedField(typ types.Type, path []int) (types.Type, int, bool) {
+	if len(path) == 0 {
+		return nil, 0, false
+	}
+	t := typ
+	for i, f := range path {
+		u := unalias(t)
+		if p, ok := u.Underlying().(*types.Pointer); ok {
+			u = unalias(p.Elem())
+		}
+		st, ok := u.Underlying().(*types.Struct)
+		if !ok || f >= st.NumFields() {
+			return nil, 0, false
+		}
+		if i == len(path)-1 {
+			return u, f, true
+		}
+		t = st.Field(f).Type()
+	}
+	return nil, 0, false
+}
+
+// laterField returns the Later FieldRef of the field that the Unwrap
+// method m of typ returns, for the value built by alloc: what the later
+// writers of that field store (see errset.Value.Later). It reports false
+// for an Unwrap that returns a slice, and for a field whose loads are not
+// modelled (see FieldStruct).
+func (a *analyzer) laterField(typ types.Type, m unwrapShape, alloc *ssa.Alloc, pos token.Pos) (errset.ValueID, bool) {
+	if m.kind != unwrapField || m.multi || len(m.path) == 0 {
+		return 0, false
+	}
+	t, field, ok := unwrappedField(typ, m.path)
+	if !ok {
+		return 0, false
+	}
+	st := FieldStruct(t, field)
+	if st == nil {
+		return 0, false
+	}
+	return a.tbl.Intern(errset.Value{
+		Kind: errset.FieldRef, Site: alloc, Pos: pos, Type: st, Index: field, Name: fieldName(st, field), Fn: a.fn.String(),
+		Detail: fmt.Sprintf("field %s of %s after the value is built", fieldName(st, field), typeString(st)),
+		Later:  true,
+	}), true
+}
+
+// TrackedAlloc reports whether alloc is a value whose fields the analysis
+// follows from the stores that the allocating function makes to them: a
+// composite literal, or new(T).
+func TrackedAlloc(alloc *ssa.Alloc) bool {
+	return alloc.Comment == "complit" || alloc.Comment == "new"
+}
+
+// literalField is what a composite literal stores to one field of the
+// struct it builds: the field itself, or, for a path of several fields, a
+// field of a struct embedded in it (by value, or as a pointer to another
+// composite literal).
+type literalField struct {
+	// stores are the stores to the field.
+	stores []*ssa.Store
+	// escaped reports that the field may be written other than by
+	// stores: the struct, an embedded struct on the path or the field's
+	// address is used other than to load it, to make an interface of it
+	// or return it (the error value, directly or through a ChangeType),
+	// or by a DebugRef. A call (a method like w.clear() or a helper
+	// taking w), a store of the pointer, a closure capture or a Phi lets
+	// the pointer escape; a store to the whole struct overwrites it.
+	escaped bool
+	// opaque reports that an embedded struct on the path is not built
+	// by the literal (it is a pointer that came from elsewhere, or a
+	// struct value stored whole): what its field holds is not known.
+	opaque bool
+}
+
+// open follows path from root, the address of a struct: the Alloc of a
+// composite literal or the address of a struct embedded in one. via is
+// the store that put root (the Alloc of an embedded literal) into the
+// struct that embeds it: that one use is not an escape.
+func (lit *literalField) open(root ssa.Value, path []int, via *ssa.Store) {
+	refs := root.Referrers()
+	if refs == nil || len(path) == 0 {
+		lit.opaque = true
+		return
+	}
+	_, isAlloc := root.(*ssa.Alloc)
+	for _, r := range *refs {
 		switch r := r.(type) {
 		case *ssa.FieldAddr:
-			if r.Field != f {
+			if r.X != root || r.Field != path[0] {
 				continue
 			}
-			for _, rr := range *r.Referrers() {
-				switch rr := rr.(type) {
-				case *ssa.Store:
-					if rr.Addr != r || rr.Val == r {
-						return true
-					}
-				case *ssa.UnOp:
-					if rr.Op != token.MUL {
-						return true
-					}
-				case *ssa.DebugRef:
-				default:
-					return true
-				}
-			}
+			lit.field(r, path[1:])
 		case *ssa.ChangeType:
+			if !isAlloc {
+				lit.escaped = true
+				continue
+			}
 			for _, rr := range *r.Referrers() {
 				switch rr.(type) {
 				case *ssa.MakeInterface, *ssa.Return, *ssa.DebugRef:
 				default:
-					return true
+					lit.escaped = true
 				}
 			}
-		case *ssa.MakeInterface, *ssa.Return, *ssa.DebugRef:
+		case *ssa.MakeInterface, *ssa.Return:
+			if !isAlloc {
+				lit.escaped = true
+			}
+		case *ssa.DebugRef:
 		case *ssa.UnOp:
 			if r.Op != token.MUL {
-				return true
+				lit.escaped = true
+			}
+		case *ssa.Store:
+			switch {
+			case r == via:
+			case r.Addr == root && r.Val != root && !isAlloc:
+				// The embedded struct is stored whole: followed into
+				// the composite literal it is copied from.
+				if load, ok := r.Val.(*ssa.UnOp); ok && load.Op == token.MUL {
+					if inner, ok := load.X.(*ssa.Alloc); ok && inner.Comment == "complit" {
+						lit.open(inner, path, nil)
+						continue
+					}
+				}
+				lit.opaque = true
+			default:
+				lit.escaped = true
 			}
 		default:
-			return true
+			lit.escaped = true
 		}
 	}
-	return false
 }
 
-// fieldStores returns the stores to field f of the struct that alloc
-// allocates.
-func fieldStores(alloc *ssa.Alloc, f int) []*ssa.Store {
-	var out []*ssa.Store
-	for _, r := range *alloc.Referrers() {
-		fa, ok := r.(*ssa.FieldAddr)
-		if !ok || fa.X != alloc || fa.Field != f {
-			continue
-		}
-		for _, rr := range *fa.Referrers() {
-			if st, ok := rr.(*ssa.Store); ok && st.Addr == fa {
-				out = append(out, st)
-			}
+// field follows rest from the field whose address is fa: with nothing
+// left, fa is the field asked for, and the stores to it are collected.
+func (lit *literalField) field(fa *ssa.FieldAddr, rest []int) {
+	refs := fa.Referrers()
+	if refs == nil {
+		return
+	}
+	if len(rest) > 0 {
+		if _, ptr := fieldType(fa).Underlying().(*types.Pointer); !ptr {
+			// A struct embedded by value: its fields are stored
+			// through its address.
+			lit.open(fa, rest, nil)
+			return
 		}
 	}
-	return out
+	for _, rr := range *refs {
+		switch rr := rr.(type) {
+		case *ssa.Store:
+			if rr.Addr != fa || rr.Val == fa {
+				lit.escaped = true
+				continue
+			}
+			if len(rest) == 0 {
+				lit.stores = append(lit.stores, rr)
+				continue
+			}
+			// A pointer to an embedded struct: followed into the
+			// composite literal it points to.
+			if inner, ok := rr.Val.(*ssa.Alloc); ok && inner.Comment == "complit" {
+				lit.open(inner, rest, rr)
+			} else {
+				lit.opaque = true
+			}
+		case *ssa.UnOp:
+			if rr.Op != token.MUL {
+				lit.escaped = true
+			}
+		case *ssa.DebugRef:
+		default:
+			lit.escaped = true
+		}
+	}
+}
+
+// fieldType returns the type of the field whose address is fa.
+func fieldType(fa *ssa.FieldAddr) types.Type {
+	return fa.Type().Underlying().(*types.Pointer).Elem()
 }
 
 // storedOnEveryPath reports whether one of stores is made on every path
@@ -613,7 +980,14 @@ func before(x, y ssa.Instruction) bool {
 // A conversion to an interface (a typed nil
 // included), a new allocation, errors.New and fmt.Errorf are never nil.
 func (a *analyzer) mayBeNil(v ssa.Value, pt point) bool {
-	return a.nilWalk(v, pt, make(map[nilKey]bool), 0)
+	return a.nilWalk(v, pt, newNilSeen(), 0)
+}
+
+// MayBeNil reports whether v, a value of fn used by the instruction at,
+// may be nil there, unless errtrace can prove it is not (see mayBeNil).
+func MayBeNil(tbl *errset.Table, fn *ssa.Function, v ssa.Value, at ssa.Instruction, opts Options) bool {
+	a := &analyzer{tbl: tbl, fn: fn, at: at, pt: pointOf(at), opts: opts}
+	return a.mayBeNil(v, a.pt)
 }
 
 type nilKey struct {
@@ -621,16 +995,85 @@ type nilKey struct {
 	pt point
 }
 
-func (a *analyzer) nilWalk(v ssa.Value, pt point, seen map[nilKey]bool, depth int) bool {
+// nilSeen is the state of one mayBeNil walk. A key (a value at a point)
+// that is being walked is open: met again, it is a cycle (of Phis, of
+// Sentinels, of recursive calls), which adds no value of its own. A key
+// whose walk is complete has its answer in done, and gives that answer
+// when it is met again. An answer "not nil" found while a key below it on
+// the stack was open and met holds only if that key is not nil either: it
+// waits (in waiting, with the stack position of the lowest such key)
+// until that key is complete, and is forgotten, to be walked again, if
+// that key may be nil.
+type nilSeen struct {
+	open    map[nilKey]int
+	done    map[nilKey]bool
+	waiting map[nilKey]int
+	// order lists the waiting keys as their walks completed.
+	order []nilKey
+	// low is the lowest stack position of the open keys that the answer
+	// of the key on top of the stack depends on.
+	low int
+}
+
+func newNilSeen() *nilSeen {
+	return &nilSeen{open: make(map[nilKey]int), done: make(map[nilKey]bool), waiting: make(map[nilKey]int), low: math.MaxInt}
+}
+
+func (a *analyzer) nilWalk(v ssa.Value, pt point, seen *nilSeen, depth int) bool {
 	if depth > 4*maxDynDepth {
 		return true
 	}
 	k := nilKey{v, pt}
-	if seen[k] {
-		// A cycle (of Phis or Sentinels) adds no value of its own.
+	if ans, ok := seen.done[k]; ok {
+		return ans
+	}
+	if pos, ok := seen.open[k]; ok {
+		// A cycle adds no value of its own.
+		seen.low = min(seen.low, pos)
 		return false
 	}
-	seen[k] = true
+	if pos, ok := seen.waiting[k]; ok {
+		seen.low = min(seen.low, pos)
+		return false
+	}
+	pos, outer, mark := len(seen.open), seen.low, len(seen.order)
+	seen.open[k], seen.low = pos, math.MaxInt
+	ans := a.nilWalkOpen(v, pt, seen, depth)
+	delete(seen.open, k)
+	low := seen.low
+	seen.low = outer
+	switch {
+	case ans:
+		// Whatever the open keys turn out to be. The answers that waited
+		// for k are walked again when they are needed.
+		seen.done[k] = true
+		for _, w := range seen.order[mark:] {
+			delete(seen.waiting, w)
+		}
+		seen.order = seen.order[:mark]
+	case low >= pos:
+		// k and the answers found during its walk depend on no open key.
+		seen.done[k] = false
+		for _, w := range seen.order[mark:] {
+			delete(seen.waiting, w)
+			seen.done[w] = false
+		}
+		seen.order = seen.order[:mark]
+	default:
+		// The answers found during the walk of k that waited for k now
+		// wait for what k waits for.
+		for _, w := range seen.order[mark:] {
+			seen.waiting[w] = min(seen.waiting[w], low)
+		}
+		seen.waiting[k] = low
+		seen.order = append(seen.order, k)
+		seen.low = min(outer, low)
+	}
+	return ans
+}
+
+// nilWalkOpen is nilWalk for a key that is neither open nor done.
+func (a *analyzer) nilWalkOpen(v ssa.Value, pt point, seen *nilSeen, depth int) bool {
 	if a.fn != nil && a.fn.Blocks != nil && v.Parent() == a.fn && a.funcGuards().isNonNil(pt, v) {
 		return false
 	}
@@ -650,6 +1093,12 @@ func (a *analyzer) nilWalk(v ssa.Value, pt point, seen map[nilKey]bool, depth in
 		return a.nilWalk(v.X, pt, seen, depth+1)
 	case *ssa.MakeInterface, *ssa.Alloc:
 		return false
+	case *ssa.Extract:
+		if call, ok := v.Tuple.(*ssa.Call); ok {
+			if _, intrinsic := Intrinsic(call.Common().StaticCallee()); !intrinsic {
+				return a.resultMayBeNil(call, v.Index, seen, depth+1)
+			}
+		}
 	case *ssa.UnOp:
 		if g, ok := v.X.(*ssa.Global); ok && v.Op == token.MUL {
 			return a.globalMayBeNil(g, seen, depth+1)
@@ -658,7 +1107,7 @@ func (a *analyzer) nilWalk(v ssa.Value, pt point, seen map[nilKey]bool, depth in
 		common := v.Common()
 		name, ok := Intrinsic(common.StaticCallee())
 		if !ok {
-			return true
+			return a.resultMayBeNil(v, 0, seen, depth)
 		}
 		switch name {
 		case "errors.New", "fmt.Errorf":
@@ -681,11 +1130,100 @@ func (a *analyzer) nilWalk(v ssa.Value, pt point, seen map[nilKey]bool, depth in
 	return true
 }
 
+// nilReaches reports whether errtrace sees nil reach v where it is used
+// at pt: v is nil itself, a Phi with such an edge, or a call of a function
+// with a body that returns such a value. It is the counterpart of
+// mayBeNil, which says yes whenever it cannot prove otherwise: a
+// parameter, a load or a dynamic call may be nil, but nil is not seen to
+// reach them. A Wrap whose operand nil reaches also exists without that
+// operand, as a value of its own; one whose operand only may be nil is
+// just marked (MayHoldNil).
+func (a *analyzer) nilReaches(v ssa.Value, pt point) bool {
+	return a.nilReach(v, pt, make(map[nilKey]bool), 0)
+}
+
+func (a *analyzer) nilReach(v ssa.Value, pt point, seen map[nilKey]bool, depth int) bool {
+	// The walk stops at the first value that nil reaches, so a key met
+	// again has not been reached by nil: seen can be the cycle guard and
+	// the memo at once (unlike in nilWalk).
+	k := nilKey{v, pt}
+	if depth > 4*maxDynDepth || seen[k] {
+		return false
+	}
+	seen[k] = true
+	if a.fn != nil && a.fn.Blocks != nil && v.Parent() == a.fn && a.funcGuards().isNonNil(pt, v) {
+		return false
+	}
+	result := func(call *ssa.Call, index int) bool {
+		callee := call.Common().StaticCallee()
+		if _, intrinsic := Intrinsic(callee); intrinsic || callee == nil || callee.Blocks == nil {
+			return false
+		}
+		c := &analyzer{tbl: a.tbl, fn: callee, opts: a.opts}
+		for _, b := range callee.Blocks {
+			ret, ok := b.Instrs[len(b.Instrs)-1].(*ssa.Return)
+			if ok && index < len(ret.Results) && c.nilReach(ret.Results[index], point{b: b}, seen, depth+1) {
+				return true
+			}
+		}
+		return false
+	}
+	switch v := v.(type) {
+	case *ssa.Const:
+		return v.IsNil()
+	case *ssa.Phi:
+		for i, e := range v.Edges {
+			if a.nilReach(e, point{b: v.Block().Preds[i], edgeTo: v.Block()}, seen, depth+1) {
+				return true
+			}
+		}
+	case *ssa.ChangeInterface:
+		return a.nilReach(v.X, pt, seen, depth+1)
+	case *ssa.ChangeType:
+		return a.nilReach(v.X, pt, seen, depth+1)
+	case *ssa.Call:
+		if name, ok := Intrinsic(v.Common().StaticCallee()); ok && name == "errtrace.Wrap" {
+			return a.nilReach(v.Common().Args[0], pointOf(v), seen, depth+1)
+		}
+		return result(v, 0)
+	case *ssa.Extract:
+		if call, ok := v.Tuple.(*ssa.Call); ok {
+			return result(call, v.Index)
+		}
+	}
+	return false
+}
+
+// resultMayBeNil reports whether result index of the call may be nil: it
+// may, unless the call has a static callee with a body whose every return
+// gives a value for that result that is never nil there.
+func (a *analyzer) resultMayBeNil(call *ssa.Call, index int, seen *nilSeen, depth int) bool {
+	callee := call.Common().StaticCallee()
+	if callee == nil || callee.Blocks == nil || callee.Recover != nil {
+		// A function that recovers from a panic may return the zero
+		// values of its results.
+		return true
+	}
+	c := &analyzer{tbl: a.tbl, fn: callee, opts: a.opts}
+	returns := false
+	for _, b := range callee.Blocks {
+		ret, ok := b.Instrs[len(b.Instrs)-1].(*ssa.Return)
+		if !ok {
+			continue
+		}
+		returns = true
+		if index >= len(ret.Results) || c.nilWalk(ret.Results[index], point{b: b}, seen, depth+1) {
+			return true
+		}
+	}
+	return !returns
+}
+
 // globalMayBeNil reports whether the package-level variable g may hold
 // nil: unless its value is a Fresh pointer, or every store of its
 // initialization gives a value that is never nil, and it is not stored to
 // elsewhere.
-func (a *analyzer) globalMayBeNil(g *ssa.Global, seen map[nilKey]bool, depth int) bool {
+func (a *analyzer) globalMayBeNil(g *ssa.Global, seen *nilSeen, depth int) bool {
 	s := a.sentinels()
 	inf := s.Info(g)
 	switch {
@@ -720,6 +1258,15 @@ func sliceElems(v ssa.Value) ([]ssa.Value, bool) {
 	return nil, false
 }
 
+// UnwrapPath returns the field that the Unwrap() error method of typ
+// returns, if typ has one that does nothing else, as a path of field
+// indices from typ: the field itself, or, for an Unwrap promoted from an
+// embedded struct, the embedded fields on the way and then the field.
+func UnwrapPath(prog *ssa.Program, typ types.Type) ([]int, bool) {
+	m := unwrapMethod(prog, typ)
+	return m.path, m.kind == unwrapField && !m.multi
+}
+
 type unwrapKind uint8
 
 const (
@@ -732,8 +1279,11 @@ const (
 )
 
 type unwrapShape struct {
-	kind  unwrapKind
-	field int
+	kind unwrapKind
+	// path leads from the type to the field Unwrap returns: the indices
+	// of the embedded fields the method is promoted through, then that
+	// of the field in the struct that declares the method.
+	path []int
 	// multi is set for Unwrap() []error.
 	multi bool
 }
@@ -766,6 +1316,11 @@ func unwrapMethod(prog *ssa.Program, typ types.Type) unwrapShape {
 		return shape
 	}
 	m := prog.FuncValue(obj)
+	if m == nil || m.Blocks == nil {
+		// The method of an instance of a generic type: its generic
+		// body returns the same field.
+		m = prog.FuncValue(obj.Origin())
+	}
 	if m == nil || m.Blocks == nil || len(m.Params) == 0 {
 		return shape
 	}
@@ -784,7 +1339,11 @@ func unwrapMethod(prog *ssa.Program, typ types.Type) unwrapShape {
 	if field < 0 {
 		return shape
 	}
-	shape.kind, shape.field = unwrapField, field
+	// The selection's index leads through the embedded fields to the
+	// method; the field is in the struct that declares it.
+	embedded := sel.Index()
+	shape.kind = unwrapField
+	shape.path = append(append([]int(nil), embedded[:len(embedded)-1]...), field)
 	return shape
 }
 
@@ -820,16 +1379,23 @@ func receiverField(recv *ssa.Parameter, v ssa.Value) (int, bool) {
 // copiesOf reports whether alloc is a local variable that only ever holds
 // recv (the copy a value receiver gets when its fields are addressed).
 func copiesOf(alloc *ssa.Alloc, recv *ssa.Parameter) bool {
-	stored := false
+	return copiedParam(alloc) == recv
+}
+
+// copiedParam returns the parameter that the local variable alloc only
+// ever holds (every store to it stores that parameter), or nil.
+func copiedParam(alloc *ssa.Alloc) *ssa.Parameter {
+	var param *ssa.Parameter
 	for _, r := range *alloc.Referrers() {
 		if st, ok := r.(*ssa.Store); ok && st.Addr == alloc {
-			if st.Val != recv {
-				return false
+			p, ok := st.Val.(*ssa.Parameter)
+			if !ok || (param != nil && p != param) {
+				return nil
 			}
-			stored = true
+			param = p
 		}
 	}
-	return stored
+	return param
 }
 
 // paramIndex returns the index of p among fn's parameters, or -1.

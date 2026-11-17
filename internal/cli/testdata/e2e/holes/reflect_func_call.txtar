@@ -1,0 +1,44 @@
+QA C4. A constructor that stores its parameter is called once through a
+function value that the analysis resolves, and once by reflect.Value.Call:
+its function value was handed to reflection, so its callers are not all seen
+and the parameter is Unresolved.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:15:12-13: Error Set of example.com/x.F: 2 entries, 2 unresolved
+$WORK/a.go:11:40-41: unresolved(memory): field Err of example.com/x.S written from parameter e of example.com/x.NewS
+	path (origin → target):
+		$WORK/a.go:11:40-41: in example.com/x.NewS
+		$WORK/a.go:11:35-41: in example.com/x.NewS
+		$WORK/a.go:16:9-14: in example.com/x.F
+$WORK/a.go:16:9-14: unresolved(memory): field Err of example.com/x.S may be written by reflection, unsafe code or a function that is not seen
+	path (origin → target):
+		$WORK/a.go:16:9-14: in example.com/x.F
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+	"reflect"
+)
+
+type S struct{ Err error }
+
+func NewS(e error) *S { return &S{Err: e} }
+
+func apply(f func(error) *S) *S { return f(nil) }
+
+func /*@q*/F(s *S) error {
+	return s.Err
+}
+
+func main() {
+	_ = apply(NewS)
+	out := reflect.ValueOf(NewS).Call([]reflect.Value{reflect.ValueOf(&io.EOF).Elem()})
+	fmt.Println(F(out[0].Interface().(*S)))
+}

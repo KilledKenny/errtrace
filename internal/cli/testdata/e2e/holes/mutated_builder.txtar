@@ -1,0 +1,56 @@
+QA4 pre-existing 1. A wrapper is written after it was built, through a pointer
+to it: a builder method stores the cause after the literal, which stores none.
+The wrapper is returned: its Wrap holds, besides what the literal stored, what
+the later writers of the field store, flagged as location values. (Run time
+has the later value only; errtrace does not order the stores.)
+-- args --
+a.go:@t
+-- stdout --
+$WORK/a.go:20:12-13: Error Set of example.com/x.F: 2 entries
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [via field Err of example.com/x.W]
+	wrap chain (origin → target):
+		$WORK/a.go:17:44-56: *example.com/x.W.Unwrap
+	path (origin → target):
+		$WORK/a.go:20:50-62: in example.com/x.F
+		$WORK/a.go:20:31-63: in example.com/x.F, call to (*example.com/x.W).WithCause
+		$WORK/a.go:18:45-46: in (*example.com/x.W).WithCause
+		$WORK/a.go:18:39-42: in (*example.com/x.W).WithCause
+		$WORK/a.go:17:44-56: in example.com/x.New
+		$WORK/a.go:20:31-39: in example.com/x.F, call to example.com/x.New
+		$WORK/a.go:18:37-38: in (*example.com/x.W).WithCause
+		$WORK/a.go:20:31-63: in example.com/x.F, call to (*example.com/x.W).WithCause
+$WORK/a.go:17:44-56: concrete *example.com/x.W
+	path (origin → target):
+		$WORK/a.go:17:44-56: in example.com/x.New
+		$WORK/a.go:20:31-39: in example.com/x.F, call to example.com/x.New
+		$WORK/a.go:18:37-38: in (*example.com/x.W).WithCause
+		$WORK/a.go:20:31-63: in example.com/x.F, call to (*example.com/x.W).WithCause
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"os"
+)
+
+type W struct {
+	msg string
+	Err error
+}
+
+func (w *W) Error() string { return w.msg }
+func (w *W) Unwrap() error { return w.Err }
+
+func New(msg string) *W           { return &W{msg: msg} }
+func (w *W) WithCause(e error) *W { w.Err = e; return w }
+
+func /*@t*/F() error { return New("x").WithCause(os.ErrClosed) }
+
+func /*@u*/U() error { return errors.Unwrap(F()) }
+
+func main() { fmt.Println(F(), U()) }

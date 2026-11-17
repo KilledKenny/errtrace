@@ -1,0 +1,101 @@
+QA M3. A deferred closure joins what a getter closure returns of the named
+result with itself: the getter's result, read inside a value stored to the
+variable, is the variable read back around the cycle.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:24:12-13: Error Set of example.com/x.B: 3 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:10:27-33: in example.com/x.src
+		$WORK/a.go:27:9-14: in example.com/x.B, call to example.com/x.src
+$GOROOT/src/io/io.go:*: sentinel io.EOF [+1 more paths]
+	wrap chain (origin → target):
+		$WORK/a.go:26:23-48: errors.Join
+	path (origin → target):
+		$WORK/a.go:10:27-33: in example.com/x.src
+		$WORK/a.go:27:9-14: in example.com/x.B, call to example.com/x.src
+		$WORK/a.go:25:31-34: in example.com/x.B$1
+		$WORK/a.go:26:42-47: in example.com/x.B$2, call to example.com/x.B$1 (dynamic function value of type func() error: 1 of 1 candidates)
+		$WORK/a.go:26:17-20: in example.com/x.B$2
+		$WORK/a.go:27:2-2: in example.com/x.B
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat]
+	wrap chain (origin → target):
+		$WORK/a.go:26:23-48: errors.Join
+		$WORK/a.go:26:23-48: errors.Join
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"os"
+)
+
+func src() error { return io.EOF }
+func c1() error  { return os.ErrClosed }
+func c2() error  { return os.ErrInvalid }
+
+type S struct{ err error }
+
+func (s *S) Err() error { return s.err }
+
+func (s *S) add(e error)  { s.err = errors.Join(s.Err(), e) }
+func (s *S) add2(e error) { s.err = fmt.Errorf("%w; %w", s.Err(), e) }
+func (s *S) dbl()         { s.err = errors.Join(s.Err(), s.Err()) }
+
+func A(s *S) error { return s.Err() }
+
+func /*@q*/B() (err error) {
+	get := func() error { return err }
+	defer func() { err = errors.Join(get(), get()) }()
+	return src()
+}
+
+func C() (err error) {
+	get := func() error { return err }
+	defer func() { err = errors.Join(get(), c1()) }()
+	defer func() { err = errors.Join(get(), c2()) }()
+	return src()
+}
+
+type T struct{ err error }
+
+func (t *T) Err() error { return t.err }
+func (t *T) dbl()       { t.err = errors.Join(t.Err(), t.Err()) }
+
+func D(t *T) error { return t.Err() }
+
+// linked list accumulation
+type N struct {
+	err  error
+	next *N
+}
+
+func (n *N) all() error {
+	if n == nil {
+		return nil
+	}
+	return errors.Join(n.err, n.next.all())
+}
+
+func (n *N) push(e error) *N { return &N{err: fmt.Errorf("n: %w", errors.Join(e, n.all())), next: n} }
+
+func E(n *N) error { return n.all() }
+
+func main() {
+	s := &S{}
+	s.add(src())
+	s.add2(c1())
+	s.dbl()
+	t := &T{err: io.EOF}
+	t.dbl()
+	var n *N
+	n = n.push(c1()).push(c2())
+	fmt.Println(A(s) != nil, B() != nil, C() != nil, D(t) != nil, E(n) != nil)
+}

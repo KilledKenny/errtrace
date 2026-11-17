@@ -1,0 +1,42 @@
+QA4 C1. A value built as NotFound (type NotFound base) is converted to *base
+and unwrapped by (*base).Unwrap: the two struct types are one for a field
+load, field for field, so the load is made on a value of the type. NotFound's
+own Unwrap is not a plain field return, so the value is not opened as a
+tracked one: the field's location answers, flagged.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:21:12-13: Error Set of example.com/x.F: 1 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF [via field err of example.com/x.base]
+	path (origin → target):
+		$WORK/a.go:19:41-47: in example.com/x.mk
+		$WORK/a.go:19:36-47: in example.com/x.mk
+		$WORK/a.go:12:40-45: in example.com/x.F
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+)
+
+type base struct{ err error }
+
+func (b *base) Error() string { return "b" }
+func (b *base) Unwrap() error { return b.err }
+
+type NotFound base
+
+func (n *NotFound) Error() string { return "nf: " + (*base)(n).Error() }
+func (n *NotFound) Unwrap() error { return (*base)(n).Unwrap() }
+
+func mk() error { return &NotFound{err: io.EOF} }
+
+func /*@q*/F() error { return errors.Unwrap(mk()) }
+
+func main() { fmt.Println(F()) }

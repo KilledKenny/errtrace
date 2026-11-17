@@ -1,0 +1,36 @@
+QA3 C4. The failed comma-ok assertion in a helper that returns the concrete
+pointer: the nil *E becomes a non-nil error where the caller converts it.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:19:12-13: Error Set of example.com/x.F: 1 entries
+$WORK/a.go:15:2-3: concrete *example.com/x.E [typed nil]
+	path (origin → target):
+		$WORK/a.go:15:2-3: in example.com/x.find
+		$WORK/a.go:19:31-42: in example.com/x.F, call to example.com/x.find
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+)
+
+type E struct{ msg string }
+
+func (e *E) Error() string { return "e" }
+
+func src() error { return io.EOF }
+
+func find(err error) *E {
+	e, _ := err.(*E)
+	return e
+}
+
+func /*@q*/F() error { return find(src()) }
+
+func main() { fmt.Println(F() != nil) }

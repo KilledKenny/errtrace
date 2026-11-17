@@ -1,0 +1,46 @@
+A closure that wraps the variable it writes. The store is not unrolled to the
+chain depth: inside a value stored to the variable, a load of the variable
+stands for the leaves of its values, so the Wrap is added once, over "any
+value of the variable under any number of Wraps": the entry marked chain may
+repeat.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:8:12-13: Error Set of example.com/fx.F: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:9:9-15: in example.com/fx.F
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat]
+	wrap chain (origin → target):
+		$WORK/a.go:11:9-37: fmt.Errorf "retry: %w"
+	path (origin → target):
+		$WORK/a.go:9:9-15: in example.com/fx.F
+		$WORK/a.go:11:33-36: in example.com/fx.F$1
+		$WORK/a.go:11:3-6: in example.com/fx.F$1
+		$WORK/a.go:16:9-12: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+)
+
+func /*@f*/F(n int) error {
+	err := io.EOF
+	retry := func() {
+		err = fmt.Errorf("retry: %w", err)
+	}
+	for i := 0; i < n; i++ {
+		retry()
+	}
+	return err
+}
+
+func main() {
+	_ = F(0)
+}

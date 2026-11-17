@@ -1,0 +1,60 @@
+QA4 pre-existing 1. A wrapper is written after it was built, through a pointer
+to it: a setter replaces what the literal stored. The wrapper is returned: its
+Wrap holds, besides what the literal stored, what the later writers of the
+field store, flagged as location values. (Run time has the later value only;
+errtrace does not order the stores.)
+-- args --
+a.go:@t
+-- stdout --
+$WORK/a.go:22:12-13: Error Set of example.com/x.F: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	wrap chain (origin → target):
+		$WORK/a.go:18:25-50: *example.com/x.W.Unwrap
+	path (origin → target):
+		$WORK/a.go:18:43-49: in example.com/x.newW
+		$WORK/a.go:23:7-13: in example.com/x.F, call to example.com/x.newW
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [via field Err of example.com/x.W]
+	wrap chain (origin → target):
+		$WORK/a.go:18:25-50: *example.com/x.W.Unwrap
+	path (origin → target):
+		$WORK/a.go:24:11-23: in example.com/x.F
+		$WORK/a.go:24:2-24: in example.com/x.F, call to (*example.com/x.W).SetErr
+		$WORK/a.go:20:39-40: in (*example.com/x.W).SetErr
+		$WORK/a.go:20:33-36: in (*example.com/x.W).SetErr
+		$WORK/a.go:18:25-50: in example.com/x.newW
+		$WORK/a.go:23:7-13: in example.com/x.F, call to example.com/x.newW
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"os"
+)
+
+type W struct {
+	msg string
+	Err error
+}
+
+func (w *W) Error() string { return w.msg }
+func (w *W) Unwrap() error { return w.Err }
+
+func newW() *W { return &W{msg: "x", Err: io.EOF} }
+
+func (w *W) SetErr(e error) { w.Err = e }
+
+func /*@t*/F() error {
+	w := newW()
+	w.SetErr(os.ErrClosed)
+	return w
+}
+
+func /*@u*/U() error { return errors.Unwrap(F()) }
+
+func main() { fmt.Println(F(), U()) }

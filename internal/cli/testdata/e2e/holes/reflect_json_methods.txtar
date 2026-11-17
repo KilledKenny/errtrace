@@ -1,0 +1,51 @@
+QA C3. MarshalJSON and UnmarshalJSON methods that only encoding/json calls, by
+reflection, write the field. They are outside the reachable program; as
+methods of types handed to reflection they are scanned, and the field keeps an
+Unresolved entry naming one of them.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:27:12-13: Error Set of example.com/x.F: 1 entries, 1 unresolved
+$WORK/a.go:27:31-37: unresolved(memory): field Err of example.com/x.S may be written by (example.com/x.T1).MarshalJSON, which only reflection can call
+	path (origin → target):
+		$WORK/a.go:27:31-37: in example.com/x.F
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+)
+
+type S struct{ Err error }
+
+var g1 = &S{}
+
+type T1 struct{ X int }
+
+func (T1) MarshalJSON() ([]byte, error) { g1.Err = io.EOF; return []byte("1"), nil }
+
+type T2 struct{ X int }
+
+func (*T2) UnmarshalJSON([]byte) error { g1.Err = os.ErrClosed; return nil }
+
+type Wrap struct {
+	A T1
+	B *T2
+}
+
+func /*@q*/F() error { return g1.Err }
+
+func main() {
+	json.Marshal(Wrap{})
+	fmt.Println(F())
+	var w Wrap
+	json.Unmarshal([]byte(`{"B":{}}`), &w)
+	fmt.Println(F())
+}

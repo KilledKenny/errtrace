@@ -10,6 +10,7 @@ import (
 	"golang.org/x/tools/go/ssa"
 
 	"github.com/KilledKenny/errtrace/internal/errset"
+	"github.com/KilledKenny/errtrace/internal/fmtverb"
 )
 
 // This file finds the guards that hold on a return path and decides what
@@ -56,11 +57,14 @@ type funcGuards struct {
 	// nonNil are, per point asked for, the values that a check that
 	// holds there proves non-nil (see provesNonNil).
 	nonNil map[point][]ssa.Value
+	// asserts numbers the type assertions whose value was walked (see
+	// analyzer.typeAssert), each with the id of its guard.
+	asserts map[*ssa.TypeAssert]int
 }
 
 // newFuncGuards recognises the guards of fn's Ifs.
 func newFuncGuards(fn *ssa.Function, sents *Sentinels) *funcGuards {
-	gd := &funcGuards{conds: make(map[*ssa.BasicBlock][]condGuard), at: make(map[point][]guardUse), nonNil: make(map[point][]ssa.Value)}
+	gd := &funcGuards{conds: make(map[*ssa.BasicBlock][]condGuard), at: make(map[point][]guardUse), nonNil: make(map[point][]ssa.Value), asserts: make(map[*ssa.TypeAssert]int)}
 	n := 0
 	for _, b := range fn.Blocks {
 		if len(b.Instrs) == 0 {
@@ -100,7 +104,12 @@ func (gd *funcGuards) guardsAt(pt point) []guardUse {
 			if provesNonNil(g) {
 				nonNil = append(nonNil, cg.raw, cg.operand)
 			}
-			if g.Kind == errset.GuardNil && !g.Holds {
+			if g.Kind == errset.GuardNil && !g.Holds && g.Type == nil {
+				continue
+			}
+			if g.Kind == errset.GuardCompanion && !g.Holds {
+				// Where the call failed, nothing is known of its
+				// other results.
 				continue
 			}
 			id := 2 * cg.id
@@ -205,10 +214,19 @@ func recognise(cond ssa.Value, sents *Sentinels) []condGuard {
 			x, y = y, x
 		}
 		if !types.IsInterface(x.Type()) {
+			if _, ptr := x.Type().Underlying().(*types.Pointer); ptr && isNilConst(y) && IsErrorType(x.Type()) {
+				// p == nil for a pointer p of an error type: true of
+				// the typed nil that p is once it is converted.
+				return []condGuard{mk(x, errset.Guard{Kind: errset.GuardNil, Type: unalias(x.Type())}, pos)}
+			}
 			return nil
 		}
 		if isNilConst(y) {
-			return []condGuard{mk(x, errset.Guard{Kind: errset.GuardNil}, pos)}
+			out := []condGuard{mk(x, errset.Guard{Kind: errset.GuardNil}, pos)}
+			if IsErrorType(x.Type()) {
+				out = append(out, companions(x, pos, mk)...)
+			}
+			return out
 		}
 		if v, g := globalVar(y); v != nil {
 			return []condGuard{mk(x, sentinelGuard(errset.GuardEqual, v, sents.Info(g)), pos)}
@@ -219,6 +237,9 @@ func recognise(cond ssa.Value, sents *Sentinels) []condGuard {
 			g := mk(ta.X, errset.Guard{Kind: errset.GuardAssert, Type: unalias(ta.AssertedType)}, positive)
 			g.g.Site, g.g.Pos = ta, ta.Pos()
 			return []condGuard{g}
+		}
+		if b, ok := c.Type().Underlying().(*types.Basic); ok && b.Info()&types.IsBoolean != 0 {
+			return companions(c, positive, mk)
 		}
 	case *ssa.Call:
 		common := c.Common()
@@ -250,6 +271,33 @@ func recognise(cond ssa.Value, sents *Sentinels) []condGuard {
 		return out
 	}
 	return nil
+}
+
+// companions returns the guards that a check of tested, one result of a
+// call (err == nil, or ok itself), makes on the call's other results that
+// are pointers of an error type: where the check holds, the call
+// succeeded (see errset.GuardCompanion). positive says whether the If's
+// true branch is the one on which it holds.
+func companions(tested ssa.Value, positive bool, mk func(ssa.Value, errset.Guard, bool) condGuard) []condGuard {
+	ex, ok := stripConv(tested).(*ssa.Extract)
+	if !ok {
+		return nil
+	}
+	call, ok := ex.Tuple.(*ssa.Call)
+	if !ok || call.Referrers() == nil {
+		return nil
+	}
+	var out []condGuard
+	for _, r := range *call.Referrers() {
+		sib, ok := r.(*ssa.Extract)
+		if !ok || sib.Index == ex.Index {
+			continue
+		}
+		if _, ptr := sib.Type().Underlying().(*types.Pointer); ptr && IsErrorType(sib.Type()) {
+			out = append(out, mk(sib, errset.Guard{Kind: errset.GuardCompanion, Index: ex.Index}, positive))
+		}
+	}
+	return out
 }
 
 // sentinelGuard returns a GuardEqual or GuardIs with the Sentinel v.
@@ -303,13 +351,102 @@ func (a *analyzer) matchGuards(v ssa.Value) {
 	}
 	for _, u := range a.funcGuards().guardsAt(a.pt) {
 		if u.raw != v && u.operand != v {
-			continue
+			var ok bool
+			if u, ok = a.otherLoadGuard(u, v); !ok {
+				continue
+			}
 		}
 		i, found := slices.BinarySearchFunc(a.guards, u.id, func(x guardUse, id int) int { return x.id - id })
 		if !found {
 			a.guards = slices.Insert(slices.Clip(a.guards), i, u)
 		}
 	}
+}
+
+// otherLoadGuard returns the guard u, which tests a load of a local
+// variable, as a guard of v, another load of the same variable (SSA loads
+// a variable that was not lifted once per use: if errors.Is(err, io.EOF) {
+// ... }; return err). If no store to the variable can run between the two
+// loads, they give the same value and the guard applies as it is. If one
+// can, the guard cannot remove a value: it becomes a guard that only marks
+// the values possibly handled.
+func (a *analyzer) otherLoadGuard(u guardUse, v ssa.Value) (guardUse, bool) {
+	load, alloc := variableLoad(v)
+	if alloc == nil {
+		return u, false
+	}
+	tested, talloc := variableLoad(u.operand)
+	if talloc != alloc || tested == load {
+		return u, false
+	}
+	if a.sameBetween(alloc, tested, load) {
+		return u, true
+	}
+	if u.g.Kind == errset.GuardNil {
+		return u, false
+	}
+	u.g = errset.Guard{
+		Kind: errset.GuardHelper, Site: u.g.Site, Pos: u.g.Pos, Holds: u.g.Holds,
+		Detail: u.g.String() + " of an earlier value of " + alloc.Comment,
+	}
+	u.id += 1 << 24
+	return u, true
+}
+
+// variableLoad returns v as a load of a local variable, with the
+// variable, or nil.
+func variableLoad(v ssa.Value) (*ssa.UnOp, *ssa.Alloc) {
+	u, ok := v.(*ssa.UnOp)
+	if !ok || u.Op != token.MUL {
+		return nil, nil
+	}
+	alloc, ok := u.X.(*ssa.Alloc)
+	if !ok || alloc.Comment == "complit" {
+		return nil, nil
+	}
+	return u, alloc
+}
+
+// sameBetween reports whether the loads first and then of the variable
+// alloc are sure to give the same value when then runs after first: the
+// variable is written only by Stores of its own function (no closure
+// writes it and its address does not escape), and none of them can run
+// after first and before then.
+func (a *analyzer) sameBetween(alloc *ssa.Alloc, first, then *ssa.UnOp) bool {
+	w := variableWriters(alloc)
+	if w.escapes {
+		return false
+	}
+	for _, st := range w.stores {
+		if st.Parent() != a.fn || (mayFollow(first, st) && mayFollow(st, then)) {
+			return false
+		}
+	}
+	return true
+}
+
+// mayFollow reports whether instruction y can run after x: later in x's
+// block, or in a block reachable from it.
+func mayFollow(x, y ssa.Instruction) bool {
+	bx, by := x.Block(), y.Block()
+	if bx == by && before(x, y) {
+		return true
+	}
+	seen := make(map[*ssa.BasicBlock]bool)
+	work := append([]*ssa.BasicBlock(nil), bx.Succs...)
+	for len(work) > 0 {
+		b := work[len(work)-1]
+		work = work[:len(work)-1]
+		if seen[b] {
+			continue
+		}
+		seen[b] = true
+		if b == by {
+			return true
+		}
+		work = append(work, b.Succs...)
+	}
+	return false
 }
 
 // funcGuards returns the guards of the analyzer's function, shared with
@@ -368,9 +505,47 @@ const (
 func Decide(tbl *errset.Table, id errset.ValueID, g errset.Guard) (Verdict, string) {
 	switch g.Kind {
 	case errset.GuardNil:
+		if g.Type != nil {
+			// A pointer compared with nil before it is converted to an
+			// interface: true of a typed nil and of nothing else
+			// errtrace knows; of a pointer it could not follow it is
+			// not known.
+			switch v := tbl.Get(id); v.Kind {
+			case errset.Concrete:
+				if v.TypedNil {
+					return Yes, ""
+				}
+			case errset.Unresolved, errset.Truncated:
+				return Maybe, ""
+			case errset.Param, errset.FreeVar, errset.CallRef, errset.ErrorfLike, errset.Guarded, errset.StoreRef, errset.FieldRef, errset.FieldOf:
+				return Unknown, ""
+			}
+			return No, ""
+		}
 		// No abstract value is nil (a typed nil is a non-nil interface).
 		return No, ""
+	case errset.GuardCompanion:
+		// False of the typed nil that the callee returns only with a
+		// failing value of the checked result, true of everything
+		// else the call returns.
+		switch v := tbl.Get(id); v.Kind {
+		case errset.Concrete:
+			if v.TypedNil && g.Index < 30 && v.Index&(1<<g.Index) != 0 {
+				return No, ""
+			}
+		case errset.Param, errset.FreeVar, errset.CallRef, errset.ErrorfLike, errset.Guarded, errset.StoreRef, errset.FieldRef, errset.FieldOf:
+			return Unknown, ""
+		}
+		return Yes, ""
 	case errset.GuardHelper:
+		// Not decided for any value; on a symbolic value the guard
+		// waits, so that it is applied to the values a caller gives
+		// (the summaries note which values a check they cannot decide
+		// let through).
+		switch tbl.Get(id).Kind {
+		case errset.Param, errset.FreeVar, errset.CallRef, errset.ErrorfLike, errset.Guarded, errset.StoreRef, errset.FieldRef, errset.FieldOf:
+			return Unknown, ""
+		}
 		return Maybe, ""
 	case errset.GuardEqual:
 		return decideTop(tbl, id, func(v errset.Value) (Verdict, string) {
@@ -418,7 +593,7 @@ func decideTop(tbl *errset.Table, id errset.ValueID, node func(errset.Value) (Ve
 		return Maybe, "unresolved value"
 	case errset.Truncated:
 		return Maybe, "Wrap Chain truncated"
-	case errset.Param, errset.FreeVar, errset.CallRef, errset.ErrorfLike, errset.Guarded:
+	case errset.Param, errset.FreeVar, errset.CallRef, errset.ErrorfLike, errset.Guarded, errset.StoreRef, errset.FieldRef, errset.FieldOf:
 		return Unknown, ""
 	}
 	return node(v)
@@ -441,7 +616,7 @@ func decideTree(tbl *errset.Table, id errset.ValueID, node func(errset.Value) (V
 			verdict, why = Maybe, "unresolved value"
 		case errset.Truncated:
 			verdict, why = Maybe, "Wrap Chain truncated"
-		case errset.Param, errset.FreeVar, errset.CallRef, errset.ErrorfLike, errset.Guarded:
+		case errset.Param, errset.FreeVar, errset.CallRef, errset.ErrorfLike, errset.Guarded, errset.StoreRef, errset.FieldRef, errset.FieldOf:
 			verdict = Unknown
 		default:
 			verdict, why = node(v)
@@ -458,6 +633,11 @@ func decideTree(tbl *errset.Table, id errset.ValueID, node func(errset.Value) (V
 			if maybe == "" {
 				maybe = why
 			}
+		}
+		if v.Kind == errset.FieldOf {
+			// The value is a field of its inner value, not the inner
+			// value: what is below says nothing yet.
+			return
 		}
 		below := mayBeMissing || (v.Kind == errset.Wrap && v.MayHoldNil)
 		for _, in := range v.Inner {
@@ -496,9 +676,10 @@ func decideTree(tbl *errset.Table, id errset.ValueID, node func(errset.Value) (V
 // types (see Sentinels.fresh) are taken as different. An Opaque Error or
 // a library Wrap is a new allocation too, decided by
 // newLibraryErrorVerdict; a custom-Unwrap Wrap is decided as the
-// allocated Concrete Type it is. Two loads of a variable that is
-// assigned outside init (Unstable) may give different values, so a
-// Sentinel of that variable may differ from it.
+// allocated Concrete Type it is (not allocated if it is Untracked), and
+// a Wrap that is the value of a Sentinel as that Sentinel. Two loads of
+// a variable that is assigned outside init (Unstable) may give different
+// values, so a Sentinel of that variable may differ from it.
 func equalVerdict(v errset.Value, g errset.Guard) (Verdict, string) {
 	switch v.Kind {
 	case errset.Sentinel:
@@ -557,10 +738,16 @@ func equalVerdict(v errset.Value, g errset.Guard) (Verdict, string) {
 	case errset.Opaque:
 		return newLibraryErrorVerdict(g, "opaque error")
 	case errset.Wrap:
+		if v.Var != nil {
+			// The value of a Sentinel, with what it wraps: decided as
+			// the Sentinel.
+			return equalVerdict(errset.Value{Kind: errset.Sentinel, Var: v.Var, Canon: v.Canon, Fresh: v.Fresh, Type: v.Type}, g)
+		}
 		if v.WrapKind == errset.WrapUnwrapMethod {
 			// A composite literal of the wrapper type: a new value of
 			// v.Type, decided as a Concrete Type Origin allocated there.
-			return equalVerdict(errset.Value{Kind: errset.Concrete, Type: v.Type, Allocated: true}, g)
+			// A value that is not tracked was got from elsewhere.
+			return equalVerdict(errset.Value{Kind: errset.Concrete, Type: v.Type, Allocated: !v.Untracked}, g)
 		}
 		return newLibraryErrorVerdict(g, "wrapped error")
 	}
@@ -702,13 +889,21 @@ func typeVerdict(v errset.Value, target types.Type) (Verdict, string) {
 		if methodsWithin(iface, "Error") {
 			return Yes, ""
 		}
+		if v.Constructor == "errors.New" || v.Constructor == "fmt.Errorf" {
+			// *errors.errorString and *fmt.errorString have no method
+			// but Error.
+			return No, ""
+		}
 		return Maybe, "opaque error"
 	case errset.Wrap:
 		if v.WrapKind == errset.WrapBraces {
 			// errtrace.Wrap's wrapper type is the library's own and its
 			// method set varies by version (Format, LogValue, TracePC,
-			// ...), so only Error is known.
+			// ...), so only Error and Unwrap() error are known.
 			if isIface && methodsWithin(iface, "Error") {
+				return Yes, ""
+			}
+			if single, multi := unwrapWanted(iface, isIface); single && !multi {
 				return Yes, ""
 			}
 			if isIface || inPackage(target, bracesErrtracePath) {
@@ -722,11 +917,80 @@ func typeVerdict(v errset.Value, target types.Type) (Verdict, string) {
 		if methodsWithin(iface, "Error") {
 			return Yes, ""
 		}
-		if methodsWithin(iface, "Error", "Unwrap") {
-			return Maybe, "wrapper type of " + string(v.WrapKind)
+		if single, multi := unwrapWanted(iface, true); single || multi {
+			// *fmt.wrapError (one %w) has Unwrap() error; *fmt.wrapErrors
+			// (several) and errors.Join's type have Unwrap() []error.
+			switch has := wrapUnwraps(v); {
+			case has == 0 || (single && multi):
+				return Maybe, "wrapper type of " + string(v.WrapKind)
+			case (has == 1) == single:
+				return Yes, ""
+			}
+			return No, ""
 		}
 	}
 	return No, ""
+}
+
+// unwrapWanted reports whether the interface iface, which has no methods
+// but Error and Unwrap, has an Unwrap() error method (single) or an
+// Unwrap() []error method (multi). Both are false if it has another
+// method, no Unwrap, or an Unwrap of another shape.
+func unwrapWanted(iface *types.Interface, isIface bool) (single, multi bool) {
+	if !isIface || !methodsWithin(iface, "Error", "Unwrap") {
+		return false, false
+	}
+	for i := range iface.NumMethods() {
+		m := iface.Method(i)
+		if m.Name() != "Unwrap" {
+			continue
+		}
+		sig, ok := m.Type().(*types.Signature)
+		if !ok || sig.Params().Len() != 0 || sig.Results().Len() != 1 {
+			return false, false
+		}
+		switch rt := sig.Results().At(0).Type(); {
+		case types.Identical(rt, types.Universe.Lookup("error").Type()):
+			single = true
+		case isErrorSlice(rt):
+			multi = true
+		}
+	}
+	return single, multi
+}
+
+// wrapUnwraps says which Unwrap method the type of the Wrap v has, for a
+// Wrap made by fmt.Errorf or errors.Join: 1 for Unwrap() error
+// (*fmt.wrapError: a constant format with one %w verb), 2 for Unwrap()
+// []error (errors.Join), and 0 if errtrace does not know (a format that is
+// not constant, or has several %w verbs, of which some may have no
+// operand).
+func wrapUnwraps(v errset.Value) int {
+	switch v.WrapKind {
+	case errset.WrapJoin:
+		return 2
+	case errset.WrapErrorf:
+		if SingleWrapFormat(v.Format) {
+			return 1
+		}
+	}
+	return 0
+}
+
+// SingleWrapFormat reports whether format is a constant format with
+// exactly one %w verb: fmt.Errorf then returns a *fmt.wrapError, whose
+// err field is the wrapped operand.
+func SingleWrapFormat(format string) bool {
+	if format == "" {
+		return false
+	}
+	n := 0
+	for _, verb := range fmtverb.Parse(format, -1) {
+		if verb.Verb == 'w' {
+			n++
+		}
+	}
+	return n == 1
 }
 
 // inPackage reports whether t, or the type it points to, is a named type
@@ -807,6 +1071,10 @@ func ApplyGuard(tbl *errset.Table, id errset.ValueID, g errset.Guard) (Outcome, 
 		return Keep, errset.GuardNote{}
 	case verdict == Yes:
 		return Remove, errset.GuardNote{}
+	case verdict == Maybe && g.Kind == errset.GuardNil:
+		// A pointer that may or may not be nil is not handled by the
+		// comparison.
+		return Keep, errset.GuardNote{}
 	case verdict == Maybe:
 		reason := g.String()
 		if why != "" {

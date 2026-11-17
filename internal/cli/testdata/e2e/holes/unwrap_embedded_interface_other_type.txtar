@@ -1,0 +1,57 @@
+QA4 C2, control. A wrapper type with no embedded field is still another type
+for the Unwrap of a second wrapper type: errors.Unwrap of an A lists only what
+the A holds, with no Unresolved entry for B's load.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:27:12-13: Error Set of example.com/x.F: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:22:18-24: in example.com/x.pick
+		$WORK/a.go:27:45-52: in example.com/x.F, call to example.com/x.pick
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap
+		$WORK/a.go:13:37-38: in (*example.com/x.A).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*example.com/x.A).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 2 of 2 candidates)
+		$WORK/a.go:27:31-53: in example.com/x.F, call to errors.Unwrap
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed
+	path (origin → target):
+		$WORK/a.go:24:17-29: in example.com/x.pick
+		$WORK/a.go:27:45-52: in example.com/x.F, call to example.com/x.pick
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap
+		$WORK/a.go:18:37-38: in (*example.com/x.B).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*example.com/x.B).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 2 of 2 candidates)
+		$WORK/a.go:27:31-53: in example.com/x.F, call to errors.Unwrap
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"os"
+)
+
+type A struct{ err error }
+
+func (a *A) Error() string { return "a" }
+func (a *A) Unwrap() error { return a.err }
+
+type B struct{ err error }
+
+func (b *B) Error() string { return "b" }
+func (b *B) Unwrap() error { return b.err }
+
+func pick(n int) error {
+	if n == 0 {
+		return &A{err: io.EOF}
+	}
+	return &B{err: os.ErrClosed}
+}
+
+func /*@q*/F() error { return errors.Unwrap(pick(0)) }
+
+func main() { fmt.Println(F(), pick(1)) }

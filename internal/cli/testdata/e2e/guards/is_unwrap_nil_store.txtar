@@ -1,8 +1,8 @@
-errors.Is through a custom Unwrap whose field is set to nil on one path: where the check fails the wrapper is kept and possibly handled.
+errors.Is through a custom Unwrap whose field is set to nil on one path: where the check fails the wrapper is kept and possibly handled. The wrapper that holds nil is an entry of its own (a Concrete Type).
 -- args --
 a.go:@g
 -- stdout --
-$WORK/a.go:21:12-13: Error Set of example.com/fx.G: 1 entries, 1 possibly handled
+$WORK/a.go:21:12-13: Error Set of example.com/fx.G: 2 entries, 1 possibly handled
 $GOROOT/src/io/io.go:*: sentinel io.EOF
 	wrap chain (origin → target):
 		$WORK/a.go:14:7-24: *example.com/fx.W.Unwrap
@@ -10,6 +10,10 @@ $GOROOT/src/io/io.go:*: sentinel io.EOF
 		$WORK/a.go:23:5-27: errors.Is with io.EOF: wrapped value may be nil
 	path (origin → target):
 		$WORK/a.go:14:17-23: in example.com/fx.source
+		$WORK/a.go:22:9-18: in example.com/fx.G, call to example.com/fx.source
+$WORK/a.go:14:7-24: concrete *example.com/fx.W
+	path (origin → target):
+		$WORK/a.go:14:7-24: in example.com/fx.source
 		$WORK/a.go:22:9-18: in example.com/fx.G, call to example.com/fx.source
 -- stderr --
 errtrace: warning: target not reachable from main/init; parameters may lack candidates

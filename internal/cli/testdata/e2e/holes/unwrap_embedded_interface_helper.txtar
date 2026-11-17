@@ -1,0 +1,56 @@
+QA4 C2. The same with the outer value built in a helper from a parameter, and
+unwrapped behind an errors.Is check.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:30:12-13: Error Set of example.com/x.F: 1 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF [via field Coder of example.com/x.Outer]
+	path (origin → target):
+		$WORK/a.go:31:24-30: in example.com/x.F
+		$WORK/a.go:31:9-32: in example.com/x.F, call to example.com/x.wrap
+		$WORK/a.go:28:42-43: in example.com/x.wrap
+		$WORK/a.go:28:42-43: in example.com/x.wrap
+		$WORK/a.go:18:37-44: in example.com/x.F
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+)
+
+type Coder interface {
+	error
+	Unwrap() error
+	Code() int
+}
+
+type W struct{ inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.inner }
+func (w *W) Code() int     { return 1 }
+
+type Outer struct {
+	Coder
+	msg string
+}
+
+func (o *Outer) Error() string { return o.msg }
+
+func wrap(c Coder) error { return &Outer{c, "ctx"} }
+
+func /*@q*/F() error {
+	err := wrap(&W{inner: io.EOF})
+	if errors.Is(err, io.EOF) {
+		return errors.Unwrap(err)
+	}
+	return nil
+}
+
+func main() { fmt.Println(F()) }

@@ -1,0 +1,38 @@
+QA N3. A prototype registry: reflect.TypeOf of a value taken out of a map of
+any, reflect.New of that type, a field set by reflection, and the type
+assertion in another function. The dynamic type at reflect.TypeOf is not
+known, so every type that can be in an any is exposed.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:20:12-13: Error Set of example.com/x.F: 1 entries, 1 unresolved
+$WORK/a.go:20:31-50: unresolved(memory): field Err of example.com/x.S may be written by reflection, unsafe code or a function that is not seen
+	path (origin → target):
+		$WORK/a.go:20:31-50: in example.com/x.F
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+	"reflect"
+)
+
+type S struct{ Err error }
+
+var protos = map[string]any{"s": &S{}}
+
+func build(name string) any {
+	t := reflect.TypeOf(protos[name]).Elem()
+	v := reflect.New(t)
+	v.Elem().Field(0).Set(reflect.ValueOf(&io.EOF).Elem())
+	return v.Interface()
+}
+
+func /*@q*/F() error { return build("s").(*S).Err }
+
+func main() { fmt.Println(F()) }

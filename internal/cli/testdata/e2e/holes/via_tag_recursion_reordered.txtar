@@ -1,0 +1,74 @@
+QA3 M1. As via_tag_recursion, with the functions declared in the opposite
+order: the tags are the same.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:29:12-13: Error Set of example.com/x.q: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF [via field err of example.com/x.S]
+	path (origin → target):
+		$WORK/a.go:43:7-13: in example.com/x.main
+		$WORK/a.go:43:2-14: in example.com/x.main, call to example.com/x.setS
+		$WORK/a.go:13:34-35: in example.com/x.setS
+		$WORK/a.go:13:28-31: in example.com/x.setS
+		$WORK/a.go:14:32-37: in example.com/x.load
+		$WORK/a.go:19:10-17: in example.com/x.t, call to example.com/x.load
+		$WORK/a.go:27:9-18: in example.com/x.r, call to example.com/x.t
+		$WORK/a.go:33:9-18: in example.com/x.q, call to example.com/x.r
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed
+	path (origin → target):
+		$WORK/a.go:15:32-44: in example.com/x.direct
+		$WORK/a.go:37:10-18: in example.com/x.p, call to example.com/x.direct
+		$WORK/a.go:21:9-18: in example.com/x.t, call to example.com/x.p
+		$WORK/a.go:27:9-18: in example.com/x.r, call to example.com/x.t
+		$WORK/a.go:33:9-18: in example.com/x.q, call to example.com/x.r
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+	"os"
+)
+
+type S struct{ err error }
+
+var gs = &S{}
+
+func setS(e error)    { gs.err = e }
+func load(s *S) error { return s.err }
+func direct() error   { return os.ErrClosed }
+
+func t(s *S, n int) error {
+	if n == 0 {
+		return load(s)
+	}
+	return p(s, n-1)
+}
+func r(s *S, n int) error {
+	if n == 7 {
+		return nil
+	}
+	return t(s, n-1)
+}
+func /*@q*/q(s *S, n int) error {
+	if n == 5 {
+		return nil
+	}
+	return r(s, n-1)
+}
+func p(s *S, n int) error {
+	if n == 1 {
+		return direct()
+	}
+	return q(s, n-1)
+}
+
+func main() {
+	setS(io.EOF)
+	setS(os.ErrClosed)
+	fmt.Println(q(&S{}, 4))
+}

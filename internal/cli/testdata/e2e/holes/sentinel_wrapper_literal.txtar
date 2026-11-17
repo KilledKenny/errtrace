@@ -1,0 +1,38 @@
+QA5 M1. A Sentinel whose value is a composite literal of a wrapper type: the
+initializer is opened as a tracked value, and what it wraps is listed under a
+Wrap that is the Sentinel's value. A guard that removes the Sentinel removes
+that Wrap too (sentinel_wrapper_guarded).
+-- args --
+a.go:@t
+-- stdout --
+$WORK/a.go:15:12-13: Error Set of example.com/x.T: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	wrap chain (origin → target):
+		$WORK/a.go:13:5-9: *example.com/x.W.Unwrap
+	path (origin → target):
+		$WORK/a.go:15:31-35: in example.com/x.T
+$WORK/a.go:13:5-9: sentinel example.com/x.ErrX
+	path (origin → target):
+		$WORK/a.go:15:31-35: in example.com/x.T
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+)
+
+type W struct{ inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.inner }
+
+var ErrX = &W{inner: io.EOF}
+
+func /*@t*/T() error { return ErrX }
+
+func main() { fmt.Println(T()) }

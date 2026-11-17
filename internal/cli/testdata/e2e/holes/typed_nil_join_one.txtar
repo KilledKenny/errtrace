@@ -1,0 +1,63 @@
+QA6 C2, control. As typed_nil_join_two with one operand: errors.Join(check(a))
+is nil when the check passes, and the typed nil of "return nil, ..." is
+listed. (Run time: T(1) is a nil *E.)
+-- args --
+a.go:@t
+-- stdout --
+$WORK/a.go:28:12-13: Error Set of example.com/x.T: 3 entries
+$WORK/a.go:12:5-11: sentinel example.com/x.ErrNeg
+	wrap chain (origin → target):
+		$WORK/a.go:23:15-36: errors.Join
+	path (origin → target):
+		$WORK/a.go:16:10-16: in example.com/x.check
+		$WORK/a.go:23:27-35: in example.com/x.parse, call to example.com/x.check
+		$WORK/a.go:29:12-26: in example.com/x.T, call to example.com/x.parse
+$WORK/a.go:23:3-3: concrete *example.com/x.E [typed nil]
+	path (origin → target):
+		$WORK/a.go:23:3-3: in example.com/x.parse
+		$WORK/a.go:29:12-26: in example.com/x.T, call to example.com/x.parse
+$WORK/a.go:25:9-14: concrete *example.com/x.E
+	path (origin → target):
+		$WORK/a.go:25:9-14: in example.com/x.parse
+		$WORK/a.go:29:12-26: in example.com/x.T, call to example.com/x.parse
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+)
+
+type E struct{ a int }
+
+func (*E) Error() string { return "e" }
+
+var ErrNeg = errors.New("negative")
+
+func check(n int) error {
+	if n < 0 {
+		return ErrNeg
+	}
+	return nil
+}
+
+func parse(a int, strict bool) (*E, error) {
+	if strict {
+		return nil, errors.Join(check(a))
+	}
+	return &E{a}, nil
+}
+
+func /*@t*/T(a int) error {
+	e, err := parse(a, true)
+	if err != nil {
+		return err
+	}
+	return e
+}
+
+func main() { fmt.Println(T(1) != nil, T(-1)) }

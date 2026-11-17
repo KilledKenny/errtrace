@@ -1,0 +1,40 @@
+QA4 C3 (found while fixing). A reflect.Type that is stored in a sync.Map is
+not "only inspected": it comes back out and reflect.New builds a value of the
+type. Only the packages that print are taken to do nothing else with a
+reflect.Type or reflect.Value.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:14:12-13: Error Set of example.com/x.F: 1 entries, 1 unresolved
+$WORK/a.go:14:31-41: unresolved(memory): field Err of example.com/x.S may be written by reflection, unsafe code or a function that is not seen
+	path (origin → target):
+		$WORK/a.go:14:31-41: in example.com/x.F
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+	"reflect"
+	"sync"
+)
+
+type S struct{ Err error }
+
+var g any
+
+func /*@q*/F() error { return g.(*S).Err }
+
+func main() {
+	var m sync.Map
+	m.Store("s", reflect.TypeOf(S{}))
+	t, _ := m.Load("s")
+	v := reflect.New(t.(reflect.Type))
+	v.Elem().Field(0).Set(reflect.ValueOf(&io.EOF).Elem())
+	g = v.Interface()
+	fmt.Println(F())
+}

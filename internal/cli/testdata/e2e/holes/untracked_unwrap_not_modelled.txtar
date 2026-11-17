@@ -1,0 +1,46 @@
+QA5 M1. A wrapper that is not a tracked value, of a type whose Unwrap is not
+a plain field return: as for a composite literal of such a type, its Wrap
+holds the Unresolved value "Unwrap not modelled". (Run time: the wrapper
+holds io.EOF.)
+-- args --
+a.go:@t
+-- stdout --
+$WORK/a.go:21:12-13: Error Set of example.com/x.T: 2 entries, 1 unresolved
+$WORK/a.go:19:32-33: concrete *example.com/x.W
+	path (origin → target):
+		$WORK/a.go:19:32-33: in example.com/x.pass
+		$WORK/a.go:21:31-50: in example.com/x.T, call to example.com/x.pass
+$WORK/a.go:19:32-33: unresolved(memory): *example.com/x.W.Unwrap not modelled
+	wrap chain (origin → target):
+		$WORK/a.go:19:32-33: *example.com/x.W.Unwrap
+	path (origin → target):
+		$WORK/a.go:19:32-33: in example.com/x.pass
+		$WORK/a.go:21:31-50: in example.com/x.T, call to example.com/x.pass
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+)
+
+type W struct{ a, b error }
+
+func (w *W) Error() string { return "w" }
+
+func (w *W) Unwrap() error {
+	if w.a != nil {
+		return w.a
+	}
+	return w.b
+}
+
+func pass(w *W) error { return w }
+
+func /*@t*/T() error { return pass(&W{a: io.EOF}) }
+
+func main() { fmt.Println(T()) }

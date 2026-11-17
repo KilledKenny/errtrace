@@ -1,0 +1,57 @@
+QA4 pre-existing 1. The program of mutated_setter, with the wrapper unwrapped:
+the same values as under the Wrap of the returned wrapper.
+-- args --
+a.go:@u
+-- stdout --
+$WORK/a.go:28:12-13: Error Set of example.com/x.U: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:18:43-49: in example.com/x.newW
+		$WORK/a.go:23:7-13: in example.com/x.F, call to example.com/x.newW
+		$WORK/a.go:28:45-48: in example.com/x.U, call to example.com/x.F
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap
+		$WORK/a.go:16:37-38: in (*example.com/x.W).Unwrap
+		$GOROOT/src/errors/wrap.go:*: in errors.Unwrap, call to (*example.com/x.W).Unwrap (dynamic (interface{Unwrap() error}).Unwrap: 1 of 1 candidates)
+		$WORK/a.go:28:31-49: in example.com/x.U, call to errors.Unwrap
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [via field Err of example.com/x.W] [+1 more paths]
+	path (origin → target):
+		$WORK/a.go:24:11-23: in example.com/x.F
+		$WORK/a.go:24:2-24: in example.com/x.F, call to (*example.com/x.W).SetErr
+		$WORK/a.go:20:39-40: in (*example.com/x.W).SetErr
+		$WORK/a.go:20:33-36: in (*example.com/x.W).SetErr
+		$WORK/a.go:16:37-42: in example.com/x.U
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"os"
+)
+
+type W struct {
+	msg string
+	Err error
+}
+
+func (w *W) Error() string { return w.msg }
+func (w *W) Unwrap() error { return w.Err }
+
+func newW() *W { return &W{msg: "x", Err: io.EOF} }
+
+func (w *W) SetErr(e error) { w.Err = e }
+
+func /*@t*/F() error {
+	w := newW()
+	w.SetErr(os.ErrClosed)
+	return w
+}
+
+func /*@u*/U() error { return errors.Unwrap(F()) }
+
+func main() { fmt.Println(F(), U()) }

@@ -1,0 +1,74 @@
+The cases of a type switch are comma-ok type assertions: the variable bound
+in the timeout case holds the operand's values that implement it, the default
+case those of no earlier case. The If guards of the switch and the guard of
+the assertion itself agree: nothing is counted twice.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:34:12-13: Error Set of example.com/fx.F: 3 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:25:10-16: in example.com/fx.source
+		$WORK/a.go:35:14-23: in example.com/fx.F, call to example.com/fx.source
+$WORK/a.go:29:10-14: concrete *example.com/fx.T
+	path (origin → target):
+		$WORK/a.go:29:10-14: in example.com/fx.source
+		$WORK/a.go:35:14-23: in example.com/fx.F, call to example.com/fx.source
+$WORK/a.go:31:9-24: opaque errors.New "x"
+	path (origin → target):
+		$WORK/a.go:31:9-24: in example.com/fx.source
+		$WORK/a.go:35:14-23: in example.com/fx.F, call to example.com/fx.source
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"io"
+)
+
+type E struct{}
+
+func (*E) Error() string { return "e" }
+
+type T struct{}
+
+func (*T) Error() string { return "t" }
+func (*T) Timeout() bool { return true }
+
+type timeout interface {
+	error
+	Timeout() bool
+}
+
+func source(n int) error {
+	switch n {
+	case 0:
+		return io.EOF
+	case 1:
+		return &E{}
+	case 2:
+		return &T{}
+	}
+	return errors.New("x")
+}
+
+func /*@f*/F(n int) error {
+	switch e := source(n).(type) {
+	case nil:
+		return nil
+	case *E:
+		return nil
+	case timeout:
+		return e
+	default:
+		return e
+	}
+}
+
+func main() {
+	_ = F(0)
+}

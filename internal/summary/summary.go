@@ -9,6 +9,69 @@
 // graph's strongly connected components with a capped fixpoint inside each
 // one. Call results are replaced by the callees' summaries, substituting
 // the call's arguments for the callees' parameters.
+//
+// A load of a struct field is replaced by the summary of the field's
+// location: the join of the values that the reachable program stores to
+// that field of that struct type anywhere (see fields.go). Locations are
+// nodes of the demand graph like functions: a function depends on the
+// locations it loads from, and a location on what its writers store.
+//
+// # Limits
+//
+// What an Error Set built from these summaries does not say, or says too
+// much of:
+//
+//   - A Target that is not reachable from main or an init function (a
+//     library Target) is solved in an open world: code outside the loaded
+//     program may call it and may write what it is handed. The standard
+//     library is assumed not to hand its arguments on to such code. A
+//     wrapper passed to a standard-library function that calls a function
+//     value of the client (slices.ContainsFunc(errs, pred), sync.Once.Do,
+//     sync.Map.Range, context.AfterFunc) may be written by that function
+//     value without an Unresolved entry saying so.
+//   - For a library Target, a tracked wrapper with an exported field gets
+//     the pessimistic Unresolved entry "may be written by code that is
+//     not reachable from the Query's roots" whenever a value of its type
+//     is handed to a dynamic call or stored to memory anywhere in the
+//     code the Target reaches, whether or not this value is.
+//   - Writes through reflection are found on a best-effort basis, from
+//     the types that reach reflect; writes through unsafe, cgo and
+//     assembly are not seen.
+//   - A typed nil (a nil pointer of an error type that becomes a non-nil
+//     error) is removed by a caller's check of another result of the call
+//     (err == nil, ok) only where that result is checked as the call
+//     returned it and the callee itself wrote "return nil, err" with an
+//     err that is never nil there, or "return nil, false". A function
+//     that passes both results of such a call on (return find()), a named
+//     result, or a check made on a copy of the error in a variable that a
+//     closure captured keeps the typed nil, which the caller may never
+//     get.
+//   - A nil pointer of an error type that is converted to an error
+//     outside the function that made it (pass(nil), where pass returns
+//     its *T parameter as an error) is listed as "concrete *T" without
+//     the [typed nil] mark.
+//   - A Sentinel is listed as itself even where its value is known to be
+//     a wrapper: the Wraps of its initializer are listed beside it, not
+//     in place of it, so a guard on a wrapped value (errors.Is with it)
+//     leaves the bare Sentinel entry and, in a chain of wrapper
+//     Sentinels, the inner Sentinels under the outer Wraps.
+//   - A Sentinel that is assigned outside a package-level initializer
+//     (func init() included) is not opened: it gets the Unresolved entry
+//     "its dynamic type is not known".
+//   - A named result that a deferred closure rewrites from itself (err =
+//     fmt.Errorf("f: %w", err)) is listed bare as well as under the Wrap,
+//     and the Wrap Chain is marked [chain may repeat], though the closure
+//     runs once. A closure that is called as well as deferred, a closure
+//     run as a goroutine, or a deferred call that errtrace cannot resolve
+//     (an interface method, a function value) makes every store to the
+//     variable readable by every load of it.
+//   - The nil-field form of a tracked wrapper (the value as it is once
+//     a later writer has set its field to nil) is not listed below the
+//     chain depth limit.
+//   - A parameter that is a function value resolves to every Candidate
+//     of its type, and a value kept by a guard of the form err == nil ||
+//     err == X is not narrowed: both give entries that cannot occur, and
+//     that are not marked as over-approximations.
 package summary
 
 import (
@@ -31,6 +94,16 @@ const (
 	// enters the closure at Site, and came from the values the creating
 	// function (ArgFn) bound to the variable, with sources ArgSources.
 	Captured
+	// Stored is a fact loaded, at Site, from a place that another
+	// function writes: it is the value that function (ArgFn) stores with
+	// the instruction Store, where it has the sources ArgSources.
+	Stored
+	// Passed is a fact that a function with no call context (the writer
+	// of a field location) got through a parameter: it is the value that
+	// the caller ArgFn passes at the call Site to Callee, where it has the
+	// sources ArgSources; Then are the sources of the parameter itself, on
+	// from there.
+	Passed
 )
 
 // MaxSources is how many sources a fact keeps, ranked local first, then
@@ -66,8 +139,48 @@ type Source struct {
 	// Dynamic reports whether a Via source's call is a dynamic call.
 	Dynamic bool
 	// ArgFn is, for a Captured source, the function that created the
-	// closure, where ArgSources are.
+	// closure, and, for a Stored source, the function that makes the
+	// store: where ArgSources are.
 	ArgFn *ssa.Function
+	// Store is, for a Stored source, the instruction of ArgFn that stores
+	// the value.
+	Store ssa.Instruction
+	// Then are, for a Passed source, the sources of the parameter that
+	// received the value, in the function the source belongs to.
+	Then []Source
+	// Field is, for a Stored source of a value loaded from a field
+	// location, the location's name ("field Err of io/fs.PathError"). It
+	// is empty for a variable that a closure stores to.
+	Field string
+	// via is set if every way the value comes through this source goes
+	// through a field location, and names the last such location on the
+	// way: the one the value was loaded from nearest to the function the
+	// source belongs to (see viaOf). It is empty for a source with a way
+	// that goes through no location.
+	via string
+}
+
+// viaOf returns the name of a field location if every source of srcs
+// goes through one: the value they belong to is known only as "what the
+// program stores to that field". It returns "" if some source does not.
+// Lists are kept with the sources that do not first (see addSource), so
+// the first one decides; it also gives the name.
+func viaOf(srcs []Source) string {
+	if len(srcs) == 0 {
+		return ""
+	}
+	return srcs[0].via
+}
+
+// later returns the name of the field location that a value went through
+// last, of two stretches of its way that each are, or are not, through
+// locations only (see Source.via): then is the later stretch and first
+// the earlier one. The whole way is through a location if either is.
+func later(then, first string) string {
+	if then != "" {
+		return then
+	}
+	return first
 }
 
 // rank orders sources: local first, then static calls, then dynamic calls.
@@ -75,26 +188,48 @@ func (s Source) rank() int {
 	switch {
 	case s.Kind == Local, s.Kind == Captured:
 		return 0
-	case !s.Dynamic:
+	case s.Kind == Stored, s.Kind == Passed, !s.Dynamic:
 		return 1
 	}
 	return 2
 }
 
 func sourceEqual(a, b Source) bool {
-	return a.Kind == b.Kind && a.Site == b.Site && a.Callee == b.Callee &&
+	return a.Kind == b.Kind && a.Site == b.Site && a.Callee == b.Callee && a.Field == b.Field && a.via == b.via &&
 		a.CalleeResult == b.CalleeResult && a.CalleeValue == b.CalleeValue && a.CalleeLeaf == b.CalleeLeaf &&
-		a.Dynamic == b.Dynamic && a.ArgFn == b.ArgFn && slices.EqualFunc(a.ArgSources, b.ArgSources, sourceEqual)
+		a.Dynamic == b.Dynamic && a.ArgFn == b.ArgFn && a.Store == b.Store &&
+		sourcesEqual(a.ArgSources, b.ArgSources) && sourcesEqual(a.Then, b.Then)
+}
+
+// sourcesEqual compares two source lists; lists that share their backing
+// array (as the argument sources of the sources made by one substitution
+// do) are equal without looking at them.
+func sourcesEqual(a, b []Source) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	if len(a) == 0 || &a[0] == &b[0] {
+		return true
+	}
+	return slices.EqualFunc(a, b, sourceEqual)
 }
 
 // addSource adds src to srcs unless it is there already, keeping srcs
-// ranked and at most MaxSources long.
+// ranked and at most MaxSources long. The sources that do not go through a
+// field location come before those that do, whatever their rank: a list
+// with one of them is never cut down to location sources only.
 func addSource(srcs []Source, src Source) []Source {
 	if slices.ContainsFunc(srcs, func(s Source) bool { return sourceEqual(s, src) }) {
 		return srcs
 	}
+	after := func(a, b Source) bool {
+		if (a.via != "") != (b.via != "") {
+			return a.via != ""
+		}
+		return a.rank() > b.rank()
+	}
 	i := len(srcs)
-	for i > 0 && srcs[i-1].rank() > src.rank() {
+	for i > 0 && after(srcs[i-1], src) {
 		i--
 	}
 	if i >= MaxSources {

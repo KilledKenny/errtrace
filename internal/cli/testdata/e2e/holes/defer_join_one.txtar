@@ -1,0 +1,89 @@
+QA M1. One deferred closure joins the named result with another error.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:15:12-13: Error Set of example.com/x.A: 4 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:10:27-33: in example.com/x.src
+		$WORK/a.go:17:9-14: in example.com/x.A, call to example.com/x.src
+$GOROOT/src/io/io.go:*: sentinel io.EOF [chain may repeat]
+	wrap chain (origin → target):
+		$WORK/a.go:16:23-45: errors.Join
+	path (origin → target):
+		$WORK/a.go:10:27-33: in example.com/x.src
+		$WORK/a.go:17:9-14: in example.com/x.A, call to example.com/x.src
+		$WORK/a.go:16:35-38: in example.com/x.A$1
+		$WORK/a.go:16:17-20: in example.com/x.A$1
+		$WORK/a.go:17:2-2: in example.com/x.A
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed
+	wrap chain (origin → target):
+		$WORK/a.go:16:23-45: errors.Join
+	path (origin → target):
+		$WORK/a.go:11:27-39: in example.com/x.c1
+		$WORK/a.go:16:40-44: in example.com/x.A$1, call to example.com/x.c1
+		$WORK/a.go:16:17-20: in example.com/x.A$1
+		$WORK/a.go:17:2-2: in example.com/x.A
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [chain may repeat]
+	wrap chain (origin → target):
+		$WORK/a.go:16:23-45: errors.Join
+	path (origin → target):
+		$WORK/a.go:11:27-39: in example.com/x.c1
+		$WORK/a.go:16:40-44: in example.com/x.A$1, call to example.com/x.c1
+		$WORK/a.go:16:17-20: in example.com/x.A$1
+		$WORK/a.go:15:17-20: in example.com/x.A
+		$WORK/a.go:16:35-38: in example.com/x.A$1
+		$WORK/a.go:16:17-20: in example.com/x.A$1
+		$WORK/a.go:17:2-2: in example.com/x.A
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"os"
+)
+
+func src() error { return io.EOF }
+func c1() error  { return os.ErrClosed }
+func c2() error  { return os.ErrInvalid }
+func c3() error  { return os.ErrExist }
+
+func /*@q*/A() (err error) {
+	defer func() { err = errors.Join(err, c1()) }()
+	return src()
+}
+
+func B() (err error) {
+	defer func() { err = errors.Join(err, c1()) }()
+	defer func() { err = errors.Join(err, c2()) }()
+	return src()
+}
+
+func C() (err error) {
+	defer func() { err = errors.Join(err, c1()) }()
+	defer func() { err = errors.Join(err, c2()) }()
+	defer func() { err = errors.Join(err, c3()) }()
+	return src()
+}
+
+func D() (err error) {
+	defer func() {
+		if cerr := c1(); cerr != nil {
+			err = fmt.Errorf("%w (close: %w)", err, cerr)
+		}
+	}()
+	defer func() {
+		if cerr := c2(); cerr != nil {
+			err = fmt.Errorf("%w (close: %w)", err, cerr)
+		}
+	}()
+	return src()
+}
+
+func main() { fmt.Println(A(), B(), C(), D()) }

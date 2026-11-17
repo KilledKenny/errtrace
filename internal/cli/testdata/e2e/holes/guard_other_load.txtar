@@ -1,0 +1,100 @@
+QA m1. A variable that a closure captures is loaded once for the guard and once
+for the return. No store can run between the two loads, so the guard on the
+first applies to the second: io.EOF, the only value, is removed.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:37:12-13: Error Set of example.com/x.C: 0 entries
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"os"
+)
+
+func src() error { return io.EOF }
+func src2() error { return os.ErrClosed }
+
+func A() (err error) {
+	defer func() {
+		if err == nil {
+			err = io.EOF
+		}
+	}()
+	err = src()
+	if errors.Is(err, io.EOF) {
+		return nil
+	}
+	return err
+}
+
+// panic after assigning; recover leaves err as assigned
+func B() (err error) {
+	defer func() { recover() }()
+	err = src2()
+	if err != nil {
+		panic("x")
+	}
+	return nil
+}
+
+// guard then return on the same variable, heap because of a reader closure
+func /*@q*/C() error {
+	var err error
+	defer func() { _ = err }()
+	err = src()
+	if errors.Is(err, io.EOF) {
+		return nil
+	}
+	return err
+}
+
+// guard, then a goroutine-free intervening write by a direct closure call
+func D() error {
+	var err error
+	set := func() { err = src() }
+	set()
+	if errors.Is(err, io.EOF) {
+		set()
+	}
+	return err
+}
+
+// errors.As target variable
+type E struct{ inner error }
+
+func (e *E) Error() string { return "e" }
+
+func mk() error { return &E{inner: os.ErrPermission} }
+
+func EE() error {
+	var t *E
+	if errors.As(mk(), &t) {
+		return t.inner
+	}
+	return nil
+}
+
+// loop-carried closure var
+func G() error {
+	var last error
+	for i := 0; i < 3; i++ {
+		func() {
+			if i == 1 {
+				last = fmt.Errorf("i=%d: %w", i, src2())
+			}
+		}()
+	}
+	return last
+}
+
+func main() {
+	fmt.Println(A(), B(), C(), D(), EE(), G())
+}

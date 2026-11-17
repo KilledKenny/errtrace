@@ -1,0 +1,48 @@
+QA N1. A wrapper literal whose inner value is always nil is still an error: a
+Concrete Type.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:16:12-13: Error Set of example.com/x.A: 1 entries
+$WORK/a.go:16:31-48: concrete *example.com/x.W
+	path (origin → target):
+		$WORK/a.go:16:31-48: in example.com/x.A
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import "fmt"
+
+type W struct{ inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.inner }
+
+func none() error { return nil }
+
+type S struct{ err error }
+
+func (s *S) wrap() { s.err = &W{inner: s.err} }
+
+func /*@q*/A() error { return &W{inner: none()} }
+
+func B(s *S) error { return s.err }
+
+func C() (err error) {
+	defer func() { err = &W{inner: err} }()
+	return nil
+}
+
+func D() (err error) {
+	defer func() { err = fmt.Errorf("ctx: %w", err) }()
+	return nil
+}
+
+func main() {
+	s := &S{}
+	s.wrap()
+	fmt.Println(A(), B(s), C(), D())
+}

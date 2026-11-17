@@ -1,0 +1,46 @@
+QA4 pre-existing 2, control. A nil check of the pointer between the call and
+the conversion removes the typed nil.
+-- args --
+a.go:@g
+-- stdout --
+$WORK/a.go:21:12-13: Error Set of example.com/x.G: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF
+	path (origin → target):
+		$WORK/a.go:25:9-15: in example.com/x.G
+$WORK/a.go:14:10-14: concrete *example.com/x.E
+	path (origin → target):
+		$WORK/a.go:14:10-14: in example.com/x.find
+		$WORK/a.go:22:10-21: in example.com/x.G, call to example.com/x.find
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+)
+
+type E struct{}
+
+func (e *E) Error() string { return "e" }
+
+func find(ok bool) *E {
+	if ok {
+		return &E{}
+	}
+	return nil
+}
+
+func /*@q*/F() error { return find(false) }
+
+func /*@g*/G() error {
+	if e := find(false); e != nil {
+		return e
+	}
+	return io.EOF
+}
+
+func main() { fmt.Println(F() != nil, G()) }

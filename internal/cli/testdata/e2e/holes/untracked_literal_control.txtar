@@ -1,0 +1,30 @@
+QA5 M1, control. A composite literal that stores nothing to the field its
+Unwrap returns is a tracked value: the Concrete Type is exact, and there is no
+Unresolved value.
+-- args --
+a.go:@t
+-- stdout --
+$WORK/a.go:13:12-13: Error Set of example.com/x.T: 1 entries
+$WORK/a.go:13:31-47: concrete *example.com/x.W
+	path (origin → target):
+		$WORK/a.go:13:31-47: in example.com/x.T
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import "fmt"
+
+type W struct {
+	msg   string
+	inner error
+}
+
+func (w *W) Error() string { return w.msg }
+func (w *W) Unwrap() error { return w.inner }
+
+func /*@t*/T() error { return &W{msg: "plain"} }
+
+func main() { fmt.Println(T()) }

@@ -1,0 +1,38 @@
+A field promoted from an embedded struct is a field of the embedded type: a
+store through one outer type is seen by a load through another.
+-- args --
+a.go:@f
+-- stdout --
+$WORK/a.go:13:12-13: Error Set of example.com/fx.F: 1 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF [via field err of example.com/fx.base]
+	path (origin → target):
+		$WORK/a.go:19:10-16: in example.com/fx.main
+		$WORK/a.go:19:4-7: in example.com/fx.main
+		$WORK/a.go:14:9-14: in example.com/fx.F
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import "io"
+
+type base struct{ err error }
+
+type X struct{ base }
+type Y struct {
+	n int
+	base
+}
+
+func /*@f*/F(y *Y) error {
+	return y.err
+}
+
+func main() {
+	x := &X{}
+	x.err = io.EOF
+	y := &Y{base: x.base}
+	_ = F(y)
+}

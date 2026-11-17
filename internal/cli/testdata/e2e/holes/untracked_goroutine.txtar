@@ -1,0 +1,52 @@
+QA5 M1. A wrapper that a goroutine's closure writes is held in a captured
+variable: what is returned is a load of that variable, not a tracked value.
+Its Wrap holds one Unresolved value, so that this Error Set no longer says
+less than that of errors.Unwrap of it (untracked_goroutine_unwrap). (Run time:
+the wrapper holds os.ErrClosed.)
+-- args --
+a.go:@t
+-- stdout --
+$WORK/a.go:16:12-13: Error Set of example.com/x.T: 2 entries, 1 unresolved
+$WORK/a.go:25:9-10: concrete *example.com/x.W
+	path (origin → target):
+		$WORK/a.go:25:9-10: in example.com/x.T
+$WORK/a.go:25:9-10: unresolved(memory): field inner of example.com/x.W: the wrapper is not a tracked value
+	wrap chain (origin → target):
+		$WORK/a.go:25:9-10: *example.com/x.W.Unwrap
+	path (origin → target):
+		$WORK/a.go:25:9-10: in example.com/x.T
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"sync"
+)
+
+type W struct{ inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.inner }
+
+func /*@t*/T() error {
+	w := &W{inner: io.EOF}
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		w.inner = os.ErrClosed
+	}()
+	wg.Wait()
+	return w
+}
+
+func /*@u*/U() error { return errors.Unwrap(T()) }
+
+func main() { fmt.Println(T(), U()) }

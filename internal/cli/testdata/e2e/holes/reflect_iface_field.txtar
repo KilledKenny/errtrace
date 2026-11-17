@@ -1,0 +1,45 @@
+QA C1. Reflection is given a struct with an interface-typed field and writes
+through the value in it: the types the interface may hold are exposed with the
+struct.
+-- args --
+a.go:@q
+-- stdout --
+$WORK/a.go:21:12-13: Error Set of example.com/x.F: 1 entries, 1 unresolved
+$WORK/a.go:22:9-14: unresolved(memory): field Err of example.com/x.S may be written by reflection, unsafe code or a function that is not seen
+	path (origin → target):
+		$WORK/a.go:22:9-14: in example.com/x.F
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+	"reflect"
+)
+
+type S struct{ Err error }
+
+func (s *S) Name() string { return "s" }
+
+type Loader interface{ Name() string }
+
+type Outer struct{ L Loader }
+
+func poke(v any) {
+	reflect.ValueOf(v).Elem().Field(0).Elem().Elem().Field(0).Set(reflect.ValueOf(io.EOF))
+}
+
+func /*@q*/F(s *S) error {
+	return s.Err
+}
+
+func main() {
+	s := &S{}
+	o := &Outer{L: s}
+	poke(o)
+	fmt.Println(F(s))
+}
