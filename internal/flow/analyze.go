@@ -157,6 +157,10 @@ type analyzer struct {
 	// shared with child analyzers), which cuts err = wrap(err) cycles.
 	captured *ssa.Alloc
 	active   map[*ssa.Store]bool
+	// initStore, if set, is the store that gives a package-level variable
+	// its value, whose stored composite literal the analyzer opens (see
+	// sentinelWraps).
+	initStore *ssa.Store
 
 	// pt is the point where the walked value is used, which says which
 	// guards hold for it (see guardsAt); gd are the function's guards,
@@ -402,7 +406,7 @@ func (a *analyzer) makeInterface(mi *ssa.MakeInterface) {
 	switch x := mi.X.(type) {
 	case *ssa.UnOp:
 		if g, ok := x.X.(*ssa.Global); ok && x.Op == token.MUL {
-			a.add(a.sentinel(g, x.Type()), x)
+			a.addSentinel(g, x.Type(), x)
 			return
 		}
 		if alloc, ok := x.X.(*ssa.Alloc); ok && x.Op == token.MUL && alloc.Comment == "complit" {
@@ -452,7 +456,10 @@ func (a *analyzer) makeInterface(mi *ssa.MakeInterface) {
 			return
 		}
 	}
+	// A value got from elsewhere (a parameter, a load, a Phi, an
+	// errors.As target): not a tracked one.
 	a.add(a.concrete(mi.X.Type(), mi, false), mi)
+	a.untracked(errset.Value{Site: mi, Pos: a.posOf(mi), Type: unalias(mi.X.Type())}, mi)
 }
 
 // debugRefAtUse returns the first DebugRef of v at or after the position
@@ -483,7 +490,7 @@ func (a *analyzer) load(v *ssa.UnOp) bool {
 		if !types.IsInterface(v.Type()) {
 			typ = v.Type() // a pointer Sentinel returned as a concrete error result
 		}
-		a.add(a.sentinel(x, typ), v)
+		a.addSentinel(x, typ, v)
 	case *ssa.FieldAddr:
 		a.fieldLoad(v, x.X, x.Field)
 	case *ssa.IndexAddr:
@@ -876,6 +883,15 @@ func (a *analyzer) sentinels() *Sentinels {
 		a.opts.Sentinels = NewSentinels()
 	}
 	return a.opts.Sentinels
+}
+
+// addSentinel adds the Sentinel of the variable g, loaded at src with the
+// dynamic type typ (nil if the load does not say), and what its value
+// wraps (see sentinelWraps).
+func (a *analyzer) addSentinel(g *ssa.Global, typ types.Type, src ssa.Value) {
+	id := a.sentinel(g, typ)
+	a.add(id, src)
+	a.sentinelWraps(g, a.tbl.Get(id), src)
 }
 
 func (a *analyzer) sentinel(g *ssa.Global, typ types.Type) errset.ValueID {

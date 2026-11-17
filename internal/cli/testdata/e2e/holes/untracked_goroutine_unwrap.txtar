@@ -1,0 +1,52 @@
+QA5 M1. errors.Unwrap of the wrapper of untracked_goroutine: the wrapper is
+known to be a W, so the load of its field lists what the field's location
+holds, flagged as location values.
+-- args --
+a.go:@u
+-- stdout --
+$WORK/a.go:28:12-13: Error Set of example.com/x.U: 2 entries
+$GOROOT/src/io/io.go:*: sentinel io.EOF [via field inner of example.com/x.W]
+	path (origin → target):
+		$WORK/a.go:17:17-23: in example.com/x.T
+		$WORK/a.go:17:10-23: in example.com/x.T
+		$WORK/a.go:14:37-44: in example.com/x.U
+$GOROOT/src/os/error.go:*: sentinel os.ErrClosed [via field inner of example.com/x.W]
+	path (origin → target):
+		$WORK/a.go:22:13-25: in example.com/x.T$1
+		$WORK/a.go:22:5-10: in example.com/x.T$1
+		$WORK/a.go:14:37-44: in example.com/x.U
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"sync"
+)
+
+type W struct{ inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.inner }
+
+func /*@t*/T() error {
+	w := &W{inner: io.EOF}
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		w.inner = os.ErrClosed
+	}()
+	wg.Wait()
+	return w
+}
+
+func /*@u*/U() error { return errors.Unwrap(T()) }
+
+func main() { fmt.Println(T(), U()) }

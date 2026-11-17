@@ -624,9 +624,10 @@ func decideTree(tbl *errset.Table, id errset.ValueID, node func(errset.Value) (V
 // types (see Sentinels.fresh) are taken as different. An Opaque Error or
 // a library Wrap is a new allocation too, decided by
 // newLibraryErrorVerdict; a custom-Unwrap Wrap is decided as the
-// allocated Concrete Type it is. Two loads of a variable that is
-// assigned outside init (Unstable) may give different values, so a
-// Sentinel of that variable may differ from it.
+// allocated Concrete Type it is (not allocated if it is Untracked), and
+// a Wrap that is the value of a Sentinel as that Sentinel. Two loads of
+// a variable that is assigned outside init (Unstable) may give different
+// values, so a Sentinel of that variable may differ from it.
 func equalVerdict(v errset.Value, g errset.Guard) (Verdict, string) {
 	switch v.Kind {
 	case errset.Sentinel:
@@ -685,10 +686,16 @@ func equalVerdict(v errset.Value, g errset.Guard) (Verdict, string) {
 	case errset.Opaque:
 		return newLibraryErrorVerdict(g, "opaque error")
 	case errset.Wrap:
+		if v.Var != nil {
+			// The value of a Sentinel, with what it wraps: decided as
+			// the Sentinel.
+			return equalVerdict(errset.Value{Kind: errset.Sentinel, Var: v.Var, Canon: v.Canon, Fresh: v.Fresh, Type: v.Type}, g)
+		}
 		if v.WrapKind == errset.WrapUnwrapMethod {
 			// A composite literal of the wrapper type: a new value of
 			// v.Type, decided as a Concrete Type Origin allocated there.
-			return equalVerdict(errset.Value{Kind: errset.Concrete, Type: v.Type, Allocated: true}, g)
+			// A value that is not tracked was got from elsewhere.
+			return equalVerdict(errset.Value{Kind: errset.Concrete, Type: v.Type, Allocated: !v.Untracked}, g)
 		}
 		return newLibraryErrorVerdict(g, "wrapped error")
 	}

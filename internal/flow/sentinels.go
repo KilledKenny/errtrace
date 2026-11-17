@@ -80,6 +80,22 @@ func (s *Sentinels) Info(g *ssa.Global) SentinelInfo {
 	return inf
 }
 
+// initStore returns the one store that gives g (or the variable whose
+// value it holds, its Canon) its value, in the initialization of its
+// package, or nil: there is not exactly one, or the variable is stored to
+// elsewhere too.
+func (s *Sentinels) initStore(g *ssa.Global) *ssa.Store {
+	inf := s.Info(g)
+	canon := inf.Canon
+	if canon == nil {
+		canon = g
+	}
+	if inf.Unstable || s.unstable[canon] || len(s.initStores[canon]) != 1 {
+		return nil
+	}
+	return s.initStores[canon][0]
+}
+
 // scan collects the stores to package-level variables in every function
 // of prog's packages, and marks the variables whose address is used.
 func (s *Sentinels) scan(prog *ssa.Program) {

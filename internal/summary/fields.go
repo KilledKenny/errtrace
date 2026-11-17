@@ -1262,6 +1262,10 @@ func (s *Solver) fieldBase(v, bv errset.Value) fieldBase {
 			if !s.sameStruct(bv.Type, v.Type) {
 				return s.otherType(v, bv)
 			}
+			if bv.Untracked {
+				// Known to be of the type, but not a tracked value.
+				return baseSome
+			}
 			if path, ok := s.unwrapPath(bv.Type); ok && path[0] == v.Index && s.followsPath(v, path) {
 				return baseInstance
 			}

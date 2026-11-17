@@ -3,7 +3,7 @@ interface that needs more than Error: its type has no other method.
 -- args --
 a.go:@q
 -- stdout --
-$WORK/a.go:84:12-21: Error Set of example.com/x.AsTimeout: 5 entries
+$WORK/a.go:84:12-21: Error Set of example.com/x.AsTimeout: 6 entries, 1 unresolved
 $GOROOT/src/os/error.go:*: sentinel os.ErrPermission
 	wrap chain (origin → target):
 		$WORK/a.go:46:10-55: *io/fs.PathError.Unwrap
@@ -25,6 +25,10 @@ $WORK/a.go:48:10-16: concrete example.com/x.V
 $WORK/a.go:50:10-18: concrete *example.com/x.V
 	path (origin → target):
 		$WORK/a.go:50:10-18: in example.com/x.src
+		$WORK/a.go:85:7-13: in example.com/x.AsTimeout, call to example.com/x.src
+$WORK/a.go:25:5-12: unresolved(memory): value of Sentinel main.ErrInit may wrap other errors: its dynamic type is not known
+	path (origin → target):
+		$WORK/a.go:40:10-17: in example.com/x.src
 		$WORK/a.go:85:7-13: in example.com/x.AsTimeout, call to example.com/x.src
 -- go.mod --
 module example.com/x

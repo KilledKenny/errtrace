@@ -450,7 +450,10 @@ func (a *analyzer) constructed(typ types.Type, alloc *ssa.Alloc) {
 	typ = unalias(typ)
 	conc := a.tbl.Intern(errset.Value{Kind: errset.Concrete, Site: alloc, Pos: a.posOf(alloc), Type: typ, Allocated: true})
 	if !TrackedAlloc(alloc) {
+		// A variable of the type (var w W; ...; return &w): its fields
+		// are not followed.
 		a.add(conc, alloc)
+		a.untracked(errset.Value{Site: alloc, Pos: a.posOf(alloc), Type: typ}, alloc)
 		return
 	}
 	m := unwrapMethod(a.fn.Prog, typ)
@@ -475,7 +478,8 @@ func (a *analyzer) constructed(typ types.Type, alloc *ssa.Alloc) {
 	// pointer to the value (a setter, a store by a caller): the Wrap
 	// holds that too, by the time it is unwrapped.
 	later, hasLater := a.laterField(typ, m, alloc, pos)
-	lit := openLiteral(alloc, m.path)
+	var lit literalField
+	lit.open(alloc, m.path, a.initStore)
 	stores := lit.stores
 	// The field is nil on a path with no store to it. With more than one
 	// store, the slice of Unwrap() []error is one of them, not all.
@@ -563,6 +567,200 @@ func (a *analyzer) constructed(typ types.Type, alloc *ssa.Alloc) {
 	}
 }
 
+// untracked adds what a value of a type with a custom Unwrap method may
+// wrap when the value is not a tracked one (a parameter, a load, an
+// errors.As target, a variable written field by field, a Sentinel whose
+// initializer is not opened): errtrace does not know what its field
+// holds, so the value is also a Wrap of base's type, marked Untracked,
+// that holds one Unresolved value. base gives the Wrap's Site, Pos and
+// Type (and the variable of a Sentinel); src is where the value enters
+// the function. The Concrete Type Origin or Sentinel that the caller adds
+// stands for the value whose field is nil. Nothing is added for a type
+// without an Unwrap method.
+func (a *analyzer) untracked(base errset.Value, src any) {
+	if a.fn == nil || base.Type == nil || types.IsInterface(base.Type) {
+		return
+	}
+	if _, ok := types.Unalias(base.Type).(*types.TypeParam); ok {
+		return
+	}
+	m := unwrapMethod(a.fn.Prog, base.Type)
+	var detail string
+	switch m.kind {
+	case unwrapNone:
+		return
+	case unwrapOther:
+		detail = typeString(base.Type) + ".Unwrap not modelled"
+	default:
+		st, field, ok := unwrappedField(base.Type, m.path)
+		if !ok {
+			return
+		}
+		detail = fmt.Sprintf("field %s of %s: the wrapper is not a tracked value", fieldName(st, field), typeString(st))
+	}
+	u := a.unresolvedAt(base.Site, base.Pos, errset.Memory, detail)
+	if a.flat {
+		a.addInner([]errset.ValueID{u}, src)
+		return
+	}
+	base.Kind, base.WrapKind = errset.Wrap, errset.WrapUnwrapMethod
+	base.Untracked, base.MayHoldNil = true, true
+	base.Inner = []errset.ValueID{u}
+	a.addFact(Fact{Value: a.tbl.Intern(base), Source: src})
+}
+
+// sentinelWraps adds what the value of the Sentinel sv, the variable g
+// loaded at src, wraps: a Sentinel is an Error Origin, but its value may
+// be a wrapper (var ErrX = &W{inner: io.EOF}, var ErrFoo =
+// fmt.Errorf("foo: %w", ErrBase)), in which errors.Is and errors.As find
+// more. Where the variable has one initializing store and no other, of a
+// composite literal of a type with a custom Unwrap method or of a call of
+// fmt.Errorf, errors.Join or errtrace.Wrap, the Wraps that the
+// initializer makes are added, each marked as the value of the Sentinel
+// (errset.Value.Var), so that the guards that remove the Sentinel remove
+// them. An initializer that cannot be opened so (its values depend on
+// calls or other symbolic values of the init function) gives one such
+// Wrap holding an Unresolved value; so does, by untracked, any other
+// Sentinel whose dynamic type is known and has an Unwrap method. The
+// Sentinel itself, which the caller adds, stands for the value that
+// wraps nothing.
+func (a *analyzer) sentinelWraps(g *ssa.Global, sv errset.Value, src any) {
+	if sv.Kind != errset.Sentinel || a.fn == nil {
+		return
+	}
+	base := errset.Value{Site: sv.Site, Pos: sv.Pos, Var: sv.Var, Canon: sv.Canon, Fresh: sv.Fresh}
+	st := a.sentinels().initStore(g)
+	if st == nil || st.Parent() == nil {
+		base.Type = sv.Type
+		a.untracked(base, src)
+		a.unknownSentinel(sv, src)
+		return
+	}
+	// The store of the literal's address to the variable is not an
+	// escape of its own: whoever loads the pointer from the variable and
+	// writes the field through it is a later writer of the field, which
+	// the Wrap of a tracked value holds already (see laterField).
+	c := &analyzer{tbl: a.tbl, fn: st.Parent(), at: st, pt: pointOf(st), seen: make(map[seenKey]bool), opts: a.opts, initStore: st}
+	val := stripConv(st.Val)
+	if mi, ok := val.(*ssa.MakeInterface); ok {
+		val = mi.X
+	}
+	opened := false
+	switch x := val.(type) {
+	case *ssa.Alloc:
+		if TrackedAlloc(x) {
+			c.constructed(x.Type(), x)
+			opened = true
+		}
+	case *ssa.UnOp:
+		if alloc, ok := x.X.(*ssa.Alloc); ok && x.Op == token.MUL && alloc.Comment == "complit" {
+			c.constructed(x.Type(), alloc)
+			opened = true
+		}
+	case *ssa.Call:
+		if _, ok := Intrinsic(x.Common().StaticCallee()); ok {
+			c.call(x, 0)
+			opened = true
+		}
+	}
+	if !opened {
+		base.Type = sv.Type
+		a.untracked(base, src)
+		a.unknownSentinel(sv, src)
+		return
+	}
+	var wraps []errset.ValueID
+	closed := true
+	for _, f := range c.facts {
+		v := a.tbl.Get(f.Value)
+		if v.Kind != errset.Wrap {
+			// The value that wraps nothing: the Sentinel itself.
+			closed = closed && v.Kind.IsOrigin()
+			continue
+		}
+		for _, e := range errset.Flatten(a.tbl, f.Value) {
+			l := a.tbl.Get(e.Leaf)
+			closed = closed && (l.Kind.IsOrigin() || l.Kind == errset.Unresolved || (l.Kind == errset.FieldRef && l.Later))
+		}
+		v.Site, v.Pos, v.Var, v.Canon, v.Fresh = base.Site, base.Pos, base.Var, base.Canon, base.Fresh
+		wraps = append(wraps, a.tbl.Intern(v))
+	}
+	if !closed {
+		detail := fmt.Sprintf("value of Sentinel %s may wrap other errors: its initializer is not followed", qualifiedName(sv.Var))
+		u := a.unresolvedAt(base.Site, base.Pos, errset.Memory, detail)
+		wraps = wraps[:0]
+		for _, f := range c.facts {
+			// One Wrap of the kind the initializer makes, holding the
+			// Unresolved value alone.
+			if v := a.tbl.Get(f.Value); v.Kind == errset.Wrap && len(wraps) == 0 {
+				w := base
+				w.Kind, w.WrapKind, w.Format, w.Type = errset.Wrap, v.WrapKind, v.Format, v.Type
+				w.MayHoldNil, w.Untracked = true, v.WrapKind == errset.WrapUnwrapMethod
+				w.Inner = []errset.ValueID{u}
+				wraps = append(wraps, a.tbl.Intern(w))
+			}
+		}
+		if len(wraps) == 0 {
+			if a.flat {
+				a.addInner([]errset.ValueID{u}, src)
+			} else {
+				a.add(u, src)
+			}
+			return
+		}
+	}
+	for _, w := range wraps {
+		if !a.flat {
+			a.add(w, src)
+			continue
+		}
+		// Below the chain depth limit: the leaves, cut.
+		for _, e := range errset.Flatten(a.tbl, w) {
+			a.addInner([]errset.ValueID{e.Leaf}, src)
+		}
+	}
+}
+
+// unknownSentinel adds an Unresolved value for the Sentinel sv, loaded at
+// src, if errtrace does not know the dynamic type of its value: the value
+// may be a wrapper of any kind.
+func (a *analyzer) unknownSentinel(sv errset.Value, src any) {
+	if sv.Type != nil {
+		return
+	}
+	detail := fmt.Sprintf("value of Sentinel %s may wrap other errors: its dynamic type is not known", qualifiedName(sv.Var))
+	u := a.unresolvedAt(sv.Site, sv.Pos, errset.Memory, detail)
+	if a.flat {
+		a.addInner([]errset.ValueID{u}, src)
+		return
+	}
+	a.add(u, src)
+}
+
+// unwrappedField returns the struct type that declares the field at path
+// (see unwrapShape.path) from typ, and the field's index in it.
+func unwrappedField(typ types.Type, path []int) (types.Type, int, bool) {
+	if len(path) == 0 {
+		return nil, 0, false
+	}
+	t := typ
+	for i, f := range path {
+		u := unalias(t)
+		if p, ok := u.Underlying().(*types.Pointer); ok {
+			u = unalias(p.Elem())
+		}
+		st, ok := u.Underlying().(*types.Struct)
+		if !ok || f >= st.NumFields() {
+			return nil, 0, false
+		}
+		if i == len(path)-1 {
+			return u, f, true
+		}
+		t = st.Field(f).Type()
+	}
+	return nil, 0, false
+}
+
 // laterField returns the Later FieldRef of the field that the Unwrap
 // method m of typ returns, for the value built by alloc: what the later
 // writers of that field store (see errset.Value.Later). It reports false
@@ -572,19 +770,10 @@ func (a *analyzer) laterField(typ types.Type, m unwrapShape, alloc *ssa.Alloc, p
 	if m.kind != unwrapField || m.multi || len(m.path) == 0 {
 		return 0, false
 	}
-	t := typ
-	for _, i := range m.path[:len(m.path)-1] {
-		u := unalias(t)
-		if p, ok := u.Underlying().(*types.Pointer); ok {
-			u = unalias(p.Elem())
-		}
-		st, ok := u.Underlying().(*types.Struct)
-		if !ok || i >= st.NumFields() {
-			return 0, false
-		}
-		t = st.Field(i).Type()
+	t, field, ok := unwrappedField(typ, m.path)
+	if !ok {
+		return 0, false
 	}
-	field := m.path[len(m.path)-1]
 	st := FieldStruct(t, field)
 	if st == nil {
 		return 0, false
@@ -622,15 +811,6 @@ type literalField struct {
 	// by the literal (it is a pointer that came from elsewhere, or a
 	// struct value stored whole): what its field holds is not known.
 	opaque bool
-}
-
-// openLiteral finds what the composite literal alloc stores to the field
-// at path: the indices of the embedded fields on the way, then that of
-// the field.
-func openLiteral(alloc *ssa.Alloc, path []int) literalField {
-	var lit literalField
-	lit.open(alloc, path, nil)
-	return lit
 }
 
 // open follows path from root, the address of a struct: the Alloc of a

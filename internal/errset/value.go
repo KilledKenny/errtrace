@@ -181,7 +181,10 @@ type Value struct {
 	// different Origins).
 	Pos token.Pos
 
-	// Var is the variable of a Sentinel.
+	// Var is the variable of a Sentinel, and of a Wrap that is the value
+	// of a Sentinel (var ErrX = &W{inner: io.EOF}, or one made by
+	// fmt.Errorf with %w): such a Wrap is equal to what the Sentinel is
+	// equal to.
 	Var *types.Var
 	// Canon is the variable whose value a Sentinel's Var holds (Var
 	// itself, or io.EOF for var ErrX = io.EOF), and Fresh reports that
@@ -235,6 +238,14 @@ type Value struct {
 	// marks the Unresolved values that such a FieldRef resolves to: they
 	// stand, under the Wrap, for ways the field may be written later.
 	Later bool
+	// Untracked marks a custom-Unwrap Wrap that stands for a value of the
+	// wrapper type that is not a tracked value (a parameter, a load, an
+	// errors.As target, a variable written field by field): what its
+	// field holds is not known, and its single inner value is an
+	// Unresolved value saying so. Such a value is not a new allocation,
+	// and a load of its field is resolved as for a Concrete Type Origin
+	// of the type, from the field's location.
+	Untracked bool
 	// MayHoldNil marks a Wrap that, on some path, holds nothing for one of
 	// its operands, which was nil there: a %w operand of fmt.Errorf, an
 	// operand of errors.Join or the field a custom Unwrap returns. Such a
@@ -283,6 +294,7 @@ type key struct {
 	format      string
 	inner       string
 	mayHoldNil  bool
+	untracked   bool
 	later       bool
 	repeat      bool
 	unresolved  UnresolvedKind
@@ -324,6 +336,7 @@ func keyWith(v Value, typs typeKeys) key {
 		hasMessage:  v.HasMessage,
 		wrapKind:    v.WrapKind,
 		mayHoldNil:  v.MayHoldNil,
+		untracked:   v.Untracked,
 		later:       v.Later,
 		repeat:      v.Repeat,
 		format:      v.Format,

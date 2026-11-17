@@ -1,0 +1,40 @@
+QA5 M1. A wrapper that reaches the conversion to error through a parameter is
+not a tracked value: errtrace does not know what its field holds. Besides the
+Concrete Type (the wrapper with a nil field) it is a Wrap that holds one
+Unresolved value. (Run time: the wrapper holds io.EOF.)
+-- args --
+a.go:@t
+-- stdout --
+$WORK/a.go:15:12-13: Error Set of example.com/x.T: 2 entries, 1 unresolved
+$WORK/a.go:13:32-33: concrete *example.com/x.W
+	path (origin → target):
+		$WORK/a.go:13:32-33: in example.com/x.pass
+		$WORK/a.go:15:31-54: in example.com/x.T, call to example.com/x.pass
+$WORK/a.go:13:32-33: unresolved(memory): field inner of example.com/x.W: the wrapper is not a tracked value
+	wrap chain (origin → target):
+		$WORK/a.go:13:32-33: *example.com/x.W.Unwrap
+	path (origin → target):
+		$WORK/a.go:13:32-33: in example.com/x.pass
+		$WORK/a.go:15:31-54: in example.com/x.T, call to example.com/x.pass
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"fmt"
+	"io"
+)
+
+type W struct{ inner error }
+
+func (w *W) Error() string { return "w" }
+func (w *W) Unwrap() error { return w.inner }
+
+func pass(w *W) error { return w }
+
+func /*@t*/T() error { return pass(&W{inner: io.EOF}) }
+
+func main() { fmt.Println(T()) }
