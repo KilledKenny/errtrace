@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"errors"
 	"go/types"
 	"sort"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/KilledKenny/errtrace/internal/flow"
 	"github.com/KilledKenny/errtrace/internal/load"
 	"github.com/KilledKenny/errtrace/internal/mark"
+	"github.com/KilledKenny/errtrace/internal/resolve"
 	"github.com/KilledKenny/errtrace/internal/target"
 )
 
@@ -76,7 +78,9 @@ type MembershipOptions struct {
 	// FloodUpper gives the call edges of the flooding pass
 	// (resolve.Upper.Wide): those of Upper, with every dynamic call
 	// open to the callees that only a store through reflection brings
-	// to it. Nil means Upper.
+	// to it. Nil means the wide view of Upper, which must then be a
+	// *resolve.Upper: the flooding pass never runs with the call edges
+	// of Upper itself, which would make a "no" unsound.
 	FloodUpper mark.Callees
 	// Open are the loaded packages of a program without a main package
 	// (see mark.Options.Open): code outside the program calls them. An
@@ -164,7 +168,18 @@ func (m *MembershipResult) ApartFromReflection() bool {
 //   - it does: Maybe, with the Carriers, and with every recorded store
 //     in ReflectStores. The Error Set is no proof that the Subject is
 //     absent: there may be no Carrier at all.
+//
+// It is an error to leave opts.FloodUpper nil with an opts.Upper that is
+// not a *resolve.Upper: there is then no wide view to derive.
 func Membership(ctx context.Context, prog *load.Program, tgt *target.Target, opts MembershipOptions) (*MembershipResult, error) {
+	floodUpper := opts.FloodUpper
+	if floodUpper == nil {
+		u, ok := opts.Upper.(*resolve.Upper)
+		if !ok || u == nil {
+			return nil, errors.New("query: MembershipOptions.FloodUpper is nil and Upper is not a *resolve.Upper: no call edges for the flooding pass")
+		}
+		floodUpper = u.Wide()
+	}
 	res, err := Run(ctx, prog, tgt, opts.Options)
 	if err != nil {
 		return nil, err
@@ -225,7 +240,7 @@ func Membership(ctx context.Context, prog *load.Program, tgt *target.Target, opt
 	// A No, and stores through reflection that were not followed: can
 	// what they write reach the Target?
 	floodStart := time.Now()
-	flood, err := marks.Flood(ctx, opts.FloodUpper)
+	flood, err := marks.Flood(ctx, floodUpper)
 	if err != nil {
 		return nil, err
 	}

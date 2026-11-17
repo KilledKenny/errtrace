@@ -87,6 +87,17 @@ func (p *program) subject(t *testing.T, s string) mark.Subject {
 // function fn of the fixture's package.
 func (p *program) membership(t *testing.T, fn string, subj mark.Subject) *query.MembershipResult {
 	t.Helper()
+	m, err := p.membershipWith(t, fn, subj, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return m
+}
+
+// membershipWith is membership with the options changed by edit, if it
+// is not nil.
+func (p *program) membershipWith(t *testing.T, fn string, subj mark.Subject, edit func(*query.MembershipOptions)) (*query.MembershipResult, error) {
+	t.Helper()
 	f := p.pkg.Func(fn)
 	if typ, name, ok := strings.Cut(fn, "."); ok {
 		// A method of a pointer receiver: Type.Method.
@@ -112,17 +123,17 @@ func (p *program) membership(t *testing.T, fn string, subj mark.Subject) *query.
 		}
 	}
 	upper := v.Upper()
-	m, err := query.Membership(t.Context(), p.l.Program, tgt, query.MembershipOptions{
+	opts := query.MembershipOptions{
 		Options:    query.Options{Resolver: v},
 		Subject:    subj,
 		Upper:      upper,
 		FloodUpper: upper.Wide(),
 		Open:       open,
-	})
-	if err != nil {
-		t.Fatal(err)
 	}
-	return m
+	if edit != nil {
+		edit(&opts)
+	}
+	return query.Membership(t.Context(), p.l.Program, tgt, opts)
 }
 
 func TestMembership(t *testing.T) {

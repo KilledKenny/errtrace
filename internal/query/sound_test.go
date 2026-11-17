@@ -3,6 +3,9 @@ package query_test
 import (
 	"testing"
 
+	"golang.org/x/tools/go/ssa"
+
+	"github.com/KilledKenny/errtrace/internal/mark"
 	"github.com/KilledKenny/errtrace/internal/query"
 )
 
@@ -406,6 +409,49 @@ func TestVerdictSoundCalls(t *testing.T) {
 		{fn: "Clean", subject: "is ErrC4", wantNo: true},
 	})
 }
+
+// TestFloodUpperNil pins what a Membership Query does when its
+// FloodUpper is left out: the flooding pass has the wide call edges all
+// the same (RegOp is a plain No with those of the upward pass, see
+// narrowEdges), and where they cannot be derived the Query fails.
+func TestFloodUpperNil(t *testing.T) {
+	t.Parallel()
+	p := loadProgram(t, "sound_calls.txtar")
+	subj := p.subject(t, "is ErrC1")
+	m, err := p.membershipWith(t, "RegOp", subj, func(o *query.MembershipOptions) { o.FloodUpper = nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !m.FloodRan || !m.ApartFromReflection() {
+		t.Errorf("FloodUpper nil: Verdict is %v, flooding pass ran %v, %d stores listed; want no, apart from reflection", m.Verdict, m.FloodRan, len(m.ReflectStores))
+	}
+	// The call edges of the upward pass are what the flooding pass must
+	// not run with: they give the unsound No.
+	m, err = p.membershipWith(t, "RegOp", subj, func(o *query.MembershipOptions) { o.FloodUpper = o.Upper })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Verdict != query.No || m.ApartFromReflection() {
+		t.Errorf("FloodUpper = Upper: Verdict is %v, apart from reflection %v; the case no longer tells the wide call edges apart", m.Verdict, m.ApartFromReflection())
+	}
+	// No *resolve.Upper to derive them from.
+	_, err = p.membershipWith(t, "RegOp", subj, func(o *query.MembershipOptions) {
+		o.Upper, o.FloodUpper = narrowEdges{o.Upper}, nil
+	})
+	if err == nil {
+		t.Error("FloodUpper nil with an Upper that is not a *resolve.Upper: no error")
+	}
+	_, err = p.membershipWith(t, "RegOp", subj, func(o *query.MembershipOptions) { o.Upper, o.FloodUpper = nil, nil })
+	if err == nil {
+		t.Error("FloodUpper and Upper nil: no error")
+	}
+}
+
+// narrowEdges is call edges that are not a *resolve.Upper.
+type narrowEdges struct{ c mark.Callees }
+
+func (n narrowEdges) Callees(site ssa.CallInstruction) []*ssa.Function { return n.c.Callees(site) }
+func (n narrowEdges) Callers(fn *ssa.Function) []ssa.CallInstruction   { return n.c.Callers(fn) }
 
 // TestFloodingPass pins when the flooding pass runs and what the Verdict
 // lists: after a No with recorded stores it runs, and the stores are
