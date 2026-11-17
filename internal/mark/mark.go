@@ -18,7 +18,8 @@
 // never behind a plain "no" if it could matter: a "no" is plain only if
 // no such store is recorded, or if a second, flooding pass, in which
 // every recorded store writes every memory location that a store through
-// reflection could write, does not reach the Target either. Otherwise the
+// reflection could write, and every read through reflection may read
+// what was written, does not reach the Target either. Otherwise the
 // Verdict is "no, apart from reflection", with the stores listed as "not
 // followed". What the pass neither models nor records it cannot name
 // (see the end of Reflection, and Known limits).
@@ -44,8 +45,15 @@
 //     of sync/atomic values;
 //   - the argument array of a variadic call that can run one function
 //     only, which is the memory of that function's slice parameter alone
-//     (and of the parameters it is passed on to) as long as the function
-//     only reads it.
+//     (and of the parameters it is passed on to) as long as the slice
+//     stays there: the function, and every function the slice is passed
+//     on to, however far, only reads it, stores into its elements,
+//     passes it to errors.Join or fmt.Errorf as their operands, or
+//     passes it on to a slice parameter of a function the pass follows.
+//     Where one of them lets it escape (copies into it, appends to it,
+//     stores or returns it, captures it, hands it to a call the pass does
+//     not follow), the elements are memory of their type as well, for
+//     all of them.
 //
 // # Seeds
 //
@@ -239,7 +247,11 @@
 //     reflect.ValueOf(x), v.Elem(), v.Field(i), v.Interface(), and
 //     reflect.TypeAssert[T](v), whose result is what the Value holds as a
 //     T (a type assertion of it). A composite passed to it counts if it
-//     holds a marked value. What Value.Addr and reflect.Append return is
+//     holds a marked value, where the call of package reflect itself is
+//     passed a composite of a static type (reflect.ValueOf(s) for a
+//     struct s, reflect.ValueOf(&s)); a composite that comes to the call
+//     in an interface value does not (see the end of this section). What
+//     Value.Addr and reflect.Append return is
 //     a pointer to, or a slice with, what they were passed: a box around
 //     a marked value, held around a held composite. The function that a
 //     range over Value.Seq or Seq2 calls is passed what the Value holds;
@@ -247,7 +259,12 @@
 //     MethodByName, and so text/template): the results, parameters and
 //     panics of the exported methods and of the functions whose value is
 //     taken (of the types the called Values were made from, when the pass
-//     can tell) are connected to those calls;
+//     can tell) are connected to those calls. Excepted are the methods
+//     whose bodies the pass does not scan but models, the Store, Swap,
+//     CompareAndSwap and Load of the sync/atomic values and the
+//     intrinsics: one of those called through reflection
+//     (reflect.ValueOf(&av).MethodByName("Store").Call(args)) is not
+//     connected, and nothing is recorded;
 //   - a store through reflection (Value.Set, SetMapIndex, Send, SetIterKey,
 //     SetIterValue, reflect.Append, AppendSlice, Copy) of a marked value is
 //     followed where the pass can tell its destination, by walking back
@@ -297,7 +314,16 @@
 // is the pass again, with one change: every store through reflection
 // that it does not follow (all the way) writes every memory location
 // that a store through reflection could write, with the Marks of the
-// value it stores (by value, by type) and held. Those are the locations
+// value it stores (by value, by type) and held, and every call of
+// package reflect that is passed a reflect.Value (or a *reflect.MapIter,
+// or a slice of them) hands out what was written: v.Interface(),
+// v.Elem(), v.Field(i), v.Index(i), v.MapIndex(k), v.Recv(),
+// it.Value(), reflect.Indirect(v). A read through reflection need not
+// read a location the pass names: the Value may be made from an
+// interface value of unknown dynamic type (a helper that takes an any),
+// or name memory that package reflect made. A call that is passed no
+// Value (reflect.ValueOf, New, MakeSlice) reads no memory; it hands out
+// what it would without the flood. The flooded locations are those
 // keyed by a type, of whatever type (the stored value is behind a
 // reflect.Value): the fields of every struct type, the memory of every
 // type behind pointers and in slices and arrays (which is also every
@@ -306,22 +332,39 @@
 // variables whose address is never taken (reflection needs the address;
 // what a slice, map or channel in such a variable refers to is flooded),
 // the contents of sync/atomic values (they are behind unexported
-// fields), panic values, and argument arrays only their callee reads. A
-// flooded field makes its type a wrapper as a store by the program
-// would.
+// fields), panic values, and the argument arrays that stay with the
+// functions they are passed to (see What a Mark means: one that a
+// function lets escape, and handing it to package reflect is that, is
+// memory of its element type, which is flooded). A flooded field makes
+// its type a wrapper as a store by the program would.
 //
 // If the flooding pass does not reach the Target either, no recorded
 // store can put X where the Target finds it, as far as the pass models
 // the program: the Verdict is a plain "no", and nothing is listed. If it
 // does, the Verdict is "no, apart from reflection" and lists every
-// recorded store, in the order of the scan. (After a "maybe" every
-// recorded store is listed too; no flooding pass is needed.) The
-// flooding pass is coarse: it tells whether the stores can matter, not
-// that they do.
+// recorded store and the stores that only the flooding pass records (of
+// a value that another store wrote, or that is read through reflection:
+// such a store may be the one that writes what the Target reads), in
+// the order of the scan. (After a "maybe" every recorded store is listed
+// too; no flooding pass is needed.) The flooding pass is coarse: it
+// tells whether the stores can matter, not that they do, and a function
+// that reads through reflection is reached by it whenever a store is
+// recorded.
 //
 // What is not modelled at all, and so neither followed nor listed (a "no"
 // can be wrong here without saying so), for example:
 //
+//   - a value read through reflection from an interface-typed value of
+//     unknown dynamic type, when no store through reflection is recorded:
+//     a helper func dump(src any) that reads the fields of what it is
+//     passed (reflect.ValueOf(src).Elem().Field(i).Interface()), called
+//     with a composite that an ordinary store put a marked value in
+//     (c := Cfg{OnFail: X}; dump(&c)). The reflect.Value is made from an
+//     interface value, not from a composite of a static type at the call
+//     of package reflect, so what the composite holds does not count.
+//     (If a store is recorded anywhere in the scanned program, the
+//     flooding pass runs and reaches the read: "no, apart from
+//     reflection".)
 //   - a method called through Value.Call or Value.Method whose result
 //     is in no memory the pass saw a store to: the []error of an
 //     Unwrap() []error of errors.Join called through reflection;

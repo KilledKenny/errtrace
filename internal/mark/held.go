@@ -302,10 +302,12 @@ func (a *analysis) notFollowed(call ssa.CallInstruction, planes tags, why reason
 // methods only, which are modelled, and a store through reflection of a
 // whole struct with such a value inside copies contents from one
 // location of the type to the same location. The value of a panic is
-// not memory. The argument array of a variadic call that only its
-// callee reads (locVarargs) is memory of the element type as soon as the
-// callee lets the slice out of its hands (see locMarkedHook), and that
-// includes handing it to package reflect.
+// not memory. The argument array of a variadic call that stays with its
+// callee and the functions the slice is passed on to (locVarargs) is
+// memory of the element type as soon as one of them, however far, lets
+// the slice out of its hands (see passedOnEscapes, closed and
+// locMarkedHook), and that includes handing it to package reflect: its
+// loads then read the memory of the element type, which is flooded.
 func floodable(k locKind) bool {
 	switch k {
 	case locField, locTyped, locMapKey, locMapVal, locChan:
