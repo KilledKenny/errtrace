@@ -210,9 +210,22 @@ func (a *analysis) indexFormatter(site ssa.CallInstruction) {
 		return
 	}
 	if common.StaticCallee() != nil && len(common.Args) == 2 {
-		if ops, ok := flow.VarargsOperands(common.Args[1]); ok && len(ops) == 0 {
-			// Nothing to format.
-			return
+		if ops, ok := flow.VarargsOperands(common.Args[1]); ok {
+			// Nothing to format, or only under verbs that call no
+			// method (see formatNames).
+			var names []opNames
+			if format, ok := constFormat(common.Args[0]); ok {
+				names = formatNames(format, len(ops))
+			}
+			formats = false
+			for i := range ops {
+				if names == nil || names[i]&opFmt != 0 {
+					formats = true
+				}
+			}
+			if !formats {
+				return
+			}
 		}
 	}
 	fn := site.Parent()
@@ -323,18 +336,96 @@ func (a *analysis) operandsFrom(l loc, typ types.Type, call ssa.CallInstruction,
 	li.operands = append(li.operands, operandRead{typ, call, name})
 }
 
-// operandMethod reports whether the intrinsics, and the errors they
-// make, may call a method of this name on an operand: fmt.Errorf formats
-// every operand (Error, String, Format, GoString), and the error it or
-// errors.Join or errtrace.Wrap returns hands the calls of its own Error,
-// Format, Unwrap, Is and As on to what it holds, as errors.Is, errors.As
-// and errors.Unwrap do.
-func operandMethod(name string) bool {
+// opNames is a set of the methods that an intrinsic, or the error it
+// makes, may call on an operand.
+type opNames uint8
+
+const (
+	opError opNames = 1 << iota
+	opString
+	opFormat
+	opGoString
+	// opChain is Unwrap, Is and As: what the error that holds the
+	// operand hands on to it.
+	opChain
+	// opFmt are the methods package fmt calls to format an operand.
+	opFmt = opError | opString | opFormat | opGoString
+	opAll = opFmt | opChain
+)
+
+// opName returns the set with the method of this name, or 0: fmt.Errorf
+// formats its operands (Error, String, Format, GoString), and the error
+// it or errors.Join or errtrace.Wrap returns hands the calls of its own
+// Error, Format, Unwrap, Is and As on to what it holds, as errors.Is,
+// errors.As and errors.Unwrap do.
+func opName(name string) opNames {
 	switch name {
-	case "Error", "String", "Format", "GoString", "Unwrap", "Is", "As":
-		return true
+	case "Error":
+		return opError
+	case "String":
+		return opString
+	case "Format":
+		return opFormat
+	case "GoString":
+		return opGoString
+	case "Unwrap", "Is", "As":
+		return opChain
 	}
-	return false
+	return 0
+}
+
+// formatNames returns, for each of the n operands of a fmt.Errorf with
+// the constant format, the methods that the call, or the error it
+// returns, may call on it. They follow package fmt (printArg,
+// handleMethods): under %T and %p it calls none; under any other verb,
+// Format; under %#v GoString, and no Error or String; under %v, %s, %x,
+// %X and %q Error or String. Only an operand at a %w is held by the
+// error, which then hands Unwrap, Is and As on to it. Where the pass is
+// not sure what package fmt does, every method may be called: on every
+// operand if a directive is malformed (a bad index, a missing operand, no
+// verb), and on an operand that no verb formats (package fmt prints it
+// after the text, as %!(EXTRA ...), or takes it for a width).
+func formatNames(format string, n int) []opNames {
+	names := make([]opNames, n)
+	used := make([]bool, n)
+	sure := true
+	for _, v := range fmtverb.Parse(format, n) {
+		if v.Verb == '%' && !v.NoVerb {
+			continue
+		}
+		if v.BadIndex || v.Missing || v.NoVerb || v.Arg < 0 || v.Arg >= n {
+			sure = false
+			break
+		}
+		used[v.Arg] = true
+		switch v.Verb {
+		case 'w':
+			names[v.Arg] = opAll
+		case 'T', 'p':
+		case 'v':
+			if v.Sharp {
+				names[v.Arg] |= opFormat | opGoString
+			} else {
+				names[v.Arg] |= opFormat | opError | opString
+			}
+		case 's', 'x', 'X', 'q':
+			names[v.Arg] |= opFormat | opError | opString
+		default:
+			names[v.Arg] |= opFormat
+		}
+	}
+	for i := range names {
+		if !sure || !used[i] {
+			names[i] = opAll
+		}
+	}
+	return names
+}
+
+// opKey is an operand type and the methods asked of it.
+type opKey struct {
+	typ   types.Type
+	names opNames
 }
 
 // operandMethods handles an operand of a call of the intrinsic name,
@@ -342,26 +433,29 @@ func operandMethod(name string) bool {
 // or the location it is read from). The bodies of the intrinsics are not
 // scanned, so the calls they make on an operand are modelled here: the
 // operand is the receiver of every method named Error, String, Format,
-// GoString, Unwrap, Is or As that a value of its type may have, as at a
-// dynamic call of each (String only where the type has no Error method:
-// package fmt prefers that). That holds for every operand, wrapped or not
+// GoString, Unwrap, Is or As that is in names and that a value of its
+// type may have, as at a dynamic call of each (String only where the
+// type has no Error method: package fmt prefers that). names is every
+// method, but for an operand of a fmt.Errorf whose format is a constant
+// (see formatNames). That holds for every operand, wrapped or not
 // (fmt.Errorf("%v", err) calls err.Error()), and it covers the calls
 // that the returned error makes later (the Error of an errors.Join calls
 // that of its operands). The receiver gets the Mark as the operand of a
 // type assertion to the receiver's type would: if that type can hold the
 // Subject at all, and with what a held or boxed operand says about the
 // memory of a composite type. Only the receiver is linked; what such a
-// method returns is the intrinsic's business (see evalIntrinsic).
-func (a *analysis) operandMethods(typ types.Type, t tags, from ref, site ssa.CallInstruction, name string) {
+// method returns is the intrinsic's business (see evalIntrinsic), and its
+// panics are connected for fmt.Errorf as a whole (see formatMethod).
+func (a *analysis) operandMethods(typ types.Type, t tags, from ref, site ssa.CallInstruction, name string, names opNames) {
 	seed := paramSeed(0, t)
-	if seed == 0 || !a.markable(typ) {
+	if seed == 0 || names == 0 || !a.markable(typ) {
 		return
 	}
-	memo := typ
+	memo := opKey{typ, names}
 	iface, _ := typ.Underlying().(*types.Interface)
 	if iface != nil && iface.Empty() {
 		// (One entry for every spelling of any.)
-		memo = nil
+		memo.typ = nil
 	}
 	if a.opSeeded[memo]&seed == seed {
 		return
@@ -370,7 +464,7 @@ func (a *analysis) operandMethods(typ types.Type, t tags, from ref, site ssa.Cal
 	if !a.opMethodsSet {
 		a.opMethodsSet = true
 		for _, g := range a.fns {
-			if g.Signature.Recv() != nil && len(g.Params) > 0 && operandMethod(g.Name()) {
+			if g.Signature.Recv() != nil && len(g.Params) > 0 && opName(g.Name()) != 0 {
 				a.opMethods = append(a.opMethods, g)
 			}
 		}
@@ -380,6 +474,9 @@ func (a *analysis) operandMethods(typ types.Type, t tags, from ref, site ssa.Cal
 		instr = site
 	}
 	for _, g := range a.opMethods {
+		if opName(g.Name())&names == 0 {
+			continue
+		}
 		recv := g.Params[0]
 		rt := recv.Type()
 		if iface != nil {
@@ -459,18 +556,18 @@ func (a *analysis) evalIntrinsic(call *ssa.Call) {
 		}
 	}
 	// Whether it holds the operand or not, it may call its methods.
-	called := func(op ssa.Value) {
+	called := func(op ssa.Value, names opNames) {
 		if op == nil {
 			return
 		}
 		if ot := a.tagsOf(op); ot != 0 {
-			a.operandMethods(op.Type(), ot, valueRef(key{op, 0}, ot), call, name)
+			a.operandMethods(op.Type(), ot, valueRef(key{op, 0}, ot), call, name, names)
 		}
 	}
 	switch name {
 	case "errtrace.Wrap":
 		if len(args) > 0 {
-			called(args[0])
+			called(args[0], opAll)
 			use(args[0])
 		}
 	case "errors.Join":
@@ -479,7 +576,7 @@ func (a *analysis) evalIntrinsic(call *ssa.Call) {
 		}
 		ops, _ := flow.VarargsOperands(args[0])
 		for _, op := range ops {
-			called(op)
+			called(op, opAll)
 			use(op)
 		}
 	case "fmt.Errorf":
@@ -487,10 +584,11 @@ func (a *analysis) evalIntrinsic(call *ssa.Call) {
 			return
 		}
 		ops, _ := flow.VarargsOperands(args[1])
-		for _, op := range ops {
-			called(op)
-		}
 		if format, ok := constFormat(args[0]); ok {
+			names := formatNames(format, len(ops))
+			for i, op := range ops {
+				called(op, names[i])
+			}
 			for _, i := range fmtverb.Wrapped(fmtverb.Parse(format, len(ops))) {
 				if i < len(ops) {
 					use(ops[i])
@@ -498,6 +596,7 @@ func (a *analysis) evalIntrinsic(call *ssa.Call) {
 			}
 		} else {
 			for _, op := range ops {
+				called(op, opAll)
 				use(op)
 			}
 		}

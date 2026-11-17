@@ -9,7 +9,8 @@ the type whose method does, the answer stays "no". So too for a panic: a
 method that package fmt calls inside fmt.Errorf panics with its receiver,
 package fmt recovers that, prints the value of the panic (which calls the
 method again) and raises the second panic out of fmt.Errorf, where the
-function recovers it. Each case has a Sentinel and a type of its own. The program prints what errors.Is says of each case
+function recovers it. And the verbs of a constant format say which methods package fmt
+calls. Each case has a Sentinel and a type of its own. The program prints what errors.Is says of each case
 when it runs.
 -- go.mod --
 module example.com/x
@@ -200,6 +201,53 @@ func PanicOther() (err error) {
 	return nil
 }
 
+// The verb decides what package fmt calls: under %d no Error method, but
+// a Format method; under %#v a GoString method and no Error method.
+
+type P13 struct{ n int }
+
+var last13 error
+
+func (p *P13) Error() string { last13 = p; return "p13" }
+
+var ErrO13 error = &P13{1}
+
+func VerbNoError() error { _ = fmt.Errorf("op: %d %T %#v", ErrO13, ErrO13, ErrO13); return last13 }
+
+type P14 struct{ n int }
+
+var last14 error
+
+func (p *P14) Error() string                 { return "p14" }
+func (p *P14) Format(s fmt.State, verb rune) { last14 = p }
+
+var ErrO14 error = &P14{1}
+
+func VerbFormat() error { _ = fmt.Errorf("op: %d", ErrO14); return last14 }
+
+type P15 struct{ n int }
+
+var last15 error
+
+func (p *P15) Error() string    { return "p15" }
+func (p *P15) GoString() string { last15 = p; return "p15" }
+
+var ErrO15 error = &P15{1}
+
+func VerbGoString() error { _ = fmt.Errorf("op: %#v", ErrO15); return last15 }
+
+// An operand that no verb formats is printed all the same.
+
+type P16 struct{ n int }
+
+var last16 error
+
+func (p *P16) Error() string { last16 = p; return "p16" }
+
+var ErrO16 error = &P16{1}
+
+func VerbExtra() error { _ = fmt.Errorf("op: %d", 1, ErrO16); return last16 }
+
 func main() {
 	(&Q6{2}).Keep()
 	fmt.Println("ErrorfRecv", errors.Is(ErrorfRecv(), ErrO1))
@@ -214,4 +262,8 @@ func main() {
 	fmt.Println("PanicFormat", errors.Is(PanicFormat(), ErrO10))
 	fmt.Println("PanicOfPanicValue", errors.Is(PanicOfPanicValue(), ErrO11))
 	fmt.Println("PanicOther", errors.Is(PanicOther(), ErrO12))
+	fmt.Println("VerbNoError", errors.Is(VerbNoError(), ErrO13))
+	fmt.Println("VerbFormat", errors.Is(VerbFormat(), ErrO14))
+	fmt.Println("VerbGoString", errors.Is(VerbGoString(), ErrO15))
+	fmt.Println("VerbExtra", errors.Is(VerbExtra(), ErrO16))
 }

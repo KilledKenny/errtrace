@@ -427,10 +427,11 @@ type analysis struct {
 	// opMethods are the scanned methods that the intrinsics may call on
 	// an operand (see operandMethods), in the order of the scan, once
 	// opMethodsSet; opSeeded are the tags their receivers already have
-	// from operands, by the type of the operand.
+	// from operands, by the type of the operand and the methods asked
+	// of it.
 	opMethods    []*ssa.Function
 	opMethodsSet bool
-	opSeeded     map[types.Type]tags
+	opSeeded     map[opKey]tags
 	// formatters are the functions with a call that may run fmt.Errorf
 	// on operands, in the order of the scan: the panics of the methods
 	// that package fmt calls surface there (see formatMethod).
@@ -515,7 +516,7 @@ func newAnalysis(prog *ssa.Program, res Callees, subj Subject) *analysis {
 		reflectTargets: make(map[*ssa.Function]bool),
 		unfollowed:     make(map[ssa.CallInstruction]bool),
 		boxes:          make(map[*ssa.Call]bool),
-		opSeeded:       make(map[types.Type]tags),
+		opSeeded:       make(map[opKey]tags),
 		typedRead:      make(map[*ssa.Call]bool),
 		dests:          make(map[destKey]*reflectDest),
 		destIDs:        make(map[ssa.Value]uint32),
@@ -1187,7 +1188,7 @@ func (a *analysis) markLoc(l loc, planes tags, why reason) {
 		a.mark(k, fresh, why)
 	}
 	for _, o := range li.operands {
-		a.operandMethods(o.typ, fresh, ref{kind: refLoc, l: l, free: true}, o.call, o.name)
+		a.operandMethods(o.typ, fresh, ref{kind: refLoc, l: l, free: true}, o.call, o.name, opAll)
 	}
 	a.locMarkedHook(l, fresh)
 }

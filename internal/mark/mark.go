@@ -159,7 +159,15 @@
 // scanned method of one of those seven names that a value of the
 // operand's static type may have: the receiver is marked as by a type
 // assertion of the operand to its type. (String only for a type without
-// an Error method: package fmt calls Error where there are both.) A
+// an Error method: package fmt calls Error where there are both.) Where
+// the format of a fmt.Errorf is a constant and the operands are those of
+// the call, the verbs say which methods, as package fmt decides it: none
+// under %T and %p; Format under every other verb; GoString under %#v,
+// and then neither Error nor String; Error or String under %v, %s, %x,
+// %X and %q; and Unwrap, Is and As only for an operand at a %w, which
+// the error holds (fmt.Errorf("%d", err) calls no Error method). An
+// operand that no verb formats, and every operand of a format with a
+// malformed directive, is taken to have all seven called. A
 // method that keeps its receiver (func (e *E) Error() string { last = e;
 // ... }) so puts the Subject where it stores it. The receiver and the
 // panics are connected (see below); what such a method returns is not,

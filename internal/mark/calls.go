@@ -175,7 +175,7 @@ func (a *analysis) linkArgs(k key, delta tags, site ssa.CallInstruction) {
 			if name, ok := a.intrinsic(g); ok {
 				// An intrinsic called dynamically calls the methods of
 				// its operand as one called statically does.
-				a.operandMethods(v.Type(), delta, from, site, name)
+				a.operandMethods(v.Type(), delta, from, site, name, opAll)
 			}
 			// A callee without a body (or an intrinsic called
 			// dynamically) may return any of its arguments.
