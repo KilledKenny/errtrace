@@ -1,7 +1,9 @@
-QA4 C1. A value built as an unnamed struct type and converted to a named
-wrapper type: the conversion unites the two types' fields, so the load in
+QA4 C1, control. A value built as an unnamed struct type and converted to a
+named wrapper type: the conversion unites the two types' fields, so the load in
 (*W).Unwrap finds what the literal of the unnamed type stored, flagged as a
-location value.
+location value. The commit before the C1 fix gives the same output (QA5): this
+fixture does not pin that fix, which convert_value_receiver does. It is kept
+as a control for the conversion of an unnamed struct type.
 -- args --
 a.go:@q
 -- stdout --

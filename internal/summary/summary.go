@@ -15,6 +15,45 @@
 // that field of that struct type anywhere (see fields.go). Locations are
 // nodes of the demand graph like functions: a function depends on the
 // locations it loads from, and a location on what its writers store.
+//
+// # Limits
+//
+// What an Error Set built from these summaries does not say, or says too
+// much of:
+//
+//   - A Target that is not reachable from main or an init function (a
+//     library Target) is solved in an open world: code outside the loaded
+//     program may call it and may write what it is handed. The standard
+//     library is assumed not to hand its arguments on to such code. A
+//     wrapper passed to a standard-library function that calls a function
+//     value of the client (slices.ContainsFunc(errs, pred), sync.Once.Do,
+//     sync.Map.Range, context.AfterFunc) may be written by that function
+//     value without an Unresolved entry saying so.
+//   - For a library Target, a tracked wrapper with an exported field gets
+//     the pessimistic Unresolved entry "may be written by code that is
+//     not reachable from the Query's roots" whenever a value of its type
+//     is handed to a dynamic call or stored to memory anywhere in the
+//     code the Target reaches, whether or not this value is.
+//   - Writes through reflection are found on a best-effort basis, from
+//     the types that reach reflect; writes through unsafe, cgo and
+//     assembly are not seen.
+//   - A typed nil (a nil pointer of an error type that becomes a non-nil
+//     error) is removed by a caller's check of another result of the call
+//     (err == nil, ok) only where that result is checked as the call
+//     returned it and the callee itself wrote "return nil, err" with an
+//     err that is never nil there, or "return nil, false". A function
+//     that passes both results of such a call on (return find()), a named
+//     result, or a check made on a copy of the error in a variable that a
+//     closure captured keeps the typed nil, which the caller may never
+//     get.
+//   - A Sentinel is listed as itself even where its value is known to be
+//     a wrapper: the Wraps of its initializer are listed beside it, not
+//     in place of it, so a guard on a wrapped value (errors.Is with it)
+//     leaves the bare Sentinel entry.
+//   - A parameter that is a function value resolves to every Candidate
+//     of its type, and a value kept by a guard of the form err == nil ||
+//     err == X is not narrowed: both give entries that cannot occur, and
+//     that are not marked as over-approximations.
 package summary
 
 import (
