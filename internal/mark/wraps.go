@@ -120,6 +120,7 @@ func (a *analysis) indexCall(site ssa.CallInstruction) {
 		}
 		return
 	}
+	a.indexFormatter(site)
 	if sc := common.StaticCallee(); sc != nil && call != nil {
 		if name, ok := a.intrinsic(sc); ok {
 			a.indexIntrinsic(call, name)
@@ -187,6 +188,55 @@ func (a *analysis) indexCall(site ssa.CallInstruction) {
 		}
 	}
 	a.indexCallees(site)
+}
+
+// indexFormatter records the function of the call at site as one in
+// which the panics of the methods that package fmt calls surface (see
+// formatMethod), if the call may run fmt.Errorf on operands: a call or a
+// deferred call, static or dynamic, but not a go statement, whose panics
+// no function sees.
+func (a *analysis) indexFormatter(site ssa.CallInstruction) {
+	if _, isGo := site.(*ssa.Go); isGo {
+		return
+	}
+	common := site.Common()
+	formats := false
+	for _, g := range a.callees(site) {
+		if name, ok := a.intrinsic(g); ok && name == "fmt.Errorf" {
+			formats = true
+		}
+	}
+	if !formats {
+		return
+	}
+	if common.StaticCallee() != nil && len(common.Args) == 2 {
+		if ops, ok := flow.VarargsOperands(common.Args[1]); ok && len(ops) == 0 {
+			// Nothing to format.
+			return
+		}
+	}
+	fn := site.Parent()
+	if n := len(a.formatters); n == 0 || a.formatters[n-1] != fn {
+		a.formatters = append(a.formatters, fn)
+	}
+}
+
+// formatMethod reports whether a call of fmt.Errorf, whose body is not
+// scanned, may run the method g and let its panic out: package fmt calls
+// Format, Error, String or GoString on an operand, recovers a panic of
+// that method and prints the value of the panic, on which it calls those
+// methods again; a panic of that second call it raises again, out of
+// fmt.Errorf. The value of the first panic may be of any type, so g may
+// be such a method of any type, whatever the operands are.
+func formatMethod(g *ssa.Function) bool {
+	if g.Signature.Recv() == nil {
+		return false
+	}
+	switch g.Name() {
+	case "Error", "String", "Format", "GoString":
+		return true
+	}
+	return false
 }
 
 // indexIntrinsic records how the operands of the intrinsic call reach it:

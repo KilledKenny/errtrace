@@ -431,6 +431,10 @@ type analysis struct {
 	opMethods    []*ssa.Function
 	opMethodsSet bool
 	opSeeded     map[types.Type]tags
+	// formatters are the functions with a call that may run fmt.Errorf
+	// on operands, in the order of the scan: the panics of the methods
+	// that package fmt calls surface there (see formatMethod).
+	formatters []*ssa.Function
 	// reflectArgs are the types of the composite values passed to
 	// reflect.ValueOf.
 	reflectArgs []reflectArg

@@ -173,7 +173,8 @@ func TestVerdictSoundSlices(t *testing.T) {
 // calls on an operand (fmt.Errorf formats it, the error of errors.Join
 // asks it), without reflection: the bodies of the intrinsics are not
 // scanned, so the receiver of such a method gets the Mark at the call of
-// the intrinsic.
+// the intrinsic, and a panic of a method that package fmt calls is seen
+// by the recovers that cover a call of fmt.Errorf.
 func TestVerdictSoundOperands(t *testing.T) {
 	t.Parallel()
 	runSound(t, "sound_operands.txtar", []soundCase{
@@ -186,6 +187,14 @@ func TestVerdictSoundOperands(t *testing.T) {
 		// operand is not the receiver of a method of another type.
 		{fn: "Quiet", subject: "is ErrO6", wantNo: true},
 		{fn: "OtherType", subject: "is ErrO7", wantNo: true},
+		// A method that package fmt calls inside fmt.Errorf panics:
+		// the panic leaves the call of fmt.Errorf.
+		{fn: "PanicError", subject: "is ErrO8", truth: true},
+		{fn: "PanicErrorWrapped", subject: "is ErrO9", truth: true},
+		{fn: "PanicFormat", subject: "is ErrO10", truth: true},
+		{fn: "PanicOfPanicValue", subject: "is ErrO11", truth: true},
+		// It panics with a value that is not the Subject.
+		{fn: "PanicOther", subject: "is ErrO12", wantNo: true},
 	})
 }
 

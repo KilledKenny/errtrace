@@ -718,7 +718,8 @@ func (a *analysis) panicLoc(fn *ssa.Function) loc {
 // wakeRecovers marks the calls of recover that can see a panic raised in
 // the function of the panic location l: a recover in F sees the panics of
 // the functions that the functions deferring F call, directly or not (not
-// through a go statement).
+// through a go statement). A function that calls fmt.Errorf on operands
+// counts as calling the methods that package fmt may run there.
 func (a *analysis) wakeRecovers(l loc, planes tags) {
 	if len(a.recovers) == 0 || int(l.id) >= len(a.fns) {
 		return
@@ -733,6 +734,16 @@ func (a *analysis) wakeRecovers(l loc, planes tags) {
 			// It may be called through reflection: the panic surfaces
 			// where the program does that.
 			for _, c := range a.reflectCallers {
+				if !reach[c] {
+					reach[c] = true
+					work = append(work, c)
+				}
+			}
+		}
+		if formatMethod(g) {
+			// A call of fmt.Errorf may run it, with no call edge
+			// (see formatMethod).
+			for _, c := range a.formatters {
 				if !reach[c] {
 					reach[c] = true
 					work = append(work, c)

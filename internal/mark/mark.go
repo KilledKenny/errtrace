@@ -161,15 +161,25 @@
 // assertion of the operand to its type. (String only for a type without
 // an Error method: package fmt calls Error where there are both.) A
 // method that keeps its receiver (func (e *E) Error() string { last = e;
-// ... }) so puts the Subject where it stores it. Only the receiver is
-// connected; what the operand holds inside is not looked at (see the end
-// of Reflection).
+// ... }) so puts the Subject where it stores it. The receiver and the
+// panics are connected (see below); what such a method returns is not,
+// and what the operand holds inside is not looked at (see the end of
+// Reflection).
 //
 // The callees of a call come from the Callees given to Run, less the
 // functions whose value is never taken at a call of a function value.
 //
 // A recover sees a panic only if the function that defers the recovering
-// function reaches the function that panics over those call edges.
+// function reaches the function that panics over those call edges. One
+// edge is added to them, for the methods that package fmt calls inside
+// fmt.Errorf: it recovers a panic of a Format, Error, String or GoString
+// method of an operand and prints the value of that panic, which calls
+// those methods on it, and a panic of that second call leaves
+// fmt.Errorf (func (p *P) Error() string { panic(p) }). The value of
+// the first panic may be of any type. So a function with a call that may
+// run fmt.Errorf on operands (not in a go statement) counts, for panics,
+// as calling every scanned method of those four names: a recover that
+// covers that call sees their panics, and those of what they reach.
 //
 // # Guards and provenance
 //

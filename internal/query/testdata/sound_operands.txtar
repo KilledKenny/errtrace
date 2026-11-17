@@ -5,8 +5,11 @@ intrinsics are not scanned, so the calls they make on an operand are
 modelled at the call of the intrinsic: a Membership Query must not answer
 "no" for the function that returns what the method published. Where the
 methods the intrinsic can call publish nothing, or the operand cannot be of
-the type whose method does, the answer stays "no". Each case has a Sentinel
-and a type of its own. The program prints what errors.Is says of each case
+the type whose method does, the answer stays "no". So too for a panic: a
+method that package fmt calls inside fmt.Errorf panics with its receiver,
+package fmt recovers that, prints the value of the panic (which calls the
+method again) and raises the second panic out of fmt.Errorf, where the
+function recovers it. Each case has a Sentinel and a type of its own. The program prints what errors.Is says of each case
 when it runs.
 -- go.mod --
 module example.com/x
@@ -117,6 +120,86 @@ var other7 error = &R7{1}
 
 func OtherType() error { _ = fmt.Errorf("op: %w, %v", ErrO7, other7); return last7 }
 
+// The Error method panics with its receiver. Package fmt recovers the
+// panic and prints its value, which calls Error again; that second panic
+// leaves fmt.Errorf.
+
+type P8 struct{ n int }
+
+func (p *P8) Error() string { panic(p) }
+
+var ErrO8 error = &P8{1}
+
+func PanicError() (err error) {
+	defer func() { err, _ = recover().(error) }()
+	_ = fmt.Errorf("op: %v", ErrO8)
+	return nil
+}
+
+// The same, and the operand is wrapped.
+
+type P9 struct{ n int }
+
+func (p *P9) Error() string { panic(p) }
+
+var ErrO9 error = &P9{1}
+
+func PanicErrorWrapped() (err error) {
+	defer func() { err, _ = recover().(error) }()
+	_ = fmt.Errorf("op: %w", ErrO9)
+	return nil
+}
+
+// A Format method that panics with its receiver.
+
+type P10 struct{ n int }
+
+func (p *P10) Error() string                 { return "p10" }
+func (p *P10) Format(s fmt.State, verb rune) { panic(p) }
+
+var ErrO10 error = &P10{1}
+
+func PanicFormat() (err error) {
+	defer func() { err, _ = recover().(error) }()
+	_ = fmt.Errorf("op: %v", ErrO10)
+	return nil
+}
+
+// The operand is not the Sentinel: its Error method panics with the
+// Sentinel, whose own Error method panics when package fmt prints it.
+
+type P11 struct{ n int }
+type Q11 struct{ n int }
+
+func (p *P11) Error() string { panic(p) }
+func (q *Q11) Error() string { panic(ErrO11) }
+
+var ErrO11 error = &P11{1}
+
+func PanicOfPanicValue() (err error) {
+	defer func() { err, _ = recover().(error) }()
+	_ = fmt.Errorf("op: %v", &Q11{1})
+	return nil
+}
+
+// The Error method panics with a value that is not the Sentinel, and that
+// second panic leaves fmt.Errorf: what the function recovers is not the
+// Sentinel.
+
+type P12 struct{ n int }
+type R12 struct{ n int }
+
+func (p *P12) Error() string { panic(&R12{1}) }
+func (r *R12) Error() string { panic(r) }
+
+var ErrO12 error = &P12{1}
+
+func PanicOther() (err error) {
+	defer func() { err, _ = recover().(error) }()
+	_ = fmt.Errorf("op: %v", ErrO12)
+	return nil
+}
+
 func main() {
 	(&Q6{2}).Keep()
 	fmt.Println("ErrorfRecv", errors.Is(ErrorfRecv(), ErrO1))
@@ -126,4 +209,9 @@ func main() {
 	fmt.Println("JoinThenError", errors.Is(JoinThenError(), ErrO5))
 	fmt.Println("Quiet", errors.Is(Quiet(), ErrO6))
 	fmt.Println("OtherType", errors.Is(OtherType(), ErrO7))
+	fmt.Println("PanicError", errors.Is(PanicError(), ErrO8))
+	fmt.Println("PanicErrorWrapped", errors.Is(PanicErrorWrapped(), ErrO9))
+	fmt.Println("PanicFormat", errors.Is(PanicFormat(), ErrO10))
+	fmt.Println("PanicOfPanicValue", errors.Is(PanicOfPanicValue(), ErrO11))
+	fmt.Println("PanicOther", errors.Is(PanicOther(), ErrO12))
 }
