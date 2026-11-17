@@ -18,6 +18,14 @@ type soundCase struct {
 	// where wantNo is set (the cases the upward pass is precise about).
 	truth  bool
 	wantNo bool
+	// wantMaybe: the Verdict must be Maybe: the case pins a guard that
+	// must not apply although nothing shows at run time.
+	wantMaybe bool
+	// notFollowed: the Subject reaches the function's result only by a
+	// store through reflection whose destination the upward pass cannot
+	// tell. That is its documented limit: the Verdict is No, and it
+	// names the stores it did not follow (the "not followed" section).
+	notFollowed bool
 	// method is the type of fn's pointer receiver, if fn is a method.
 	method string
 }
@@ -31,11 +39,20 @@ func runSound(t *testing.T, file string, cases []soundCase) {
 			fn = c.method + "." + c.fn
 		}
 		m := p.membership(t, fn, p.subject(t, c.subject))
+		if c.wantNo && len(m.ReflectStores) > 0 {
+			t.Errorf("%s, %s: %d stores through reflection were not followed, want none", c.fn, c.subject, len(m.ReflectStores))
+		}
 		switch {
+		case c.notFollowed:
+			if m.Verdict != query.No || len(m.ReflectStores) == 0 {
+				t.Errorf("%s, %s: Verdict is %v with %d stores through reflection not followed, want no with at least one", c.fn, c.subject, m.Verdict, len(m.ReflectStores))
+			}
 		case c.truth && m.Verdict == query.No:
 			t.Errorf("%s, %s: Verdict is no, but the function can return it", c.fn, c.subject)
 		case !c.truth && m.Verdict == query.Yes:
 			t.Errorf("%s, %s: Verdict is yes, but the function cannot return it", c.fn, c.subject)
+		case c.wantMaybe && m.Verdict != query.Maybe:
+			t.Errorf("%s, %s: Verdict is %v, want maybe", c.fn, c.subject, m.Verdict)
 		case c.wantNo && m.Verdict != query.No:
 			t.Errorf("%s, %s: Verdict is %v, want no", c.fn, c.subject, m.Verdict)
 		}
@@ -157,5 +174,75 @@ func TestVerdictSoundWild(t *testing.T) {
 		{fn: "TemplateMethod", subject: "is ErrX", truth: true},
 		{fn: "TemplateFuncMap", subject: "is ErrX", truth: true},
 		{fn: "TemplatePanics", subject: "is ErrX", truth: true},
+	})
+}
+
+// TestVerdictSoundReflect does the same for stores through reflection:
+// one whose destination the upward pass can tell is followed, and one
+// whose destination it cannot tell is reported as not followed.
+func TestVerdictSoundReflect(t *testing.T) {
+	t.Parallel()
+	runSound(t, "sound_reflect.txtar", []soundCase{
+		{fn: "FreshWhole", subject: "is ErrA", truth: true},
+		{fn: "FreshHelper", subject: "is ErrB", truth: true},
+		{fn: "FreshStruct", subject: "is ErrC", truth: true},
+		{fn: "FreshField", subject: "is ErrD", truth: true},
+		{fn: "FreshAddr", subject: "is ErrE", truth: true},
+		{fn: "FreshSlice", subject: "is ErrF", truth: true},
+		{fn: "FreshMap", subject: "is ErrG", truth: true},
+		{fn: "FreshChan", subject: "is ErrH", truth: true},
+		{fn: "FreshParam", subject: "is ErrI", truth: true},
+		{fn: "KnownParam", subject: "is ErrJ", truth: true},
+		{fn: "KnownHelper", subject: "is ErrK", truth: true},
+		{fn: "FreshMapIter", subject: "is ErrL", truth: true},
+		{fn: "KnownMapIter", subject: "is ErrM", truth: true},
+		{fn: "KnownSeq", subject: "is ErrP", truth: true},
+		{fn: "FreshSeq", subject: "is ErrQ", truth: true},
+		{fn: "LazyHeld", subject: "is ErrR", truth: true},
+		{fn: "DeepRead", subject: "is ErrS", truth: true},
+		{fn: "HeldReceiver", subject: "is ErrU", truth: true},
+		{fn: "FreshAwayReflect", subject: "is ErrV", truth: true},
+		// The documented limit.
+		{fn: "FreshAwayTyped", subject: "is ErrW", truth: true, notFollowed: true},
+		{fn: "KnownCross", subject: "is ErrT", truth: true, notFollowed: true},
+		{fn: "FreshEscape", subject: "is ErrN", truth: true, notFollowed: true},
+		{fn: "UnknownGlobal", subject: "is ErrO", truth: true, notFollowed: true},
+		// A store that is followed marks what it writes, not the program.
+		{fn: "Clean", subject: "is ErrA", wantNo: true},
+		{fn: "Clean", subject: "is ErrC", wantNo: true},
+		{fn: "Clean", subject: "is ErrD", wantNo: true},
+		{fn: "Clean", subject: "is ErrG", wantNo: true},
+		{fn: "FreshWhole", subject: "is ErrB", wantNo: true},
+		{fn: "FreshField", subject: "is ErrC", wantNo: true},
+	})
+}
+
+// TestVerdictSoundValues does the same for what a value holds: a
+// Sentinel whose value can change, fields that no Unwrap, Is or As method
+// reports, and composites in interface values.
+func TestVerdictSoundValues(t *testing.T) {
+	t.Parallel()
+	runSound(t, "sound_values.txtar", []soundCase{
+		// A failed errors.Is excludes only a Sentinel whose value is
+		// fixed.
+		{fn: "MutatedSentinel", subject: "is ErrMS", truth: true},
+		{fn: "GuardWrapperSentinel", subject: "is ErrPW", wantMaybe: true},
+		{fn: "GuardOverWrapper", subject: "is ErrOver", wantMaybe: true},
+		{fn: "GuardPlain", subject: "is ErrPlain", wantNo: true},
+		{fn: "GuardBuilt", subject: "is ErrBuilt", wantNo: true},
+		{fn: "GuardCode", subject: "is ErrCode", wantNo: true},
+		// What errors.Is and errors.As find in a value is what its
+		// Unwrap, Is and As methods report.
+		{fn: "ValOnly", subject: "is ErrVal", wantNo: true},
+		{fn: "IsField", subject: "is ErrIsF", truth: true},
+		{fn: "EqField", subject: "is ErrEq", truth: true},
+		{fn: "HelperUnwrap", subject: "is ErrGet", truth: true},
+		{fn: "Promoted", subject: "is ErrEmb", truth: true},
+		{fn: "MultiUnwrap", subject: "is ErrMulti", truth: true},
+		{fn: "AsField", subject: "as *AT", truth: true},
+		{fn: "IsField", subject: "is ErrEq", wantNo: true},
+		// Composites in interface values.
+		{fn: "AnyBox", subject: "is ErrBox", truth: true},
+		{fn: "OtherSlice", subject: "is ErrAny", wantNo: true},
 	})
 }

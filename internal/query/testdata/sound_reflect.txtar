@@ -1,0 +1,348 @@
+Stores through reflection, each case with a Sentinel and types of its own,
+so that no case is answered by the Marks of another. A store whose
+destination the upward pass can tell (the composite passed to
+reflect.ValueOf, or fresh memory made by package reflect) must not be
+answered "no". A store whose destination it cannot tell is not followed:
+the Verdict may be "no", and then names the store.
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- main.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"reflect"
+)
+
+var errType = reflect.TypeOf((*error)(nil)).Elem()
+
+// Fresh memory: reflect.New(t).Elem() is the stored value.
+
+var ErrA = errors.New("a")
+
+func FreshWhole() error {
+	v := reflect.New(errType).Elem()
+	v.Set(reflect.ValueOf(ErrA))
+	return v.Interface().(error)
+}
+
+// The fresh Value comes out of a helper.
+
+var ErrB = errors.New("b")
+
+func newVal(t reflect.Type) reflect.Value { return reflect.New(t).Elem() }
+
+func FreshHelper() error {
+	v := newVal(errType)
+	v.Set(reflect.ValueOf(ErrB))
+	return v.Interface().(error)
+}
+
+// The fresh Value sits in a struct, as the addressableValue of
+// encoding/json does, and is read in another function.
+
+var ErrC = errors.New("c")
+
+type holder struct {
+	reflect.Value
+	ok bool
+}
+
+func newHolder(t reflect.Type) holder { return holder{reflect.New(t).Elem(), true} }
+
+func readHolder(h holder) error { return h.Interface().(error) }
+
+func FreshStruct() error {
+	h := newHolder(errType)
+	h.Set(reflect.ValueOf(ErrC))
+	return readHolder(h)
+}
+
+// A field of fresh memory, read back through the typed pointer.
+
+var ErrD = errors.New("d")
+
+type FD struct{ ED error }
+
+func FreshField() error {
+	p := reflect.New(reflect.TypeOf(FD{}))
+	p.Elem().Field(0).Set(reflect.ValueOf(ErrD))
+	return p.Interface().(*FD).ED
+}
+
+// The address of the fresh variable.
+
+var ErrE = errors.New("e")
+
+type errE error
+
+func FreshAddr() error {
+	v := reflect.New(reflect.TypeOf((*errE)(nil)).Elem()).Elem()
+	v.Set(reflect.ValueOf(ErrE))
+	p := v.Addr().Interface().(*errE)
+	return *p
+}
+
+// A fresh slice, map and channel.
+
+var ErrF = errors.New("f")
+
+type errF error
+
+func FreshSlice() error {
+	s := reflect.MakeSlice(reflect.TypeOf([]errF{}), 1, 1)
+	s.Index(0).Set(reflect.ValueOf(ErrF))
+	return s.Interface().([]errF)[0]
+}
+
+var ErrG = errors.New("g")
+
+type errG error
+
+func FreshMap() error {
+	m := reflect.MakeMap(reflect.TypeOf(map[string]errG{}))
+	m.SetMapIndex(reflect.ValueOf("k"), reflect.ValueOf(ErrG))
+	return m.Interface().(map[string]errG)["k"]
+}
+
+var ErrH = errors.New("h")
+
+type errH error
+
+func FreshChan() error {
+	c := reflect.MakeChan(reflect.TypeOf(make(chan errH)), 1)
+	c.Send(reflect.ValueOf(ErrH))
+	return <-c.Interface().(chan errH)
+}
+
+// The store is in a callee that is passed the fresh Value.
+
+var ErrI = errors.New("i")
+
+func fill(v reflect.Value, e error) { v.Set(reflect.ValueOf(e)) }
+
+func FreshParam() error {
+	v := reflect.New(errType).Elem()
+	fill(v, ErrI)
+	return v.Interface().(error)
+}
+
+// The destination is the composite a caller passes as an any.
+
+var ErrJ = errors.New("j")
+
+type errJ error
+
+func setAny(dst any, e error) { reflect.ValueOf(dst).Elem().Set(reflect.ValueOf(e)) }
+
+func KnownParam() error {
+	var e errJ
+	setAny(&e, ErrJ)
+	return e
+}
+
+// The destination comes out of a helper that walks into its argument.
+
+var ErrK = errors.New("k")
+
+type HK struct{ EK error }
+
+func elemOf(p any) reflect.Value { return reflect.ValueOf(p).Elem() }
+
+func KnownHelper() error {
+	h := &HK{}
+	elemOf(h).Field(0).Set(reflect.ValueOf(ErrK))
+	return h.EK
+}
+
+// A fresh map read back through a MapIter.
+
+var ErrL = errors.New("l")
+
+type errL error
+
+func FreshMapIter() error {
+	m := reflect.MakeMap(reflect.TypeOf(map[string]errL{}))
+	m.SetMapIndex(reflect.ValueOf("k"), reflect.ValueOf(ErrL))
+	it := m.MapRange()
+	for it.Next() {
+		return it.Value().Interface().(error)
+	}
+	return nil
+}
+
+// A known composite read back through a MapIter.
+
+var ErrM = errors.New("m")
+
+type errM error
+
+func KnownMapIter() error {
+	m := map[string]errM{"k": ErrM}
+	it := reflect.ValueOf(m).MapRange()
+	for it.Next() {
+		return it.Value().Interface().(error)
+	}
+	return nil
+}
+
+// A known composite and fresh memory read back through Value.Seq2.
+
+var ErrP = errors.New("p")
+
+type errP error
+
+func KnownSeq() error {
+	s := []errP{ErrP}
+	for _, v := range reflect.ValueOf(s).Seq2() {
+		return v.Interface().(error)
+	}
+	return nil
+}
+
+var ErrQ = errors.New("q")
+
+type errQ error
+
+func FreshSeq() error {
+	s := reflect.MakeSlice(reflect.TypeOf([]errQ{}), 1, 1)
+	s.Index(0).Set(reflect.ValueOf(ErrQ))
+	for _, v := range s.Seq2() {
+		return v.Interface().(error)
+	}
+	return nil
+}
+
+// A composite made by reflection, stored by reflection in an interface
+// field of a known composite, and read back by reflection.
+
+var ErrR = errors.New("r")
+
+type SR struct{ ER error }
+
+type HR struct{ AR any }
+
+func LazyHeld() error {
+	h := &HR{}
+	p := reflect.New(reflect.TypeOf(SR{}))
+	p.Elem().Field(0).Set(reflect.ValueOf(ErrR))
+	reflect.ValueOf(h).Elem().Field(0).Set(p)
+	return reflect.ValueOf(h).Elem().Field(0).Interface().(*SR).ER
+}
+
+// A composite read by reflection through a pointer field.
+
+var ErrS = errors.New("s")
+
+type innerS struct{ ES error }
+
+type outerS struct{ PS *innerS }
+
+func DeepRead() error {
+	o := outerS{PS: &innerS{ES: ErrS}}
+	return reflect.ValueOf(o).Field(0).Elem().Field(0).Interface().(error)
+}
+
+// A composite made by reflection is read back as the receiver of a
+// method, called through an interface.
+
+var ErrU = errors.New("u")
+
+type getter interface{ Get() error }
+
+type GU struct{ EU error }
+
+func (g *GU) Get() error { return g.EU }
+
+func HeldReceiver() error {
+	p := reflect.New(reflect.TypeOf(GU{}))
+	p.Elem().Field(0).Set(reflect.ValueOf(ErrU))
+	return p.Interface().(getter).Get()
+}
+
+// Fresh memory that leaves the function that fills it: what is read back
+// through reflection is followed; a read through its type is not.
+
+var ErrV = errors.New("v")
+
+type FV struct{ EV error }
+
+func buildV() reflect.Value {
+	p := reflect.New(reflect.TypeOf(FV{}))
+	p.Elem().Field(0).Set(reflect.ValueOf(ErrV))
+	return p
+}
+
+func FreshAwayReflect() error { return buildV().Elem().Field(0).Interface().(error) }
+
+var ErrW = errors.New("w")
+
+type FW struct{ EW error }
+
+func buildW() reflect.Value {
+	p := reflect.New(reflect.TypeOf(FW{}))
+	p.Elem().Field(0).Set(reflect.ValueOf(ErrW))
+	return p
+}
+
+func FreshAwayTyped() error { return buildW().Interface().(*FW).EW }
+
+// Not followed: the store crosses an interface value inside the known
+// composite, to memory that its static type does not show.
+
+var ErrT = errors.New("t")
+
+type UT struct{ ET error }
+
+type ST struct{ AT any }
+
+func KnownCross() error {
+	u := &UT{}
+	s := &ST{AT: u}
+	reflect.ValueOf(s).Elem().Field(0).Elem().Elem().Field(0).Set(reflect.ValueOf(ErrT))
+	return u.ET
+}
+
+// Not followed: the store goes through a pointer that was stored in the
+// fresh memory, to a variable outside it.
+
+var ErrN = errors.New("n")
+
+type errN error
+
+type PN struct{ PN *errN }
+
+func FreshEscape() error {
+	var e errN
+	v := reflect.New(reflect.TypeOf(PN{})).Elem()
+	v.Field(0).Set(reflect.ValueOf(&e))
+	v.Field(0).Elem().Set(reflect.ValueOf(ErrN))
+	return e
+}
+
+// Not followed: the destination Value comes out of a variable.
+
+var ErrO = errors.New("o")
+
+type errO error
+
+var slotO errO
+var destO = reflect.ValueOf(&slotO).Elem()
+
+func UnknownGlobal() error {
+	destO.Set(reflect.ValueOf(ErrO))
+	return slotO
+}
+
+// A store that is followed leaves the other functions alone.
+
+func Clean() error { return errors.New("clean") }
+
+func main() {
+	fmt.Println(FreshWhole(), FreshHelper(), FreshStruct(), FreshField(), FreshAddr(),
+		FreshSlice(), FreshMap(), FreshChan(), FreshParam(), KnownParam(), KnownHelper(),
+		FreshMapIter(), KnownMapIter(), KnownSeq(), FreshSeq(), LazyHeld(), DeepRead(), HeldReceiver(), FreshAwayReflect(), FreshAwayTyped(), KnownCross(), FreshEscape(), UnknownGlobal(), Clean())
+}

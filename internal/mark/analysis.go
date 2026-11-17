@@ -9,38 +9,53 @@ import (
 	"golang.org/x/tools/go/ssa"
 
 	"github.com/KilledKenny/errtrace/internal/flow"
+	"github.com/KilledKenny/errtrace/internal/fmtverb"
 )
 
-// tags are the contexts in which a Mark holds, in two planes that say how
-// the value came to hold the Subject.
+// tags are the contexts in which a Mark holds, in three planes that say
+// how the value came to hold the Subject.
 //
-// By value (the low half): the value is the Subject itself, or an
+// By value (the low third): the value is the Subject itself, or an
 // immutable construction over such values (fmt.Errorf, errors.Join): what
-// errors.Is says about it never changes. By type (the high half): the
+// errors.Is says about it never changes. By type (the middle third): the
 // value has a type that wraps the Subject, comes from memory or code the
 // pass does not see, or is derived from such a value: what errors.Is says
-// about it may change after a check. The errors.Is guard drops only the
-// by-value plane.
+// about it may change after a check. Held (the high third): the value is
+// an interface or a reflect.Value that came out of reflection or from
+// outside the program, and may be a composite (a struct, a slice, a
+// pointer) with the Subject somewhere in its memory. The errors.Is guard
+// drops only the by-value plane; only a held Mark makes a type assertion
+// to a composite type mark the memory of that type (an error that flows
+// through an any is not a slice).
 //
 // In each plane, bit 0 is free (true in any calling context) and bit i+1
 // is "when parameter i of the enclosing function holds the Subject" (in
 // that plane). A plane with free is just free.
 type tags uint64
 
+// planeBits is the width of a plane.
+const planeBits = 21
+
 const (
-	// free is the by-value free tag, freeT the by-type one.
+	// free is the by-value free tag, freeT the by-type one, freeH the
+	// held one.
 	free  tags = 1
-	freeT tags = 1 << 32
-	// planeV and planeT are the bits of the two planes.
-	planeV tags = 1<<32 - 1
-	planeT tags = ^planeV
-	// anyFree is free in either plane.
-	anyFree = free | freeT
+	freeT tags = 1 << planeBits
+	freeH tags = 1 << (2 * planeBits)
+	// planeV, planeT and planeH are the bits of the three planes.
+	planeV tags = 1<<planeBits - 1
+	planeT tags = planeV << planeBits
+	planeH tags = planeV << (2 * planeBits)
+	// anyFree is free in any plane.
+	anyFree = free | freeT | freeH
 )
+
+// planeShifts are the positions of the planes.
+var planeShifts = [...]uint{0, planeBits, 2 * planeBits}
 
 // maxParamTag is the number of parameters that have a tag of their own;
 // a Mark that depends on a later parameter is free.
-const maxParamTag = 31
+const maxParamTag = planeBits - 1
 
 // paramTag returns the by-value tag of parameter i.
 func paramTag(i int) tags {
@@ -50,24 +65,28 @@ func paramTag(i int) tags {
 	return 1 << uint(i+1)
 }
 
-// paramBits returns the tags of parameter i in both planes.
+// paramBits returns the tags of parameter i in every plane.
 func paramBits(i int) tags {
 	t := paramTag(i)
-	return t | t<<32
+	return t | t<<planeBits | t<<(2*planeBits)
 }
 
-// toT moves every tag of t to the by-type plane.
-func toT(t tags) tags { return (t&planeV)<<32 | t&planeT }
+// toT moves the by-value tags of t to the by-type plane.
+func toT(t tags) tags { return (t&planeV)<<planeBits | t&^planeV }
+
+// toH moves every tag of t to the held plane.
+func toH(t tags) tags {
+	return (t&planeV)<<(2*planeBits) | (t&planeT)<<planeBits | t&planeH
+}
 
 // planesOf returns free in every plane in which t has a tag: what a
 // location gets when a value with the tags t is stored to it.
 func planesOf(t tags) tags {
 	var p tags
-	if t&planeV != 0 {
-		p |= free
-	}
-	if t&planeT != 0 {
-		p |= freeT
+	for _, sh := range planeShifts {
+		if t&(planeV<<sh) != 0 {
+			p |= free << sh
+		}
 	}
 	return p
 }
@@ -76,11 +95,10 @@ func planesOf(t tags) tags {
 // argument with the tags t: its Param tag in each plane t has a tag in.
 func paramSeed(p int, t tags) tags {
 	var out tags
-	if t&planeV != 0 {
-		out |= paramTag(p)
-	}
-	if t&planeT != 0 {
-		out |= paramTag(p) << 32
+	for _, sh := range planeShifts {
+		if t&(planeV<<sh) != 0 {
+			out |= paramTag(p) << sh
+		}
 	}
 	return out
 }
@@ -91,22 +109,20 @@ func paramSeed(p int, t tags) tags {
 // in.
 func throughParam(ret, arg tags) tags {
 	var out tags
-	if ret&planeV != 0 {
-		out |= arg & planeV
-	}
-	if ret&planeT != 0 {
-		out |= arg & planeT
+	for _, sh := range planeShifts {
+		if ret&(planeV<<sh) != 0 {
+			out |= arg & (planeV << sh)
+		}
 	}
 	return out
 }
 
 // normTags makes a plane that has free just free.
 func normTags(t tags) tags {
-	if t&free != 0 {
-		t = t&planeT | free
-	}
-	if t&freeT != 0 {
-		t = t&planeV | freeT
+	for _, sh := range planeShifts {
+		if t&(free<<sh) != 0 {
+			t = t&^(planeV<<sh) | free<<sh
+		}
 	}
 	return t
 }
@@ -205,6 +221,7 @@ const (
 	kReflectArg
 	kReflectRet
 	kOutside
+	kReflectFresh
 )
 
 // reason is the first way a Mark was found.
@@ -336,8 +353,18 @@ type analysis struct {
 	recovers []recoverCall
 	// locOrder are the locations in the order they were first named.
 	locOrder []loc
-	// allMarked are the planes in which markAll ran.
-	allMarked tags
+	// unfollowed are the stores through reflection of a marked value
+	// whose destination the pass cannot tell (see reflectDest); dests
+	// caches the walks back from destinations and destIDs numbers the
+	// values they look at.
+	unfollowed map[ssa.CallInstruction]bool
+	// boxes are the calls of package reflect that return a composite
+	// around what they are passed (see reflectBoxes).
+	boxes map[*ssa.Call]bool
+	// typedRead caches typedReads.
+	typedRead map[*ssa.Call]bool
+	dests     map[destKey]*reflectDest
+	destIDs   map[ssa.Value]uint32
 	// reflects says that the program calls functions through reflection
 	// (see reflectCall); reflectCallers are the functions that do,
 	// reflectValues the memory of type reflect.Value, and reflectSeeded
@@ -350,18 +377,17 @@ type analysis struct {
 	reflectRoots   []types.Type
 	reflectAny     bool
 	reflectTargets map[*ssa.Function]bool
-	// boxed are the concrete types converted to interfaces anywhere.
-	boxed          []types.Type
-	boxedSeen      map[int32]bool
 	reflectCallers []*ssa.Function
 	reflectValues  loc
 	reflectSeeded  tags
 	// reflectArgs are the types of the composite values passed to
 	// reflect.ValueOf.
 	reflectArgs []reflectArg
-	// guards caches deadBlocks; guardOK says that the Sentinel keeps the
-	// value of its initialization, so that a failed errors.Is excludes it.
+	// guards caches deadBlocks; byValue says that the Sentinel's value is
+	// one fixed value (see setupSubject): its Marks are then by value,
+	// and guardOK says that a failed errors.Is excludes it.
 	guards  map[ssa.Value][]*ssa.BasicBlock
+	byValue bool
 	guardOK bool
 	// targets caches targetInfo.
 	targets map[*ssa.Function]*targetInfo
@@ -422,7 +448,11 @@ func newAnalysis(prog *ssa.Program, res Callees, subj Subject) *analysis {
 		callersCache:   make(map[*ssa.Function][]ssa.CallInstruction),
 		models:         make(map[*ssa.Function]model),
 		reflectTargets: make(map[*ssa.Function]bool),
-		boxedSeen:      make(map[int32]bool),
+		unfollowed:     make(map[ssa.CallInstruction]bool),
+		boxes:          make(map[*ssa.Call]bool),
+		typedRead:      make(map[*ssa.Call]bool),
+		dests:          make(map[destKey]*reflectDest),
+		destIDs:        make(map[ssa.Value]uint32),
 		guards:         make(map[ssa.Value][]*ssa.BasicBlock),
 		targets:        make(map[*ssa.Function]*targetInfo),
 		markableCache:  make(map[types.Type]bool),
@@ -464,16 +494,33 @@ func (a *analysis) run(ctx context.Context) error {
 			}
 		}
 		// A composite value that holds a marked value and is passed to
-		// package reflect (reflect.ValueOf(s)) may come out of the call.
+		// package reflect (reflect.ValueOf(s)) may come out of the call:
+		// by type, for what the program stored in its memory (a typed
+		// read finds that in the memory itself), and held, if its
+		// memory holds a composite that no store of the program wrote.
 		rest := a.reflectArgs[:0]
+		reached := make(map[types.Type]reach)
 		for _, ra := range a.reflectArgs {
-			a.heldBy = ref{}
-			if !a.holds(ra.typ, 0) {
-				rest = append(rest, ra)
-				continue
+			r, ok := reached[ra.typ]
+			if !ok {
+				r = a.reaches(ra.typ)
+				reached[ra.typ] = r
 			}
-			a.reflectResults(ra.call, freeT, reason{kind: kThrough, from: a.heldBy, site: ra.call, fn: ra.call.Call.StaticCallee()})
-			changed = true
+			var t tags
+			if r.planes != 0 {
+				t |= freeT
+			}
+			if r.planes&freeH != 0 {
+				t |= freeH
+			}
+			if t &^= ra.done; t != 0 {
+				ra.done |= t
+				a.reflectResults(ra.call, t, reason{kind: kThrough, from: r.by, site: ra.call, fn: ra.call.Call.StaticCallee()})
+				changed = true
+			}
+			if ra.done != freeT|freeH {
+				rest = append(rest, ra)
+			}
 		}
 		a.reflectArgs = rest
 		if !changed {
@@ -1099,8 +1146,15 @@ func (a *analysis) mark(k key, t tags, why reason) {
 	if t == 0 || !a.canMark(k) {
 		return
 	}
-	if _, ok := k.v.(*ssa.Const); ok {
+	switch x := k.v.(type) {
+	case *ssa.Const:
 		return
+	case *ssa.Call:
+		if a.boxes[x] {
+			// A pointer to what it was passed, a slice with it: what
+			// was the Subject is now held in a composite.
+			t |= toH(t)
+		}
 	}
 	in := a.marks[k]
 	if in == nil {
@@ -1124,14 +1178,8 @@ func (a *analysis) markRet(fn *ssa.Function, idx int, t tags, why reason) {
 }
 
 func (a *analysis) add(in *info, t tags, why reason, it item) {
+	// (A plane that is free already takes nothing more.)
 	nt := normTags(in.t | t)
-	// A plane that is free already takes nothing more.
-	if in.t&free != 0 {
-		nt = nt&planeT | free
-	}
-	if in.t&freeT != 0 {
-		nt = nt&planeV | freeT
-	}
 	if nt == in.t {
 		return
 	}
@@ -1203,7 +1251,7 @@ func (a *analysis) use(k key, delta tags, dead []*ssa.BasicBlock, r ssa.Instruct
 	if len(dead) > 0 && guarded(dead, v, r) {
 		// errors.Is(v, X) was false on every path to this use: v is not
 		// X by value there. What it holds by type may have changed.
-		delta &= planeT
+		delta &^= planeV
 		if delta == 0 {
 			return
 		}
@@ -1234,11 +1282,11 @@ func (a *analysis) use(k key, delta tags, dead []*ssa.BasicBlock, r ssa.Instruct
 			}
 			if a.assertable(x.AssertedType) {
 				a.mark(key{x, 0}, delta, reason{kind: kAssert, from: from, site: x, typ: x.AssertedType})
-			} else if !a.markable(x.AssertedType) {
-				// The interface held a composite (it came out of
+			} else if !a.markable(x.AssertedType) && planes&freeH != 0 {
+				// The interface may hold a composite (it came out of
 				// reflection, or from outside): what was marked is
 				// inside it.
-				a.markHeld(x.AssertedType, toT(planes), reason{kind: kAssert, from: from, site: x, typ: x.AssertedType})
+				a.markHeld(x.AssertedType, reason{kind: kAssert, from: from, site: x, typ: x.AssertedType})
 			}
 		case *ssa.Store:
 			if x.Val == v {
@@ -1405,10 +1453,6 @@ func (a *analysis) index() {
 					if isInterface(ot) {
 						break
 					}
-					if id := a.ty.id(ot); !a.boxedSeen[id] {
-						a.boxedSeen[id] = true
-						a.boxed = append(a.boxed, ot)
-					}
 					if a.typeSeed(ot) {
 						a.typeSeeds = append(a.typeSeeds, x)
 					} else if a.potentialWrapper(ot) {
@@ -1505,12 +1549,180 @@ func (a *analysis) setupSubject() {
 		w.global(h, 0)
 	}
 	a.dynTypes, a.dynUnknown, a.dynNilable = w.types, w.unknown, w.nilable
-	// A failed errors.Is(v, X) excludes X only if X is one value: every
-	// variable of the class is only initialized.
-	a.guardOK = true
+	// The Sentinel is held by value only if what its variables hold is
+	// one value that never changes: every variable of the class is only
+	// initialized, with a value that holds nothing that can change (see
+	// fixedValue). Otherwise its Marks are by type, and a failed
+	// errors.Is(v, X) excludes nothing.
+	a.byValue = true
+	fw := &fixedWalk{a: a, seen: make(map[any]bool)}
 	for _, h := range a.class {
-		a.guardOK = a.guardOK && a.initOnly(h)
+		a.byValue = a.byValue && fw.global(h, 0)
 	}
+	a.guardOK = a.byValue
+}
+
+// fixedWalk decides whether the value of a Sentinel is fixed: errors.Is
+// says the same about it, and about what is built over it, at any time.
+// That holds for a value made by errors.New, by fmt.Errorf with a
+// constant format whose %w operands are fixed, and for a value of a
+// comparable type that can hold no value that carries a Mark (errors.Is
+// finds it by ==, and it has nothing inside that could change). It does
+// not hold for a wrapper such as &W{inner: err}: the program may change
+// what it wraps after a check.
+type fixedWalk struct {
+	a    *analysis
+	seen map[any]bool
+}
+
+// maxFixedWalk bounds the walk through calls and variables.
+const maxFixedWalk = 8
+
+// global reports whether the program only initializes g, with fixed
+// values.
+func (w *fixedWalk) global(g *ssa.Global, depth int) bool {
+	if w.seen[g] {
+		return true
+	}
+	w.seen[g] = true
+	if !w.a.initOnly(g) {
+		return false
+	}
+	for _, st := range w.a.globalStore[g] {
+		if !w.value(st.Val, depth+1) {
+			return false
+		}
+	}
+	return true
+}
+
+func (w *fixedWalk) value(v ssa.Value, depth int) bool {
+	if depth > maxFixedWalk {
+		return false
+	}
+	if w.seen[v] {
+		return true
+	}
+	w.seen[v] = true
+	switch x := v.(type) {
+	case *ssa.MakeInterface:
+		t := x.X.Type()
+		if isInterface(t) || !types.Comparable(t) {
+			return false
+		}
+		// What the value has inside: for a pointer, what it points to.
+		body := t
+		if p := pointerElem(t); p != nil {
+			body = p
+		}
+		return !w.a.canHold(body, make(map[types.Type]bool), 0)
+	case *ssa.ChangeInterface:
+		return w.value(x.X, depth+1)
+	case *ssa.Phi:
+		for _, e := range x.Edges {
+			if !w.value(e, depth+1) {
+				return false
+			}
+		}
+		return true
+	case *ssa.UnOp:
+		if g, ok := x.X.(*ssa.Global); ok && x.Op == token.MUL {
+			return w.global(g, depth+1)
+		}
+	case *ssa.Call:
+		sc := x.Call.StaticCallee()
+		if sc == nil {
+			return false
+		}
+		if name, ok := flow.Intrinsic(sc); ok {
+			switch name {
+			case "errors.New":
+				return true
+			case "fmt.Errorf":
+				args := x.Call.Args
+				if len(args) != 2 {
+					return false
+				}
+				format, ok := constFormat(args[0])
+				if !ok {
+					return false
+				}
+				ops, ok := flow.VarargsOperands(args[1])
+				if !ok {
+					return false
+				}
+				for _, i := range fmtverb.Wrapped(fmtverb.Parse(format, len(ops))) {
+					if i >= len(ops) || !w.value(ops[i], depth+1) {
+						return false
+					}
+				}
+				return true
+			}
+			return false
+		}
+		if sc.Blocks == nil || sc.Signature.Results().Len() != 1 {
+			return false
+		}
+		// A function that returns the value (io/fs.errNotExist).
+		for _, b := range sc.Blocks {
+			if len(b.Instrs) == 0 {
+				continue
+			}
+			if r, ok := b.Instrs[len(b.Instrs)-1].(*ssa.Return); ok {
+				if len(r.Results) != 1 || !w.value(r.Results[0], depth+1) {
+					return false
+				}
+			}
+		}
+		return true
+	}
+	return false
+}
+
+// maxCanHold bounds the walk of canHold through unnamed types.
+const maxCanHold = 16
+
+// canHold reports whether a value of type t can have, in its own storage
+// or behind its pointers, slices, maps and channels, a value that carries
+// a Mark or that the pass cannot look into: an interface, a value of a
+// type that can be an error, a reflect.Value, a function, an unsafe
+// pointer.
+func (a *analysis) canHold(t types.Type, seen map[types.Type]bool, depth int) bool {
+	if depth > maxCanHold {
+		return true
+	}
+	if seen[t] {
+		return false
+	}
+	if _, ok := types.Unalias(t).(*types.Named); ok {
+		seen[t] = true
+	}
+	inner := func(e types.Type) bool {
+		return a.markable(e) || a.canHold(e, seen, depth+1)
+	}
+	switch u := t.Underlying().(type) {
+	case *types.Basic:
+		return u.Kind() == types.UnsafePointer
+	case *types.Pointer:
+		return inner(u.Elem())
+	case *types.Slice:
+		return inner(u.Elem())
+	case *types.Array:
+		return inner(u.Elem())
+	case *types.Chan:
+		return inner(u.Elem())
+	case *types.Map:
+		return inner(u.Key()) || inner(u.Elem())
+	case *types.Struct:
+		for i := range u.NumFields() {
+			if inner(u.Field(i).Type()) {
+				return true
+			}
+		}
+		return false
+	}
+	// An interface, a function, a type parameter.
+	return true
 }
 
 // initOnly reports whether the program only initializes the package-level
@@ -1733,17 +1945,21 @@ func (w *typeWalk) results(call *ssa.Call, idx, depth int) {
 
 // seed makes the first Marks.
 func (a *analysis) seed() {
+	// The value of the Sentinel: by value, if it is fixed.
+	plane := free
+	if !a.byValue {
+		plane = freeT
+	}
 	for _, g := range a.class {
 		why := reason{kind: kSeedSentinel, text: Subject{Sentinel: g}.String()}
 		locs, n := a.addrLocs(g)
 		for _, l := range locs[:n] {
-			// The value of the Sentinel: by value.
-			a.markLoc(l, free, why)
+			a.markLoc(l, plane, why)
 		}
 		// A value the program stores into the variable is its value
 		// from then on.
 		for _, st := range a.globalStore[g] {
-			a.mark(key{st.Val, 0}, free, reason{kind: kSeedStored, site: st, text: why.text})
+			a.mark(key{st.Val, 0}, plane, reason{kind: kSeedStored, site: st, text: why.text})
 		}
 	}
 	a.seedOpen()

@@ -93,6 +93,12 @@ type MembershipResult struct {
 	// result, and TargetTrace how the Mark got there (it may be empty).
 	Reached     bool
 	TargetTrace []mark.Step
+	// ReflectStores are the stores through reflection that the Subject
+	// reaches and the upward pass did not follow, because it cannot tell
+	// where they write (see mark.Result.ReflectStores). A No or Maybe
+	// Verdict holds only as far as none of them puts the Subject where
+	// the Target reads it; they are reported with the Verdict.
+	ReflectStores []mark.ReflectStore
 	// MarkRan reports whether the upward pass ran; MarkTime is how long
 	// it took and MarkStats what it did.
 	MarkRan   bool
@@ -110,7 +116,9 @@ type MembershipResult struct {
 //   - only possibly handled entries that are the Subject: Maybe;
 //   - the upward pass does not reach the Target's error result: No,
 //     whatever Unresolved entries the Error Set has (but Maybe if the
-//     program is open and an entry depends on the caller);
+//     program is open and an entry depends on the caller). The stores
+//     through reflection that the pass did not follow are listed in
+//     ReflectStores: the No does not cover what they write;
 //   - it does: Maybe, with the Carriers. The Error Set is no proof that
 //     the Subject is absent: there may be no Carrier at all.
 func Membership(ctx context.Context, prog *load.Program, tgt *target.Target, opts MembershipOptions) (*MembershipResult, error) {
@@ -144,6 +152,7 @@ func Membership(ctx context.Context, prog *load.Program, tgt *target.Target, opt
 		return nil, err
 	}
 	m.MarkRan, m.MarkTime, m.MarkStats = true, time.Since(start), marks.Stats()
+	m.ReflectStores = marks.ReflectStores()
 	m.Reached, m.TargetTrace = targetMarked(marks, tgt)
 	c := carriers{marks: marks, tbl: res.Table, prog: prog.SSA, open: len(opts.Open) > 0, reached: m.Reached}
 	for _, e := range res.Entries {

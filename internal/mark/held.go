@@ -7,14 +7,16 @@ import (
 	"golang.org/x/tools/go/ssa"
 )
 
-// markHeld marks, in the given planes, every memory location in which a
-// value of the composite type t can hold a value that carries a Mark: the
-// elements of its slices, arrays, maps and channels, what its pointers
-// point to, and its struct fields, through every type it leads to. It is
-// what the pass knows about a composite that comes from where it cannot
-// see: outside the program, or out of reflection.
-func (a *analysis) markHeld(t types.Type, planes tags, why reason) {
-	a.markHeldIn(t, planes, why, make(map[types.Type]bool), 0)
+// markHeld marks every memory location in which a value of the composite
+// type t can hold a value that carries a Mark: the elements of its
+// slices, arrays, maps and channels, what its pointers point to, and its
+// struct fields, through every type it leads to. It is what the pass
+// knows about a composite that comes from where it cannot see: outside
+// the program, or out of reflection. The locations are marked in the held
+// plane: what is loaded from one of an interface type may be such a
+// composite again.
+func (a *analysis) markHeld(t types.Type, why reason) {
+	a.markHeldIn(t, freeH, why, make(map[types.Type]bool), 0)
 }
 
 // maxHeldDepth bounds the walk of markHeld through unnamed types; named
@@ -62,17 +64,72 @@ func (a *analysis) markHeldIn(t types.Type, planes tags, why reason, seen map[ty
 	}
 }
 
-// markAll marks the memory that a store through reflection can reach when
-// the pass cannot tell where it goes: reflection starts from an interface
-// value, so it reaches what the values converted to interfaces anywhere in
-// the program hold (and no variable whose address is not among them).
-func (a *analysis) markAll(planes tags, why reason) {
-	if a.allMarked&planes == planes {
+// reach is what reaches found: the planes in which memory that a value
+// of a type leads to is marked, and one such location (or none, if the
+// Mark is that of a type).
+type reach struct {
+	planes tags
+	by     ref
+}
+
+// reaches returns the planes in which a value of the composite type t
+// holds a marked value anywhere in the memory it leads to: the locations
+// markHeld would mark. A value of a type that is marked as such (the
+// Subject's type, a wrapper) counts as by type.
+func (a *analysis) reaches(t types.Type) reach {
+	var r reach
+	a.reachesIn(t, &r, make(map[types.Type]bool), 0)
+	return r
+}
+
+func (a *analysis) reachesIn(t types.Type, r *reach, seen map[types.Type]bool, depth int) {
+	if t == nil || seen[t] {
 		return
 	}
-	a.allMarked |= planes
-	for _, t := range a.boxed {
-		a.markHeld(t, planes, why)
+	if depth > maxHeldDepth {
+		// Deeper is not looked at: it may hold anything.
+		r.planes |= freeT | freeH
+		return
+	}
+	if _, ok := types.Unalias(t).(*types.Named); ok {
+		// A named type is walked once; the bound is on the nesting of
+		// unnamed types.
+		seen[t] = true
+		depth = 0
+	}
+	at := func(e types.Type, locs ...loc) {
+		if a.implicit(e) {
+			r.planes |= freeT
+		}
+		if a.markable(e) {
+			for _, l := range locs {
+				if li := a.locs[l]; li != nil && li.marked != 0 {
+					if r.planes == 0 {
+						r.by = ref{kind: refLoc, l: l}
+					}
+					r.planes |= li.marked
+				}
+			}
+		}
+		a.reachesIn(e, r, seen, depth+1)
+	}
+	switch u := t.Underlying().(type) {
+	case *types.Pointer:
+		at(u.Elem(), a.typedLoc(u.Elem()))
+	case *types.Slice:
+		at(u.Elem(), a.typedLoc(u.Elem()))
+	case *types.Array:
+		at(u.Elem(), a.typedLoc(u.Elem()))
+	case *types.Map:
+		at(u.Key(), a.mapLoc(locMapKey, t))
+		at(u.Elem(), a.mapLoc(locMapVal, t))
+	case *types.Chan:
+		at(u.Elem(), a.chanLoc(u.Elem()))
+	case *types.Struct:
+		for i := range u.NumFields() {
+			locs, n := a.fieldLocs(u, i)
+			at(u.Field(i).Type(), locs[:n]...)
+		}
 	}
 }
 
@@ -85,8 +142,10 @@ func (a *analysis) markAll(planes tags, why reason) {
 //   - a store through reflection (Value.Set, SetMapIndex, Send, and
 //     reflect.Append, AppendSlice, Copy) of a marked value marks the
 //     memory of the composite the destination Value was made from
-//     (reflect.ValueOf(&s).Elem().Field(0)), or all memory if the pass
-//     cannot tell;
+//     (reflect.ValueOf(&s).Elem().Field(0)), or the Value of the fresh
+//     memory it names (reflect.New(t).Elem()); if the pass cannot tell
+//     where it writes, the store is recorded and not followed (see
+//     reflectDest);
 //   - if the program calls functions through reflection (Value.Call,
 //     CallSlice, Method, MethodByName), any exported method and any
 //     function whose value is taken may be the callee: their marked
@@ -148,15 +207,46 @@ func (a *analysis) reflectRoot(v ssa.Value) types.Type {
 	return nil
 }
 
-// reflectStored handles the marked operand of a store through reflection
-// at call (see reflectStore), whose destination is dst.
-func (a *analysis) reflectStored(call ssa.CallInstruction, dst ssa.Value, planes tags, why reason) {
-	planes = toT(planes)
-	if root := a.reflectRoot(dst); root != nil {
-		a.markHeld(root, planes, why)
-		return
+// reflectReferent reports whether the store through reflection fn writes
+// what its destination Value refers to (the elements of a slice, map or
+// channel) and not the Value's own slot.
+func reflectReferent(fn *ssa.Function) bool {
+	switch fn.Name() {
+	case "Set", "SetIterKey", "SetIterValue":
+		return false
 	}
-	a.markAll(planes, why)
+	return true
+}
+
+// reflectStored handles the marked operand of the store through
+// reflection at call (see reflectStore), whose destination is dst: it
+// marks the memory the destination names where the pass can tell (see
+// reflectDest), and records the store where it cannot.
+func (a *analysis) reflectStored(call ssa.CallInstruction, dst ssa.Value, planes tags, why reason) {
+	d := a.reflectDest(dst, reflectReferent(call.Common().StaticCallee()))
+	for _, t := range d.known {
+		a.markHeld(t, why)
+	}
+	for _, f := range d.fresh {
+		// The Value of the fresh memory holds it from now on, and so
+		// does what is read back from that Value through reflection.
+		why := reason{kind: kReflectFresh, from: why.from, site: why.site, fn: f.call.Call.StaticCallee()}
+		if deref := a.soleDeref(f.call); f.whole && deref != nil {
+			// The variable is the stored value.
+			a.mark(key{deref, 0}, toT(planes), why)
+			continue
+		}
+		// The memory is a composite with the stored value inside. What
+		// reads it back through its type (v.Interface().(*T)) is
+		// followed only where the Value stays in sight.
+		a.mark(key{f.call, 0}, toT(planes), why)
+		if !a.typedReads(f.call, why) {
+			a.unfollowed[call] = true
+		}
+	}
+	if d.unknown {
+		a.unfollowed[call] = true
+	}
 }
 
 // reflectTarget reports whether a call through reflection may run g: the
@@ -273,11 +363,12 @@ func (a *analysis) seedOpen() {
 		for i, p := range fn.Params {
 			why := reason{kind: kSeedCaller, fn: fn}
 			if a.markable(p.Type()) {
-				// As if a caller passed it: by type, in its context.
-				a.mark(key{p, 0}, paramTag(i)<<32, why)
+				// As if a caller passed it: by type, or a composite
+				// in an interface, in its context.
+				a.mark(key{p, 0}, paramSeed(i, freeT|freeH), why)
 			}
 			// What a composite argument holds is in memory.
-			a.markHeld(p.Type(), freeT, why)
+			a.markHeld(p.Type(), why)
 		}
 	}
 	for _, k := range a.openLoads {
@@ -285,7 +376,7 @@ func (a *analysis) seedOpen() {
 		if instr, ok := k.v.(ssa.Instruction); ok {
 			why.site = instr
 		}
-		a.mark(k, freeT, why)
+		a.mark(k, freeT|freeH, why)
 	}
 	// What an exported variable of a composite type holds.
 	var pkgs []*ssa.Package
@@ -305,7 +396,7 @@ func (a *analysis) seedOpen() {
 				continue
 			}
 			if elem := pointerElem(g.Type()); elem != nil {
-				a.markHeld(elem, freeT, reason{kind: kSeedOpen})
+				a.markHeld(elem, reason{kind: kSeedOpen})
 			}
 		}
 	}
@@ -316,7 +407,7 @@ func (a *analysis) seedOpen() {
 // open world: every value from outside is marked, so the code that runs
 // may be outside the program, and return the Subject.
 func (a *analysis) outsideResults(call *ssa.Call, t tags, from ref) {
-	t = toT(t)
+	t = toT(t) | toH(t)
 	why := reason{kind: kOutside, from: from, site: call}
 	res := call.Call.Signature().Results()
 	for r := range res.Len() {
@@ -324,11 +415,11 @@ func (a *analysis) outsideResults(call *ssa.Call, t tags, from ref) {
 		if a.markable(rt) {
 			a.markResult(call, r, t, why)
 		}
-		a.markHeld(rt, planesOf(t), why)
+		a.markHeld(rt, why)
 	}
 	// It may also write through what it is passed.
 	for _, arg := range call.Call.Args {
-		a.markHeld(arg.Type(), planesOf(t), why)
+		a.markHeld(arg.Type(), why)
 	}
 }
 

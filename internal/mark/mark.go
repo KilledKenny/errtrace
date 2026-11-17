@@ -46,9 +46,14 @@
 //     errors.Is or errors.As about one, asserts the target to X's type, or
 //     passes the target where the pass cannot see what is done with it
 //     (then the type wraps every X);
-//   - it has an Unwrap, Is or As method and holds a marked value in a
-//     field (through structs nested by value) or in a slice, array, map,
-//     channel or pointer field.
+//   - one of its Unwrap, Is or As methods is not scanned (it has no
+//     body), and it holds a marked value in a field (through structs
+//     nested by value) or in a slice, array, map, channel or pointer
+//     field.
+//
+// A marked value in a field that no Unwrap method returns and no Is or As
+// method reports does not make the type a wrapper: errors.Is and errors.As
+// only see what those methods give them.
 //
 // # Calls
 //
@@ -79,8 +84,24 @@
 // construction over such values (fmt.Errorf, errors.Join). A Mark held by
 // type (v has a type that wraps or reports X, or comes from memory or code
 // the pass does not see) may become true after the check, when the
-// wrapper's content changes. Every Mark is in one or both of these two
-// planes, and the guard drops the by-value plane only.
+// wrapper's content changes. The guard drops the by-value plane only.
+//
+// The Sentinel itself is held by value only if its value is fixed: every
+// variable that holds it is only initialized, with a value made by
+// errors.New, by fmt.Errorf with a constant format over fixed %w
+// operands, or of a comparable type that can hold nothing that carries a
+// Mark (no interface, error, function or reflect.Value in it or behind
+// its pointers). A Sentinel such as var ErrX error = &W{} (a wrapper the
+// program may fill after a check) is held by type: no guard applies to
+// it.
+//
+// A third plane, held, is for an interface value or reflect.Value that
+// may be a composite (a struct, a slice, a pointer) with X somewhere in
+// memory that no store of the program wrote: it came out of a store
+// through reflection or from outside the program. Only such a value makes
+// a type assertion to a composite type mark the memory of that type; an
+// error that travels in an any is not taken for a slice. Every Mark is in
+// one or more of the three planes.
 //
 // # Which functions are scanned
 //
@@ -115,23 +136,63 @@
 //     results are marked;
 //   - the loads of exported fields, and of exported variables, of the open
 //     packages are marked. An exported variable named like a Sentinel
-//     (Err..., EOF) that the program only initializes is the one exception:
-//     it is taken not to be reassigned from outside, or every Sentinel of a
-//     library could be every other.
+//     (Err..., err..., EOF) that the program only initializes is the one
+//     exception: it is taken not to be reassigned from outside, or every
+//     Sentinel of a library could be every other. This is an assumption,
+//     not a proof: a client that reassigns an exported Sentinel
+//     (lib.ErrNotFound = io.EOF) is not modelled. (The CLI warns when the
+//     loaded program itself assigns the Subject outside its
+//     initialization.)
+//
+// Which packages are open is for the caller to say. The CLI opens every
+// loaded package that is not a main package, with one exception: an
+// internal package (one with an "internal" path element) of the main
+// module is closed when the default pattern ./... is run from the root of
+// that module, because then every package that may import it is loaded.
+// With any other patterns, from a directory below the module's root, or
+// for an internal package of another module, it is open like any other
+// package.
 //
 // # Reflection
 //
-// Package reflect is modelled, coarsely: a reflect.Value carries the Mark
-// of what it holds, a call of package reflect gives back what it is
-// passed, a composite passed to it counts if it holds a marked value, a
-// store through it (Set, SetMapIndex, Send, Append, Copy) marks the memory
-// of the composite the destination was made from (or, if the pass cannot
-// tell, all memory that values converted to interfaces can hold), and if
-// the program calls through reflect.Value (Call, CallSlice, Method,
-// MethodByName) the results, parameters and panics of the exported methods
-// and of the functions whose value is taken (of the types the called
-// Values were made from, when the pass can tell) are connected to those
-// calls.
+// The bodies of package reflect are not scanned; its calls are modelled:
+//
+//   - a reflect.Value (and a *reflect.MapIter) carries the Mark of what it
+//     holds, and a call of package reflect gives back what it is passed:
+//     reflect.ValueOf(x), v.Elem(), v.Field(i), v.Interface(). A composite
+//     passed to it counts if it holds a marked value. What Value.Addr and
+//     reflect.Append return is a composite around what they were passed
+//     (held plane). The function that a range over Value.Seq or Seq2
+//     calls is passed what the Value holds;
+//   - calls through reflection (Value.Call, CallSlice, Method,
+//     MethodByName, and so text/template): the results, parameters and
+//     panics of the exported methods and of the functions whose value is
+//     taken (of the types the called Values were made from, when the pass
+//     can tell) are connected to those calls;
+//   - a store through reflection (Value.Set, SetMapIndex, Send, SetIterKey,
+//     SetIterValue, reflect.Append, AppendSlice, Copy) of a marked value is
+//     followed where the pass can tell its destination, by walking back
+//     from the destination Value (through the calls of package reflect,
+//     phis, the results of static calls, the parameters of functions all
+//     of whose callers it sees, and private local struct variables). If
+//     the Value was made by reflect.ValueOf(x) from a composite x of a
+//     known static type, the memory that type can hold is marked. If it
+//     names fresh memory (reflect.New, MakeSlice, MakeMap, MakeChan), the
+//     reflect.Value of that memory is marked, and with it what is read
+//     back from that same Value through reflection; the rest of the
+//     program is not;
+//   - a store through reflection whose destination the pass cannot tell
+//     (the Value comes out of memory, out of a dynamic call, through a
+//     pointer that was stored in fresh memory, across an interface value
+//     inside a known composite, or from further away than the walk goes)
+//     is not followed: nothing is marked. Nor is a store into fresh
+//     memory followed all the way if it puts the value inside a composite
+//     (a field, an element) and the Value then leaves the calls of
+//     package reflect: a read of that memory through its type
+//     (v.Interface().(*T).F) is seen only next to the store. Both are
+//     reported instead: Result.ReflectStores lists these stores, and the
+//     Verdict names them ("not followed"). A "no" does not cover what
+//     they write.
 //
 // # Known limits
 //
@@ -154,8 +215,23 @@
 //   - A value converted to another named type and back is followed only as
 //     far as its Mark goes: a type assertion to a type that is neither the
 //     Subject's nor a possible wrapper drops it.
-//   - An internal package is not open (the CLI decides): the code that may
-//     import it is taken to be loaded.
+//   - Stores through reflection with an unknown destination are reported,
+//     not followed (see Reflection). A store through a known composite
+//     marks what its static type can hold; what an interface value inside
+//     it points to is only found where that value is later asserted to a
+//     composite type.
+//   - Not modelled, and not reported: a send through reflect.Select, an
+//     iterator of Value.Seq that is not called where it is made,
+//     reflect.Append into the spare capacity of an array that another
+//     slice shows, and the unsafe ways into a Value (NewAt, Pointer,
+//     UnsafeAddr).
+//   - The callers of a function are the calls in scanned functions: a
+//     call from the body of an intrinsic or of package reflect is not one
+//     of them when a destination is traced through a parameter.
+//   - An internal package of the main module is closed when the whole
+//     module is loaded (the CLI decides, see above); files left out by
+//     build constraints, test files and nested modules that could import
+//     it are not seen.
 //   - The bodies of generic functions are not scanned, only their
 //     instances.
 package mark
@@ -212,6 +288,9 @@ type Stats struct {
 	Values int
 	// Locations is how many memory locations carry a Mark.
 	Locations int
+	// ReflectStores is how many stores through reflection the Subject
+	// reaches that the pass did not follow (see Result.ReflectStores).
+	ReflectStores int
 }
 
 // Result is the outcome of the upward pass for one Subject.
@@ -444,7 +523,7 @@ func (r *Result) TraceType(t types.Type) []Step {
 // Stats returns the counts of the pass.
 func (r *Result) Stats() Stats {
 	a := r.a
-	st := Stats{Functions: len(a.fns)}
+	st := Stats{Functions: len(a.fns), ReflectStores: len(a.unfollowed)}
 	fns := make(map[*ssa.Function]bool)
 	for k, in := range a.marks {
 		if in.t == 0 {

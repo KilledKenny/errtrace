@@ -189,6 +189,8 @@ func (a *analysis) describe(why reason, at ref) (Step, bool) {
 		return Step{Desc: fmt.Sprintf("passed to %s by a call through reflection (reflect.Value.Call)", why.fn)}, true
 	case kReflectRet:
 		return Step{Desc: fmt.Sprintf("returned by %s to a call through reflection (reflect.Value.Call)", why.fn)}, true
+	case kReflectFresh:
+		return Step{Site: site(why.site), Desc: fmt.Sprintf("stored through reflection into the memory made by %s", why.fn)}, true
 	case kOutside:
 		return Step{Site: site(why.site), Desc: "result of a dynamic call on it: the code called may be outside the loaded program"}, true
 	case kSeedOpaque:

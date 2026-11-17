@@ -36,7 +36,7 @@ func runMembership(ctx context.Context, opts Options, cfg *config, prog *load.Pr
 		fmt.Fprintf(opts.Stderr, "summary: functions=%d sccs=%d\n", res.Stats.Functions, res.Stats.SCCs)
 		if res.MarkRan {
 			st := res.MarkStats
-			fmt.Fprintf(opts.Stderr, "mark: functions=%d marked=%d values=%d locations=%d\n", st.Functions, st.MarkedFunctions, st.Values, st.Locations)
+			fmt.Fprintf(opts.Stderr, "mark: functions=%d marked=%d values=%d locations=%d reflectstores=%d\n", st.Functions, st.MarkedFunctions, st.Values, st.Locations, st.ReflectStores)
 		}
 	}
 	if cfg.debug["timing"] {
@@ -55,6 +55,9 @@ func runMembership(ctx context.Context, opts Options, cfg *config, prog *load.Pr
 		Matches:     res.Matches,
 		TargetTrace: steps(res.TargetTrace),
 		Full:        cfg.full,
+	}
+	for _, rs := range res.ReflectStores {
+		in.NotFollowed = append(in.NotFollowed, render.ReflectStore{Site: rs.Site, Function: rs.Fn.String()})
 	}
 	for _, c := range res.Carriers {
 		in.Carriers = append(in.Carriers, render.CarrierEntry{Entry: c.Entry, Unresolved: c.Unresolved, Trace: steps(c.Trace)})

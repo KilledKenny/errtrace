@@ -23,6 +23,6 @@
 
 **Verdict**: The answer of a Membership Query: yes (an entry of the Error Set is that error, with its Propagation Path as witness), no (the upward pass, an upper bound, does not reach the Target), or maybe (the error is only in possibly handled entries, or it can reach the Target and the Error Set does not witness it).
 
-**Mark**: The upward pass's fact "this value or memory location may hold X", where X is the error of a Membership Query. Marks are pushed forward from every place that produces X; they are an upper bound: what carries no Mark cannot hold X.
+**Mark**: The upward pass's fact "this value or memory location may hold X", where X is the error of a Membership Query. Marks are pushed forward from every place that produces X; they are an upper bound: what carries no Mark cannot hold X. The one exception is reported with the Verdict: a store through reflection whose destination the pass cannot tell is not followed.
 
 **Carrier**: An entry of the Error Set that X could come through: an Unresolved entry whose place carries a Mark, or a resolved entry whose leaf may hold X without being it (a Sentinel whose value wraps X, a type that wraps or reports X). A maybe Verdict lists the Carriers.

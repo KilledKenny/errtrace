@@ -34,6 +34,19 @@ type CarrierEntry struct {
 	Trace []TraceStep
 }
 
+// ReflectStore is a store through reflection that the Subject of a
+// Membership Query reaches and the upward pass did not follow.
+type ReflectStore struct {
+	// Site is the call that stores, for printing its span.
+	Site any
+	// Function names the function the call is in.
+	Function string
+}
+
+// maxNotFollowed is how many stores the "not followed" section lists
+// unless Full is set.
+const maxNotFollowed = 5
+
 // MembershipInput is everything the renderer needs to print the Verdict
 // of a Membership Query.
 type MembershipInput struct {
@@ -51,8 +64,12 @@ type MembershipInput struct {
 	// TargetTrace is how the Mark reached the Target's error result; it
 	// is printed when there is no Carrier.
 	TargetTrace []TraceStep
+	// NotFollowed are the stores through reflection that the Subject
+	// reaches and the upward pass did not follow; they are printed after
+	// a no and after a maybe with Carriers.
+	NotFollowed []ReflectStore
 	// Full prints every Carrier with its whole trace instead of grouping
-	// the Carriers that share a pivot.
+	// the Carriers that share a pivot, and every store of NotFollowed.
 	Full bool
 }
 
@@ -98,6 +115,18 @@ type MembershipInput struct {
 //
 // A no is the header alone: X cannot reach the Target, whatever
 // Unresolved entries its Error Set has.
+//
+// The upward pass does not follow a store through reflection whose
+// destination it cannot tell (or, into fresh memory, whose destination it
+// loses sight of). If X reaches such stores, a no, and a maybe that is not
+// possibly handled, end with them (the first 5, all with Full), in the
+// order of the pass:
+//
+//	<TAB>not followed: <X> reaches <N> reflective store[s] whose destination is unknown:
+//	<TAB><TAB><span>: in <function>
+//	<TAB><TAB>… and <K> more
+//
+// The Verdict does not cover what those stores write.
 func Membership(w io.Writer, in MembershipInput) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s: %s in Error Set of %s: %s", in.TargetSpan, in.Subject, in.TargetName, in.Verdict)
@@ -145,6 +174,10 @@ func Membership(w io.Writer, in MembershipInput) error {
 				fmt.Fprintf(&b, "\t%s: %s\n", in.locate(in.Table.Get(e.Leaf).Site), Label(in.Table, e.Leaf))
 			}
 		}
+		in.notFollowed(&b)
+	case in.Verdict == "no":
+		b.WriteByte('\n')
+		in.notFollowed(&b)
 	default:
 		b.WriteByte('\n')
 		for _, e := range in.Matches {
@@ -153,6 +186,30 @@ func Membership(w io.Writer, in MembershipInput) error {
 	}
 	_, err := io.WriteString(w, b.String())
 	return err
+}
+
+// notFollowed writes the section of the stores through reflection that
+// the upward pass did not follow, if there are any.
+func (in MembershipInput) notFollowed(b *strings.Builder) {
+	n := len(in.NotFollowed)
+	if n == 0 {
+		return
+	}
+	stores := "stores"
+	if n == 1 {
+		stores = "store"
+	}
+	fmt.Fprintf(b, "\tnot followed: %s reaches %d reflective %s whose destination is unknown:\n", in.Subject, n, stores)
+	shown := n
+	if !in.Full && shown > maxNotFollowed {
+		shown = maxNotFollowed
+	}
+	for _, rs := range in.NotFollowed[:shown] {
+		fmt.Fprintf(b, "\t\t%s: in %s\n", in.locate(rs.Site), rs.Function)
+	}
+	if shown < n {
+		fmt.Fprintf(b, "\t\t… and %d more\n", n-shown)
+	}
 }
 
 // steps writes the steps of a trace, two tabs deep.

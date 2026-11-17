@@ -124,8 +124,9 @@ func (a *analysis) markable(t types.Type) bool {
 	switch t.(type) {
 	case *types.Tuple, *types.Basic:
 	default:
-		if isReflectValue(t) {
-			// A reflect.Value carries the Mark of what it holds.
+		if isReflectValue(t) || isReflectIter(t) {
+			// A reflect.Value carries the Mark of what it holds, and
+			// a *reflect.MapIter that of the map it ranges over.
 			a.markableCache[t] = true
 			return true
 		}
@@ -152,6 +153,16 @@ func (a *analysis) markable(t types.Type) bool {
 func isReflectValue(t types.Type) bool {
 	n, ok := types.Unalias(t).(*types.Named)
 	return ok && n.Obj().Name() == "Value" && n.Obj().Pkg() != nil && n.Obj().Pkg().Path() == "reflect"
+}
+
+// isReflectIter reports whether t is *reflect.MapIter.
+func isReflectIter(t types.Type) bool {
+	p, ok := types.Unalias(t).(*types.Pointer)
+	if !ok {
+		return false
+	}
+	n, ok := types.Unalias(p.Elem()).(*types.Named)
+	return ok && n.Obj().Name() == "MapIter" && n.Obj().Pkg() != nil && n.Obj().Pkg().Path() == "reflect"
 }
 
 var errorIface = types.Universe.Lookup("error").Type().Underlying().(*types.Interface)
@@ -320,6 +331,21 @@ func (a *analysis) assertable(t types.Type) bool {
 // or location that makes it one, if there is one to name.
 func (a *analysis) isWrapper(t types.Type) bool {
 	ms := a.prog.MethodSets.MethodSet(t)
+	// seen says that the pass scanned every Unwrap, Is and As method of
+	// t: what they can report is then all that errors.Is and errors.As
+	// can find in a value of t.
+	seen := true
+	for i := range ms.Len() {
+		switch ms.At(i).Obj().Name() {
+		case "Unwrap", "Is", "As":
+			fn := a.prog.MethodValue(ms.At(i))
+			if fn == nil {
+				seen = false
+			} else if _, scanned := a.fnIndex[fn]; !scanned {
+				seen = false
+			}
+		}
+	}
 	for i := range ms.Len() {
 		sel := ms.At(i)
 		if sel.Obj().Name() != "Unwrap" {
@@ -359,6 +385,12 @@ func (a *analysis) isWrapper(t types.Type) bool {
 		if a.targetMatches(a.prog.MethodValue(sel)) {
 			return true
 		}
+	}
+	if seen {
+		// A marked value in a field that no Unwrap returns and no Is or
+		// As method reports (the Val of a ValueError{Val any; Err
+		// error}) is not found in the value.
+		return false
 	}
 	base := t
 	if p, ok := t.Underlying().(*types.Pointer); ok {

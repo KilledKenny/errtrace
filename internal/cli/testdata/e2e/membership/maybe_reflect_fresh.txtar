@@ -1,0 +1,42 @@
+A store through reflection into fresh memory (reflect.New) is followed: the Value holds the Sentinel, and what is read back from it does. Nothing is reported as not followed.
+-- args --
+-is example.com/fx.ErrX a.go:@f
+-- stdout --
+$WORK/a.go:13:12-15: example.com/fx.ErrX in Error Set of example.com/fx.Get: maybe: 1 entries could carry it (1 unresolved)
+$WORK/a.go:16:9-30: unresolved(memory): value of TypeAssert not modelled
+	path (origin → target):
+		$WORK/a.go:16:9-30: in example.com/fx.Get
+	marked via (origin of example.com/fx.ErrX → here):
+		$WORK/a.go:9:5-9: Sentinel example.com/fx.ErrX
+		$WORK/a.go:15:24-28: loaded from variable example.com/fx.ErrX
+		$WORK/a.go:15:8-29: passed to reflect.ValueOf, which returns it
+		$WORK/a.go:15:2-30: stored through reflection into the memory made by reflect.New
+		$WORK/a.go:14:7-53: returned by example.com/fx.newValue
+		$WORK/a.go:16:9-22: passed to (reflect.Value).Interface, which returns it
+		$WORK/a.go:16:9-30: type assertion to error
+-- exit --
+3
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"reflect"
+)
+
+var ErrX = errors.New("x")
+
+func newValue(t reflect.Type) reflect.Value { return reflect.New(t).Elem() }
+
+func /*@f*/Get() error {
+	v := newValue(reflect.TypeOf((*error)(nil)).Elem())
+	v.Set(reflect.ValueOf(ErrX))
+	return v.Interface().(error)
+}
+
+func main() { fmt.Println(Get()) }

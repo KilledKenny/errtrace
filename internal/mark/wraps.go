@@ -131,11 +131,14 @@ func (a *analysis) indexCall(site ssa.CallInstruction) {
 			}
 		case modelReflect:
 			res := common.Signature().Results()
+			if reflectBoxes(sc) {
+				a.boxes[call] = true
+			}
 			for _, arg := range common.Args {
 				// A composite argument is not marked itself: what it
 				// holds is looked at when the pass settles (see run).
 				if mi, ok := arg.(*ssa.MakeInterface); ok && !isInterface(mi.X.Type()) && !a.markable(mi.X.Type()) {
-					a.reflectArgs = append(a.reflectArgs, reflectArg{call, mi.X.Type()})
+					a.reflectArgs = append(a.reflectArgs, reflectArg{call: call, typ: mi.X.Type()})
 				}
 				// The reflect.Values of a slice argument are memory.
 				if st, ok := arg.Type().Underlying().(*types.Slice); ok && reflectCarrier(st.Elem()) {
@@ -333,6 +336,7 @@ func (a *analysis) callUse(k key, delta tags, site ssa.CallInstruction) {
 			}
 			if call != nil {
 				a.reflectResults(call, delta, reason{kind: kThrough, from: from, site: site, fn: sc})
+				a.reflectYields(call, sc, delta, from)
 			}
 			// Its body is not followed.
 			return
@@ -397,10 +401,12 @@ func (a *analysis) asTarget(target ssa.Value, from ref, planes tags, site ssa.In
 	}
 }
 
-// reflectArg is a composite value passed to a function of package reflect.
+// reflectArg is a composite value passed to a function of package reflect;
+// done are the planes in which the call's results are marked for it.
 type reflectArg struct {
 	call *ssa.Call
 	typ  types.Type
+	done tags
 }
 
 // sliceAlloc returns the argument array that the slice v is made from, or
@@ -414,10 +420,11 @@ func sliceAlloc(v ssa.Value) *ssa.Alloc {
 }
 
 // reflectCarrier reports whether a result of a function of package
-// reflect can give back what the function was passed: a reflect.Value, or
-// an empty interface (Value.Interface). A reflect.Type or a bool cannot.
+// reflect can give back what the function was passed: a reflect.Value, a
+// *reflect.MapIter (Value.MapRange), or an empty interface
+// (Value.Interface). A reflect.Type or a bool cannot.
 func reflectCarrier(t types.Type) bool {
-	if isReflectValue(t) {
+	if isReflectValue(t) || isReflectIter(t) {
 		return true
 	}
 	if _, isParam := t.(*types.TypeParam); isParam {
@@ -440,6 +447,44 @@ func (a *analysis) reflectResults(call *ssa.Call, t tags, why reason) {
 		}
 		if st, ok := rt.Underlying().(*types.Slice); ok && reflectCarrier(st.Elem()) {
 			a.markLoc(a.typedLoc(st.Elem()), planesOf(t), why)
+		}
+	}
+}
+
+// reflectYields handles the marked reflect.Value that is the receiver of
+// the call of Value.Seq or Value.Seq2: the iterator function it returns
+// passes what the Value holds to the function it is called with (the body
+// of a range statement). The parameters of that function are marked where
+// the iterator is called at once; an iterator that goes anywhere else is
+// not followed.
+func (a *analysis) reflectYields(call *ssa.Call, sc *ssa.Function, delta tags, from ref) {
+	if sc.Signature.Recv() == nil || (sc.Name() != "Seq" && sc.Name() != "Seq2") {
+		return
+	}
+	refs := call.Referrers()
+	if refs == nil {
+		return
+	}
+	for _, r := range *refs {
+		site, ok := r.(ssa.CallInstruction)
+		if !ok || site.Common().Value != ssa.Value(call) {
+			continue
+		}
+		for _, arg := range site.Common().Args {
+			var yield *ssa.Function
+			switch x := arg.(type) {
+			case *ssa.MakeClosure:
+				yield, _ = x.Fn.(*ssa.Function)
+			case *ssa.Function:
+				yield = x
+			}
+			if yield == nil || !a.known(yield) {
+				continue
+			}
+			for _, p := range yield.Params {
+				// As memory: in any calling context.
+				a.mark(key{p, 0}, planesOf(delta), reason{kind: kParam, from: from, site: site, fn: yield})
+			}
 		}
 	}
 }

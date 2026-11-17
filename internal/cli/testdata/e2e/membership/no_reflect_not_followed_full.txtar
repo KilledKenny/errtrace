@@ -1,0 +1,53 @@
+With -full every store through reflection that was not followed is listed.
+-- args --
+-full -is example.com/fx.ErrX a.go:@f
+-- stdout --
+$WORK/a.go:22:12-15: example.com/fx.ErrX in Error Set of example.com/fx.Get: no
+	not followed: example.com/fx.ErrX reaches 7 reflective stores whose destination is unknown:
+		$WORK/a.go:14:13-44: in example.com/fx.s1
+		$WORK/a.go:15:13-44: in example.com/fx.s2
+		$WORK/a.go:16:13-44: in example.com/fx.s3
+		$WORK/a.go:17:13-44: in example.com/fx.s4
+		$WORK/a.go:18:13-44: in example.com/fx.s5
+		$WORK/a.go:19:13-44: in example.com/fx.s6
+		$WORK/a.go:20:13-44: in example.com/fx.s7
+-- exit --
+1
+-- go.mod --
+module example.com/fx
+
+go 1.24
+-- a.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+	"reflect"
+)
+
+var ErrX = errors.New("x")
+
+var slot error
+var dest = reflect.ValueOf(&slot).Elem()
+
+func s1() { dest.Set(reflect.ValueOf(ErrX)) }
+func s2() { dest.Set(reflect.ValueOf(ErrX)) }
+func s3() { dest.Set(reflect.ValueOf(ErrX)) }
+func s4() { dest.Set(reflect.ValueOf(ErrX)) }
+func s5() { dest.Set(reflect.ValueOf(ErrX)) }
+func s6() { dest.Set(reflect.ValueOf(ErrX)) }
+func s7() { dest.Set(reflect.ValueOf(ErrX)) }
+
+func /*@f*/Get() error { return slot }
+
+func main() {
+	s1()
+	s2()
+	s3()
+	s4()
+	s5()
+	s6()
+	s7()
+	fmt.Println(Get())
+}
