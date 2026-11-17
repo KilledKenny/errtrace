@@ -255,9 +255,13 @@ func TestVerdictSoundReflect(t *testing.T) {
 		{fn: "FreshWhole", subject: "is ErrB", wantNo: true},
 		{fn: "FreshField", subject: "is ErrC", wantNo: true},
 		// A store of a value that reflection made of a type chosen at
-		// run time is not one the Subject reaches.
-		{fn: "ReadsMemory", subject: "as *CT8", wantNo: true},
-		{fn: "ReadsMemory", subject: "is ErrE1", wantNo: true},
+		// run time is recorded like any other: it may put a value of the
+		// Subject's type into an interface variable. It cannot matter
+		// to a function that reads no memory.
+		{fn: "ReadsMemory", subject: "as *CT8", wantApart: true},
+		{fn: "ReadsMemory", subject: "is ErrE1", wantApart: true},
+		{fn: "Clean", subject: "as *CT8", wantNo: true},
+		{fn: "Clean", subject: "is ErrE1", wantNo: true},
 		// A store that is not followed cannot matter to a function that
 		// reads no memory; it can to one that reads a field.
 		{fn: "Clean", subject: "is ErrO", wantNo: true},
@@ -285,11 +289,19 @@ func TestVerdictSoundFlood(t *testing.T) {
 		{fn: "MapWhole", subject: "is ErrF5", truth: true, wantApart: true},
 		// The value comes in an argument.
 		{fn: "ArgRoute", subject: "is ErrF6", truth: true, wantApart: true},
+		// A value that reflection makes of a type chosen at run time,
+		// which may equal the Sentinel or have the Concrete Type, stored
+		// by reflection into an interface variable and read back by
+		// typed code.
+		{fn: "MadeSentinel", subject: "is ErrF7", truth: true, wantApart: true},
+		{fn: "MadeConcrete", subject: "as CT8", truth: true, wantApart: true},
 		// A recorded store that cannot matter: the function reads no
 		// memory, or only a variable whose address is never taken.
 		{fn: "Clean", subject: "is ErrF1", wantNo: true},
 		{fn: "QuietVar", subject: "is ErrF1", wantNo: true},
 		{fn: "Clean", subject: "is ErrF5", wantNo: true},
+		{fn: "Clean", subject: "is ErrF7", wantNo: true},
+		{fn: "QuietVar", subject: "as CT8", wantNo: true},
 	})
 }
 

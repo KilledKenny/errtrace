@@ -449,8 +449,9 @@ func NewConcrete() error {
 
 // A decoder stores a value that it makes of a type chosen at run time
 // where the pass cannot tell. Such a value may be of the Subject's type,
-// but it is not the Subject on its way somewhere: the store is not one
-// the Subject reaches.
+// and the variable it is stored into may hold an interface, where no
+// conversion in scanned code marks it again: the store is recorded like
+// any other.
 
 var decTypes = []reflect.Type{reflect.TypeOf(0)}
 var decSlot any

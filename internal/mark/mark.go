@@ -272,15 +272,17 @@
 //     then: it is printed as "no, apart from reflection".
 //
 // Which stores are listed. A store through reflection is recorded if the
-// value stored carries a Mark that comes from X and the pass did not
-// follow the store (all the way). A Mark comes from X unless the value
-// has it only because package reflect made it of a type chosen at run
-// time (reflect.New(t), see Seeds): such a value is not X on its way
-// somewhere, and wherever scanned code converts it to an interface it is
-// marked by its type again. So the stores of a decoder (encoding/json,
-// fmt.Sscan) into what it allocates are not recorded for every Concrete
-// Type Subject. (The pass runs a second time without those seeds to tell
-// the two apart.)
+// value stored carries a Mark and the pass did not follow the store (all
+// the way), whatever the Mark comes from. That includes a value that is
+// marked only because package reflect made it of a type chosen at run
+// time (reflect.New(t), see Seeds): the destination may be an interface
+// variable, and then package reflect converts the value to an interface
+// (Value.Set into an any or error), where no seed of the scanned code
+// marks it again; typed code reads it back with a plain load. So for a
+// Concrete Type Subject, and for a Sentinel whose value may be equal to
+// another value of its type, the stores of every decoder (encoding/json,
+// encoding/gob) into what it allocates are recorded: the pass cannot
+// tell the types they make, nor the type of the variables they fill.
 //
 // Whether the recorded stores can matter to a Target is decided by a
 // flooding pass (Result.Flood), which the Membership Query runs when the
@@ -495,25 +497,7 @@ func RunWith(ctx context.Context, prog *ssa.Program, res Callees, subj Subject, 
 	if err := a.run(ctx); err != nil {
 		return nil, err
 	}
-	r := &Result{a: a, unfollowed: a.unfollowed, ctxRes: res}
-	if len(a.unfollowed) > 0 && a.madeSeeded {
-		// Which of those stores does the Subject itself reach? A value
-		// that is marked only because reflection made it of a type
-		// chosen at run time (it may be equal to the Subject, or have
-		// the Subject's type) is not the Subject on its way somewhere:
-		// wherever it is converted to an interface in scanned code it
-		// is marked by its type again. The stores it reaches (those of
-		// every decoder) are not reported. They are told apart by
-		// running the pass once more without those seeds.
-		b := newAnalysis(prog, res, subj)
-		b.open = a.open
-		b.noMadeSeeds = true
-		if err := b.run(ctx); err != nil {
-			return nil, err
-		}
-		r.unfollowed = b.unfollowed
-	}
-	return r, nil
+	return &Result{a: a, unfollowed: a.unfollowed, ctxRes: res}, nil
 }
 
 // Flood runs the pass again as the flooding pass and returns its
