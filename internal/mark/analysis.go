@@ -176,8 +176,8 @@ const (
 	// locVarargs is the elements of the slices passed to the slice
 	// parameter v of a function that are argument arrays of static
 	// variadic calls (directly, or passed on from parameter to
-	// parameter): memory only that function reads, unless it lets the
-	// slice escape.
+	// parameter): memory only that function reads, unless it, or a
+	// function the slice is passed on to, lets the slice escape.
 	locVarargs
 )
 
@@ -330,11 +330,13 @@ type analysis struct {
 	// varargsParam maps the argument array of a static call of a
 	// variadic function to the locVarargs of the callee's parameter;
 	// forwards are the locVarargs a function passes its own on to
-	// (f(args...)), and vaEsc caches vaEscapes.
+	// (f(args...)), backwards the reverse, vaEsc caches vaEscapes and
+	// passedEsc passedOnEscapes.
 	varargsParam map[*ssa.Alloc]loc
 	forwards     map[loc][]loc
 	backwards    map[loc][]loc
 	vaEsc        map[loc]bool
+	passedEsc    map[loc]bool
 	// taken are the functions used as values, not only called: the
 	// only functions a call of a function value can run.
 	taken map[*ssa.Function]bool
@@ -477,6 +479,7 @@ func newAnalysis(prog *ssa.Program, res Callees, subj Subject) *analysis {
 		forwards:       make(map[loc][]loc),
 		backwards:      make(map[loc][]loc),
 		vaEsc:          make(map[loc]bool),
+		passedEsc:      make(map[loc]bool),
 		taken:          make(map[*ssa.Function]bool),
 		staticSites:    make(map[*ssa.Function][]ssa.CallInstruction),
 		closedMemo:     make(map[loc]int8),

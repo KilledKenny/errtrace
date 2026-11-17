@@ -409,34 +409,63 @@ func (a *analysis) indexStatic() {
 }
 
 // closed reports whether the elements of the slices passed to the slice
-// parameter of l are in no other memory than l: the function only reads
-// the slice (see vaEscapes), every call that may run it can run nothing
-// else, and every such call passes a fresh argument array, nil, or a slice
-// parameter that is closed itself. Loads from such a parameter need not look at the type-keyed
-// memory of the element type.
+// parameter of l are in no other memory than l. That is so if l and every
+// slice parameter whose slice may be passed on to l, directly or through
+// others, are sealed (see sealed): nothing lets the slice out of the
+// functions that receive it, and nothing passes in a slice that is other
+// memory. Loads from such a parameter need not look at the type-keyed
+// memory of the element type. The notion exists for precision only: when
+// in doubt, a parameter is not closed.
 func (a *analysis) closed(l loc) bool {
 	switch a.closedMemo[l] {
-	case 1, 3:
-		// 3: being decided; a cycle of forwarding is closed if the
-		// rest is.
+	case 1:
 		return true
 	case 2:
 		return false
 	}
-	a.closedMemo[l] = 3
-	ok := a.closedNow(l)
-	a.closedMemo[l] = 2
-	if ok {
-		a.closedMemo[l] = 1
+	// The parameters whose slices reach l, l among them. (A cycle of
+	// passing on is closed if all of it is sealed.)
+	seen := map[loc]bool{l: true}
+	work := []loc{l}
+	for len(work) > 0 {
+		cur := work[len(work)-1]
+		work = work[:len(work)-1]
+		if a.closedMemo[cur] == 1 {
+			// Decided, with all that reaches it.
+			continue
+		}
+		from, ok := a.sealed(cur)
+		if a.closedMemo[cur] == 2 || !ok {
+			a.closedMemo[l] = 2
+			return false
+		}
+		for _, f := range from {
+			if !seen[f] {
+				seen[f] = true
+				work = append(work, f)
+			}
+		}
 	}
-	return ok
+	// What reaches one of them reaches l.
+	for s := range seen {
+		a.closedMemo[s] = 1
+	}
+	return true
 }
 
-func (a *analysis) closedNow(l loc) bool {
+// sealed reports whether the slice parameter of l keeps the slices passed
+// to it to itself, as far as its own function and the calls of that
+// function tell: neither the function nor a function the slice is passed
+// on to, however far, lets it escape (see passedOnEscapes); every call
+// that may run the function can run nothing else; and every such call
+// passes a fresh argument array, nil, or a slice parameter of the caller.
+// Those parameters are returned: l is closed only if they are (see
+// closed).
+func (a *analysis) sealed(l loc) (from []loc, ok bool) {
 	p := l.v.(*ssa.Parameter)
 	g := p.Parent()
-	if a.open != nil || a.vaEscapes(l) {
-		return false
+	if a.open != nil || a.passedOnEscapes(l) {
+		return nil, false
 	}
 	idx := -1
 	for i, q := range g.Params {
@@ -445,7 +474,7 @@ func (a *analysis) closedNow(l loc) bool {
 		}
 	}
 	if idx < 0 {
-		return false
+		return nil, false
 	}
 	// (Not a.callers: the scan that orders the call sites is running.)
 	for _, site := range a.res.Callers(g) {
@@ -456,17 +485,17 @@ func (a *analysis) closedNow(l loc) bool {
 			continue
 		}
 		if a.soleCallee(site) != g {
-			return false
+			return nil, false
 		}
 	}
 	if len(a.staticSites[g]) == 0 {
 		// Nothing the pass sees calls it: do not conclude from that.
-		return false
+		return nil, false
 	}
 	for _, site := range a.staticSites[g] {
 		args := site.Common().Args
 		if _, isCall := site.(*ssa.Call); !isCall || len(args) != len(g.Params) {
-			return false
+			return nil, false
 		}
 		arg := args[idx]
 		if c, ok := arg.(*ssa.Const); ok && c.IsNil() {
@@ -477,12 +506,46 @@ func (a *analysis) closedNow(l loc) bool {
 				continue
 			}
 		}
-		if from, ok := sliceParam(arg); ok && a.closed(from) {
+		if f, ok := sliceParam(arg); ok {
+			from = append(from, f)
 			continue
 		}
-		return false
+		return nil, false
 	}
-	return true
+	return from, true
+}
+
+// passedOnEscapes reports whether the slice passed to the slice parameter
+// of l escapes: its function lets it (see vaEscapes), or a function it is
+// passed on to as a slice parameter does (see indexSlices), however far.
+// What such a function does with the slice (copy into it, append to it
+// and keep the result, store or return it) writes or reads the type-keyed
+// memory of the element type, and the elements of l are that memory too.
+func (a *analysis) passedOnEscapes(l loc) bool {
+	if esc, ok := a.passedEsc[l]; ok {
+		return esc
+	}
+	seen := map[loc]bool{l: true}
+	work := []loc{l}
+	for len(work) > 0 {
+		cur := work[len(work)-1]
+		work = work[:len(work)-1]
+		if a.passedEsc[cur] || a.vaEscapes(cur) {
+			a.passedEsc[l] = true
+			return true
+		}
+		for _, to := range a.forwards[cur] {
+			if !seen[to] {
+				seen[to] = true
+				work = append(work, to)
+			}
+		}
+	}
+	// What one of them is passed on to, l is passed on to.
+	for s := range seen {
+		a.passedEsc[s] = false
+	}
+	return false
 }
 
 // indexSlices records, for a call that can only run the function g, which

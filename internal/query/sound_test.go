@@ -146,6 +146,29 @@ func TestVerdictSound(t *testing.T) {
 	})
 }
 
+// TestVerdictSoundSlices does the same for a slice parameter that a
+// function passes on to another, without reflection: the argument array of
+// a variadic call is memory of its own only if no function it reaches
+// lets the slice escape.
+func TestVerdictSoundSlices(t *testing.T) {
+	t.Parallel()
+	runSound(t, "sound_slices.txtar", []soundCase{
+		{fn: "FwdCopy", subject: "is ErrCopy", truth: true},
+		{fn: "FwdAppend", subject: "is ErrAppend", truth: true},
+		{fn: "FwdStored", subject: "is ErrStored", truth: true},
+		{fn: "FwdReturned", subject: "is ErrReturned", truth: true},
+		{fn: "FwdTwice", subject: "is ErrTwice", truth: true},
+		{fn: "FwdCycle", subject: "is ErrCycle", truth: true},
+		{fn: "FwdJoin", subject: "is ErrJoin", truth: true},
+		{fn: "FwdErrorf", subject: "is ErrErrorf", truth: true},
+		{fn: "FwdAny", subject: "is ErrAny", truth: true},
+		// The slice stays with the functions it is passed on to: what
+		// other memory of type error holds is not in it.
+		{fn: "FwdReadOnly", subject: "is ErrPool", wantNo: true},
+		{fn: "FwdElemStore", subject: "is ErrPool", wantNo: true},
+	})
+}
+
 // TestVerdictSoundLibrary does the same for a program without a main
 // package, where the callers are not all loaded.
 func TestVerdictSoundLibrary(t *testing.T) {

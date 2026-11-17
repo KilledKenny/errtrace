@@ -1,0 +1,179 @@
+A whole program, without reflection, in which a function passes its slice
+parameter (the argument array of a variadic call) on to another function.
+What that function does with the slice decides whether the elements are
+memory of their own: where it writes through the slice, keeps it or
+returns it, a Membership Query must not answer "no"; where every function
+the slice reaches only reads it or stores into its elements, the answer
+stays "no" although the Sentinel is in other memory of the element type.
+Each case has a Sentinel of its own. The program prints what errors.Is
+says of each case when it runs.
+-- go.mod --
+module example.com/x
+
+go 1.24
+-- main.go --
+package main
+
+import (
+	"errors"
+	"fmt"
+)
+
+// The callee copies into the slice.
+
+var ErrCopy = errors.New("copy")
+
+func setCopy(s []error) { copy(s, []error{ErrCopy}) }
+
+func copyInto(args ...error) error { setCopy(args); return args[0] }
+
+func FwdCopy() error { return copyInto(nil) }
+
+// It appends to the slice, in place.
+
+var ErrAppend = errors.New("append")
+
+func setAppend(s []error) { _ = append(s[:0], ErrAppend) }
+
+func appendInto(args ...error) error { setAppend(args); return args[0] }
+
+func FwdAppend() error { return appendInto(nil) }
+
+// It keeps the slice, which is written later.
+
+var ErrStored = errors.New("stored")
+
+var saved []error
+
+func keep(s []error) { saved = s }
+
+func storedThen(args ...error) error { keep(args); saved[0] = ErrStored; return args[0] }
+
+func FwdStored() error { return storedThen(nil) }
+
+// It returns the slice.
+
+var ErrReturned = errors.New("returned")
+
+func same(s []error) []error { return s }
+
+func returnedThen(args ...error) error {
+	t := same(args)
+	t[0] = ErrReturned
+	return args[0]
+}
+
+func FwdReturned() error { return returnedThen(nil) }
+
+// The slice is passed on twice before it is written.
+
+var ErrTwice = errors.New("twice")
+
+func twiceB(s []error) { copy(s, []error{ErrTwice}) }
+func twiceA(s []error) { twiceB(s) }
+
+func twiceInto(args ...error) error { twiceA(args); return args[0] }
+
+func FwdTwice() error { return twiceInto(nil) }
+
+// It is passed on in a cycle.
+
+var ErrCycle = errors.New("cycle")
+
+func cycle(s []error, n int) {
+	if n > 0 {
+		cycle(s, n-1)
+		return
+	}
+	copy(s, []error{ErrCycle})
+}
+
+func cycleInto(args ...error) error { cycle(args, 2); return args[0] }
+
+func FwdCycle() error { return cycleInto(nil) }
+
+// The elements are read back by errors.Join and by fmt.Errorf.
+
+var ErrJoin = errors.New("join")
+
+func setJoin(s []error) { copy(s, []error{ErrJoin}) }
+
+func joinAfter(args ...error) error { setJoin(args); return errors.Join(args...) }
+
+func FwdJoin() error { return joinAfter(nil) }
+
+var ErrErrorf = errors.New("errorf")
+
+func setErrorf(s []any) { copy(s, []any{ErrErrorf}) }
+
+func errorfAfter(args ...any) error { setErrorf(args); return fmt.Errorf("%w", args...) }
+
+func FwdErrorf() error { return errorfAfter(nil) }
+
+// A []any.
+
+var ErrAny = errors.New("any")
+
+func setAny(s []any) { copy(s, []any{ErrAny}) }
+
+func anyInto(args ...any) error {
+	setAny(args)
+	e, _ := args[0].(error)
+	return e
+}
+
+func FwdAny() error { return anyInto(nil) }
+
+// Precision: ErrPool is in memory of type error, but not in the argument
+// arrays below, which stay with the functions they are passed on to.
+
+var ErrPool = errors.New("pool")
+
+var pool = []error{ErrPool}
+
+func first(s []error) error { return s[0] }
+func count(s []error) int   { return len(s) }
+
+func readOnly(args ...error) error {
+	if count(args) == 0 {
+		return nil
+	}
+	return first(args)
+}
+
+func FwdReadOnly() error { return readOnly(errors.New("other")) }
+
+func put(s []error, e error) { s[0] = e }
+func relay(s []error) error  { put(s, errors.New("put")); return first(s[:1]) }
+
+func elemStore(args ...error) error {
+	if err := relay(args); err != nil {
+		return err
+	}
+	return args[0]
+}
+
+func FwdElemStore() error { return elemStore(nil) }
+
+func main() {
+	for _, c := range []struct {
+		name string
+		err  error
+		sub  error
+	}{
+		{"FwdCopy ErrCopy", FwdCopy(), ErrCopy},
+		{"FwdAppend ErrAppend", FwdAppend(), ErrAppend},
+		{"FwdStored ErrStored", FwdStored(), ErrStored},
+		{"FwdReturned ErrReturned", FwdReturned(), ErrReturned},
+		{"FwdTwice ErrTwice", FwdTwice(), ErrTwice},
+		{"FwdCycle ErrCycle", FwdCycle(), ErrCycle},
+		{"FwdJoin ErrJoin", FwdJoin(), ErrJoin},
+		{"FwdErrorf ErrErrorf", FwdErrorf(), ErrErrorf},
+		{"FwdAny ErrAny", FwdAny(), ErrAny},
+		{"FwdReadOnly ErrPool", FwdReadOnly(), ErrPool},
+		{"FwdElemStore ErrPool", FwdElemStore(), ErrPool},
+	} {
+		fmt.Println(c.name, errors.Is(c.err, c.sub))
+	}
+	fmt.Println(len(pool))
+}
