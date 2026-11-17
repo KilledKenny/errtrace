@@ -2,7 +2,7 @@
 
 Label: wayfinder:plan
 Map: [errtrace v1 map](./map.md) · Glossary: [GLOSSARY.md](../../GLOSSARY.md)
-Date: 2026-11-09 · Branch: `errtrace-v1` · Module: `github.com/killedKenny/errtrace` (go 1.24.3)
+Date: 2026-11-09 · Branch: `errtrace-v1` · Module: `github.com/KilledKenny/errtrace` (go 1.24.3)
 
 This plan turns the map's destination into ordered build steps. Each step is
 done by a fresh **builder** agent, checked by a **reviewer** agent, and
@@ -160,7 +160,7 @@ update its decision here and in the ticket, and change the affected steps.
 
 ### P10: Project and binary name (ticket 10)
 
-- **Choice.** Keep the module path `github.com/killedKenny/errtrace` for now. The
+- **Choice.** Keep the module path `github.com/KilledKenny/errtrace` for now. The
   binary name lives in **one** constant, `BinaryName = "errtrace"`, in
   `internal/cli/name.go`. All messages, usage text and the stderr prefix use it.
   The command directory is `cmd/errtrace`. A rename means changing the constant
@@ -1491,7 +1491,7 @@ form of a Target (`gopls-io-conventions`, Implication 4). Check the cold-time bu
   paths with dots, such as `gopkg.in/x.v2.Func`).
 - **Manual budget check (the reviewer runs it):** from the repo root, build
   the binary into a scratch directory (`go build -o <scratch>/et ./cmd/errtrace`),
-  then `time <scratch>/et -debug=timing github.com/killedKenny/errtrace/internal/load.Load`
+  then `time <scratch>/et -debug=timing github.com/KilledKenny/errtrace/internal/load.Load`
   completes in under 10 s wall time on the dev machine with a warm Go build cache. Report the phase timings. If it misses the budget,
   record that in P05/P08's "revisit" notes instead of optimising in this step.
 
